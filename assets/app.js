@@ -242,14 +242,18 @@ function render() {
     ? `${list.length} model${list.length === 1 ? "" : "s"}`
     : "";
 
+  // When the team is searching, auto-expand matches so prices show
+  // immediately. While browsing (no query), keep cards collapsed.
+  const expand = els.search.value.trim().length > 0;
+
   const frag = document.createDocumentFragment();
-  for (const m of list) frag.appendChild(card(m));
+  for (const m of list) frag.appendChild(card(m, expand));
   els.results.appendChild(frag);
 }
 
-function card(m) {
+function card(m, expand = false) {
   const el = document.createElement("div");
-  el.className = "card";
+  el.className = "card" + (expand ? " open" : "");
 
   const head = document.createElement("div");
   head.className = "card-head";
