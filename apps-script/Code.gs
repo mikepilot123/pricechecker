@@ -24,7 +24,8 @@
    ============================================================ */
 
 var PIN = "1234"; // <-- CHANGE THIS to your team's private PIN
-var SHEET_NAME = "Repairs";
+var SHEET_GID = 2015067928; // the "repairs" tab you added (found by gid)
+var SHEET_NAME = "Repairs";  // fallback / name used if the tab must be created
 var STATUSES = [
   "Received",
   "Diagnosing",
@@ -80,14 +81,32 @@ function handle(p) {
 
 function getSheet() {
   var ss = SpreadsheetApp.getActive();
-  var sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(HEADERS);
-    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight("bold");
-    sheet.setFrozenRows(1);
+  var sheet = null;
+
+  // Prefer the tab you added, found by its stable gid (case-insensitive,
+  // rename-proof). Fall back to name, then create one if neither exists.
+  var all = ss.getSheets();
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].getSheetId() === SHEET_GID) {
+      sheet = all[i];
+      break;
+    }
   }
+  if (!sheet) sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
+
+  // Ensure the header row exists (your tab was created empty).
+  ensureHeaders(sheet);
   return sheet;
+}
+
+function ensureHeaders(sheet) {
+  var firstCell = String(sheet.getRange(1, 1).getValue()).trim();
+  if (firstCell === HEADERS[0]) return; // already has headers
+  // Empty tab -> write headers in row 1. Tab with other content -> push it down.
+  if (firstCell !== "") sheet.insertRowBefore(1);
+  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight("bold");
+  sheet.setFrozenRows(1);
 }
 
 function listTickets(sheet) {
