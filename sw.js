@@ -1,12 +1,13 @@
 /* Service worker: caches the app shell so it opens offline.
    Prices themselves are always fetched live (and fall back to
    localStorage if the network is down) — handled in app.js. */
-const CACHE = "rpc-shell-v1";
+const CACHE = "rpc-shell-v2";
 const SHELL = [
   "./",
   "./index.html",
   "./assets/style.css",
   "./assets/app.js",
+  "./assets/repairs.js",
   "./manifest.webmanifest",
 ];
 

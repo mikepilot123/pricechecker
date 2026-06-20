@@ -288,3 +288,218 @@ body {
 @media (min-width: 600px) {
   .brand { font-size: 1.35rem; }
 }
+
+/* ---------- View nav ---------- */
+.view-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.nav-btn {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-btn:active { transform: scale(0.98); }
+.nav-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.view[hidden] { display: none; }
+.refresh-btn[data-view][hidden] { display: none; }
+
+/* ---------- Buttons / inputs (shared) ---------- */
+.primary-btn {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+.primary-btn:active { transform: scale(0.98); }
+.primary-btn:hover { filter: brightness(1.08); }
+.primary-btn:disabled { opacity: 0.55; cursor: default; }
+.ghost-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.ghost-btn:hover { background: var(--card-hover); }
+.text-input {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1rem;
+  padding: 11px 13px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.text-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
+}
+.field-label {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin: 0 0 5px 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.field-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 10px 0 0;
+}
+
+/* ---------- Setup card ---------- */
+.setup-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  margin-top: 6px;
+}
+.setup-title { margin: 0 0 6px; font-size: 1.1rem; }
+.setup-sub { margin: 0 0 16px; font-size: 0.85rem; color: var(--text-dim); }
+.setup-card .field-label { margin-top: 12px; }
+.setup-card .primary-btn { width: 100%; margin-top: 16px; }
+
+/* ---------- Repairs toolbar ---------- */
+.repairs-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.repairs-toolbar .primary-btn { flex: 1; }
+
+/* ---------- Repair form ---------- */
+.repair-form {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.form-field-full { grid-column: 1 / -1; }
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+@media (max-width: 460px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+/* ---------- Ticket cards ---------- */
+.ticket {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.ticket-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  cursor: pointer;
+}
+.ticket-head:hover { background: var(--card-hover); }
+.ticket-main { min-width: 0; }
+.ticket-device { font-size: 1rem; font-weight: 600; }
+.ticket-client {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-badge {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.ticket-body {
+  display: none;
+  padding: 4px 15px 15px;
+  border-top: 1px solid var(--border);
+}
+.ticket.open .ticket-body { display: block; }
+.ticket-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.ticket-row .k { color: var(--text-dim); }
+.ticket-row .v { text-align: right; font-weight: 600; }
+.ticket-actions { margin-top: 14px; }
+.status-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+.status-set {
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.status-set:hover { background: var(--card-hover); color: var(--text); }
+.status-set.current { border-color: var(--accent); color: var(--text); }
+.ticket-edit-btn { margin-top: 12px; }
+
+.repair-loading {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  padding: 30px 0;
+}
+
+/* Status colour map */
+.st-received   { background: rgba(79,140,255,0.18); color: #8db5ff; }
+.st-diagnosing { background: rgba(159,122,234,0.18); color: #c4a9f5; }
+.st-approval   { background: rgba(245,166,35,0.18);  color: #f5c777; }
+.st-progress   { background: rgba(69,212,131,0.16);  color: #6fe0a3; }
+.st-parts      { background: rgba(245,166,35,0.18);  color: #f5c777; }
+.st-ready      { background: rgba(69,212,131,0.22);  color: #45d483; }
+.st-collected  { background: rgba(154,167,189,0.18); color: #b6c2d6; }
+.st-cancelled  { background: rgba(255,107,107,0.18); color: #ff9b9b; }

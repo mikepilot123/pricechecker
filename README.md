@@ -61,6 +61,45 @@ const TABS = [
 
 ---
 
+---
+
+## Repairs — logging client devices & tracking status
+
+The **Repairs** tab lets the team log a client's device and move it through
+statuses (Received → Diagnosing → Awaiting Approval → In Progress → Awaiting
+Parts → Ready for Pickup → Collected / Cancelled).
+
+Tickets are stored in a **private `Repairs` tab of the same spreadsheet** — so
+client names and phone numbers are **never** in the public pricelist. A small
+Google Apps Script (runs as you) does the reading/writing; the app talks to it
+over a PIN-protected URL.
+
+> **Privacy:** the script URL + PIN are entered once per device and saved only
+> in that browser — they are **not** committed to this public repo. Do **not**
+> "Publish to web" the `Repairs` tab.
+
+### One-time setup (~3 minutes)
+
+1. Open the Google Sheet → **Extensions → Apps Script**.
+2. Delete the sample code, paste the contents of
+   [`apps-script/Code.gs`](apps-script/Code.gs).
+3. Change `var PIN = "1234"` to a private team PIN.
+4. **Deploy → New deployment → Web app**:
+   - *Execute as:* **Me**
+   - *Who has access:* **Anyone**
+   - Deploy, authorise, and **copy the Web app URL** (ends in `/exec`).
+5. In the app: open **🛠️ Repairs**, paste the URL + PIN, tap **Save & connect**.
+
+Each team member pastes the same URL + PIN once on their own device. The
+`Repairs` tab is created automatically on first use.
+
+### Updating the script later
+
+Edit `Code.gs` in the Apps Script editor, then **Deploy → Manage deployments →
+edit → Version: New version**. The URL stays the same.
+
+---
+
 ## Tech
 
 Plain HTML/CSS/JS — **no build step, no dependencies**. Just static files
@@ -68,9 +107,11 @@ served by GitHub Pages. Includes a PWA manifest + service worker so it can be
 installed to a home screen and opened offline.
 
 ```
-index.html                 # markup
+index.html                 # markup (Prices + Repairs views)
 assets/style.css           # styling (mobile-first, dark theme)
-assets/app.js              # CSV fetch + parse + search/filter UI
+assets/app.js              # price list: CSV fetch + parse + search/filter
+assets/repairs.js          # repairs: ticket log + status tracking UI
+apps-script/Code.gs        # Google Apps Script backend for repairs
 manifest.webmanifest       # installable PWA
 sw.js                      # offline app shell
 ```
