@@ -345,23 +345,27 @@
 
     const head = document.createElement("div");
     head.className = "ticket-head";
+    const hasPhone = !!t.phone;
     head.innerHTML = `
       <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
       <div class="ticket-main">
-        <div class="ticket-device">${esc(t.device || "—")}</div>
-        <div class="ticket-issue">${esc(t.customerName || "Unknown customer")} · ${esc(t.issue || "")}</div>
+        <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
+        <div class="ticket-sub">${esc(t.device || "—")} · ${esc(t.issue || "")}</div>
       </div>
+      <a class="ticket-call${hasPhone ? "" : " disabled"}" href="${hasPhone ? `tel:${esc(t.phone)}` : "#"}" title="${hasPhone ? "Call " + esc(t.customerName || "customer") : "No phone on file"}" aria-label="Call customer">📞</a>
       <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>`;
+    head.querySelector(".ticket-call").onclick = (e) => e.stopPropagation();
 
     const body = document.createElement("div");
     body.className = "ticket-body";
     body.innerHTML = `
-      <div class="ticket-row"><span class="k">Ticket</span><span class="v">${esc(t.id || "")}</span></div>
+      <div class="ticket-row"><span class="k">Ticket</span><span class="v mono">${esc(t.id || "")}</span></div>
       <div class="ticket-row"><span class="k">Customer</span><span class="v">${esc(t.customerName || "—")}</span></div>
       <div class="ticket-row"><span class="k">Phone</span><span class="v">${t.phone ? `<a class="ticket-tel" href="tel:${esc(t.phone)}">${esc(t.phone)}</a>` : "—"}</span></div>
+      <div class="ticket-row"><span class="k">Device</span><span class="v">${esc(t.device || "—")}</span></div>
       <div class="ticket-row"><span class="k">Issue</span><span class="v">${esc(t.issue || "—")}</span></div>
-      <div class="ticket-row"><span class="k">Logged</span><span class="v">${esc(fmtDate(t.created))}</span></div>
-      <div class="ticket-row"><span class="k">Updated</span><span class="v">${esc(fmtDate(t.updated))}</span></div>
+      <div class="ticket-row"><span class="k">Logged</span><span class="v mono">${esc(fmtDate(t.created))}</span></div>
+      <div class="ticket-row"><span class="k">Updated</span><span class="v mono">${esc(fmtDate(t.updated))}</span></div>
       ${t.notes ? `<div class="ticket-row"><span class="k">Notes</span><span class="v">${esc(t.notes)}</span></div>` : ""}
       <div class="ticket-actions">
         <div class="field-label">Set status</div>
