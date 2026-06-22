@@ -147,6 +147,9 @@ async function loadData({ manual = false } = {}) {
       if (b.length > banner.length) banner = b; // keep the richest info line
     }
     MODELS = all;
+    // Expose model names so the Intake form can autosuggest devices.
+    window.RPC_MODEL_NAMES = all.map((m) => m.name.trim());
+    window.dispatchEvent(new Event("rpc-models"));
     infoLines = banner;
     lastFetchTime = Date.now();
     persistCache();
