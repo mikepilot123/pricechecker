@@ -483,7 +483,6 @@ body {
 }
 .issue-select-btn:hover { background: var(--card-hover); }
 .issue-select-btn.has-selection #issueSelectLabel,
-.issue-select-btn.has-selection #clientSelectLabel,
 .issue-select-btn.has-selection { color: var(--text); }
 .issue-select-chevron { color: var(--text-dim); font-size: 1.1rem; }
 

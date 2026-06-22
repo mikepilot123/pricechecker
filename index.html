@@ -127,14 +127,15 @@
       <div class="modal-body">
         <form id="intakeForm" autocomplete="off">
           <div class="form-section-label">Customer</div>
-          <div class="form-field form-field-full">
-            <label class="field-label">Customer *</label>
-            <button type="button" id="openClientModal" class="issue-select-btn">
-              <span id="clientSelectLabel">Select customer…</span>
-              <span class="issue-select-chevron">›</span>
-            </button>
-            <input id="fName" type="hidden" />
-            <input id="fPhone" type="hidden" />
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="fName">Name *</label>
+              <input id="fName" class="text-input" required placeholder="e.g. Anita Singh" />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="fPhone">Phone *</label>
+              <input id="fPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
+            </div>
           </div>
 
           <div class="form-section-label">Device</div>
@@ -175,8 +176,7 @@
     </div>
   </div>
 
-  <!-- Customer info modal: picks the customer for the device form, or
-       quick-edits a ticket's customer details from its card -->
+  <!-- Customer info modal: quick-edits a ticket's customer details from its card -->
   <div id="clientModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="clientModalTitle">
       <div class="modal-header">
@@ -192,7 +192,7 @@
           <label class="field-label" for="cPhone">Phone *</label>
           <input id="cPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
         </div>
-        <div class="form-field" id="cNotesField" hidden>
+        <div class="form-field" id="cNotesField">
           <label class="field-label" for="cNotes">Notes</label>
           <textarea id="cNotes" class="text-input" rows="2" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
         </div>
