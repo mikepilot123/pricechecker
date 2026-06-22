@@ -8,13 +8,17 @@
  *  4. Deploy -> New deployment -> type "Web app".
  *     - Execute as: Me
  *     - Who has access: Anyone
- *  5. Copy the /exec URL it gives you.
- *  6. In the app's Intake tab, paste that URL + the PIN (one-time, per device).
+ *  5. Copy the /exec URL it gives you and set it as SCRIPT_URL at the
+ *     top of assets/intake.js.
  *
  * Stores customer name + phone for staff to contact about pickup. Since
- * this sheet now holds personal info, unpublish it from "Publish to web"
- * if it's currently published — the app never reads the public CSV, only
- * this PIN-gated script, so publishing it serves no purpose here.
+ * this sheet now holds personal info, it must stay unpublished (no
+ * "Publish to web", no "Anyone with the link") — the app only ever talks
+ * to this PIN-gated script, never a public CSV.
+ *
+ * Every status/issue/device/notes change is appended to a History column
+ * as a timestamped log line, so the team can see the full timeline of
+ * what happened to a device, not just its current state.
  */
 
 var PIN = "1234"; // <-- CHANGE THIS to your team's private PIN
@@ -35,9 +39,10 @@ var HEADERS = [
   "Customer Name",
   "Phone",
   "Device",
-  "Issue",
+  "Issues",
   "Status",
   "Notes",
+  "History",
   "Last Updated",
 ];
 
@@ -87,7 +92,17 @@ function getSheet() {
 
 function ensureHeaders(sheet) {
   var firstCell = String(sheet.getRange(1, 1).getValue()).trim();
-  if (firstCell === HEADERS[0]) return;
+  if (firstCell === HEADERS[0]) {
+    // Already set up — but make sure the History column exists for
+    // sheets created before this column was added.
+    var lastCol = sheet.getLastColumn();
+    var existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    if (existing.indexOf("History") === -1) {
+      sheet.insertColumnBefore(lastCol); // before "Last Updated"
+      sheet.getRange(1, lastCol).setValue("History").setFontWeight("bold");
+    }
+    return;
+  }
   if (firstCell !== "") sheet.insertRowBefore(1);
   sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight("bold");
   sheet.setFrozenRows(1);
@@ -115,27 +130,34 @@ function rowToTicket(row, rowNum) {
     customerName: row[2],
     phone: row[3],
     device: row[4],
-    issue: row[5],
+    issues: row[5],
     status: row[6],
     notes: row[7],
-    updated: toIso(row[8]),
+    history: row[8],
+    updated: toIso(row[9]),
     _row: rowNum,
   };
+}
+
+function historyLine(msg) {
+  return "[" + new Date().toISOString() + "] " + msg;
 }
 
 function addTicket(sheet, p) {
   var id = "T" + Date.now().toString(36).toUpperCase();
   var now = new Date();
   var status = STATUSES.indexOf(p.status) >= 0 ? p.status : "Received";
+  var history = historyLine("Logged — " + status);
   sheet.appendRow([
     id,
     now,
     p.customerName || "",
     p.phone || "",
     p.device || "",
-    p.issue || "",
+    p.issues || "",
     status,
     p.notes || "",
+    history,
     now,
   ]);
   return rowToTicket([
@@ -144,9 +166,10 @@ function addTicket(sheet, p) {
     p.customerName || "",
     p.phone || "",
     p.device || "",
-    p.issue || "",
+    p.issues || "",
     status,
     p.notes || "",
+    history,
     now,
   ]);
 }
@@ -168,13 +191,23 @@ function updateTicket(sheet, p) {
   var customerName = p.customerName != null ? p.customerName : current[2];
   var phone = p.phone != null ? p.phone : current[3];
   var device = p.device != null ? p.device : current[4];
-  var issue = p.issue != null ? p.issue : current[5];
+  var issues = p.issues != null ? p.issues : current[5];
   var status = STATUSES.indexOf(p.status) >= 0 ? p.status : current[6];
   var notes = p.notes != null ? p.notes : current[7];
   var now = new Date();
 
-  sheet.getRange(rowNum, 3, 1, 7).setValues([[customerName, phone, device, issue, status, notes, now]]);
-  return rowToTicket([current[0], current[1], customerName, phone, device, issue, status, notes, now]);
+  // Build history entries for whatever actually changed.
+  var lines = [];
+  if (status !== current[6]) lines.push(historyLine("Status: " + current[6] + " → " + status));
+  if (device !== current[4]) lines.push(historyLine("Device updated to " + device));
+  if (issues !== current[5]) lines.push(historyLine("Issues updated: " + (issues || "—")));
+  if (notes !== current[7]) lines.push(historyLine("Notes updated"));
+  var history = current[8] || "";
+  if (lines.length) history = (history ? history + "\n" : "") + lines.join("\n");
+
+  sheet.getRange(rowNum, 3, 1, 7).setValues([[customerName, phone, device, issues, status, notes, history]]);
+  sheet.getRange(rowNum, 10, 1, 1).setValue(now);
+  return rowToTicket([current[0], current[1], customerName, phone, device, issues, status, notes, history, now]);
 }
 
 function toIso(v) {

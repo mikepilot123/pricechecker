@@ -116,15 +116,10 @@
               <select id="fStatus" class="text-input select-input"></select>
             </div>
           </div>
-          <div class="form-field">
-            <label class="field-label" for="fIssue">Issue *</label>
-            <div class="select-wrap">
-              <select id="fIssue" class="text-input select-input" required></select>
-            </div>
-          </div>
-          <div class="form-field" id="fIssueOtherWrap" hidden>
-            <label class="field-label" for="fIssueOther">Describe issue *</label>
-            <input id="fIssueOther" class="text-input" placeholder="Describe the issue" />
+          <div class="form-field form-field-full">
+            <label class="field-label">Issues * <span class="field-hint">(select all that apply)</span></label>
+            <div id="issueTags" class="issue-tags"></div>
+            <input id="fIssueOther" class="text-input issue-other-input" hidden placeholder="Describe the other issue" />
           </div>
           <div class="form-field form-field-full">
             <label class="field-label" for="fNotes">Notes</label>

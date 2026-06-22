@@ -414,6 +414,53 @@ body {
   font-size: 0.85rem;
   margin: 10px 0 0;
 }
+.field-hint {
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+/* ---------- Issue tags: multi-select toggle chips ---------- */
+.issue-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.issue-toggle {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.issue-toggle:hover { background: var(--card-hover); }
+.issue-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.issue-other-input { margin-top: 10px; }
+
+/* Read-only issue chips shown on a ticket card */
+.issue-tags-readonly { margin-top: 6px; }
+.issue-chip {
+  display: inline-block;
+  background: var(--bg-soft);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin: 0 6px 6px 0;
+}
+.issue-chip.muted { color: var(--text-dim); font-weight: 500; background: none; border-style: dashed; }
 
 /* ---------- Setup card ---------- */
 .setup-card {
@@ -505,7 +552,7 @@ body {
 .ticket-head {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   padding: 13px 15px 13px 19px;
@@ -522,6 +569,19 @@ body {
   background: var(--dot, var(--accent));
 }
 .ticket-main { min-width: 0; flex: 1; }
+.ticket-toprow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.ticket-num {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
 .ticket-customer {
   font-size: 1rem;
   font-weight: 700;
@@ -549,6 +609,7 @@ body {
   text-decoration: none;
   font-size: 1.05rem;
   transition: background 0.15s, transform 0.1s;
+  margin-top: 1px;
 }
 .ticket-call:hover { background: #dde6fb; }
 .ticket-call:active { transform: scale(0.92); }
@@ -639,6 +700,29 @@ body {
 
 /* ---------- Mono utility (ticket IDs, PIN dots) ---------- */
 .mono { font-family: var(--font-mono); }
+
+/* ---------- Activity log (history timeline) ---------- */
+.history-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.history-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: 5px;
+}
+.history-msg { font-size: 0.88rem; font-weight: 600; }
+.history-when { font-size: 0.72rem; color: var(--text-dim); margin-top: 1px; }
 
 /* Subtle interaction polish */
 .text-input, .primary-btn, .ghost-btn, .chip, .nav-btn {

@@ -63,11 +63,17 @@ const TABS = [
 
 ## Intake — logging devices & repair status
 
-The **Intake** tab lets the team log a customer's device + issue and track
-status through the repair pipeline: `Received → Diagnosing → Waiting for
-Parts → In Progress → Repaired → Picked Up` (or `Cancelled`). It captures
-Customer Name, Phone, Device, Issue (preset dropdown + "Other"), Status, and
-Notes.
+The **Intake** tab lets the team log a customer's device, pick **one or
+more issues** (tag-style multi-select, plus "Other" for anything not
+listed), and track status through the repair pipeline: `Received →
+Diagnosing → Waiting for Parts → In Progress → Repaired → Picked Up` (or
+`Cancelled`). Every status change, device edit, or issue update is appended
+to that ticket's **activity log** — visible on the card — so there's a full
+timeline of what happened, not just the current state.
+
+It captures Customer Name, Phone, Device, Issues, Status, and Notes. The
+call button on each card dials the customer directly (`tel:` link) using
+the phone number captured at intake.
 
 Data is stored in a separate, dedicated Google Sheet ("JQ Reapirs"), written
 to only through a PIN-gated Apps Script — never read as a public CSV.
@@ -97,6 +103,12 @@ only the PIN is entered by staff.
    you redeploy to a new URL — the current one is already set).
 6. In the app, open the **Intake** tab — staff just enter the PIN once per
    device; it's remembered locally after that (never uploaded or committed).
+
+If you already had an earlier version of `Code.gs` deployed (before the
+Issues/History columns existed), just re-paste the updated script over the
+old one and use **Manage deployments → Edit → New version** — no need for a
+new URL. It auto-adds the `History` column to the existing sheet the first
+time it runs.
 
 The PIN is the only access control on this endpoint — anyone with it can
 read every logged ticket (including customer name/phone) or write new ones.
