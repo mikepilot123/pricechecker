@@ -237,14 +237,6 @@ body {
   margin: 0 0 10px 2px;
 }
 .results { display: flex; flex-direction: column; gap: 10px; }
-#results {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-@media (min-width: 620px) {
-  #results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 .view-more-btn {
   grid-column: 1 / -1;
   display: inline-flex;

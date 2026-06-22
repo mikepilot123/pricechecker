@@ -15,7 +15,6 @@ const TABS = [
 
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // every 5 minutes
 const CACHE_KEY = "rpc_cache_v1";
-const MODEL_PAGE_SIZE = 18;
 
 // Section labels in the sheet that are dividers, not real models.
 const SECTION_RE = /(series|^table\d*$)/i;
@@ -42,7 +41,6 @@ let infoLines = [];       // standing info banner text
 let activeBrand = "all";
 let lastFetchTime = null;
 let tickTimer = null;
-let visibleModelCount = MODEL_PAGE_SIZE;
 
 // --- CSV parsing ------------------------------------------------------------
 // Robust CSV -> array of rows (handles quoted fields, commas, newlines).
@@ -149,7 +147,6 @@ async function loadData({ manual = false } = {}) {
       if (b.length > banner.length) banner = b; // keep the richest info line
     }
     MODELS = all;
-    visibleModelCount = MODEL_PAGE_SIZE;
     // Expose model names so the Intake form can autosuggest devices.
     window.RPC_MODEL_NAMES = all.map((m) => m.name.trim());
     window.dispatchEvent(new Event("rpc-models"));
@@ -220,7 +217,6 @@ function buildChips() {
     btn.textContent = labels[b] || b;
     btn.onclick = () => {
       activeBrand = b;
-      visibleModelCount = MODEL_PAGE_SIZE;
       [...els.chips.children].forEach((c) => c.classList.remove("active"));
       btn.classList.add("active");
       render();
@@ -240,14 +236,13 @@ function currentFilter() {
 
 function render() {
   const list = currentFilter();
-  const visible = list.slice(0, visibleModelCount);
   els.clearSearch.hidden = !els.search.value;
   els.results.innerHTML = "";
   els.empty.hidden = list.length > 0;
   els.error.hidden = true;
 
   els.count.textContent = list.length
-    ? `Showing ${visible.length} of ${list.length} model${list.length === 1 ? "" : "s"}`
+    ? `${list.length} model${list.length === 1 ? "" : "s"}`
     : "";
 
   // When the team is searching, auto-expand matches so prices show
@@ -255,18 +250,7 @@ function render() {
   const expand = els.search.value.trim().length > 0;
 
   const frag = document.createDocumentFragment();
-  for (const m of visible) frag.appendChild(card(m, expand));
-  if (visible.length < list.length) {
-    const more = document.createElement("button");
-    const remaining = list.length - visible.length;
-    more.className = "view-more-btn";
-    more.innerHTML = `View ${Math.min(MODEL_PAGE_SIZE, remaining)} more <span aria-hidden="true">↓</span>`;
-    more.onclick = () => {
-      visibleModelCount += MODEL_PAGE_SIZE;
-      render();
-    };
-    frag.appendChild(more);
-  }
+  for (const m of list) frag.appendChild(card(m, expand));
   els.results.appendChild(frag);
 }
 
@@ -378,13 +362,9 @@ function showSkeleton() {
 }
 
 // --- Wire up events ---------------------------------------------------------
-els.search.addEventListener("input", () => {
-  visibleModelCount = MODEL_PAGE_SIZE;
-  render();
-});
+els.search.addEventListener("input", render);
 els.clearSearch.addEventListener("click", () => {
   els.search.value = "";
-  visibleModelCount = MODEL_PAGE_SIZE;
   els.search.focus();
   render();
 });
