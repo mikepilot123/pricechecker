@@ -339,7 +339,6 @@
     $("intakeFormTitle").textContent = ticket ? "Edit device" : "Log device";
     $("fName").value = ticket ? ticket.customerName || "" : "";
     $("fPhone").value = ticket ? ticket.phone || "" : "";
-    updateClientSelectLabel();
     $("fDevice").value = ticket ? ticket.device || "" : "";
     $("fStatus").value = ticket ? ticket.status || "Received" : "Received";
     $("fNotes").value = ticket ? ticket.notes || "" : "";
@@ -348,7 +347,7 @@
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
     $("intakeFormModal").hidden = false;
-    $("openClientModal").focus();
+    $("fName").focus();
   }
   function closeForm() {
     $("intakeFormModal").hidden = true;
@@ -366,38 +365,14 @@
   });
 
   // ---- Customer info modal --------------------------------------------------
-  // Picks the customer for the device form (mode "form"), or quick-edits a
-  // ticket's customer details straight from its card (mode "ticket").
-  let clientModalMode = null;
+  // Quick-edits a ticket's customer details straight from its card.
   let clientModalTicket = null;
 
-  function updateClientSelectLabel() {
-    const name = $("fName").value.trim();
-    const phone = $("fPhone").value.trim();
-    $("clientSelectLabel").textContent = name ? `${name}${phone ? " • " + phone : ""}` : "Select customer…";
-    $("openClientModal").classList.toggle("has-selection", !!name);
-  }
-
-  function openClientModalForForm() {
-    clientModalMode = "form";
-    clientModalTicket = null;
-    $("clientModalTitle").textContent = "Customer info";
-    $("cName").value = $("fName").value;
-    $("cPhone").value = $("fPhone").value;
-    $("cNotesField").hidden = true;
-    $("saveClientModal").textContent = "Done";
-    $("clientModalError").hidden = true;
-    $("clientModal").hidden = false;
-    $("cName").focus();
-  }
-
   function openClientModalForTicket(ticket) {
-    clientModalMode = "ticket";
     clientModalTicket = ticket;
     $("clientModalTitle").textContent = "Update customer";
     $("cName").value = ticket.customerName || "";
     $("cPhone").value = ticket.phone || "";
-    $("cNotesField").hidden = false;
     $("cNotes").value = ticket.notes || "";
     $("saveClientModal").textContent = "Save";
     $("clientModalError").hidden = true;
@@ -407,11 +382,9 @@
 
   function closeClientModal() {
     $("clientModal").hidden = true;
-    clientModalMode = null;
     clientModalTicket = null;
   }
 
-  $("openClientModal").addEventListener("click", openClientModalForForm);
   $("closeClientModal").addEventListener("click", closeClientModal);
   $("clientModal").addEventListener("click", (e) => {
     if (e.target.id === "clientModal") closeClientModal();
@@ -428,14 +401,6 @@
     if (!name || !phone) {
       err.textContent = "Enter the customer's name and phone.";
       err.hidden = false;
-      return;
-    }
-
-    if (clientModalMode === "form") {
-      $("fName").value = name;
-      $("fPhone").value = phone;
-      updateClientSelectLabel();
-      closeClientModal();
       return;
     }
 
@@ -477,7 +442,7 @@
     const err = $("formError");
     err.hidden = true;
     if (!$("fName").value.trim() || !$("fPhone").value.trim()) {
-      err.textContent = "Select the customer first.";
+      err.textContent = "Enter the customer's name and phone.";
       err.hidden = false;
       return;
     }
