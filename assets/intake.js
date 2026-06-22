@@ -109,7 +109,7 @@
       const res = await api({ action: "list" }, { url: SCRIPT_URL, pin });
       if (!res.ok) throw new Error(res.error || "Rejected");
       localStorage.setItem(LS_PIN, pin);
-      TICKETS = res.tickets || [];
+      TICKETS = (res.tickets || []).map(normalizeTicket);
       loadedOnce = true;
       showMain();
       renderStatusChips();
@@ -159,7 +159,7 @@
     try {
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
-      TICKETS = res.tickets || [];
+      TICKETS = (res.tickets || []).map(normalizeTicket);
       loadedOnce = true;
       renderStatusChips();
       render();
@@ -176,6 +176,24 @@
 
   $("reloadIntake").addEventListener("click", loadTickets);
   $("intakeSettings").addEventListener("click", () => showSetup(true));
+  $("clearIntake").addEventListener("click", clearAllTickets);
+
+  async function clearAllTickets() {
+    const count = TICKETS.length;
+    if (!count) return;
+    if (!window.confirm(`Delete all ${count} intake record${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    if (!window.confirm("Final confirmation: permanently delete every intake record?")) return;
+    try {
+      const res = await api({ action: "clear" });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TICKETS = [];
+      statusFilter = "all";
+      renderStatusChips();
+      render();
+    } catch (e) {
+      alert("Couldn't clear intake records: " + e.message);
+    }
+  }
 
   // ---- Form ------------------------------------------------------------------
   populateStatusSelect();
@@ -320,9 +338,13 @@
       action: editingId ? "update" : "add",
       id: editingId || undefined,
       customerName: $("fName").value.trim(),
+      // Older deployed backends used `client`; send both names so a
+      // frontend update never silently drops customer details.
+      client: $("fName").value.trim(),
       phone: $("fPhone").value.trim(),
       device: $("fDevice").value.trim(),
       issues: issuesStr,
+      issue: issuesStr,
       status: $("fStatus").value,
       notes: $("fNotes").value.trim(),
     };
@@ -347,6 +369,7 @@
 
   function mergeTicket(t) {
     if (!t) return;
+    t = normalizeTicket(t);
     const i = TICKETS.findIndex((x) => x.id === t.id);
     if (i >= 0) TICKETS[i] = t;
     else TICKETS.unshift(t);
@@ -359,8 +382,12 @@
         action: "update",
         id: ticket.id,
         status,
+        customerName: ticket.customerName,
+        client: ticket.customerName,
+        phone: ticket.phone,
         device: ticket.device,
         issues: ticket.issues,
+        issue: ticket.issues,
         notes: ticket.notes,
       });
       if (!res.ok) throw new Error(res.error || "Rejected");
@@ -369,6 +396,20 @@
       render();
     } catch (e) {
       alert("Couldn't update status: " + e.message);
+    }
+  }
+
+  async function deleteTicket(ticket) {
+    const label = ticket.customerName || ticket.device || "this record";
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    try {
+      const res = await api({ action: "delete", id: ticket.id });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TICKETS = TICKETS.filter((t) => t.id !== ticket.id);
+      renderStatusChips();
+      render();
+    } catch (e) {
+      alert("Couldn't delete record: " + e.message);
     }
   }
 
@@ -474,7 +515,8 @@
       <div class="ticket-actions">
         <div class="field-label">Set status</div>
         <div class="status-buttons"></div>
-        <button class="ghost-btn ticket-edit-btn">✎ Edit details</button>
+        <button class="ghost-btn ticket-edit-btn">${t.customerName ? "✎ Edit details" : "+ Add client info"}</button>
+        <button class="ghost-btn ticket-delete-btn">Delete record</button>
       </div>
       <div class="ticket-actions">
         <div class="field-label">Activity log</div>
@@ -496,6 +538,10 @@
       e.stopPropagation();
       openForm(t);
     };
+    body.querySelector(".ticket-delete-btn").onclick = (e) => {
+      e.stopPropagation();
+      deleteTicket(t);
+    };
 
     head.onclick = () => el.classList.toggle("open");
     el.appendChild(head);
@@ -512,6 +558,16 @@
   fillModelList();
 
   // ---- Helpers -------------------------------------------------------------
+  // The original Apps Script API returned `client` and `issue`. The current
+  // API returns `customerName` and `issues`. Normalize both versions at the
+  // boundary so existing tickets keep their caller details on the dashboard.
+  function normalizeTicket(ticket) {
+    return Object.assign({}, ticket, {
+      customerName: ticket.customerName || ticket.client || "",
+      issues: ticket.issues || ticket.issue || "",
+    });
+  }
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])

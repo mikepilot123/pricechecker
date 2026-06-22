@@ -702,6 +702,8 @@ body {
 .status-set:hover { background: var(--card-hover); color: var(--text); }
 .status-set.current { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .ticket-edit-btn { margin-top: 12px; }
+.ticket-delete-btn { margin-top: 12px; margin-left: 8px; color: var(--danger); }
+.danger-btn { color: var(--danger); }
 
 .repair-loading {
   text-align: center;
