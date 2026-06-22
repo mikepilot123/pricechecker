@@ -1,7 +1,12 @@
-/* Service worker: caches the app shell so it opens offline.
-   Prices themselves are always fetched live (and fall back to
-   localStorage if the network is down) — handled in app.js. */
-const CACHE = "rpc-shell-v8";
+/* Service worker.
+   Strategy: NETWORK-FIRST for the app's own files (HTML/CSS/JS) so a new
+   deploy shows up automatically the next time the device is online — no
+   manual hard-refresh needed. The cache is only a fallback for when the
+   network is unavailable, so the app still opens offline.
+
+   Google Sheet requests are never touched here — prices/intake always go
+   straight to the network (with their own localStorage fallback in app.js). */
+const CACHE = "rpc-shell-v9";
 const SHELL = [
   "./",
   "./index.html",
@@ -24,11 +29,22 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  const url = new URL(e.request.url);
-  // Never cache the Google Sheet — always go to network for live prices.
-  if (url.hostname.includes("google")) return;
-  // App shell: cache-first, fall back to network.
+  const req = e.request;
+  const url = new URL(req.url);
+
+  // Only handle our own GET requests; let everything else (Google Sheet,
+  // fonts, POSTs to Apps Script, etc.) go straight to the network.
+  if (req.method !== "GET" || url.origin !== self.location.origin) return;
+
+  // Network-first: try the live file, cache a fresh copy, and only fall
+  // back to the cached copy if the network is unreachable.
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request))
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(req).then((hit) => hit || caches.match("./index.html")))
   );
 });
