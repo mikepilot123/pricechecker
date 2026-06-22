@@ -70,6 +70,8 @@ function handle(p) {
     if (action === "list") return json({ ok: true, tickets: listTickets(sheet) });
     if (action === "add") return json({ ok: true, ticket: addTicket(sheet, p) });
     if (action === "update") return json({ ok: true, ticket: updateTicket(sheet, p) });
+    if (action === "delete") return json({ ok: true, deletedId: deleteTicket(sheet, p) });
+    if (action === "clear") return json({ ok: true, deletedCount: clearTickets(sheet) });
     return json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -92,18 +94,33 @@ function getSheet() {
 
 function ensureHeaders(sheet) {
   var firstCell = String(sheet.getRange(1, 1).getValue()).trim();
-  if (firstCell === HEADERS[0]) {
-    // Already set up — but make sure the History column exists for
-    // sheets created before this column was added.
-    var lastCol = sheet.getLastColumn();
-    var existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    if (existing.indexOf("History") === -1) {
-      sheet.insertColumnBefore(lastCol); // before "Last Updated"
-      sheet.getRange(1, lastCol).setValue("History").setFontWeight("bold");
-    }
+  if (firstCell !== HEADERS[0]) {
+    if (firstCell !== "") sheet.insertRowBefore(1);
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight("bold");
+    sheet.setFrozenRows(1);
     return;
   }
-  if (firstCell !== "") sheet.insertRowBefore(1);
+
+  // Migrate the original intake sheet in place. It had Device immediately
+  // after Date Logged, so insert the missing client columns before it. This
+  // preserves every existing device record while giving new/edited records a
+  // durable place for the customer's name and phone number.
+  var lastCol = sheet.getLastColumn();
+  var existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var hasCustomer = existing.indexOf("Customer Name") !== -1 || existing.indexOf("Client Name") !== -1;
+  if (!hasCustomer) {
+    sheet.insertColumnsBefore(3, 2);
+    lastCol += 2;
+    existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  }
+
+  // History arrived after the customer fields. Keep it directly before the
+  // Last Updated column rather than overwriting any stored timestamps.
+  if (existing.indexOf("History") === -1) {
+    var updatedCol = existing.indexOf("Last Updated") + 1;
+    if (updatedCol > 0) sheet.insertColumnBefore(updatedCol);
+    else sheet.insertColumnAfter(sheet.getLastColumn());
+  }
   sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight("bold");
   sheet.setFrozenRows(1);
 }
@@ -128,9 +145,13 @@ function rowToTicket(row, rowNum) {
     id: row[0],
     created: toIso(row[1]),
     customerName: row[2],
+    // Keep the legacy field during the transition so older page versions
+    // also show the customer rather than “Unknown customer”.
+    client: row[2],
     phone: row[3],
     device: row[4],
     issues: row[5],
+    issue: row[5],
     status: row[6],
     notes: row[7],
     history: row[8],
@@ -151,10 +172,10 @@ function addTicket(sheet, p) {
   sheet.appendRow([
     id,
     now,
-    p.customerName || "",
+    customerNameFrom(p),
     p.phone || "",
     p.device || "",
-    p.issues || "",
+    issuesFrom(p),
     status,
     p.notes || "",
     history,
@@ -163,10 +184,10 @@ function addTicket(sheet, p) {
   return rowToTicket([
     id,
     now,
-    p.customerName || "",
+    customerNameFrom(p),
     p.phone || "",
     p.device || "",
-    p.issues || "",
+    issuesFrom(p),
     status,
     p.notes || "",
     history,
@@ -188,10 +209,10 @@ function updateTicket(sheet, p) {
   if (rowNum === -1) throw new Error("Ticket not found: " + p.id);
 
   var current = sheet.getRange(rowNum, 1, 1, HEADERS.length).getValues()[0];
-  var customerName = p.customerName != null ? p.customerName : current[2];
+  var customerName = hasCustomerName(p) ? customerNameFrom(p) : current[2];
   var phone = p.phone != null ? p.phone : current[3];
   var device = p.device != null ? p.device : current[4];
-  var issues = p.issues != null ? p.issues : current[5];
+  var issues = hasIssues(p) ? issuesFrom(p) : current[5];
   var status = STATUSES.indexOf(p.status) >= 0 ? p.status : current[6];
   var notes = p.notes != null ? p.notes : current[7];
   var now = new Date();
@@ -210,10 +231,50 @@ function updateTicket(sheet, p) {
   return rowToTicket([current[0], current[1], customerName, phone, device, issues, status, notes, history, now]);
 }
 
+function deleteTicket(sheet, p) {
+  if (!p.id) throw new Error("Ticket ID is required");
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error("Ticket not found");
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(p.id)) {
+      sheet.deleteRow(i + 2);
+      return p.id;
+    }
+  }
+  throw new Error("Ticket not found: " + p.id);
+}
+
+function clearTickets(sheet) {
+  var lastRow = sheet.getLastRow();
+  var count = Math.max(0, lastRow - 1); // Keep the header row.
+  if (count) sheet.deleteRows(2, count);
+  return count;
+}
+
 function toIso(v) {
   if (!v) return null;
   var d = v instanceof Date ? v : new Date(v);
   return isNaN(d) ? null : d.toISOString();
+}
+
+// Accept both the current API names and the field names used by the first
+// intake dashboard. This lets the website and deployed script be upgraded in
+// either order without losing client information.
+function hasCustomerName(p) {
+  return p.customerName != null || p.client != null;
+}
+
+function customerNameFrom(p) {
+  return p.customerName != null ? p.customerName : (p.client || "");
+}
+
+function hasIssues(p) {
+  return p.issues != null || p.issue != null;
+}
+
+function issuesFrom(p) {
+  return p.issues != null ? p.issues : (p.issue || "");
 }
 
 function json(obj) {

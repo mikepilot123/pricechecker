@@ -75,6 +75,15 @@ It captures Customer Name, Phone, Device, Issues, Status, and Notes. The
 call button on each card dials the customer directly (`tel:` link) using
 the phone number captured at intake.
 
+Open any ticket card to edit its client details, or use **Delete record** to
+remove it after a confirmation prompt. Older tickets created before client
+details were added do not contain a recoverable name or phone number; use
+**Add client info** once on each of those records.
+
+To reset the intake completely, use **Clear all** in the Intake toolbar and
+confirm twice. It removes all ticket rows from the Sheet and dashboard, while
+retaining the header row and the app's connection settings.
+
 Data is stored in a separate, dedicated Google Sheet ("JQ Reapirs"), written
 to only through a PIN-gated Apps Script — never read as a public CSV.
 
@@ -104,11 +113,11 @@ only the PIN is entered by staff.
 6. In the app, open the **Intake** tab — staff just enter the PIN once per
    device; it's remembered locally after that (never uploaded or committed).
 
-If you already had an earlier version of `Code.gs` deployed (before the
-Issues/History columns existed), just re-paste the updated script over the
-old one and use **Manage deployments → Edit → New version** — no need for a
-new URL. It auto-adds the `History` column to the existing sheet the first
-time it runs.
+If you already had an earlier version of `Code.gs` deployed, re-paste the
+updated script over the old one and use **Manage deployments → Edit → New
+version** — no need for a new URL. On its first request it preserves old
+device records and adds the Customer Name, Phone, and History columns. This
+deployment step is required before deleting records from the app.
 
 The PIN is the only access control on this endpoint — anyone with it can
 read every logged ticket (including customer name/phone) or write new ones.
