@@ -60,6 +60,7 @@
   let statusFilter = "all";
   let editingId = null;
   let loadedOnce = false;
+  let activeTicket = null;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -168,7 +169,7 @@
       $("intakeEmpty").hidden = true;
       $("intakeError").hidden = false;
       $("intakeErrorSub").textContent =
-        "Couldn't load devices (" + e.message + "). Tap ↻ to retry.";
+        "Couldn't load devices (" + e.message + "). Tap Reload to retry.";
     } finally {
       $("intakeLoading").style.display = "none";
     }
@@ -258,7 +259,86 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("issueModal").hidden) closeIssueModal();
+    if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal();
   });
+
+  // ---- Ticket detail modal -------------------------------------------------
+  function openTicketModal(ticket) {
+    activeTicket = ticket;
+    const hasPhone = !!ticket.phone;
+    $("ticketModalBody").innerHTML = `
+      <div class="ticket-detail-hero">
+        <span class="ticket-device-icon"><svg class="icon"><use href="#i-device"></use></svg></span>
+        <div>
+          <h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4>
+          <p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p>
+        </div>
+        <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
+      </div>
+      <section class="ticket-detail-section">
+        <p class="field-label">Customer & device</p>
+        <div class="ticket-detail-grid">
+          ${detailRow("i-user", "Customer", ticket.customerName || "Unknown customer")}
+          ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
+          ${detailRow("i-device", "Device", ticket.device || "—")}
+          ${detailRow("i-clock", "Logged", fmtDate(ticket.created))}
+          ${detailRow("i-clock", "Updated", fmtDate(ticket.updated))}
+        </div>
+      </section>
+      <section class="ticket-detail-section">
+        <p class="field-label">Issues</p>
+        <div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div>
+      </section>
+      ${ticket.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(ticket.notes)}</p></section>` : ""}
+      <section class="ticket-detail-section">
+        <p class="field-label">Set status</p>
+        <div class="status-buttons" id="ticketModalStatuses"></div>
+      </section>
+      <section class="ticket-detail-section">
+        <p class="field-label">Activity log</p>
+        ${historyHtml(ticket.history)}
+      </section>`;
+
+    const statusBox = $("ticketModalStatuses");
+    STATUSES.forEach((status) => {
+      const button = document.createElement("button");
+      button.className = "status-set" + (status === ticket.status ? " current" : "");
+      button.textContent = status;
+      button.onclick = async () => {
+        if (status === ticket.status) return;
+        const updated = await setStatus(ticket, status);
+        if (updated) openTicketModal(updated);
+      };
+      statusBox.appendChild(button);
+    });
+
+    $("ticketModalFooter").innerHTML = `
+      ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
+      <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
+    $("ticketModalEdit").onclick = () => {
+      closeTicketModal();
+      openForm(ticket);
+    };
+    $("ticketModalDelete").onclick = async () => {
+      if (await deleteTicket(ticket)) closeTicketModal();
+    };
+    $("ticketModal").hidden = false;
+    $("closeTicketModal").focus();
+  }
+
+  function closeTicketModal() {
+    $("ticketModal").hidden = true;
+    activeTicket = null;
+  }
+  $("closeTicketModal").addEventListener("click", closeTicketModal);
+  $("ticketModal").addEventListener("click", (e) => {
+    if (e.target.id === "ticketModal") closeTicketModal();
+  });
+
+  function detailRow(iconName, label, value) {
+    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${value}</span></div>`;
+  }
 
   function setIssueTags(issuesStr) {
     selectedIssues = new Set();
@@ -394,8 +474,10 @@
       mergeTicket(res.ticket);
       renderStatusChips();
       render();
+      return normalizeTicket(res.ticket);
     } catch (e) {
       alert("Couldn't update status: " + e.message);
+      return null;
     }
   }
 
@@ -408,8 +490,10 @@
       TICKETS = TICKETS.filter((t) => t.id !== ticket.id);
       renderStatusChips();
       render();
+      return true;
     } catch (e) {
       alert("Couldn't delete record: " + e.message);
+      return false;
     }
   }
 
@@ -488,6 +572,9 @@
 
     const head = document.createElement("div");
     head.className = "ticket-head";
+    head.tabIndex = 0;
+    head.setAttribute("role", "button");
+    head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
     const hasPhone = !!t.phone;
     head.innerHTML = `
       <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
@@ -500,52 +587,18 @@
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
       </div>
-      <a class="ticket-call${hasPhone ? "" : " disabled"}" href="${hasPhone ? `tel:${esc(t.phone)}` : "#"}" title="${hasPhone ? "Call " + esc(t.customerName || "customer") : "No phone on file"}" aria-label="Call customer">📞</a>`;
-    head.querySelector(".ticket-call").onclick = (e) => e.stopPropagation();
-
-    const body = document.createElement("div");
-    body.className = "ticket-body";
-    body.innerHTML = `
-      <div class="ticket-row"><span class="k">Customer</span><span class="v">${esc(t.customerName || "—")}</span></div>
-      <div class="ticket-row"><span class="k">Phone</span><span class="v">${t.phone ? `<a class="ticket-tel" href="tel:${esc(t.phone)}">${esc(t.phone)}</a>` : "—"}</span></div>
-      <div class="ticket-row"><span class="k">Device</span><span class="v">${esc(t.device || "—")}</span></div>
-      <div class="ticket-row"><span class="k">Logged</span><span class="v mono">${esc(fmtDate(t.created))}</span></div>
-      <div class="ticket-row"><span class="k">Updated</span><span class="v mono">${esc(fmtDate(t.updated))}</span></div>
-      ${t.notes ? `<div class="ticket-row"><span class="k">Notes</span><span class="v">${esc(t.notes)}</span></div>` : ""}
-      <div class="ticket-actions">
-        <div class="field-label">Set status</div>
-        <div class="status-buttons"></div>
-        <button class="ghost-btn ticket-edit-btn">${t.customerName ? "✎ Edit details" : "+ Add client info"}</button>
-        <button class="ghost-btn ticket-delete-btn">Delete record</button>
-      </div>
-      <div class="ticket-actions">
-        <div class="field-label">Activity log</div>
-        ${historyHtml(t.history)}
-      </div>`;
-
-    const sb = body.querySelector(".status-buttons");
-    STATUSES.forEach((s) => {
-      const b = document.createElement("button");
-      b.className = "status-set" + (s === t.status ? " current" : "");
-      b.textContent = s;
-      b.onclick = (e) => {
-        e.stopPropagation();
-        if (s !== t.status) setStatus(t, s);
-      };
-      sb.appendChild(b);
-    });
-    body.querySelector(".ticket-edit-btn").onclick = (e) => {
-      e.stopPropagation();
-      openForm(t);
+      <a class="ticket-call${hasPhone ? "" : " disabled"}" href="${hasPhone ? `tel:${esc(t.phone)}` : "#"}" title="${hasPhone ? "Call " + esc(t.customerName || "customer") : "No phone on file"}" aria-label="Call customer"><svg class="icon"><use href="#i-phone"></use></svg></a>`;
+    const callButton = head.querySelector(".ticket-call");
+    callButton.onclick = (e) => e.stopPropagation();
+    callButton.onkeydown = (e) => e.stopPropagation();
+    head.onclick = () => openTicketModal(t);
+    head.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openTicketModal(t);
+      }
     };
-    body.querySelector(".ticket-delete-btn").onclick = (e) => {
-      e.stopPropagation();
-      deleteTicket(t);
-    };
-
-    head.onclick = () => el.classList.toggle("open");
     el.appendChild(head);
-    el.appendChild(body);
     return el;
   }
 

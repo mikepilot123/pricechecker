@@ -273,7 +273,7 @@ function card(m, expand = false) {
             : `<span class="from-value na">Call to confirm</span>`
         }
       </div>
-      <span class="chevron">▼</span>
+      <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
     </div>`;
 
   const body = document.createElement("div");
