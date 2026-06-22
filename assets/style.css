@@ -392,6 +392,17 @@ body {
   cursor: pointer;
 }
 .ghost-btn:hover { background: var(--card-hover); }
+.danger-btn {
+  color: var(--danger);
+  border-color: rgba(200, 54, 43, 0.35);
+}
+.danger-btn:hover { background: rgba(200, 54, 43, 0.08); }
+.primary-btn.danger-btn {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.primary-btn.danger-btn:hover { filter: brightness(1.08); }
 .text-input {
   width: 100%;
   background: var(--card);
@@ -472,6 +483,7 @@ body {
 }
 .issue-select-btn:hover { background: var(--card-hover); }
 .issue-select-btn.has-selection #issueSelectLabel,
+.issue-select-btn.has-selection #clientSelectLabel,
 .issue-select-btn.has-selection { color: var(--text); }
 .issue-select-chevron { color: var(--text-dim); font-size: 1.1rem; }
 
@@ -513,14 +525,6 @@ body {
 .repairs-toolbar .primary-btn { flex: 1; }
 
 /* ---------- Intake form ---------- */
-.repair-form {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 14px;
-  box-shadow: var(--shadow);
-}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -624,27 +628,30 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ticket-call {
-  flex: none;
+/* Tap-to-call number shown right on the card */
+.ticket-phone {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
   text-decoration: none;
-  font-size: 1.05rem;
   transition: background 0.15s, transform 0.1s;
-  margin-top: 1px;
 }
-.ticket-call:hover { background: #dde6fb; }
-.ticket-call:active { transform: scale(0.92); }
-.ticket-call.disabled {
+.ticket-phone:hover { background: #dde6fb; }
+.ticket-phone:active { transform: scale(0.97); }
+.ticket-phone-icon { font-size: 0.95rem; }
+.ticket-phone.no-phone {
   background: var(--bg-soft);
   color: var(--text-dim);
-  pointer-events: none;
+  font-weight: 500;
+  font-family: inherit;
 }
 .status-badge {
   flex: none;
@@ -702,8 +709,8 @@ body {
 .status-set:hover { background: var(--card-hover); color: var(--text); }
 .status-set.current { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .ticket-edit-btn { margin-top: 12px; }
+.ticket-client-btn { margin-top: 12px; margin-left: 8px; }
 .ticket-delete-btn { margin-top: 12px; margin-left: 8px; color: var(--danger); }
-.danger-btn { color: var(--danger); }
 
 .repair-loading {
   text-align: center;
@@ -819,3 +826,6 @@ body {
   flex: none;
 }
 .modal-footer .primary-btn { width: 100%; }
+.modal-footer .form-actions { margin-top: 0; }
+.modal-footer .form-actions .ghost-btn,
+.modal-footer .form-actions .primary-btn { flex: 1; width: auto; }
