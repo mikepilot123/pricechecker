@@ -269,7 +269,7 @@ function card(m, expand = false) {
       <div class="from-price">
         ${
           m.minPrice != null
-            ? `<span class="from-label">from</span><span class="from-value">$${fmt(m.minPrice)}</span>`
+            ? `<span class="from-value"><span class="from-prefix">From</span> $${fmt(m.minPrice)}</span>`
             : `<span class="from-value na">Call to confirm</span>`
         }
       </div>

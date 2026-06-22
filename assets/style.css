@@ -237,6 +237,7 @@ body {
   margin: 0 0 10px 2px;
 }
 .results { display: flex; flex-direction: column; gap: 10px; }
+#results { gap: 6px; }
 .view-more-btn {
   grid-column: 1 / -1;
   display: inline-flex;
@@ -263,6 +264,10 @@ body {
   transition: background 0.15s;
   box-shadow: var(--shadow);
 }
+#results .card {
+  border-radius: 10px;
+  box-shadow: none;
+}
 .card-head {
   display: flex;
   align-items: center;
@@ -272,6 +277,10 @@ body {
   cursor: pointer;
   user-select: none;
 }
+#results .card-head {
+  min-height: 52px;
+  padding: 10px 12px;
+}
 .card-head:hover { background: var(--card-hover); }
 .card-model {
   font-size: 1.02rem;
@@ -279,6 +288,15 @@ body {
   display: flex;
   align-items: center;
   gap: 9px;
+}
+#results .card-model {
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+}
+#results .card-model > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .brand-tag {
   font-size: 0.62rem;
@@ -291,9 +309,10 @@ body {
   color: var(--accent);
 }
 .card-right { display: flex; align-items: center; gap: 10px; flex: none; }
-.from-price { text-align: right; }
+.from-price { display: flex; align-items: center; text-align: right; }
 .from-label { font-size: 0.62rem; color: var(--text-dim); display: block; line-height: 1; }
-.from-value { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--price); }
+.from-value { font-family: var(--font-mono); font-size: 0.92rem; font-weight: 700; color: var(--price); white-space: nowrap; }
+.from-prefix { font-family: inherit; font-size: 0.72rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
 .from-value.na { color: var(--warn); font-family: inherit; font-size: 0.82rem; font-weight: 600; }
 .chevron {
   color: var(--text-dim);
@@ -301,6 +320,13 @@ body {
   transition: transform 0.2s;
 }
 .card.open .chevron { transform: rotate(180deg); }
+
+@media (max-width: 460px) {
+  #results .brand-tag { display: none; }
+  #results .card-head { gap: 8px; }
+  #results .card-model { font-size: 0.96rem; }
+  .from-prefix { display: none; }
+}
 
 .card-body {
   display: none;
