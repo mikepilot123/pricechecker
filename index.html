@@ -98,16 +98,23 @@
       <input id="cfgPin" class="text-input" type="password" inputmode="numeric" placeholder="••••" />
       <button id="cfgSave" class="primary-btn">Save & connect</button>
       <p id="cfgError" class="field-error" hidden></p>
+      <div id="settingsMaintenance" class="settings-maintenance" hidden>
+        <p class="field-label">Intake records</p>
+        <p class="settings-help">Refresh records, restore a saved backup, or clear the current intake list.</p>
+        <div class="settings-actions">
+          <button id="reloadIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
+          <button id="restoreIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-restore"></use></svg>Restore</button>
+          <button id="clearAllIntake" class="ghost-btn danger-btn" type="button"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
+        </div>
+        <button id="closeIntakeSettings" class="ghost-btn settings-back" type="button">Back to intake</button>
+      </div>
     </section>
 
     <!-- Main intake UI: shown once configured -->
     <section id="intakeMain" hidden>
       <div class="repairs-toolbar">
         <button id="newIntakeBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Log device</button>
-        <button id="reloadIntake" class="ghost-btn icon-btn" title="Reload" aria-label="Reload"><svg class="icon"><use href="#i-refresh"></use></svg></button>
         <button id="intakeSettings" class="ghost-btn icon-btn" title="Connection settings" aria-label="Connection settings"><svg class="icon"><use href="#i-gear"></use></svg></button>
-        <button id="restoreIntake" class="ghost-btn" title="Restore an intake backup"><svg class="icon"><use href="#i-restore"></use></svg><span>Restore</span></button>
-        <button id="clearAllIntake" class="ghost-btn danger-btn" title="Delete all devices"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
       </div>
 
       <div class="search-wrap">

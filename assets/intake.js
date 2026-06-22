@@ -88,6 +88,7 @@
   function showSetup(prefill) {
     $("intakeSetup").hidden = false;
     $("intakeMain").hidden = true;
+    $("settingsMaintenance").hidden = !prefill;
     if (prefill) $("cfgPin").value = getCfg().pin;
   }
   function showMain() {
@@ -180,6 +181,7 @@
 
   $("reloadIntake").addEventListener("click", loadTickets);
   $("intakeSettings").addEventListener("click", () => showSetup(true));
+  $("closeIntakeSettings").addEventListener("click", showMain);
 
   // ---- Clear all -------------------------------------------------------------
   function openClearAllModal() {
@@ -753,6 +755,9 @@
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
+      </div>
+      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
+        <img src="assets/branding/device-thumbnail.png" alt="" />
       </div>`;
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
