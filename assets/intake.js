@@ -176,24 +176,57 @@
 
   $("reloadIntake").addEventListener("click", loadTickets);
   $("intakeSettings").addEventListener("click", () => showSetup(true));
-  $("clearIntake").addEventListener("click", clearAllTickets);
 
-  async function clearAllTickets() {
-    const count = TICKETS.length;
-    if (!count) return;
-    if (!window.confirm(`Delete all ${count} intake record${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
-    if (!window.confirm("Final confirmation: permanently delete every intake record?")) return;
+  // ---- Clear all -------------------------------------------------------------
+  function openClearAllModal() {
+    if (!TICKETS.length) return;
+    $("clearAllPin").value = "";
+    $("clearAllError").hidden = true;
+    $("clearAllModal").hidden = false;
+    $("clearAllPin").focus();
+  }
+  function closeClearAllModal() {
+    $("clearAllModal").hidden = true;
+  }
+  $("clearAllIntake").addEventListener("click", openClearAllModal);
+  $("closeClearAllModal").addEventListener("click", closeClearAllModal);
+  $("clearAllModal").addEventListener("click", (e) => {
+    if (e.target.id === "clearAllModal") closeClearAllModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("clearAllModal").hidden) closeClearAllModal();
+  });
+
+  $("confirmClearAll").addEventListener("click", async () => {
+    const err = $("clearAllError");
+    err.hidden = true;
+    const pin = $("clearAllPin").value.trim();
+    if (!pin || pin !== getCfg().pin) {
+      err.textContent = "PIN doesn't match — clear all canceled.";
+      err.hidden = false;
+      return;
+    }
+    const btn = $("confirmClearAll");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Deleting…";
     try {
       const res = await api({ action: "clear" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = [];
       statusFilter = "all";
+      closeForm();
+      closeClearAllModal();
       renderStatusChips();
       render();
     } catch (e) {
-      alert("Couldn't clear intake records: " + e.message);
+      err.textContent = "Couldn't clear devices: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
     }
-  }
+  });
 
   // ---- Form ------------------------------------------------------------------
   populateStatusSelect();
@@ -303,9 +336,10 @@
 
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
-    $("intakeForm").hidden = false;
+    $("intakeFormTitle").textContent = ticket ? "Edit device" : "Log device";
     $("fName").value = ticket ? ticket.customerName || "" : "";
     $("fPhone").value = ticket ? ticket.phone || "" : "";
+    updateClientSelectLabel();
     $("fDevice").value = ticket ? ticket.device || "" : "";
     $("fStatus").value = ticket ? ticket.status || "Received" : "Received";
     $("fNotes").value = ticket ? ticket.notes || "" : "";
@@ -313,21 +347,140 @@
 
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
-    $("intakeForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
-    $("fName").focus();
+    $("intakeFormModal").hidden = false;
+    $("openClientModal").focus();
   }
   function closeForm() {
-    $("intakeForm").hidden = true;
+    $("intakeFormModal").hidden = true;
     editingId = null;
   }
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
   $("cancelForm").addEventListener("click", closeForm);
+  $("closeIntakeFormModal").addEventListener("click", closeForm);
+  $("intakeFormModal").addEventListener("click", (e) => {
+    if (e.target.id === "intakeFormModal") closeForm();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("intakeFormModal").hidden) closeForm();
+  });
+
+  // ---- Customer info modal --------------------------------------------------
+  // Picks the customer for the device form (mode "form"), or quick-edits a
+  // ticket's customer details straight from its card (mode "ticket").
+  let clientModalMode = null;
+  let clientModalTicket = null;
+
+  function updateClientSelectLabel() {
+    const name = $("fName").value.trim();
+    const phone = $("fPhone").value.trim();
+    $("clientSelectLabel").textContent = name ? `${name}${phone ? " • " + phone : ""}` : "Select customer…";
+    $("openClientModal").classList.toggle("has-selection", !!name);
+  }
+
+  function openClientModalForForm() {
+    clientModalMode = "form";
+    clientModalTicket = null;
+    $("clientModalTitle").textContent = "Customer info";
+    $("cName").value = $("fName").value;
+    $("cPhone").value = $("fPhone").value;
+    $("cNotesField").hidden = true;
+    $("saveClientModal").textContent = "Done";
+    $("clientModalError").hidden = true;
+    $("clientModal").hidden = false;
+    $("cName").focus();
+  }
+
+  function openClientModalForTicket(ticket) {
+    clientModalMode = "ticket";
+    clientModalTicket = ticket;
+    $("clientModalTitle").textContent = "Update customer";
+    $("cName").value = ticket.customerName || "";
+    $("cPhone").value = ticket.phone || "";
+    $("cNotesField").hidden = false;
+    $("cNotes").value = ticket.notes || "";
+    $("saveClientModal").textContent = "Save";
+    $("clientModalError").hidden = true;
+    $("clientModal").hidden = false;
+    $("cName").focus();
+  }
+
+  function closeClientModal() {
+    $("clientModal").hidden = true;
+    clientModalMode = null;
+    clientModalTicket = null;
+  }
+
+  $("openClientModal").addEventListener("click", openClientModalForForm);
+  $("closeClientModal").addEventListener("click", closeClientModal);
+  $("clientModal").addEventListener("click", (e) => {
+    if (e.target.id === "clientModal") closeClientModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("clientModal").hidden) closeClientModal();
+  });
+
+  $("saveClientModal").addEventListener("click", async () => {
+    const err = $("clientModalError");
+    err.hidden = true;
+    const name = $("cName").value.trim();
+    const phone = $("cPhone").value.trim();
+    if (!name || !phone) {
+      err.textContent = "Enter the customer's name and phone.";
+      err.hidden = false;
+      return;
+    }
+
+    if (clientModalMode === "form") {
+      $("fName").value = name;
+      $("fPhone").value = phone;
+      updateClientSelectLabel();
+      closeClientModal();
+      return;
+    }
+
+    const ticket = clientModalTicket;
+    const notes = $("cNotes").value.trim();
+    const btn = $("saveClientModal");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Saving…";
+    try {
+      const res = await api({
+        action: "update",
+        id: ticket.id,
+        customerName: name,
+        client: name,
+        phone,
+        notes,
+        device: ticket.device,
+        issues: ticket.issues,
+        issue: ticket.issues,
+        status: ticket.status,
+      });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      mergeTicket(res.ticket);
+      renderStatusChips();
+      render();
+      closeClientModal();
+    } catch (e) {
+      err.textContent = "Couldn't save: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
 
   $("intakeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = $("formError");
     err.hidden = true;
+    if (!$("fName").value.trim() || !$("fPhone").value.trim()) {
+      err.textContent = "Select the customer first.";
+      err.hidden = false;
+      return;
+    }
     const issuesStr = buildIssuesString();
     if (!issuesStr) {
       err.textContent = "Select at least one issue.";
@@ -489,6 +642,9 @@
     const head = document.createElement("div");
     head.className = "ticket-head";
     const hasPhone = !!t.phone;
+    const phoneLine = hasPhone
+      ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><span class="ticket-phone-icon">📞</span>${esc(t.phone)}</a>`
+      : `<span class="ticket-phone no-phone">No number on file</span>`;
     head.innerHTML = `
       <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
       <div class="ticket-main">
@@ -498,10 +654,11 @@
         </div>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
+        ${phoneLine}
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
-      </div>
-      <a class="ticket-call${hasPhone ? "" : " disabled"}" href="${hasPhone ? `tel:${esc(t.phone)}` : "#"}" title="${hasPhone ? "Call " + esc(t.customerName || "customer") : "No phone on file"}" aria-label="Call customer">📞</a>`;
-    head.querySelector(".ticket-call").onclick = (e) => e.stopPropagation();
+      </div>`;
+    const phoneEl = head.querySelector("a.ticket-phone");
+    if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
 
     const body = document.createElement("div");
     body.className = "ticket-body";
@@ -515,7 +672,8 @@
       <div class="ticket-actions">
         <div class="field-label">Set status</div>
         <div class="status-buttons"></div>
-        <button class="ghost-btn ticket-edit-btn">${t.customerName ? "✎ Edit details" : "+ Add client info"}</button>
+        <button class="ghost-btn ticket-edit-btn">✎ Edit details</button>
+        <button class="ghost-btn ticket-client-btn">${t.customerName ? "+ Client" : "+ Add client"}</button>
         <button class="ghost-btn ticket-delete-btn">Delete record</button>
       </div>
       <div class="ticket-actions">
@@ -537,6 +695,10 @@
     body.querySelector(".ticket-edit-btn").onclick = (e) => {
       e.stopPropagation();
       openForm(t);
+    };
+    body.querySelector(".ticket-client-btn").onclick = (e) => {
+      e.stopPropagation();
+      openClientModalForTicket(t);
     };
     body.querySelector(".ticket-delete-btn").onclick = (e) => {
       e.stopPropagation();
