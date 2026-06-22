@@ -210,7 +210,37 @@
     const otherOn = selectedIssues.has("Other");
     $("fIssueOther").hidden = !otherOn;
     if (otherOn) $("fIssueOther").focus();
+    updateIssueSummary();
   }
+
+  function updateIssueSummary() {
+    const str = buildIssuesString();
+    const btn = $("openIssueModal");
+    const count = selectedIssues.size;
+    $("issueSelectLabel").textContent = count
+      ? `${count} issue${count === 1 ? "" : "s"} selected`
+      : "Select issues…";
+    btn.classList.toggle("has-selection", count > 0);
+    $("issueSummary").innerHTML = count ? issueTagsHtml(str) : "";
+  }
+
+  // ---- Issue picker modal ---------------------------------------------------
+  function openIssueModal() {
+    $("issueModal").hidden = false;
+  }
+  function closeIssueModal() {
+    $("issueModal").hidden = true;
+    updateIssueSummary();
+  }
+  $("openIssueModal").addEventListener("click", openIssueModal);
+  $("closeIssueModal").addEventListener("click", closeIssueModal);
+  $("issueModalDone").addEventListener("click", closeIssueModal);
+  $("issueModal").addEventListener("click", (e) => {
+    if (e.target.id === "issueModal") closeIssueModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("issueModal").hidden) closeIssueModal();
+  });
 
   function setIssueTags(issuesStr) {
     selectedIssues = new Set();
@@ -238,6 +268,7 @@
       $("fIssueOther").hidden = false;
       $("fIssueOther").value = otherText;
     }
+    updateIssueSummary();
   }
 
   function buildIssuesString() {

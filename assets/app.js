@@ -387,6 +387,19 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// --- Sticky search offset -----------------------------------------------
+// Search bars stick just below the header; track its real height (it can
+// change with font load, wrapping, or the refresh button showing/hiding)
+// so the sticky offset never overlaps or gaps.
+(function () {
+  const header = document.querySelector(".app-header");
+  if (!header) return;
+  const setH = () => document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+  setH();
+  if ("ResizeObserver" in window) new ResizeObserver(setH).observe(header);
+  window.addEventListener("resize", setH);
+})();
+
 // --- Go ---------------------------------------------------------------------
 showSkeleton();
 loadData();

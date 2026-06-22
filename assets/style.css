@@ -18,6 +18,7 @@
   --shadow: 0 1px 2px rgba(18, 24, 38, 0.05), 0 10px 24px rgba(18, 24, 38, 0.06);
   --font-display: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "IBM Plex Mono", "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  --header-h: 112px; /* fallback; app.js sets the real measured height */
 }
 
 * { box-sizing: border-box; }
@@ -144,9 +145,16 @@ body {
 }
 
 /* ---------- Search ---------- */
+/* Sticks just below the header so it stays reachable while a long list
+   scrolls underneath. The opaque background + top padding masks list
+   content scrolling up behind it. */
 .search-wrap {
-  position: relative;
-  margin-bottom: 14px;
+  position: sticky;
+  top: var(--header-h);
+  z-index: 5;
+  background: var(--bg);
+  padding: 10px 0 14px;
+  margin: -10px 0 0;
 }
 .search-input {
   width: 100%;
@@ -445,9 +453,29 @@ body {
   border-color: var(--accent);
   color: #fff;
 }
-.issue-other-input { margin-top: 10px; }
+.issue-other-input { margin-top: 14px; }
 
-/* Read-only issue chips shown on a ticket card */
+/* Button on the form that opens the issue-picker modal */
+.issue-select-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font-size: 1rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+}
+.issue-select-btn:hover { background: var(--card-hover); }
+.issue-select-btn.has-selection #issueSelectLabel,
+.issue-select-btn.has-selection { color: var(--text); }
+.issue-select-chevron { color: var(--text-dim); font-size: 1.1rem; }
+
+/* Read-only issue chips shown on a ticket card, or as a selection summary */
 .issue-tags-readonly { margin-top: 6px; }
 .issue-chip {
   display: inline-block;
@@ -728,3 +756,63 @@ body {
 .text-input, .primary-btn, .ghost-btn, .chip, .nav-btn {
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
+
+/* ---------- Issue picker modal ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(18, 24, 38, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+@media (min-width: 560px) {
+  .modal-backdrop { align-items: center; padding: 20px; }
+}
+.modal-panel {
+  background: var(--card);
+  width: 100%;
+  max-width: 480px;
+  max-height: min(82vh, 640px);
+  border-radius: 18px 18px 0 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -8px 30px rgba(18, 24, 38, 0.18);
+}
+@media (min-width: 560px) {
+  .modal-panel { border-radius: var(--radius); box-shadow: var(--shadow); }
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.modal-header h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; }
+.modal-close {
+  background: var(--bg-soft);
+  border: none;
+  color: var(--text-dim);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal-close:hover { background: var(--border); }
+.modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+.modal-footer {
+  padding: 14px 18px max(env(safe-area-inset-bottom), 14px);
+  border-top: 1px solid var(--border);
+  flex: none;
+}
+.modal-footer .primary-btn { width: 100%; }

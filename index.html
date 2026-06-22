@@ -117,9 +117,12 @@
             </div>
           </div>
           <div class="form-field form-field-full">
-            <label class="field-label">Issues * <span class="field-hint">(select all that apply)</span></label>
-            <div id="issueTags" class="issue-tags"></div>
-            <input id="fIssueOther" class="text-input issue-other-input" hidden placeholder="Describe the other issue" />
+            <label class="field-label">Issues *</label>
+            <button type="button" id="openIssueModal" class="issue-select-btn">
+              <span id="issueSelectLabel">Select issues…</span>
+              <span class="issue-select-chevron">›</span>
+            </button>
+            <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
           </div>
           <div class="form-field form-field-full">
             <label class="field-label" for="fNotes">Notes</label>
@@ -159,6 +162,23 @@
   <footer class="app-footer">
     <p>Prices in TTD · Live from the shop sheet · Internal team use</p>
   </footer>
+
+  <!-- Issue picker modal -->
+  <div id="issueModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="issueModalTitle">
+      <div class="modal-header">
+        <h3 id="issueModalTitle">Select issues</h3>
+        <button type="button" id="closeIssueModal" class="modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="issueTags" class="issue-tags"></div>
+        <input id="fIssueOther" class="text-input issue-other-input" hidden placeholder="Describe the other issue" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="issueModalDone" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
 
   <script src="assets/app.js"></script>
   <script src="assets/intake.js"></script>
