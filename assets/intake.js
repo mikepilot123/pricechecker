@@ -52,6 +52,7 @@
   ];
 
   const LS_PIN = "rpc_intake_pin";
+  const TICKET_PAGE_SIZE = 12;
 
   const $ = (id) => document.getElementById(id);
 
@@ -60,6 +61,7 @@
   let statusFilter = "all";
   let editingId = null;
   let loadedOnce = false;
+  let visibleTicketCount = TICKET_PAGE_SIZE;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -110,6 +112,7 @@
       if (!res.ok) throw new Error(res.error || "Rejected");
       localStorage.setItem(LS_PIN, pin);
       TICKETS = (res.tickets || []).map(normalizeTicket);
+      visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       showMain();
       renderStatusChips();
@@ -160,6 +163,7 @@
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
+      visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       renderStatusChips();
       render();
@@ -214,17 +218,83 @@
       const res = await api({ action: "clear" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = [];
+      visibleTicketCount = TICKET_PAGE_SIZE;
       statusFilter = "all";
       closeForm();
       closeClearAllModal();
       renderStatusChips();
       render();
+      if (res.backup) alert(`Deleted ${res.deletedCount} record${res.deletedCount === 1 ? "" : "s"}. Backup ${res.backup.id} is ready to restore if needed.`);
     } catch (e) {
       err.textContent = "Couldn't clear devices: " + e.message;
       err.hidden = false;
     } finally {
       btn.disabled = false;
       btn.textContent = original;
+    }
+  });
+
+  // ---- Backup restore ------------------------------------------------------
+  async function openRestoreBackupModal() {
+    const err = $("restoreBackupError");
+    err.hidden = true;
+    $("backupSelect").innerHTML = "";
+    $("restoreBackupEmpty").hidden = true;
+    $("confirmRestoreBackup").disabled = true;
+    $("restoreBackupModal").hidden = false;
+    try {
+      const res = await api({ action: "listBackups" });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      const backups = res.backups || [];
+      $("restoreBackupEmpty").hidden = backups.length > 0;
+      $("backupSelect").hidden = backups.length === 0;
+      $("confirmRestoreBackup").disabled = backups.length === 0;
+      $("backupSelect").innerHTML = backups.map((backup) =>
+        `<option value="${esc(backup.id)}">${esc(fmtDate(backup.created))} · ${Number(backup.count) || 0} record${Number(backup.count) === 1 ? "" : "s"}</option>`
+      ).join("");
+      if (backups.length) $("backupSelect").focus();
+    } catch (e) {
+      err.textContent = "Couldn't load backups: " + e.message;
+      err.hidden = false;
+    }
+  }
+
+  function closeRestoreBackupModal() { $("restoreBackupModal").hidden = true; }
+  $("restoreIntake").addEventListener("click", openRestoreBackupModal);
+  $("closeRestoreBackupModal").addEventListener("click", closeRestoreBackupModal);
+  $("restoreBackupModal").addEventListener("click", (e) => {
+    if (e.target.id === "restoreBackupModal") closeRestoreBackupModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("restoreBackupModal").hidden) closeRestoreBackupModal();
+  });
+
+  $("confirmRestoreBackup").addEventListener("click", async () => {
+    const id = $("backupSelect").value;
+    const err = $("restoreBackupError");
+    err.hidden = true;
+    if (!id) return;
+    if (!window.confirm("Restore this intake backup? Your current records will first be saved as a new backup.")) return;
+    const btn = $("confirmRestoreBackup");
+    btn.disabled = true;
+    const original = btn.innerHTML;
+    btn.textContent = "Restoring…";
+    try {
+      const res = await api({ action: "restoreBackup", id: id });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TICKETS = (res.tickets || []).map(normalizeTicket);
+      statusFilter = "all";
+      visibleTicketCount = TICKET_PAGE_SIZE;
+      renderStatusChips();
+      render();
+      closeRestoreBackupModal();
+      alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous intake is backed up as ${res.backup.id}.`);
+    } catch (e) {
+      err.textContent = "Couldn't restore backup: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
     }
   });
 
@@ -311,25 +381,11 @@
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
       ${ticket.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(ticket.notes)}</p></section>` : ""}
-      <section class="ticket-detail-section"><p class="field-label">Set status</p><div class="status-buttons" id="ticketModalStatuses"></div></section>
       <section class="ticket-detail-section"><p class="field-label">Activity log</p>${historyHtml(ticket.history)}</section>`;
-
-    const statusBox = $("ticketModalStatuses");
-    STATUSES.forEach((status) => {
-      const button = document.createElement("button");
-      button.className = "status-set" + (status === ticket.status ? " current" : "");
-      button.textContent = status;
-      button.onclick = async () => {
-        if (status === ticket.status) return;
-        const updated = await setStatus(ticket, status);
-        if (updated) openTicketModal(updated);
-      };
-      statusBox.appendChild(button);
-    });
 
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
-      <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
+      <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit details</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
@@ -589,7 +645,10 @@
   }
 
   // ---- Filtering / search --------------------------------------------------
-  $("intakeSearch").addEventListener("input", render);
+  $("intakeSearch").addEventListener("input", () => {
+    visibleTicketCount = TICKET_PAGE_SIZE;
+    render();
+  });
 
   function renderStatusChips() {
     const counts = { all: TICKETS.length };
@@ -602,6 +661,7 @@
       b.textContent = label;
       b.onclick = () => {
         statusFilter = key;
+        visibleTicketCount = TICKET_PAGE_SIZE;
         [...box.children].forEach((c) => c.classList.remove("active"));
         b.classList.add("active");
         render();
@@ -627,14 +687,26 @@
 
   function render() {
     const list = currentList();
+    const visible = list.slice(0, visibleTicketCount);
     $("intakeList").innerHTML = "";
     $("intakeEmpty").hidden = list.length > 0;
     $("intakeError").hidden = true;
     $("intakeCount").textContent = list.length
-      ? `${list.length} device${list.length === 1 ? "" : "s"}`
+      ? `Showing ${visible.length} of ${list.length} device${list.length === 1 ? "" : "s"}`
       : "";
     const frag = document.createDocumentFragment();
-    for (const t of list) frag.appendChild(ticketCard(t));
+    for (const t of visible) frag.appendChild(ticketCard(t));
+    if (visible.length < list.length) {
+      const more = document.createElement("button");
+      const remaining = list.length - visible.length;
+      more.className = "view-more-btn";
+      more.innerHTML = `View ${Math.min(TICKET_PAGE_SIZE, remaining)} more <span aria-hidden="true">↓</span>`;
+      more.onclick = () => {
+        visibleTicketCount += TICKET_PAGE_SIZE;
+        render();
+      };
+      frag.appendChild(more);
+    }
     $("intakeList").appendChild(frag);
   }
 
