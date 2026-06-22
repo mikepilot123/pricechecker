@@ -583,6 +583,12 @@ body {
 .setup-sub { margin: 0 0 16px; font-size: 0.85rem; color: var(--text-dim); }
 .setup-card .field-label { margin-top: 12px; }
 .setup-card .primary-btn { width: 100%; margin-top: 16px; }
+.settings-maintenance { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.settings-help { margin: 5px 0 12px; color: var(--text-dim); font-size: 0.82rem; line-height: 1.45; }
+.settings-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.settings-actions .ghost-btn { justify-content: center; min-height: 42px; }
+.settings-actions .danger-btn { grid-column: 1 / -1; }
+.settings-back { width: 100%; justify-content: center; margin-top: 12px; }
 
 /* ---------- Toolbar ---------- */
 .repairs-toolbar {
@@ -675,6 +681,19 @@ body {
   background: var(--dot, var(--accent));
 }
 .ticket-main { min-width: 0; flex: 1; }
+.ticket-device-thumb {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 72px;
+  height: 86px;
+  margin-top: 2px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--bg-soft), var(--card));
+}
+.ticket-device-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
 .ticket-toprow {
   display: flex;
   align-items: center;
@@ -701,6 +720,9 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+@media (max-width: 390px) {
+  .ticket-device-thumb { width: 58px; height: 72px; border-radius: 12px; }
 }
 /* Tap-to-call number shown right on the card */
 .ticket-phone {
