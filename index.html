@@ -7,25 +7,43 @@
   <meta name="description" content="Live repair price checker + device intake tracker for the team." />
   <title>Repair Hub</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232756e0'/><path d='m58 31 12-12a16 16 0 0 1-21 21L28 61a8 8 0 1 0 11 11l21-21a16 16 0 0 1 21-21L69 42' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232756e0'/><path d='m58 31 12-12a16 16 0 0 1-21 21L28 61a8 8 0 1 0 11 11l21-21a16 16 0 0 1 21-21L69 42' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-tools" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5.2 5.2l-7.8 7.8a2.1 2.1 0 0 0 3 3l7.8-7.8a4 4 0 0 1 5.2-5.2l-3 3"/><path d="m6.2 6.2 4.2 4.2"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2A2 2 0 0 1 3 12V5a2 2 0 0 1 2-2h7a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.8Z"/><path d="M7.5 7.5h.01"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.2 4.2"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.7 2.7-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1.1 1.5v.2h-4v-.2a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 13.9h-.2v-4H3A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9L4.2 7 6.9 4.3l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3.2V3h4v.2a1.7 1.7 0 0 0 1.1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6.9h.2v4h-.2a1.7 1.7 0 0 0-1.6 1.1Z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M7.1 3.8 4.6 5.1c-.8.4-1.1 1.3-.8 2.1 2.5 6.5 7.6 11.6 14.1 14.1.8.3 1.7 0 2.1-.8l1.3-2.5a1.7 1.7 0 0 0-.4-2l-2.8-2.3a1.7 1.7 0 0 0-2-.1l-1.7 1.1a13.2 13.2 0 0 1-5.2-5.2l1.1-1.7a1.7 1.7 0 0 0-.1-2L9.1 4.2a1.7 1.7 0 0 0-2-.4Z"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m4 16.8-.8 4 4-.8L19 8.2 15.8 5 4 16.8Z"/><path d="m13.8 7 3.2 3.2M18 4.8l1.2-1.2a1.5 1.5 0 0 1 2.1 2.1L20 6.9"/></symbol>
+    <symbol id="i-xmark" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6.5 9 5.5 5.5L17.5 9"/></symbol>
+    <symbol id="i-device" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.2"/><path d="M10 18.5h4"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.2 20c.8-3.3 3.2-5 6.8-5s6 1.7 6.8 5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
+  </svg>
   <header class="app-header">
     <div class="header-row">
-      <h1 class="brand">🔧 Repair Hub</h1>
+      <h1 class="brand"><svg class="icon brand-icon"><use href="#i-tools"></use></svg>Repair Hub</h1>
       <button id="refreshBtn" class="refresh-btn" title="Refresh prices" aria-label="Refresh prices" data-view="prices">
-        <span class="refresh-icon">↻</span>
+        <svg class="icon refresh-icon"><use href="#i-refresh"></use></svg>
         <span class="refresh-label">Refresh</span>
       </button>
     </div>
     <nav class="view-nav" role="tablist" aria-label="Sections">
-      <button class="nav-btn active" data-target="prices" role="tab">💲 Prices</button>
-      <button class="nav-btn" data-target="intake" role="tab">📋 Intake</button>
+      <button class="nav-btn active" data-target="prices" role="tab"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
+      <button class="nav-btn" data-target="intake" role="tab"><svg class="icon"><use href="#i-clipboard"></use></svg>Intake</button>
     </nav>
   </header>
 
@@ -47,7 +65,7 @@
         placeholder="Search a model — e.g. 13 Pro, S22 Ultra, A54…"
         aria-label="Search for a device model"
       />
-      <button id="clearSearch" class="clear-search" aria-label="Clear search" hidden>×</button>
+      <button id="clearSearch" class="clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
     </div>
 
     <div id="filterChips" class="filter-chips" role="tablist" aria-label="Filter by brand"></div>
@@ -55,12 +73,12 @@
     <div id="results" class="results" aria-live="polite"></div>
 
     <div id="emptyState" class="empty-state" hidden>
-      <p class="empty-emoji">🔍</p>
+      <div class="empty-icon"><svg class="icon"><use href="#i-search"></use></svg></div>
       <p class="empty-title">No matching models</p>
       <p class="empty-sub">Try a shorter search, like just the number.</p>
     </div>
     <div id="errorState" class="error-state" hidden>
-      <p class="empty-emoji">⚠️</p>
+      <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
       <p class="empty-title">Couldn't load the latest prices</p>
       <p class="empty-sub" id="errorSub">Check your internet connection and tap Refresh.</p>
     </div>
@@ -84,10 +102,10 @@
     <!-- Main intake UI: shown once configured -->
     <section id="intakeMain" hidden>
       <div class="repairs-toolbar">
-        <button id="newIntakeBtn" class="primary-btn">+ Log device</button>
-        <button id="reloadIntake" class="ghost-btn" title="Reload">↻</button>
-        <button id="intakeSettings" class="ghost-btn" title="Connection settings">⚙︎</button>
-        <button id="clearAllIntake" class="ghost-btn danger-btn" title="Delete all devices">🗑 Clear all</button>
+        <button id="newIntakeBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Log device</button>
+        <button id="reloadIntake" class="ghost-btn icon-btn" title="Reload" aria-label="Reload"><svg class="icon"><use href="#i-refresh"></use></svg></button>
+        <button id="intakeSettings" class="ghost-btn icon-btn" title="Connection settings" aria-label="Connection settings"><svg class="icon"><use href="#i-gear"></use></svg></button>
+        <button id="clearAllIntake" class="ghost-btn danger-btn" title="Delete all devices"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
       </div>
 
       <div class="search-wrap">
@@ -100,12 +118,12 @@
       <div id="intakeList" class="results" aria-live="polite"></div>
 
       <div id="intakeEmpty" class="empty-state" hidden>
-        <p class="empty-emoji">📋</p>
+        <div class="empty-icon"><svg class="icon"><use href="#i-clipboard"></use></svg></div>
         <p class="empty-title">No devices logged yet</p>
         <p class="empty-sub">Tap “+ Log device” to add the first one.</p>
       </div>
       <div id="intakeError" class="error-state" hidden>
-        <p class="empty-emoji">⚠️</p>
+        <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
         <p class="empty-title">Couldn't load devices</p>
         <p class="empty-sub" id="intakeErrorSub">Check the connection and try again.</p>
       </div>
@@ -122,7 +140,7 @@
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="intakeFormTitle">
       <div class="modal-header">
         <h3 id="intakeFormTitle">Log device</h3>
-        <button type="button" id="closeIntakeFormModal" class="modal-close" aria-label="Close">×</button>
+        <button type="button" id="closeIntakeFormModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div class="modal-body">
         <form id="intakeForm" autocomplete="off">
@@ -155,7 +173,7 @@
               <label class="field-label">Issues *</label>
               <button type="button" id="openIssueModal" class="issue-select-btn">
                 <span id="issueSelectLabel">Select issues…</span>
-                <span class="issue-select-chevron">›</span>
+                <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
               </button>
               <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
             </div>
@@ -181,7 +199,7 @@
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="clientModalTitle">
       <div class="modal-header">
         <h3 id="clientModalTitle">Customer info</h3>
-        <button type="button" id="closeClientModal" class="modal-close" aria-label="Close">×</button>
+        <button type="button" id="closeClientModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div class="modal-body">
         <div class="form-field">
@@ -209,7 +227,7 @@
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="issueModalTitle">
       <div class="modal-header">
         <h3 id="issueModalTitle">Select issues</h3>
-        <button type="button" id="closeIssueModal" class="modal-close" aria-label="Close">×</button>
+        <button type="button" id="closeIssueModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div class="modal-body">
         <div id="issueTags" class="issue-tags"></div>
@@ -226,7 +244,7 @@
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="clearAllModalTitle">
       <div class="modal-header">
         <h3 id="clearAllModalTitle">Clear all devices?</h3>
-        <button type="button" id="closeClearAllModal" class="modal-close" aria-label="Close">×</button>
+        <button type="button" id="closeClearAllModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div class="modal-body">
         <p class="empty-sub" id="clearAllModalSub">
@@ -241,6 +259,18 @@
         <button type="button" id="confirmClearAll" class="primary-btn danger-btn">Delete everything</button>
       </div>
     </div>
+  </div>
+
+  <!-- Device detail sheet -->
+  <div id="ticketModal" class="modal-backdrop" hidden>
+    <section class="modal-panel ticket-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ticketModalTitle">
+      <div class="modal-header">
+        <div><p class="modal-eyebrow">Intake record</p><h3 id="ticketModalTitle">Device details</h3></div>
+        <button type="button" id="closeTicketModal" class="modal-close" aria-label="Close device details"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div id="ticketModalBody" class="modal-body"></div>
+      <div id="ticketModalFooter" class="modal-footer ticket-modal-footer"></div>
+    </section>
   </div>
 
   <script src="assets/app.js"></script>
