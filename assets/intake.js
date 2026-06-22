@@ -60,7 +60,6 @@
   let statusFilter = "all";
   let editingId = null;
   let loadedOnce = false;
-  let activeTicket = null;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -177,24 +176,57 @@
 
   $("reloadIntake").addEventListener("click", loadTickets);
   $("intakeSettings").addEventListener("click", () => showSetup(true));
-  $("clearIntake").addEventListener("click", clearAllTickets);
 
-  async function clearAllTickets() {
-    const count = TICKETS.length;
-    if (!count) return;
-    if (!window.confirm(`Delete all ${count} intake record${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
-    if (!window.confirm("Final confirmation: permanently delete every intake record?")) return;
+  // ---- Clear all -------------------------------------------------------------
+  function openClearAllModal() {
+    if (!TICKETS.length) return;
+    $("clearAllPin").value = "";
+    $("clearAllError").hidden = true;
+    $("clearAllModal").hidden = false;
+    $("clearAllPin").focus();
+  }
+  function closeClearAllModal() {
+    $("clearAllModal").hidden = true;
+  }
+  $("clearAllIntake").addEventListener("click", openClearAllModal);
+  $("closeClearAllModal").addEventListener("click", closeClearAllModal);
+  $("clearAllModal").addEventListener("click", (e) => {
+    if (e.target.id === "clearAllModal") closeClearAllModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("clearAllModal").hidden) closeClearAllModal();
+  });
+
+  $("confirmClearAll").addEventListener("click", async () => {
+    const err = $("clearAllError");
+    err.hidden = true;
+    const pin = $("clearAllPin").value.trim();
+    if (!pin || pin !== getCfg().pin) {
+      err.textContent = "PIN doesn't match — clear all canceled.";
+      err.hidden = false;
+      return;
+    }
+    const btn = $("confirmClearAll");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Deleting…";
     try {
       const res = await api({ action: "clear" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = [];
       statusFilter = "all";
+      closeForm();
+      closeClearAllModal();
       renderStatusChips();
       render();
     } catch (e) {
-      alert("Couldn't clear intake records: " + e.message);
+      err.textContent = "Couldn't clear devices: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
     }
-  }
+  });
 
   // ---- Form ------------------------------------------------------------------
   populateStatusSelect();
@@ -259,45 +291,28 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("issueModal").hidden) closeIssueModal();
-    if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal();
   });
 
   // ---- Ticket detail modal -------------------------------------------------
   function openTicketModal(ticket) {
-    activeTicket = ticket;
     const hasPhone = !!ticket.phone;
     $("ticketModalBody").innerHTML = `
       <div class="ticket-detail-hero">
         <span class="ticket-device-icon"><svg class="icon"><use href="#i-device"></use></svg></span>
-        <div>
-          <h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4>
-          <p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p>
-        </div>
+        <div><h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4><p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p></div>
         <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
       </div>
-      <section class="ticket-detail-section">
-        <p class="field-label">Customer & device</p>
-        <div class="ticket-detail-grid">
-          ${detailRow("i-user", "Customer", ticket.customerName || "Unknown customer")}
-          ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
-          ${detailRow("i-device", "Device", ticket.device || "—")}
-          ${detailRow("i-clock", "Logged", fmtDate(ticket.created))}
-          ${detailRow("i-clock", "Updated", fmtDate(ticket.updated))}
-        </div>
-      </section>
-      <section class="ticket-detail-section">
-        <p class="field-label">Issues</p>
-        <div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div>
-      </section>
+      <section class="ticket-detail-section"><p class="field-label">Customer & device</p><div class="ticket-detail-grid">
+        ${detailRow("i-user", "Customer", ticket.customerName || "Unknown customer")}
+        ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
+        ${detailRow("i-device", "Device", ticket.device || "—")}
+        ${detailRow("i-clock", "Logged", fmtDate(ticket.created))}
+        ${detailRow("i-clock", "Updated", fmtDate(ticket.updated))}
+      </div></section>
+      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
       ${ticket.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(ticket.notes)}</p></section>` : ""}
-      <section class="ticket-detail-section">
-        <p class="field-label">Set status</p>
-        <div class="status-buttons" id="ticketModalStatuses"></div>
-      </section>
-      <section class="ticket-detail-section">
-        <p class="field-label">Activity log</p>
-        ${historyHtml(ticket.history)}
-      </section>`;
+      <section class="ticket-detail-section"><p class="field-label">Set status</p><div class="status-buttons" id="ticketModalStatuses"></div></section>
+      <section class="ticket-detail-section"><p class="field-label">Activity log</p>${historyHtml(ticket.history)}</section>`;
 
     const statusBox = $("ticketModalStatuses");
     STATUSES.forEach((status) => {
@@ -316,25 +331,16 @@
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
-    $("ticketModalEdit").onclick = () => {
-      closeTicketModal();
-      openForm(ticket);
-    };
-    $("ticketModalDelete").onclick = async () => {
-      if (await deleteTicket(ticket)) closeTicketModal();
-    };
+    $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
+    $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     $("ticketModal").hidden = false;
     $("closeTicketModal").focus();
   }
 
-  function closeTicketModal() {
-    $("ticketModal").hidden = true;
-    activeTicket = null;
-  }
+  function closeTicketModal() { $("ticketModal").hidden = true; }
   $("closeTicketModal").addEventListener("click", closeTicketModal);
-  $("ticketModal").addEventListener("click", (e) => {
-    if (e.target.id === "ticketModal") closeTicketModal();
-  });
+  $("ticketModal").addEventListener("click", (e) => { if (e.target.id === "ticketModal") closeTicketModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal(); });
 
   function detailRow(iconName, label, value) {
     return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${value}</span></div>`;
@@ -383,7 +389,7 @@
 
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
-    $("intakeForm").hidden = false;
+    $("intakeFormTitle").textContent = ticket ? "Edit device" : "Log device";
     $("fName").value = ticket ? ticket.customerName || "" : "";
     $("fPhone").value = ticket ? ticket.phone || "" : "";
     $("fDevice").value = ticket ? ticket.device || "" : "";
@@ -393,21 +399,106 @@
 
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
-    $("intakeForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    $("intakeFormModal").hidden = false;
     $("fName").focus();
   }
   function closeForm() {
-    $("intakeForm").hidden = true;
+    $("intakeFormModal").hidden = true;
     editingId = null;
   }
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
   $("cancelForm").addEventListener("click", closeForm);
+  $("closeIntakeFormModal").addEventListener("click", closeForm);
+  $("intakeFormModal").addEventListener("click", (e) => {
+    if (e.target.id === "intakeFormModal") closeForm();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("intakeFormModal").hidden) closeForm();
+  });
+
+  // ---- Customer info modal --------------------------------------------------
+  // Quick-edits a ticket's customer details straight from its card.
+  let clientModalTicket = null;
+
+  function openClientModalForTicket(ticket) {
+    clientModalTicket = ticket;
+    $("clientModalTitle").textContent = "Update customer";
+    $("cName").value = ticket.customerName || "";
+    $("cPhone").value = ticket.phone || "";
+    $("cNotes").value = ticket.notes || "";
+    $("saveClientModal").textContent = "Save";
+    $("clientModalError").hidden = true;
+    $("clientModal").hidden = false;
+    $("cName").focus();
+  }
+
+  function closeClientModal() {
+    $("clientModal").hidden = true;
+    clientModalTicket = null;
+  }
+
+  $("closeClientModal").addEventListener("click", closeClientModal);
+  $("clientModal").addEventListener("click", (e) => {
+    if (e.target.id === "clientModal") closeClientModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("clientModal").hidden) closeClientModal();
+  });
+
+  $("saveClientModal").addEventListener("click", async () => {
+    const err = $("clientModalError");
+    err.hidden = true;
+    const name = $("cName").value.trim();
+    const phone = $("cPhone").value.trim();
+    if (!name || !phone) {
+      err.textContent = "Enter the customer's name and phone.";
+      err.hidden = false;
+      return;
+    }
+
+    const ticket = clientModalTicket;
+    const notes = $("cNotes").value.trim();
+    const btn = $("saveClientModal");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Saving…";
+    try {
+      const res = await api({
+        action: "update",
+        id: ticket.id,
+        customerName: name,
+        client: name,
+        phone,
+        notes,
+        device: ticket.device,
+        issues: ticket.issues,
+        issue: ticket.issues,
+        status: ticket.status,
+      });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      mergeTicket(res.ticket);
+      renderStatusChips();
+      render();
+      closeClientModal();
+    } catch (e) {
+      err.textContent = "Couldn't save: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
 
   $("intakeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = $("formError");
     err.hidden = true;
+    if (!$("fName").value.trim() || !$("fPhone").value.trim()) {
+      err.textContent = "Enter the customer's name and phone.";
+      err.hidden = false;
+      return;
+    }
     const issuesStr = buildIssuesString();
     if (!issuesStr) {
       err.textContent = "Select at least one issue.";
@@ -576,6 +667,9 @@
     head.setAttribute("role", "button");
     head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
     const hasPhone = !!t.phone;
+    const phoneLine = hasPhone
+      ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
+      : `<span class="ticket-phone no-phone">No number on file</span>`;
     head.innerHTML = `
       <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
       <div class="ticket-main">
@@ -585,12 +679,12 @@
         </div>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
+        ${phoneLine}
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
-      </div>
-      <a class="ticket-call${hasPhone ? "" : " disabled"}" href="${hasPhone ? `tel:${esc(t.phone)}` : "#"}" title="${hasPhone ? "Call " + esc(t.customerName || "customer") : "No phone on file"}" aria-label="Call customer"><svg class="icon"><use href="#i-phone"></use></svg></a>`;
-    const callButton = head.querySelector(".ticket-call");
-    callButton.onclick = (e) => e.stopPropagation();
-    callButton.onkeydown = (e) => e.stopPropagation();
+      </div>`;
+    const phoneEl = head.querySelector("a.ticket-phone");
+    if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
+    if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
     head.onclick = () => openTicketModal(t);
     head.onkeydown = (e) => {
       if (e.key === "Enter" || e.key === " ") {

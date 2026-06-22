@@ -15,8 +15,6 @@
   <link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
-  <!-- Shared outline icon set. Rounded strokes deliberately echo the clarity
-       of SF Symbols without depending on an external icon library. -->
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
     <symbol id="i-tools" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5.2 5.2l-7.8 7.8a2.1 2.1 0 0 0 3 3l7.8-7.8a4 4 0 0 1 5.2-5.2l-3 3"/><path d="m6.2 6.2 4.2 4.2"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></symbol>
@@ -106,56 +104,9 @@
       <div class="repairs-toolbar">
         <button id="newIntakeBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Log device</button>
         <button id="reloadIntake" class="ghost-btn icon-btn" title="Reload" aria-label="Reload"><svg class="icon"><use href="#i-refresh"></use></svg></button>
-        <button id="clearIntake" class="ghost-btn danger-btn" title="Delete all intake records"><svg class="icon"><use href="#i-trash"></use></svg><span>Clear all</span></button>
         <button id="intakeSettings" class="ghost-btn icon-btn" title="Connection settings" aria-label="Connection settings"><svg class="icon"><use href="#i-gear"></use></svg></button>
+        <button id="clearAllIntake" class="ghost-btn danger-btn" title="Delete all devices"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
       </div>
-
-      <!-- New / edit ticket form -->
-      <form id="intakeForm" class="repair-form" hidden autocomplete="off">
-        <div class="form-section-label">Customer</div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label class="field-label" for="fName">Name *</label>
-            <input id="fName" class="text-input" required placeholder="e.g. Anita Singh" />
-          </div>
-          <div class="form-field">
-            <label class="field-label" for="fPhone">Phone *</label>
-            <input id="fPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
-          </div>
-        </div>
-
-        <div class="form-section-label">Device</div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label class="field-label" for="fDevice">Device *</label>
-            <input id="fDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
-            <datalist id="modelList"></datalist>
-          </div>
-          <div class="form-field">
-            <label class="field-label" for="fStatus">Status</label>
-            <div class="select-wrap">
-              <select id="fStatus" class="text-input select-input"></select>
-            </div>
-          </div>
-          <div class="form-field form-field-full">
-            <label class="field-label">Issues *</label>
-            <button type="button" id="openIssueModal" class="issue-select-btn">
-              <span id="issueSelectLabel">Select issues…</span>
-              <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
-            </button>
-            <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
-          </div>
-          <div class="form-field form-field-full">
-            <label class="field-label" for="fNotes">Notes</label>
-            <textarea id="fNotes" class="text-input" rows="2" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" id="cancelForm" class="ghost-btn">Cancel</button>
-          <button type="submit" id="saveForm" class="primary-btn">Save device</button>
-        </div>
-        <p id="formError" class="field-error" hidden></p>
-      </form>
 
       <div class="search-wrap">
         <input id="intakeSearch" class="search-input" type="search" autocomplete="off"
@@ -184,6 +135,93 @@
     <p>Prices in TTD · Live from the shop sheet · Internal team use</p>
   </footer>
 
+  <!-- Log / edit device modal -->
+  <div id="intakeFormModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="intakeFormTitle">
+      <div class="modal-header">
+        <h3 id="intakeFormTitle">Log device</h3>
+        <button type="button" id="closeIntakeFormModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="intakeForm" autocomplete="off">
+          <div class="form-section-label">Customer</div>
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="fName">Name *</label>
+              <input id="fName" class="text-input" required placeholder="e.g. Anita Singh" />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="fPhone">Phone *</label>
+              <input id="fPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
+            </div>
+          </div>
+
+          <div class="form-section-label">Device</div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label" for="fDevice">Device *</label>
+              <input id="fDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
+              <datalist id="modelList"></datalist>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="fStatus">Status</label>
+              <div class="select-wrap">
+                <select id="fStatus" class="text-input select-input"></select>
+              </div>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label">Issues *</label>
+              <button type="button" id="openIssueModal" class="issue-select-btn">
+                <span id="issueSelectLabel">Select issues…</span>
+                <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
+              </button>
+              <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="fNotes">Notes</label>
+              <textarea id="fNotes" class="text-input" rows="2" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
+            </div>
+          </div>
+          <p id="formError" class="field-error" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="cancelForm" class="ghost-btn">Cancel</button>
+          <button type="submit" id="saveForm" class="primary-btn" form="intakeForm">Save device</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer info modal: quick-edits a ticket's customer details from its card -->
+  <div id="clientModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="clientModalTitle">
+      <div class="modal-header">
+        <h3 id="clientModalTitle">Customer info</h3>
+        <button type="button" id="closeClientModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-field">
+          <label class="field-label" for="cName">Name *</label>
+          <input id="cName" class="text-input" required placeholder="e.g. Anita Singh" />
+        </div>
+        <div class="form-field">
+          <label class="field-label" for="cPhone">Phone *</label>
+          <input id="cPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
+        </div>
+        <div class="form-field" id="cNotesField">
+          <label class="field-label" for="cNotes">Notes</label>
+          <textarea id="cNotes" class="text-input" rows="2" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
+        </div>
+        <p id="clientModalError" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="saveClientModal" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Issue picker modal -->
   <div id="issueModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="issueModalTitle">
@@ -201,14 +239,33 @@
     </div>
   </div>
 
-  <!-- Ticket detail sheet -->
+  <!-- Clear all confirmation modal -->
+  <div id="clearAllModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="clearAllModalTitle">
+      <div class="modal-header">
+        <h3 id="clearAllModalTitle">Clear all devices?</h3>
+        <button type="button" id="closeClearAllModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p class="empty-sub" id="clearAllModalSub">
+          This permanently deletes every device, customer, and activity log entry
+          from the dashboard and the shop sheet. This cannot be undone.
+        </p>
+        <label class="field-label" for="clearAllPin">Re-enter the team PIN to confirm</label>
+        <input id="clearAllPin" class="text-input" type="password" inputmode="numeric" placeholder="••••" autocomplete="off" />
+        <p id="clearAllError" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="confirmClearAll" class="primary-btn danger-btn">Delete everything</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device detail sheet -->
   <div id="ticketModal" class="modal-backdrop" hidden>
     <section class="modal-panel ticket-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ticketModalTitle">
       <div class="modal-header">
-        <div>
-          <p class="modal-eyebrow">Intake record</p>
-          <h3 id="ticketModalTitle">Device details</h3>
-        </div>
+        <div><p class="modal-eyebrow">Intake record</p><h3 id="ticketModalTitle">Device details</h3></div>
         <button type="button" id="closeTicketModal" class="modal-close" aria-label="Close device details"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div id="ticketModalBody" class="modal-body"></div>

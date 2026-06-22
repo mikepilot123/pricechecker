@@ -24,20 +24,8 @@
 * { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
-
 .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
-.icon {
-  width: 1.15em;
-  height: 1.15em;
-  display: inline-block;
-  flex: none;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vertical-align: -0.15em;
-}
+.icon { width: 1.15em; height: 1.15em; display: inline-block; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; }
 
 body {
   margin: 0;
@@ -199,6 +187,8 @@ body {
   border: none;
   background: var(--bg-soft);
   color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1;
   cursor: pointer;
 }
 .clear-search .icon { width: 16px; height: 16px; }
@@ -284,8 +274,7 @@ body {
 .from-value.na { color: var(--warn); font-family: inherit; font-size: 0.82rem; font-weight: 600; }
 .chevron {
   color: var(--text-dim);
-  width: 1.2rem;
-  height: 1.2rem;
+  font-size: 0.85rem;
   transition: transform 0.2s;
 }
 .card.open .chevron { transform: rotate(180deg); }
@@ -325,17 +314,7 @@ body {
   padding: 50px 20px;
   color: var(--text-dim);
 }
-.empty-icon {
-  width: 48px;
-  height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 0 12px;
-  border-radius: 15px;
-  color: var(--accent);
-  background: var(--accent-soft);
-}
+.empty-icon { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; margin: 0 0 12px; border-radius: 15px; color: var(--accent); background: var(--accent-soft); }
 .empty-icon .icon { width: 25px; height: 25px; stroke-width: 1.65; }
 .empty-icon.error { color: var(--danger); background: #fce7e5; }
 .empty-title { font-size: 1.05rem; font-weight: 600; color: var(--text); margin: 0 0 4px; }
@@ -433,6 +412,17 @@ body {
 .ghost-btn:hover { background: var(--card-hover); }
 .icon-btn { width: 42px; height: 42px; padding: 0; }
 .icon-btn .icon { width: 19px; height: 19px; }
+.danger-btn {
+  color: var(--danger);
+  border-color: rgba(200, 54, 43, 0.35);
+}
+.danger-btn:hover { background: rgba(200, 54, 43, 0.08); }
+.primary-btn.danger-btn {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.primary-btn.danger-btn:hover { filter: brightness(1.08); }
 .text-input {
   width: 100%;
   background: var(--card);
@@ -554,14 +544,6 @@ body {
 .repairs-toolbar .primary-btn { flex: 1; }
 
 /* ---------- Intake form ---------- */
-.repair-form {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 14px;
-  box-shadow: var(--shadow);
-}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -666,27 +648,30 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ticket-call {
-  flex: none;
+/* Tap-to-call number shown right on the card */
+.ticket-phone {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px 6px 10px;
+  border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
   text-decoration: none;
   transition: background 0.15s, transform 0.1s;
-  margin-top: 1px;
 }
-.ticket-call .icon { width: 18px; height: 18px; stroke-width: 1.9; }
-.ticket-call:hover { background: #dde6fb; }
-.ticket-call:active { transform: scale(0.92); }
-.ticket-call.disabled {
+.ticket-phone:hover { background: #dde6fb; }
+.ticket-phone:active { transform: scale(0.97); }
+.ticket-phone-icon { width: 17px; height: 17px; stroke-width: 1.9; }
+.ticket-phone.no-phone {
   background: var(--bg-soft);
   color: var(--text-dim);
-  pointer-events: none;
+  font-weight: 500;
+  font-family: inherit;
 }
 .status-badge {
   flex: none;
@@ -744,19 +729,9 @@ body {
 .status-set:hover { background: var(--card-hover); color: var(--text); }
 .status-set.current { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .ticket-edit-btn { margin-top: 12px; }
+.ticket-client-btn { margin-top: 12px; margin-left: 8px; }
 .ticket-delete-btn { margin-top: 12px; margin-left: 8px; color: var(--danger); }
-.danger-btn { color: var(--danger); }
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .repair-loading {
   text-align: center;
@@ -874,49 +849,28 @@ body {
   border-top: 1px solid var(--border);
   flex: none;
 }
+.modal-footer .primary-btn { width: 100%; }
+.modal-footer .form-actions { margin-top: 0; }
+.modal-footer .form-actions .ghost-btn,
+.modal-footer .form-actions .primary-btn { flex: 1; width: auto; }
 
 /* ---------- Ticket detail sheet ---------- */
 .ticket-modal-panel { max-width: 560px; }
-.ticket-detail-hero {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 2px 0 16px;
-  border-bottom: 1px solid var(--border);
-}
-.ticket-device-icon {
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  border-radius: 13px;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
+.ticket-detail-hero { display: flex; align-items: center; gap: 12px; padding: 2px 0 16px; border-bottom: 1px solid var(--border); }
+.ticket-device-icon { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 13px; background: var(--accent-soft); color: var(--accent); }
 .ticket-device-icon .icon { width: 22px; height: 22px; }
 .ticket-detail-title { margin: 0; font-size: 1.05rem; font-family: var(--font-display); }
 .ticket-detail-id { margin: 2px 0 0; font-size: 0.72rem; color: var(--text-dim); }
 .ticket-detail-section { margin-top: 18px; }
 .ticket-detail-section .field-label { margin-bottom: 8px; }
 .ticket-detail-grid { border-top: 1px solid var(--border); }
-.ticket-detail-row {
-  display: grid;
-  grid-template-columns: 26px minmax(88px, 0.6fr) minmax(0, 1.4fr);
-  align-items: center;
-  gap: 8px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.88rem;
-}
+.ticket-detail-row { display: grid; grid-template-columns: 26px minmax(88px, 0.6fr) minmax(0, 1.4fr); align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
 .ticket-detail-row .icon { width: 17px; height: 17px; color: var(--text-dim); }
 .ticket-detail-label { color: var(--text-dim); }
 .ticket-detail-value { min-width: 0; text-align: right; font-weight: 650; overflow-wrap: anywhere; }
 .ticket-detail-value .ticket-tel { font-size: inherit; }
 .ticket-detail-notes { margin: 0; border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; color: var(--text-dim); font-size: 0.88rem; white-space: pre-wrap; }
 .ticket-modal-footer { display: flex; gap: 8px; }
-.ticket-modal-footer .primary-btn { flex: 1; }
+.ticket-modal-footer .primary-btn { flex: 1; width: auto; }
 .ticket-modal-footer .ghost-btn { flex: none; }
 .ticket-modal-footer .danger-btn { margin-left: auto; }
-.modal-footer .primary-btn { width: 100%; }
