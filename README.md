@@ -63,23 +63,28 @@ const TABS = [
 
 ## Intake — logging devices & repair status
 
-The **Intake** tab lets the team log a device, its issue, and track status
-through the repair pipeline: `Received → Diagnosing → Waiting for Parts →
-In Progress → Repaired → Picked Up` (or `Cancelled`).
+The **Intake** tab lets the team log a customer's device + issue and track
+status through the repair pipeline: `Received → Diagnosing → Waiting for
+Parts → In Progress → Repaired → Picked Up` (or `Cancelled`). It captures
+Customer Name, Phone, Device, Issue (preset dropdown + "Other"), Status, and
+Notes.
 
-Data is stored in a separate, dedicated Google Sheet ("JQ Reapirs"):
-https://docs.google.com/spreadsheets/d/e/2PACX-1vRM2QLZHosrZyBOczFvDvnmsZDPzl-r6cW1K2HpEYl6whm5kyp4rtm4DwbfM_pCRhdP4hqiWFyPDIDh/pubhtml
+Data is stored in a separate, dedicated Google Sheet ("JQ Reapirs"), written
+to only through a PIN-gated Apps Script — never read as a public CSV.
 
-**Privacy — read before using:** that sheet is published publicly (read-only
-CSV), so the Intake form intentionally has **no customer name, phone, or
-email field** — only Device, Issue, Status, and Notes. Don't put customer
-identifying details in Notes either. If you ever need to track customer
-contact info, keep it in a separate, non-published system.
+**Privacy — this sheet now holds customer PII (name + phone).** It must
+**not** be published to the web or link-shared. Verify both are off:
+**File → Share → Publish to web** (should be off/unpublished) and the
+**Share** button (should be restricted, not "Anyone with the link"). The
+app never needs it published — it only ever talks to the Apps Script
+endpoint below.
 
 ### One-time setup (per team manager)
 
 A static site can't write to Google Sheets directly, so writes go through a
-small Google Apps Script "web app" that the sheet owner deploys once:
+small Google Apps Script "web app" that the sheet owner deploys once. The
+script's URL is already wired into [`assets/intake.js`](assets/intake.js) —
+only the PIN is entered by staff.
 
 1. Open the JQ Reapirs spreadsheet → **Extensions → Apps Script**.
 2. Paste in the contents of [`apps-script/Code.gs`](apps-script/Code.gs).
@@ -87,13 +92,17 @@ small Google Apps Script "web app" that the sheet owner deploys once:
 4. **Deploy → New deployment → Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**
-5. Copy the resulting `.../exec` URL.
-6. In the app, open the **Intake** tab — it'll prompt for that URL + the PIN
-   once per device, then remembers it locally (never uploaded or committed).
+5. Copy the resulting `.../exec` URL and update the `SCRIPT_URL` constant
+   near the top of [`assets/intake.js`](assets/intake.js) (only needed if
+   you redeploy to a new URL — the current one is already set).
+6. In the app, open the **Intake** tab — staff just enter the PIN once per
+   device; it's remembered locally after that (never uploaded or committed).
 
-If you ever need to rotate the PIN, update it in the script, redeploy (same
-deployment, "Manage deployments → Edit → New version"), and re-enter the new
-PIN on each device.
+The PIN is the only access control on this endpoint — anyone with it can
+read every logged ticket (including customer name/phone) or write new ones.
+Keep it private, and if it ever leaks, rotate it: change `PIN` in the
+script, redeploy (same deployment, "Manage deployments → Edit → New
+version"), and re-enter the new PIN on each device.
 
 ---
 

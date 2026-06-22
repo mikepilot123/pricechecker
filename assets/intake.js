@@ -3,16 +3,18 @@
    Talks to a Google Apps Script web app that reads/writes a
    dedicated "JQ Reapirs" spreadsheet.
 
-   That sheet is published/public, so by design this stores only
-   device + issue + status + notes — no customer name, phone, or
-   other personal info. Keep it that way when filling in Notes.
-
-   The script URL + team PIN are stored only in this browser
-   (localStorage) — never committed to the repo. See
-   apps-script/Code.gs + README for setup.
+   The Apps Script URL is fixed below (it's not secret on its own —
+   every request still requires the team PIN, checked server-side in
+   apps-script/Code.gs). Only the PIN is entered once per device and
+   stored in localStorage.
    ============================================================ */
 
 (function () {
+  // Fixed Apps Script web app URL — update if you ever redeploy to a
+  // new URL. The PIN (set server-side in Code.gs) is the real gate.
+  const SCRIPT_URL =
+    "https://script.google.com/macros/s/AKfycbyNDPA3RSYJfpoQ0sWqPZ1Ebyui9xyeVXzC00RDTZ3F0ilOg8nPnNGn9dYqlId2YiBaUw/exec";
+
   // Status pipeline — keep in sync with apps-script/Code.gs STATUSES.
   const STATUSES = [
     "Received",
@@ -48,7 +50,6 @@
     "Other",
   ];
 
-  const LS_URL = "rpc_intake_url";
   const LS_PIN = "rpc_intake_pin";
 
   const $ = (id) => document.getElementById(id);
@@ -76,22 +77,15 @@
 
   // ---- Config --------------------------------------------------------------
   const getCfg = () => ({
-    url: localStorage.getItem(LS_URL) || "",
+    url: SCRIPT_URL,
     pin: localStorage.getItem(LS_PIN) || "",
   });
-  const isConfigured = () => {
-    const c = getCfg();
-    return !!c.url && !!c.pin;
-  };
+  const isConfigured = () => !!getCfg().pin;
 
   function showSetup(prefill) {
     $("intakeSetup").hidden = false;
     $("intakeMain").hidden = true;
-    if (prefill) {
-      const c = getCfg();
-      $("cfgUrl").value = c.url;
-      $("cfgPin").value = c.pin;
-    }
+    if (prefill) $("cfgPin").value = getCfg().pin;
   }
   function showMain() {
     $("intakeSetup").hidden = true;
@@ -99,15 +93,9 @@
   }
 
   $("cfgSave").addEventListener("click", async () => {
-    const url = $("cfgUrl").value.trim();
     const pin = $("cfgPin").value.trim();
     const err = $("cfgError");
     err.hidden = true;
-    if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url)) {
-      err.textContent = "That doesn't look like an Apps Script /exec URL.";
-      err.hidden = false;
-      return;
-    }
     if (!pin) {
       err.textContent = "Enter the team PIN.";
       err.hidden = false;
@@ -117,9 +105,8 @@
     $("cfgSave").disabled = true;
     $("cfgSave").textContent = "Connecting…";
     try {
-      const res = await api({ action: "list" }, { url, pin });
+      const res = await api({ action: "list" }, { url: SCRIPT_URL, pin });
       if (!res.ok) throw new Error(res.error || "Rejected");
-      localStorage.setItem(LS_URL, url);
       localStorage.setItem(LS_PIN, pin);
       TICKETS = res.tickets || [];
       loadedOnce = true;
@@ -127,7 +114,7 @@
       renderStatusChips();
       render();
     } catch (e) {
-      err.textContent = "Couldn't connect: " + e.message + ". Check the URL and PIN.";
+      err.textContent = "Couldn't connect: " + e.message + ". Check the PIN.";
       err.hidden = false;
     } finally {
       $("cfgSave").disabled = false;
