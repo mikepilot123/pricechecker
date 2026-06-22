@@ -33,6 +33,21 @@
     "Cancelled": "st-cancelled",
   };
 
+  // Common issue presets — "Other" reveals a free-text field.
+  const ISSUES = [
+    "Screen Cracked / Broken",
+    "Battery Issue",
+    "Charging Port",
+    "Won't Power On",
+    "Water Damage",
+    "Camera Issue",
+    "Speaker / Mic Issue",
+    "Back Glass Cracked",
+    "Software Issue",
+    "Diagnostic Needed",
+    "Other",
+  ];
+
   const LS_URL = "rpc_intake_url";
   const LS_PIN = "rpc_intake_pin";
 
@@ -176,24 +191,47 @@
 
   // ---- Form ------------------------------------------------------------------
   populateStatusSelect();
+  populateIssueSelect();
 
   function populateStatusSelect() {
     $("fStatus").innerHTML = STATUSES.map(
       (s) => `<option value="${s}">${s}</option>`
     ).join("");
   }
+  function populateIssueSelect() {
+    $("fIssue").innerHTML = ISSUES.map(
+      (s) => `<option value="${s}">${s}</option>`
+    ).join("");
+  }
+
+  $("fIssue").addEventListener("change", () => {
+    const isOther = $("fIssue").value === "Other";
+    $("fIssueOtherWrap").hidden = !isOther;
+    $("fIssueOther").required = isOther;
+    if (isOther) $("fIssueOther").focus();
+  });
 
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
     $("intakeForm").hidden = false;
+    $("fName").value = ticket ? ticket.customerName || "" : "";
+    $("fPhone").value = ticket ? ticket.phone || "" : "";
     $("fDevice").value = ticket ? ticket.device || "" : "";
-    $("fIssue").value = ticket ? ticket.issue || "" : "";
     $("fStatus").value = ticket ? ticket.status || "Received" : "Received";
     $("fNotes").value = ticket ? ticket.notes || "" : "";
+
+    const issue = ticket ? ticket.issue || "" : "";
+    const known = ISSUES.includes(issue) && issue !== "Other";
+    $("fIssue").value = ticket ? (known ? issue : issue ? "Other" : ISSUES[0]) : ISSUES[0];
+    const isOther = $("fIssue").value === "Other";
+    $("fIssueOtherWrap").hidden = !isOther;
+    $("fIssueOther").required = isOther;
+    $("fIssueOther").value = isOther ? issue : "";
+
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
     $("intakeForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
-    $("fDevice").focus();
+    $("fName").focus();
   }
   function closeForm() {
     $("intakeForm").hidden = true;
@@ -205,11 +243,14 @@
 
   $("intakeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const issueVal = $("fIssue").value === "Other" ? $("fIssueOther").value.trim() : $("fIssue").value;
     const payload = {
       action: editingId ? "update" : "add",
       id: editingId || undefined,
+      customerName: $("fName").value.trim(),
+      phone: $("fPhone").value.trim(),
       device: $("fDevice").value.trim(),
-      issue: $("fIssue").value.trim(),
+      issue: issueVal,
       status: $("fStatus").value,
       notes: $("fNotes").value.trim(),
     };
@@ -292,7 +333,7 @@
     return TICKETS.filter((t) => {
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (!q) return true;
-      return [t.device, t.issue, t.id]
+      return [t.device, t.issue, t.id, t.customerName, t.phone]
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
@@ -318,9 +359,10 @@
     const head = document.createElement("div");
     head.className = "ticket-head";
     head.innerHTML = `
+      <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
       <div class="ticket-main">
         <div class="ticket-device">${esc(t.device || "—")}</div>
-        <div class="ticket-issue">${esc(t.issue || "")}</div>
+        <div class="ticket-issue">${esc(t.customerName || "Unknown customer")} · ${esc(t.issue || "")}</div>
       </div>
       <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>`;
 
@@ -328,6 +370,8 @@
     body.className = "ticket-body";
     body.innerHTML = `
       <div class="ticket-row"><span class="k">Ticket</span><span class="v">${esc(t.id || "")}</span></div>
+      <div class="ticket-row"><span class="k">Customer</span><span class="v">${esc(t.customerName || "—")}</span></div>
+      <div class="ticket-row"><span class="k">Phone</span><span class="v">${t.phone ? `<a class="ticket-tel" href="tel:${esc(t.phone)}">${esc(t.phone)}</a>` : "—"}</span></div>
       <div class="ticket-row"><span class="k">Issue</span><span class="v">${esc(t.issue || "—")}</span></div>
       <div class="ticket-row"><span class="k">Logged</span><span class="v">${esc(fmtDate(t.created))}</span></div>
       <div class="ticket-row"><span class="k">Updated</span><span class="v">${esc(fmtDate(t.updated))}</span></div>

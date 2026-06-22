@@ -90,6 +90,19 @@
 
       <!-- New / edit ticket form -->
       <form id="intakeForm" class="repair-form" hidden autocomplete="off">
+        <div class="form-section-label">Customer</div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="field-label" for="fName">Name *</label>
+            <input id="fName" class="text-input" required placeholder="e.g. Anita Singh" />
+          </div>
+          <div class="form-field">
+            <label class="field-label" for="fPhone">Phone *</label>
+            <input id="fPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
+          </div>
+        </div>
+
+        <div class="form-section-label">Device</div>
         <div class="form-grid">
           <div class="form-field">
             <label class="field-label" for="fDevice">Device *</label>
@@ -98,15 +111,23 @@
           </div>
           <div class="form-field">
             <label class="field-label" for="fStatus">Status</label>
-            <select id="fStatus" class="text-input"></select>
+            <div class="select-wrap">
+              <select id="fStatus" class="text-input select-input"></select>
+            </div>
           </div>
-          <div class="form-field form-field-full">
+          <div class="form-field">
             <label class="field-label" for="fIssue">Issue *</label>
-            <input id="fIssue" class="text-input" required placeholder="e.g. Screen cracked, won't power on" />
+            <div class="select-wrap">
+              <select id="fIssue" class="text-input select-input" required></select>
+            </div>
+          </div>
+          <div class="form-field" id="fIssueOtherWrap" hidden>
+            <label class="field-label" for="fIssueOther">Describe issue *</label>
+            <input id="fIssueOther" class="text-input" placeholder="Describe the issue" />
           </div>
           <div class="form-field form-field-full">
             <label class="field-label" for="fNotes">Notes</label>
-            <textarea id="fNotes" class="text-input" rows="2" placeholder="No customer names/contact info — this sheet is public"></textarea>
+            <textarea id="fNotes" class="text-input" rows="2" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
           </div>
         </div>
         <div class="form-actions">

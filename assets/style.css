@@ -502,3 +502,94 @@ body {
 .st-repaired   { background: rgba(69,212,131,0.22);  color: #45d483; }
 .st-pickedup   { background: rgba(154,167,189,0.18); color: #b6c2d6; }
 .st-cancelled  { background: rgba(255,107,107,0.18); color: #ff9b9b; }
+
+/* Same hues as solid fills, for accent bars / dots */
+.st-received   { --dot: #4f8cff; }
+.st-diagnosing { --dot: #9f7aea; }
+.st-parts      { --dot: #f5a623; }
+.st-progress   { --dot: #45d483; }
+.st-repaired   { --dot: #2fc476; }
+.st-pickedup   { --dot: #9aa7bd; }
+.st-cancelled  { --dot: #ff6b6b; }
+
+/* ---------- Form polish: section labels, custom selects ---------- */
+.form-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 18px 0 10px;
+  opacity: 0.85;
+}
+.form-section-label:first-child { margin-top: 2px; }
+
+.select-wrap {
+  position: relative;
+}
+.select-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 36px;
+  cursor: pointer;
+}
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-dim);
+  border-bottom: 2px solid var(--text-dim);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* Status badge gets a small leading dot for quicker scanning */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot, currentColor);
+}
+
+/* Coloured accent strip on the left edge of each ticket, matching status */
+.ticket-head {
+  position: relative;
+  padding-left: 19px;
+}
+.ticket-accent {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--dot, var(--accent));
+}
+
+.ticket-tel {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 700;
+}
+.ticket-tel:hover { text-decoration: underline; }
+
+/* Subtle elevation + smoother interaction states throughout */
+.ticket, .repair-form, .setup-card, .card {
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s ease;
+}
+.text-input, .primary-btn, .ghost-btn, .chip, .nav-btn {
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.status-set {
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}

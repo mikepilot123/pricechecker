@@ -11,9 +11,10 @@
  *  5. Copy the /exec URL it gives you.
  *  6. In the app's Intake tab, paste that URL + the PIN (one-time, per device).
  *
- * This sheet is published publicly (read-only CSV), so this script
- * intentionally only ever stores: device, issue, status, notes.
- * Do NOT add customer name/phone/email columns here.
+ * Stores customer name + phone for staff to contact about pickup. Since
+ * this sheet now holds personal info, unpublish it from "Publish to web"
+ * if it's currently published — the app never reads the public CSV, only
+ * this PIN-gated script, so publishing it serves no purpose here.
  */
 
 var PIN = "1234"; // <-- CHANGE THIS to your team's private PIN
@@ -28,7 +29,17 @@ var STATUSES = [
   "Picked Up",
   "Cancelled",
 ];
-var HEADERS = ["Ticket ID", "Date Logged", "Device", "Issue", "Status", "Notes", "Last Updated"];
+var HEADERS = [
+  "Ticket ID",
+  "Date Logged",
+  "Customer Name",
+  "Phone",
+  "Device",
+  "Issue",
+  "Status",
+  "Notes",
+  "Last Updated",
+];
 
 function doGet(e) {
   return handle((e && e.parameter) || {});
@@ -101,11 +112,13 @@ function rowToTicket(row, rowNum) {
   return {
     id: row[0],
     created: toIso(row[1]),
-    device: row[2],
-    issue: row[3],
-    status: row[4],
-    notes: row[5],
-    updated: toIso(row[6]),
+    customerName: row[2],
+    phone: row[3],
+    device: row[4],
+    issue: row[5],
+    status: row[6],
+    notes: row[7],
+    updated: toIso(row[8]),
     _row: rowNum,
   };
 }
@@ -114,8 +127,28 @@ function addTicket(sheet, p) {
   var id = "T" + Date.now().toString(36).toUpperCase();
   var now = new Date();
   var status = STATUSES.indexOf(p.status) >= 0 ? p.status : "Received";
-  sheet.appendRow([id, now, p.device || "", p.issue || "", status, p.notes || "", now]);
-  return rowToTicket([id, now, p.device || "", p.issue || "", status, p.notes || "", now]);
+  sheet.appendRow([
+    id,
+    now,
+    p.customerName || "",
+    p.phone || "",
+    p.device || "",
+    p.issue || "",
+    status,
+    p.notes || "",
+    now,
+  ]);
+  return rowToTicket([
+    id,
+    now,
+    p.customerName || "",
+    p.phone || "",
+    p.device || "",
+    p.issue || "",
+    status,
+    p.notes || "",
+    now,
+  ]);
 }
 
 function updateTicket(sheet, p) {
@@ -132,14 +165,16 @@ function updateTicket(sheet, p) {
   if (rowNum === -1) throw new Error("Ticket not found: " + p.id);
 
   var current = sheet.getRange(rowNum, 1, 1, HEADERS.length).getValues()[0];
-  var status = STATUSES.indexOf(p.status) >= 0 ? p.status : current[4];
-  var device = p.device != null ? p.device : current[2];
-  var issue = p.issue != null ? p.issue : current[3];
-  var notes = p.notes != null ? p.notes : current[5];
+  var customerName = p.customerName != null ? p.customerName : current[2];
+  var phone = p.phone != null ? p.phone : current[3];
+  var device = p.device != null ? p.device : current[4];
+  var issue = p.issue != null ? p.issue : current[5];
+  var status = STATUSES.indexOf(p.status) >= 0 ? p.status : current[6];
+  var notes = p.notes != null ? p.notes : current[7];
   var now = new Date();
 
-  sheet.getRange(rowNum, 3, 1, 5).setValues([[device, issue, status, notes, now]]);
-  return rowToTicket([current[0], current[1], device, issue, status, notes, now]);
+  sheet.getRange(rowNum, 3, 1, 7).setValues([[customerName, phone, device, issue, status, notes, now]]);
+  return rowToTicket([current[0], current[1], customerName, phone, device, issue, status, notes, now]);
 }
 
 function toIso(v) {
