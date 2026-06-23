@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=intake-success-1" />
+  <link rel="stylesheet" href="assets/style.css?v=intake-steps-2" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -160,14 +160,10 @@
             <span class="form-progress-step active" data-progress-step="1">1<span>Customer</span></span>
             <span class="form-progress-line"></span>
             <span class="form-progress-step" data-progress-step="2">2<span>Device</span></span>
-            <span class="form-progress-line"></span>
-            <span class="form-progress-step" data-progress-step="3">3<span>Payment</span></span>
-            <span class="form-progress-line"></span>
-            <span class="form-progress-step" data-progress-step="4">4<span>Done</span></span>
           </div>
 
           <section class="form-step" data-form-step="1">
-            <div class="form-step-heading"><p class="form-section-label">Step 1 of 3</p><h4>Customer details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Customer details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
             <div class="form-grid">
               <div class="form-field form-field-full">
                 <label class="field-label" for="fName">Name *</label>
@@ -189,7 +185,7 @@
           </section>
 
           <section class="form-step" data-form-step="2" hidden>
-            <div class="form-step-heading"><p class="form-section-label">Step 2 of 3</p><h4>Device and repair</h4><p>Record the device, its status, and what needs attention.</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Device and repair</h4><p>Record the device, its status, and what needs attention.</p></div>
             <div class="form-grid">
               <div class="form-field">
                 <label class="field-label" for="fDevice">Device *</label>
@@ -218,7 +214,7 @@
           </section>
 
           <section class="form-step" data-form-step="3" hidden>
-            <div class="form-step-heading"><p class="form-section-label">Step 3 of 3</p><h4>Payment</h4><p>Optional—add the quoted repair cost and any payment received.</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Payment</p><h4>Payment</h4><p>Optional—add the quoted repair cost and any payment received.</p></div>
             <p id="quotedPriceSummary" class="quoted-price-summary" hidden></p>
             <div class="form-grid">
               <div id="repairCostField" class="form-field">
@@ -369,6 +365,6 @@
   </div>
 
   <script src="assets/app.js"></script>
-  <script src="assets/intake.js?v=intake-success-1"></script>
+  <script src="assets/intake.js?v=intake-steps-2"></script>
 </body>
 </html>
