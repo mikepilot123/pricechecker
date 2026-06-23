@@ -380,6 +380,11 @@
         ${detailRow("i-clock", "Logged", fmtDate(ticket.created))}
         ${detailRow("i-clock", "Updated", fmtDate(ticket.updated))}
       </div></section>
+      <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
+        ${detailRow("i-cash", "Repair cost", formatMoney(ticket.repairCost))}
+        ${detailRow("i-cash", "Amount paid", formatMoney(ticket.amountPaid))}
+        ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)))}
+      </div></section>
       <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
       ${ticket.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(ticket.notes)}</p></section>` : ""}
       <section class="ticket-detail-section"><p class="field-label">Activity log</p>${historyHtml(ticket.history)}</section>`;
@@ -401,6 +406,20 @@
 
   function detailRow(iconName, label, value) {
     return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${value}</span></div>`;
+  }
+
+  function formatMoney(value) {
+    if (value == null || value === "") return "—";
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return "—";
+    return "TT$" + amount.toLocaleString("en-TT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function balanceDue(repairCost, amountPaid) {
+    if (repairCost == null || repairCost === "") return null;
+    const cost = Number(repairCost);
+    const paid = amountPaid == null || amountPaid === "" ? 0 : Number(amountPaid);
+    return Number.isFinite(cost) && Number.isFinite(paid) ? cost - paid : null;
   }
 
   function setIssueTags(issuesStr) {
@@ -452,6 +471,8 @@
     $("fDevice").value = ticket ? ticket.device || "" : "";
     $("fStatus").value = ticket ? ticket.status || "Received" : "Received";
     $("fNotes").value = ticket ? ticket.notes || "" : "";
+    $("fRepairCost").value = ticket ? ticket.repairCost ?? "" : "";
+    $("fAmountPaid").value = ticket ? ticket.amountPaid ?? "" : "";
     setIssueTags(ticket ? ticket.issues || "" : "");
 
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
@@ -575,6 +596,8 @@
       issue: issuesStr,
       status: $("fStatus").value,
       notes: $("fNotes").value.trim(),
+      repairCost: $("fRepairCost").value.trim(),
+      amountPaid: $("fAmountPaid").value.trim(),
     };
     $("saveForm").disabled = true;
     const original = $("saveForm").textContent;
@@ -617,6 +640,8 @@
         issues: ticket.issues,
         issue: ticket.issues,
         notes: ticket.notes,
+        repairCost: ticket.repairCost,
+        amountPaid: ticket.amountPaid,
       });
       if (!res.ok) throw new Error(res.error || "Rejected");
       mergeTicket(res.ticket);
@@ -836,6 +861,8 @@
     return Object.assign({}, ticket, {
       customerName: ticket.customerName || ticket.client || "",
       issues: ticket.issues || ticket.issue || "",
+      repairCost: ticket.repairCost ?? ticket.cost ?? "",
+      amountPaid: ticket.amountPaid ?? ticket.paid ?? "",
     });
   }
 
