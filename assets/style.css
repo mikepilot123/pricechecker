@@ -888,6 +888,13 @@ body {
   flex-direction: column;
   box-shadow: 0 -8px 30px rgba(18, 24, 38, 0.18);
 }
+@media (max-width: 559px) {
+  .modal-panel {
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+}
 @media (min-width: 560px) {
   .modal-panel { border-radius: var(--radius); box-shadow: var(--shadow); }
 }
