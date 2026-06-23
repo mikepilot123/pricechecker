@@ -60,6 +60,9 @@
   let statusFilter = "all";
   let editingId = null;
   let formStep = 1;
+  // True when the form was opened from a Prices-tab repair click — device and
+  // issue are already known, so the wizard skips straight to Payment.
+  let quickLogMode = false;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
   // A "log this repair" request from the Prices tab that arrived before the
@@ -478,8 +481,16 @@
     return parts.join(", ");
   }
 
+  function setQuickLogMode(on) {
+    quickLogMode = on;
+    $("intakeFormModal").classList.toggle("quick-log", on);
+    $("repairCostField").hidden = on;
+    $("quotedPriceSummary").hidden = !on;
+  }
+
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
+    setQuickLogMode(false);
     $("intakeFormTitle").textContent = ticket ? "Edit device" : "Log device";
     $("fName").value = ticket ? ticket.customerName || "" : "";
     $("fPhone").value = ticket ? ticket.phone || "" : "";
@@ -499,6 +510,7 @@
   function closeForm() {
     $("intakeFormModal").hidden = true;
     editingId = null;
+    setQuickLogMode(false);
   }
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
@@ -540,11 +552,11 @@
 
   $("nextFormStep").addEventListener("click", () => {
     if (!validateFormStep(formStep)) return;
-    setFormStep(formStep + 1);
+    setFormStep(quickLogMode && formStep === 1 ? 3 : formStep + 1);
     const firstField = document.querySelector(`[data-form-step="${formStep}"] input, [data-form-step="${formStep}"] select, [data-form-step="${formStep}"] button`);
     if (firstField) firstField.focus();
   });
-  $("previousFormStep").addEventListener("click", () => setFormStep(formStep - 1));
+  $("previousFormStep").addEventListener("click", () => setFormStep(quickLogMode && formStep === 3 ? 1 : formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
   $("closeIntakeFormModal").addEventListener("click", closeForm);
   $("intakeFormModal").addEventListener("click", (e) => {
@@ -580,11 +592,13 @@
   // filled in, so staff only enter the customer's name, phone, and how much
   // they actually paid.
   function applyLogDevicePrefill(detail) {
-    const { device, repairType, priceValue } = detail || {};
+    const { device, repairType, price, priceValue } = detail || {};
     openForm(null);
     $("fDevice").value = device || "";
     setIssueTags(guessIssueFromRepairType(repairType) || (repairType ? "Other: " + repairType : ""));
     if (priceValue != null) $("fRepairCost").value = priceValue;
+    setQuickLogMode(true);
+    $("quotedPriceSummary").textContent = `Quoted ${price || (priceValue != null ? "$" + priceValue : "—")} — ${repairType || device || ""}`;
     $("fName").focus();
   }
 

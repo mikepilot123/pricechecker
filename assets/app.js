@@ -313,8 +313,8 @@ function card(m, expand = false) {
       .map(
         (p, i) => `<div class="price-row" role="button" tabindex="0" data-idx="${i}"
             aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
-          <span class="price-name">${escapeHtml(p.type)}</span>
-          <span class="price-val">${formatPrice(p.value)}<span class="price-row-hint">+ Log device</span></span>
+          <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}</span>
+          <span class="price-val">${formatPrice(p.value)}</span>
         </div>`
       )
       .join("");
