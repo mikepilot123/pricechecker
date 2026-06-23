@@ -48,6 +48,7 @@ async function main() {
     const customerName = t.customerName || t.client || "";
     const issues = t.issues || t.issue || "";
     const phone = t.phone || "";
+    const email = t.email || "";
     const device = t.device || "";
     const status = t.status || "Received";
     const notes = t.notes || "";
@@ -55,10 +56,10 @@ async function main() {
     const updatedAt = t.updated || createdAt;
 
     await sql`
-      INSERT INTO tickets (id, customer_name, phone, device, issues, status, notes, created_at, updated_at, deleted_at, current_version)
-      VALUES (${t.id}, ${customerName}, ${phone}, ${device}, ${issues}, ${status}, ${notes}, ${createdAt}, ${updatedAt}, NULL, 1)
+      INSERT INTO tickets (id, customer_name, phone, email, device, issues, status, notes, created_at, updated_at, deleted_at, current_version)
+      VALUES (${t.id}, ${customerName}, ${phone}, ${email}, ${device}, ${issues}, ${status}, ${notes}, ${createdAt}, ${updatedAt}, NULL, 1)
       ON CONFLICT (id) DO UPDATE SET
-        customer_name = EXCLUDED.customer_name, phone = EXCLUDED.phone, device = EXCLUDED.device,
+        customer_name = EXCLUDED.customer_name, phone = EXCLUDED.phone, email = EXCLUDED.email, device = EXCLUDED.device,
         issues = EXCLUDED.issues, status = EXCLUDED.status, notes = EXCLUDED.notes,
         updated_at = EXCLUDED.updated_at
     `;
@@ -70,7 +71,7 @@ async function main() {
       INSERT INTO ticket_versions (ticket_id, version_number, snapshot, change_summary, change_type, created_at)
       VALUES (
         ${t.id}, 1,
-        ${JSON.stringify({ customerName, phone, device, issues, status, notes, importedHistoryText: t.history || "" })}::jsonb,
+        ${JSON.stringify({ customerName, phone, email, device, issues, status, notes, importedHistoryText: t.history || "" })}::jsonb,
         'Imported from Google Sheet', 'import', now()
       )
     `;

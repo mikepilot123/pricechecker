@@ -379,17 +379,99 @@
   });
 
   // ---- Ticket detail modal -------------------------------------------------
+  function parseHistoryEntries(historyStr) {
+    if (!historyStr) return [];
+    return historyStr
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        const m = /^\[([^\]]+)\]\s*(.*)$/.exec(line);
+        return { when: m ? m[1] : "", msg: m ? m[2] : line };
+      })
+      .reverse();
+  }
+
+  function activityLogCount(ticket) {
+    return parseHistoryEntries(ticket.history).length + (ticket.notes ? 1 : 0);
+  }
+
+  function activityLogBtnHtml(ticket, id) {
+    const count = activityLogCount(ticket);
+    const label = count
+      ? `View ${count} update${count === 1 ? "" : "s"} and notes`
+      : "View updates and notes";
+    return `<button type="button" class="activity-log-btn" id="${id}" aria-label="${esc(label)}" title="Updates & notes">
+      <svg class="icon" aria-hidden="true"><use href="#i-note"></use></svg>
+      ${count ? `<span class="activity-log-badge" aria-hidden="true">${count}</span>` : ""}
+    </button>`;
+  }
+
+  function bindActivityLogBtn(btn, ticket) {
+    if (!btn) return;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openActivityLogModal(ticket);
+    };
+    btn.onkeydown = (e) => e.stopPropagation();
+  }
+
+  function activityLogBodyHtml(ticket) {
+    const sections = [];
+    if (ticket.notes) {
+      sections.push(`<section class="activity-log-section">
+        <p class="field-label">Notes</p>
+        <p class="ticket-detail-notes activity-log-note">${esc(ticket.notes)}</p>
+      </section>`);
+    }
+    const entries = parseHistoryEntries(ticket.history);
+    if (entries.length) {
+      sections.push(`<section class="activity-log-section">
+        <p class="field-label">Updates</p>
+        <div class="history-list">${entries
+          .map(({ when, msg }) =>
+            `<div class="history-item"><span class="history-dot"></span><div><div class="history-msg">${esc(msg)}</div><div class="history-when mono">${esc(when ? fmtDate(when) : "")}</div></div></div>`
+          )
+          .join("")}</div>
+      </section>`);
+    }
+    if (!sections.length) return `<p class="empty-sub">No updates or notes recorded yet.</p>`;
+    return sections.join("");
+  }
+
+  function openActivityLogModal(ticket) {
+    $("activityLogTitle").textContent = ticket.device || "Updates & notes";
+    $("activityLogBody").innerHTML = activityLogBodyHtml(ticket);
+    $("activityLogModal").hidden = false;
+    $("closeActivityLogModal").focus();
+  }
+
+  function closeActivityLogModal() {
+    $("activityLogModal").hidden = true;
+  }
+
+  $("closeActivityLogModal").addEventListener("click", closeActivityLogModal);
+  $("activityLogModal").addEventListener("click", (e) => {
+    if (e.target.id === "activityLogModal") closeActivityLogModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("activityLogModal").hidden) closeActivityLogModal();
+  });
+
   function openTicketModal(ticket) {
     const hasPhone = !!ticket.phone;
     $("ticketModalBody").innerHTML = `
       <div class="ticket-detail-hero">
         <span class="ticket-device-icon"><svg class="icon"><use href="#i-device"></use></svg></span>
-        <div><h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4><p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p></div>
-        <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
+        <div class="ticket-detail-hero-main"><h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4><p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p></div>
+        <div class="ticket-detail-hero-actions">
+          ${activityLogBtnHtml(ticket, "ticketModalActivity")}
+          <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
+        </div>
       </div>
       <section class="ticket-detail-section"><p class="field-label">Customer & device</p><div class="ticket-detail-grid">
         ${detailRow("i-user", "Customer", ticket.customerName || "Unknown customer")}
         ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
+        ${detailRow("i-mail", "Email", ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—")}
         ${detailRow("i-device", "Device", ticket.device || "—")}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
@@ -397,14 +479,13 @@
         ${detailRow("i-cash", "Amount paid", formatMoney(ticket.amountPaid), "money-positive")}
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
       </div></section>
-      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
-      ${ticket.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(ticket.notes)}</p></section>` : ""}
-      <section class="ticket-detail-section"><p class="field-label">Activity log</p>${historyHtml(ticket.history)}</section>`;
+      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>`;
 
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit details</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
+    bindActivityLogBtn($("ticketModalActivity"), ticket);
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     $("ticketModal").hidden = false;
@@ -494,6 +575,7 @@
     $("intakeFormTitle").textContent = ticket ? "Edit device" : "Log device";
     $("fName").value = ticket ? ticket.customerName || "" : "";
     $("fPhone").value = ticket ? ticket.phone || "" : "";
+    $("fEmail").value = ticket ? ticket.email || "" : "";
     $("fDevice").value = ticket ? ticket.device || "" : "";
     $("fStatus").value = ticket ? ticket.status || "Received" : "Received";
     $("fNotes").value = ticket ? ticket.notes || "" : "";
@@ -533,10 +615,21 @@
     $("formError").hidden = true;
   }
 
+  function customerFieldsError() {
+    const name = $("fName").value.trim();
+    const phone = $("fPhone").value.trim();
+    const email = $("fEmail").value.trim();
+    if (!name || !phone || !email) return "Enter the customer's name, phone, and email.";
+    if (!$("fEmail").checkValidity()) return "Enter a valid email address for the invoice.";
+    return null;
+  }
+
   function validateFormStep(step) {
     const err = $("formError");
-    if (step === 1 && (!$('fName').value.trim() || !$("fPhone").value.trim())) {
-      err.textContent = "Enter the customer's name and phone.";
+    if (step === 1) {
+      const message = customerFieldsError();
+      if (message) err.textContent = message;
+      else return true;
     } else if (step === 2 && !$("fDevice").value.trim()) {
       err.textContent = "Enter the device model.";
     } else if (step === 2 && !buildIssuesString()) {
@@ -589,7 +682,7 @@
 
   // Prefills and opens the Log device wizard for a repair picked on the
   // Prices tab: device, matched issue, and the quoted repair cost are all
-  // filled in, so staff only enter the customer's name, phone, and how much
+  // filled in, so staff only enter the customer's name, phone, email, and how much
   // they actually paid.
   function applyLogDevicePrefill(detail) {
     const { device, repairType, price, priceValue } = detail || {};
@@ -625,6 +718,7 @@
     $("clientModalTitle").textContent = "Update customer";
     $("cName").value = ticket.customerName || "";
     $("cPhone").value = ticket.phone || "";
+    $("cEmail").value = ticket.email || "";
     $("cNotes").value = ticket.notes || "";
     $("saveClientModal").textContent = "Save";
     $("clientModalError").hidden = true;
@@ -650,8 +744,14 @@
     err.hidden = true;
     const name = $("cName").value.trim();
     const phone = $("cPhone").value.trim();
-    if (!name || !phone) {
-      err.textContent = "Enter the customer's name and phone.";
+    const email = $("cEmail").value.trim();
+    if (!name || !phone || !email) {
+      err.textContent = "Enter the customer's name, phone, and email.";
+      err.hidden = false;
+      return;
+    }
+    if (!$("cEmail").checkValidity()) {
+      err.textContent = "Enter a valid email address for the invoice.";
       err.hidden = false;
       return;
     }
@@ -669,6 +769,7 @@
         customerName: name,
         client: name,
         phone,
+        email,
         notes,
         device: ticket.device,
         issues: ticket.issues,
@@ -693,8 +794,9 @@
     e.preventDefault();
     const err = $("formError");
     err.hidden = true;
-    if (!$("fName").value.trim() || !$("fPhone").value.trim()) {
-      err.textContent = "Enter the customer's name and phone.";
+    const customerError = customerFieldsError();
+    if (customerError) {
+      err.textContent = customerError;
       err.hidden = false;
       return;
     }
@@ -712,6 +814,7 @@
       // frontend update never silently drops customer details.
       client: $("fName").value.trim(),
       phone: $("fPhone").value.trim(),
+      email: $("fEmail").value.trim(),
       device: $("fDevice").value.trim(),
       issues: issuesStr,
       issue: issuesStr,
@@ -757,6 +860,7 @@
         customerName: ticket.customerName,
         client: ticket.customerName,
         phone: ticket.phone,
+        email: ticket.email,
         device: ticket.device,
         issues: ticket.issues,
         issue: ticket.issues,
@@ -826,7 +930,7 @@
     return TICKETS.filter((t) => {
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (!q) return true;
-      return [t.device, t.issues, t.id, t.customerName, t.phone]
+      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email]
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
@@ -863,19 +967,6 @@
     return parts.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
   }
 
-  function historyHtml(historyStr) {
-    if (!historyStr) return `<p class="empty-sub">No activity recorded yet.</p>`;
-    const entries = historyStr.split("\n").filter(Boolean).reverse();
-    return `<div class="history-list">${entries
-      .map((line) => {
-        const m = /^\[([^\]]+)\]\s*(.*)$/.exec(line);
-        const when = m ? fmtDate(m[1]) : "";
-        const msg = m ? m[2] : line;
-        return `<div class="history-item"><span class="history-dot"></span><div><div class="history-msg">${esc(msg)}</div><div class="history-when mono">${esc(when)}</div></div></div>`;
-      })
-      .join("")}</div>`;
-  }
-
   function ticketCard(t) {
     const el = document.createElement("div");
     el.className = "ticket";
@@ -894,7 +985,10 @@
       <div class="ticket-main">
         <div class="ticket-toprow">
           <span class="ticket-num mono">#${esc(t.id || "")}</span>
-          <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
+          <div class="ticket-toprow-actions">
+            ${activityLogBtnHtml(t, "")}
+            <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
+          </div>
         </div>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
@@ -907,6 +1001,7 @@
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
     if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
+    bindActivityLogBtn(head.querySelector(".activity-log-btn"), t);
     const thumbImg = head.querySelector(".ticket-device-thumb img");
     if (thumbImg) {
       fetchDeviceImage(t.device).then((url) => {
@@ -963,6 +1058,7 @@
   function normalizeTicket(ticket) {
     return Object.assign({}, ticket, {
       customerName: ticket.customerName || ticket.client || "",
+      email: ticket.email || "",
       issues: ticket.issues || ticket.issue || "",
       repairCost: ticket.repairCost ?? ticket.cost ?? "",
       amountPaid: ticket.amountPaid ?? ticket.paid ?? "",

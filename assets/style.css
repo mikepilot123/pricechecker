@@ -907,6 +907,56 @@ body {
 .mono { font-family: var(--font-mono); }
 
 /* ---------- Activity log (history timeline) ---------- */
+.activity-log-backdrop { z-index: 110; }
+.activity-log-panel { max-width: 480px; }
+.activity-log-section + .activity-log-section { margin-top: 18px; }
+.activity-log-note { margin-top: 8px; }
+.activity-log-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text-dim);
+  cursor: pointer;
+  flex: none;
+}
+.activity-log-btn .icon { width: 17px; height: 17px; }
+.activity-log-btn:hover,
+.activity-log-btn:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
+}
+.activity-log-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+.ticket-toprow-actions,
+.ticket-detail-hero-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.ticket-detail-hero-main { min-width: 0; flex: 1; }
 .history-list {
   margin-top: 8px;
   display: flex;
