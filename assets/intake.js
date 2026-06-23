@@ -378,13 +378,11 @@
         ${detailRow("i-user", "Customer", ticket.customerName || "Unknown customer")}
         ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
         ${detailRow("i-device", "Device", ticket.device || "—")}
-        ${detailRow("i-clock", "Logged", fmtDate(ticket.created))}
-        ${detailRow("i-clock", "Updated", fmtDate(ticket.updated))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
-        ${detailRow("i-cash", "Repair cost", formatMoney(ticket.repairCost))}
-        ${detailRow("i-cash", "Amount paid", formatMoney(ticket.amountPaid))}
-        ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)))}
+        ${detailRow("i-cash", "Repair cost", formatMoney(ticket.repairCost), "money-positive")}
+        ${detailRow("i-cash", "Amount paid", formatMoney(ticket.amountPaid), "money-positive")}
+        ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
       ${ticket.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(ticket.notes)}</p></section>` : ""}
@@ -405,8 +403,8 @@
   $("ticketModal").addEventListener("click", (e) => { if (e.target.id === "ticketModal") closeTicketModal(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal(); });
 
-  function detailRow(iconName, label, value) {
-    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${value}</span></div>`;
+  function detailRow(iconName, label, value, valueClass = "") {
+    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value ${valueClass}">${value}</span></div>`;
   }
 
   function formatMoney(value) {
@@ -421,6 +419,12 @@
     const cost = Number(repairCost);
     const paid = amountPaid == null || amountPaid === "" ? 0 : Number(amountPaid);
     return Number.isFinite(cost) && Number.isFinite(paid) ? cost - paid : null;
+  }
+
+  function balanceTone(repairCost, amountPaid) {
+    const balance = balanceDue(repairCost, amountPaid);
+    if (balance == null) return "";
+    return balance > 0 ? "money-due" : "money-positive";
   }
 
   function setIssueTags(issuesStr) {
@@ -848,12 +852,11 @@
     return el;
   }
 
-  // ---- Device images (Wikipedia thumbnail lookup) --------------------------
-  // Looks up a free, openly-licensed photo of the device model from Wikipedia's
-  // PageImages API to replace the generic placeholder thumbnail. Cached in
-  // localStorage (including a "not found" sentinel) so repeated renders of
-  // the same device don't re-query every time.
-  const LS_IMG_PREFIX = "rpc_device_img_";
+  // ---- Device images --------------------------------------------------------
+  // Prefer a model-specific rear-device photo from Wikimedia Commons. When a
+  // rear photo does not exist for a model, fall back to that model's Wikipedia
+  // image, then the local neutral device placeholder.
+  const LS_IMG_PREFIX = "rpc_device_back_img_v2_";
   const IMG_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
   const IMG_NOT_FOUND = "__none__";
 
@@ -872,22 +875,50 @@
       }
     } catch (e) { /* ignore bad cache entry */ }
 
-    let url = null;
-    try {
-      const res = await fetch(
-        "https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(device),
-        { headers: { Accept: "application/json" } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.thumbnail && data.thumbnail.source) url = data.thumbnail.source;
-      }
-    } catch (e) { /* network/lookup failure — fall through to "not found" */ }
+    let url = await fetchCommonsBackImage(device);
+    if (!url) {
+      try {
+        const res = await fetch(
+          "https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(device),
+          { headers: { Accept: "application/json" } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.thumbnail && data.thumbnail.source) url = data.thumbnail.source;
+        }
+      } catch (e) { /* network/lookup failure — retain local placeholder */ }
+    }
 
     try {
       localStorage.setItem(key, JSON.stringify({ url: url || IMG_NOT_FOUND, fetchedAt: Date.now() }));
     } catch (e) { /* localStorage full/unavailable — skip caching */ }
     return url;
+  }
+
+  async function fetchCommonsBackImage(device) {
+    try {
+      const params = new URLSearchParams({
+        action: "query",
+        generator: "search",
+        gsrsearch: `${device} back`,
+        gsrnamespace: "6",
+        gsrlimit: "8",
+        prop: "imageinfo",
+        iiprop: "url",
+        iiurlwidth: "360",
+        format: "json",
+        origin: "*",
+      });
+      const res = await fetch("https://commons.wikimedia.org/w/api.php?" + params.toString());
+      if (!res.ok) return null;
+      const data = await res.json();
+      const pages = Object.values((data.query && data.query.pages) || {});
+      const image = pages.find((page) => /\b(back|rear)\b/i.test(page.title || "")) || pages[0];
+      const info = image && image.imageinfo && image.imageinfo[0];
+      return (info && (info.thumburl || info.url)) || null;
+    } catch (e) {
+      return null;
+    }
   }
 
   // ---- Device autosuggest (from price list) --------------------------------
