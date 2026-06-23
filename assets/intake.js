@@ -762,6 +762,12 @@
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
     if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
+    const thumbImg = head.querySelector(".ticket-device-thumb img");
+    if (thumbImg) {
+      fetchDeviceImage(t.device).then((url) => {
+        if (url) thumbImg.src = url;
+      });
+    }
     head.onclick = () => openTicketModal(t);
     head.onkeydown = (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -771,6 +777,48 @@
     };
     el.appendChild(head);
     return el;
+  }
+
+  // ---- Device images (Wikipedia thumbnail lookup) --------------------------
+  // Looks up a free, openly-licensed photo of the device model from Wikipedia's
+  // PageImages API to replace the generic placeholder thumbnail. Cached in
+  // localStorage (including a "not found" sentinel) so repeated renders of
+  // the same device don't re-query every time.
+  const LS_IMG_PREFIX = "rpc_device_img_";
+  const IMG_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const IMG_NOT_FOUND = "__none__";
+
+  function imgCacheKey(device) {
+    return LS_IMG_PREFIX + String(device || "").trim().toLowerCase().replace(/\s+/g, "-");
+  }
+
+  async function fetchDeviceImage(device) {
+    device = String(device || "").trim();
+    if (!device) return null;
+    const key = imgCacheKey(device);
+    try {
+      const cached = JSON.parse(localStorage.getItem(key) || "null");
+      if (cached && Date.now() - cached.fetchedAt < IMG_STALE_MS) {
+        return cached.url === IMG_NOT_FOUND ? null : cached.url;
+      }
+    } catch (e) { /* ignore bad cache entry */ }
+
+    let url = null;
+    try {
+      const res = await fetch(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(device),
+        { headers: { Accept: "application/json" } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.thumbnail && data.thumbnail.source) url = data.thumbnail.source;
+      }
+    } catch (e) { /* network/lookup failure — fall through to "not found" */ }
+
+    try {
+      localStorage.setItem(key, JSON.stringify({ url: url || IMG_NOT_FOUND, fetchedAt: Date.now() }));
+    } catch (e) { /* localStorage full/unavailable — skip caching */ }
+    return url;
   }
 
   // ---- Device autosuggest (from price list) --------------------------------
