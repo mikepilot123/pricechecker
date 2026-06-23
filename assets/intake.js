@@ -52,6 +52,7 @@
   ];
 
   const LS_PIN = "rpc_intake_pin";
+  const TICKET_PAGE_SIZE = 12;
 
   const $ = (id) => document.getElementById(id);
 
@@ -60,6 +61,7 @@
   let statusFilter = "all";
   let editingId = null;
   let loadedOnce = false;
+  let visibleTicketCount = TICKET_PAGE_SIZE;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -86,6 +88,7 @@
   function showSetup(prefill) {
     $("intakeSetup").hidden = false;
     $("intakeMain").hidden = true;
+    $("settingsMaintenance").hidden = !prefill;
     if (prefill) $("cfgPin").value = getCfg().pin;
   }
   function showMain() {
@@ -110,6 +113,7 @@
       if (!res.ok) throw new Error(res.error || "Rejected");
       localStorage.setItem(LS_PIN, pin);
       TICKETS = (res.tickets || []).map(normalizeTicket);
+      visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       showMain();
       renderStatusChips();
@@ -160,6 +164,7 @@
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
+      visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       renderStatusChips();
       render();
@@ -168,38 +173,19 @@
       $("intakeEmpty").hidden = true;
       $("intakeError").hidden = false;
       $("intakeErrorSub").textContent =
-        "Couldn't load devices (" + e.message + "). Tap ↻ to retry.";
+        "Couldn't load devices (" + e.message + "). Tap Reload to retry.";
     } finally {
       $("intakeLoading").style.display = "none";
     }
   }
 
   $("reloadIntake").addEventListener("click", loadTickets);
-
-  // ---- Settings modal --------------------------------------------------------
-  function openSettingsModal() {
-    $("settingsModal").hidden = false;
-  }
-  function closeSettingsModal() {
-    $("settingsModal").hidden = true;
-  }
-  $("intakeSettings").addEventListener("click", openSettingsModal);
-  $("closeSettingsModal").addEventListener("click", closeSettingsModal);
-  $("settingsModal").addEventListener("click", (e) => {
-    if (e.target.id === "settingsModal") closeSettingsModal();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !$("settingsModal").hidden) closeSettingsModal();
-  });
-  $("settingsChangePin").addEventListener("click", () => {
-    closeSettingsModal();
-    showSetup(true);
-  });
+  $("intakeSettings").addEventListener("click", () => showSetup(true));
+  $("closeIntakeSettings").addEventListener("click", showMain);
 
   // ---- Clear all -------------------------------------------------------------
   function openClearAllModal() {
     if (!TICKETS.length) return;
-    closeSettingsModal();
     $("clearAllPin").value = "";
     $("clearAllError").hidden = true;
     $("clearAllModal").hidden = false;
@@ -234,17 +220,83 @@
       const res = await api({ action: "clear" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = [];
+      visibleTicketCount = TICKET_PAGE_SIZE;
       statusFilter = "all";
       closeForm();
       closeClearAllModal();
       renderStatusChips();
       render();
+      if (res.backup) alert(`Deleted ${res.deletedCount} record${res.deletedCount === 1 ? "" : "s"}. Backup ${res.backup.id} is ready to restore if needed.`);
     } catch (e) {
       err.textContent = "Couldn't clear devices: " + e.message;
       err.hidden = false;
     } finally {
       btn.disabled = false;
       btn.textContent = original;
+    }
+  });
+
+  // ---- Backup restore ------------------------------------------------------
+  async function openRestoreBackupModal() {
+    const err = $("restoreBackupError");
+    err.hidden = true;
+    $("backupSelect").innerHTML = "";
+    $("restoreBackupEmpty").hidden = true;
+    $("confirmRestoreBackup").disabled = true;
+    $("restoreBackupModal").hidden = false;
+    try {
+      const res = await api({ action: "listBackups" });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      const backups = res.backups || [];
+      $("restoreBackupEmpty").hidden = backups.length > 0;
+      $("backupSelect").hidden = backups.length === 0;
+      $("confirmRestoreBackup").disabled = backups.length === 0;
+      $("backupSelect").innerHTML = backups.map((backup) =>
+        `<option value="${esc(backup.id)}">${esc(fmtDate(backup.created))} · ${Number(backup.count) || 0} record${Number(backup.count) === 1 ? "" : "s"}</option>`
+      ).join("");
+      if (backups.length) $("backupSelect").focus();
+    } catch (e) {
+      err.textContent = "Couldn't load backups: " + e.message;
+      err.hidden = false;
+    }
+  }
+
+  function closeRestoreBackupModal() { $("restoreBackupModal").hidden = true; }
+  $("restoreIntake").addEventListener("click", openRestoreBackupModal);
+  $("closeRestoreBackupModal").addEventListener("click", closeRestoreBackupModal);
+  $("restoreBackupModal").addEventListener("click", (e) => {
+    if (e.target.id === "restoreBackupModal") closeRestoreBackupModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("restoreBackupModal").hidden) closeRestoreBackupModal();
+  });
+
+  $("confirmRestoreBackup").addEventListener("click", async () => {
+    const id = $("backupSelect").value;
+    const err = $("restoreBackupError");
+    err.hidden = true;
+    if (!id) return;
+    if (!window.confirm("Restore this intake backup? Your current records will first be saved as a new backup.")) return;
+    const btn = $("confirmRestoreBackup");
+    btn.disabled = true;
+    const original = btn.innerHTML;
+    btn.textContent = "Restoring…";
+    try {
+      const res = await api({ action: "restoreBackup", id: id });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TICKETS = (res.tickets || []).map(normalizeTicket);
+      statusFilter = "all";
+      visibleTicketCount = TICKET_PAGE_SIZE;
+      renderStatusChips();
+      render();
+      closeRestoreBackupModal();
+      alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous intake is backed up as ${res.backup.id}.`);
+    } catch (e) {
+      err.textContent = "Couldn't restore backup: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
     }
   });
 
@@ -312,6 +364,45 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("issueModal").hidden) closeIssueModal();
   });
+
+  // ---- Ticket detail modal -------------------------------------------------
+  function openTicketModal(ticket) {
+    const hasPhone = !!ticket.phone;
+    $("ticketModalBody").innerHTML = `
+      <div class="ticket-detail-hero">
+        <span class="ticket-device-icon"><svg class="icon"><use href="#i-device"></use></svg></span>
+        <div><h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4><p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p></div>
+        <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
+      </div>
+      <section class="ticket-detail-section"><p class="field-label">Customer & device</p><div class="ticket-detail-grid">
+        ${detailRow("i-user", "Customer", ticket.customerName || "Unknown customer")}
+        ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
+        ${detailRow("i-device", "Device", ticket.device || "—")}
+        ${detailRow("i-clock", "Logged", fmtDate(ticket.created))}
+        ${detailRow("i-clock", "Updated", fmtDate(ticket.updated))}
+      </div></section>
+      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
+      ${ticket.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(ticket.notes)}</p></section>` : ""}
+      <section class="ticket-detail-section"><p class="field-label">Activity log</p>${historyHtml(ticket.history)}</section>`;
+
+    $("ticketModalFooter").innerHTML = `
+      ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit details</button>
+      <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
+    $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
+    $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
+    $("ticketModal").hidden = false;
+    $("closeTicketModal").focus();
+  }
+
+  function closeTicketModal() { $("ticketModal").hidden = true; }
+  $("closeTicketModal").addEventListener("click", closeTicketModal);
+  $("ticketModal").addEventListener("click", (e) => { if (e.target.id === "ticketModal") closeTicketModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal(); });
+
+  function detailRow(iconName, label, value) {
+    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${value}</span></div>`;
+  }
 
   function setIssueTags(issuesStr) {
     selectedIssues = new Set();
@@ -532,8 +623,10 @@
       mergeTicket(res.ticket);
       renderStatusChips();
       render();
+      return normalizeTicket(res.ticket);
     } catch (e) {
       alert("Couldn't update status: " + e.message);
+      return null;
     }
   }
 
@@ -546,13 +639,18 @@
       TICKETS = TICKETS.filter((t) => t.id !== ticket.id);
       renderStatusChips();
       render();
+      return true;
     } catch (e) {
       alert("Couldn't delete record: " + e.message);
+      return false;
     }
   }
 
   // ---- Filtering / search --------------------------------------------------
-  $("intakeSearch").addEventListener("input", render);
+  $("intakeSearch").addEventListener("input", () => {
+    visibleTicketCount = TICKET_PAGE_SIZE;
+    render();
+  });
 
   function renderStatusChips() {
     const counts = { all: TICKETS.length };
@@ -565,6 +663,7 @@
       b.textContent = label;
       b.onclick = () => {
         statusFilter = key;
+        visibleTicketCount = TICKET_PAGE_SIZE;
         [...box.children].forEach((c) => c.classList.remove("active"));
         b.classList.add("active");
         render();
@@ -590,14 +689,26 @@
 
   function render() {
     const list = currentList();
+    const visible = list.slice(0, visibleTicketCount);
     $("intakeList").innerHTML = "";
     $("intakeEmpty").hidden = list.length > 0;
     $("intakeError").hidden = true;
     $("intakeCount").textContent = list.length
-      ? `${list.length} device${list.length === 1 ? "" : "s"}`
+      ? `Showing ${visible.length} of ${list.length} device${list.length === 1 ? "" : "s"}`
       : "";
     const frag = document.createDocumentFragment();
-    for (const t of list) frag.appendChild(ticketCard(t));
+    for (const t of visible) frag.appendChild(ticketCard(t));
+    if (visible.length < list.length) {
+      const more = document.createElement("button");
+      const remaining = list.length - visible.length;
+      more.className = "view-more-btn";
+      more.innerHTML = `View ${Math.min(TICKET_PAGE_SIZE, remaining)} more <span aria-hidden="true">↓</span>`;
+      more.onclick = () => {
+        visibleTicketCount += TICKET_PAGE_SIZE;
+        render();
+      };
+      frag.appendChild(more);
+    }
     $("intakeList").appendChild(frag);
   }
 
@@ -626,9 +737,12 @@
 
     const head = document.createElement("div");
     head.className = "ticket-head";
+    head.tabIndex = 0;
+    head.setAttribute("role", "button");
+    head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
     const hasPhone = !!t.phone;
     const phoneLine = hasPhone
-      ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><span class="ticket-phone-icon">📞</span>${esc(t.phone)}</a>`
+      ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
       : `<span class="ticket-phone no-phone">No number on file</span>`;
     head.innerHTML = `
       <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
@@ -637,120 +751,26 @@
           <span class="ticket-num mono">#${esc(t.id || "")}</span>
           <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
         </div>
-        <div class="ticket-device-img-wrap"></div>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
+      </div>
+      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
+        <img src="assets/branding/device-thumbnail.png" alt="" />
       </div>`;
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
-    attachDeviceImage(head.querySelector(".ticket-device-img-wrap"), t.device);
-
-    const body = document.createElement("div");
-    body.className = "ticket-body";
-    body.innerHTML = `
-      <div class="ticket-row"><span class="k">Customer</span><span class="v">${esc(t.customerName || "—")}</span></div>
-      <div class="ticket-row"><span class="k">Phone</span><span class="v">${t.phone ? `<a class="ticket-tel" href="tel:${esc(t.phone)}">${esc(t.phone)}</a>` : "—"}</span></div>
-      <div class="ticket-row"><span class="k">Device</span><span class="v">${esc(t.device || "—")}</span></div>
-      <div class="ticket-row"><span class="k">Logged</span><span class="v mono">${esc(fmtDate(t.created))}</span></div>
-      <div class="ticket-row"><span class="k">Updated</span><span class="v mono">${esc(fmtDate(t.updated))}</span></div>
-      ${t.notes ? `<div class="ticket-row"><span class="k">Notes</span><span class="v">${esc(t.notes)}</span></div>` : ""}
-      <div class="ticket-actions">
-        <div class="field-label">Set status</div>
-        <div class="status-buttons"></div>
-        <button class="ghost-btn ticket-edit-btn">✎ Edit details</button>
-        <button class="ghost-btn ticket-client-btn">${t.customerName ? "+ Client" : "+ Add client"}</button>
-        <button class="ghost-btn ticket-delete-btn">Delete record</button>
-      </div>
-      <div class="ticket-actions">
-        <div class="field-label">Activity log</div>
-        ${historyHtml(t.history)}
-      </div>`;
-
-    const sb = body.querySelector(".status-buttons");
-    STATUSES.forEach((s) => {
-      const b = document.createElement("button");
-      b.className = "status-set" + (s === t.status ? " current" : "");
-      b.textContent = s;
-      b.onclick = (e) => {
-        e.stopPropagation();
-        if (s !== t.status) setStatus(t, s);
-      };
-      sb.appendChild(b);
-    });
-    body.querySelector(".ticket-edit-btn").onclick = (e) => {
-      e.stopPropagation();
-      openForm(t);
+    if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
+    head.onclick = () => openTicketModal(t);
+    head.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openTicketModal(t);
+      }
     };
-    body.querySelector(".ticket-client-btn").onclick = (e) => {
-      e.stopPropagation();
-      openClientModalForTicket(t);
-    };
-    body.querySelector(".ticket-delete-btn").onclick = (e) => {
-      e.stopPropagation();
-      deleteTicket(t);
-    };
-
-    head.onclick = () => el.classList.toggle("open");
     el.appendChild(head);
-    el.appendChild(body);
     return el;
-  }
-
-  // ---- Device images (Wikipedia thumbnail lookup) --------------------------
-  // Looks up a free, openly-licensed photo of the device model from Wikipedia's
-  // PageImages API. Results are cached in localStorage (including "not found")
-  // so repeated renders of the same device don't re-query on every render.
-  const LS_IMG_PREFIX = "rpc_device_img_";
-  const IMG_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-  const IMG_NOT_FOUND = "__none__";
-
-  function imgCacheKey(device) {
-    return LS_IMG_PREFIX + String(device || "").trim().toLowerCase().replace(/\s+/g, "-");
-  }
-
-  async function fetchDeviceImage(device) {
-    device = String(device || "").trim();
-    if (!device) return null;
-    const key = imgCacheKey(device);
-    try {
-      const cached = JSON.parse(localStorage.getItem(key) || "null");
-      if (cached && Date.now() - cached.fetchedAt < IMG_STALE_MS) {
-        return cached.url === IMG_NOT_FOUND ? null : cached.url;
-      }
-    } catch (e) { /* ignore bad cache entry */ }
-
-    let url = null;
-    try {
-      const res = await fetch(
-        "https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(device),
-        { headers: { Accept: "application/json" } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.thumbnail && data.thumbnail.source) url = data.thumbnail.source;
-      }
-    } catch (e) { /* network/lookup failure — fall through to "not found" */ }
-
-    try {
-      localStorage.setItem(key, JSON.stringify({ url: url || IMG_NOT_FOUND, fetchedAt: Date.now() }));
-    } catch (e) { /* localStorage full/unavailable — skip caching */ }
-    return url;
-  }
-
-  function attachDeviceImage(wrap, device) {
-    fetchDeviceImage(device).then((url) => {
-      if (!url) return;
-      const img = document.createElement("img");
-      img.className = "ticket-device-img";
-      img.loading = "lazy";
-      img.alt = device || "";
-      img.onload = () => img.classList.add("loaded");
-      img.src = url;
-      wrap.appendChild(img);
-      wrap.classList.add("has-image");
-    });
   }
 
   // ---- Device autosuggest (from price list) --------------------------------

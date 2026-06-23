@@ -24,6 +24,8 @@
 var PIN = "1234"; // <-- CHANGE THIS to your team's private PIN
 
 var SHEET_NAME = "Intake"; // tab name to use/create
+var BACKUP_INDEX_SHEET = "Intake Backup Index";
+var BACKUP_SHEET_PREFIX = "Intake Backup ";
 var STATUSES = [
   "Received",
   "Diagnosing",
@@ -71,7 +73,9 @@ function handle(p) {
     if (action === "add") return json({ ok: true, ticket: addTicket(sheet, p) });
     if (action === "update") return json({ ok: true, ticket: updateTicket(sheet, p) });
     if (action === "delete") return json({ ok: true, deletedId: deleteTicket(sheet, p) });
-    if (action === "clear") return json({ ok: true, deletedCount: clearTickets(sheet) });
+    if (action === "clear") return json(Object.assign({ ok: true }, clearTickets(sheet)));
+    if (action === "listBackups") return json({ ok: true, backups: listBackups(sheet.getParent()) });
+    if (action === "restoreBackup") return json(Object.assign({ ok: true }, restoreBackup(sheet, p)));
     return json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -248,8 +252,73 @@ function deleteTicket(sheet, p) {
 function clearTickets(sheet) {
   var lastRow = sheet.getLastRow();
   var count = Math.max(0, lastRow - 1); // Keep the header row.
+  var backup = createBackup(sheet);
   if (count) sheet.deleteRows(2, count);
-  return count;
+  return { deletedCount: count, backup: backup };
+}
+
+// ---- Intake version history ------------------------------------------------
+// Every destructive reset gets its own immutable sheet snapshot. The index is
+// intentionally separate so the team can inspect backups directly in Google
+// Sheets as well as restore one from the app.
+function getBackupIndex(ss) {
+  var index = ss.getSheetByName(BACKUP_INDEX_SHEET);
+  if (!index) {
+    index = ss.insertSheet(BACKUP_INDEX_SHEET);
+    index.appendRow(["Backup ID", "Created", "Backup Sheet", "Record Count"]);
+    index.setFrozenRows(1);
+  }
+  return index;
+}
+
+function createBackup(sheet) {
+  var ss = sheet.getParent();
+  var now = new Date();
+  var id = "B" + now.getTime();
+  var name = BACKUP_SHEET_PREFIX + id;
+  var sourceRows = Math.max(1, sheet.getLastRow());
+  var sourceCols = Math.max(HEADERS.length, sheet.getLastColumn());
+  var count = Math.max(0, sourceRows - 1);
+  var backupSheet = ss.insertSheet(name);
+  var values = sheet.getRange(1, 1, sourceRows, sourceCols).getValues();
+  backupSheet.getRange(1, 1, sourceRows, sourceCols).setValues(values);
+  backupSheet.setFrozenRows(1);
+  getBackupIndex(ss).appendRow([id, now.toISOString(), name, count]);
+  return { id: id, created: now.toISOString(), sheet: name, count: count };
+}
+
+function listBackups(ss) {
+  var index = ss.getSheetByName(BACKUP_INDEX_SHEET);
+  if (!index || index.getLastRow() < 2) return [];
+  var values = index.getRange(2, 1, index.getLastRow() - 1, 4).getValues();
+  return values
+    .filter(function (row) { return row[0] && row[2]; })
+    .map(function (row) {
+      return { id: String(row[0]), created: toIso(row[1]), sheet: String(row[2]), count: Number(row[3]) || 0 };
+    })
+    .sort(function (a, b) { return new Date(b.created) - new Date(a.created); });
+}
+
+function restoreBackup(sheet, p) {
+  if (!p.id) throw new Error("Backup ID is required");
+  var ss = sheet.getParent();
+  var backup = listBackups(ss).filter(function (item) { return item.id === String(p.id); })[0];
+  if (!backup) throw new Error("Backup not found");
+  var source = ss.getSheetByName(backup.sheet);
+  if (!source) throw new Error("Backup sheet is missing: " + backup.sheet);
+
+  // Save the current intake before replacing it, so restore is reversible.
+  var safetyBackup = createBackup(sheet);
+  var rows = Math.max(1, source.getLastRow());
+  var cols = Math.max(HEADERS.length, source.getLastColumn());
+  if (sheet.getMaxRows() < rows) sheet.insertRowsAfter(sheet.getMaxRows(), rows - sheet.getMaxRows());
+  if (sheet.getMaxColumns() < cols) sheet.insertColumnsAfter(sheet.getMaxColumns(), cols - sheet.getMaxColumns());
+  var clearRows = Math.max(rows, sheet.getLastRow());
+  var clearCols = Math.max(cols, sheet.getLastColumn());
+  sheet.getRange(1, 1, clearRows, clearCols).clearContent();
+  sheet.getRange(1, 1, rows, cols).setValues(source.getRange(1, 1, rows, cols).getValues());
+  ensureHeaders(sheet);
+  return { restoredCount: Math.max(0, rows - 1), backup: safetyBackup, tickets: listTickets(sheet) };
 }
 
 function toIso(v) {
