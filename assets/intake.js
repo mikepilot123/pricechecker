@@ -59,6 +59,7 @@
   let TICKETS = [];
   let statusFilter = "all";
   let editingId = null;
+  let formStep = 1;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
 
@@ -477,6 +478,7 @@
 
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
+    setFormStep(1);
     $("intakeFormModal").hidden = false;
     $("fName").focus();
   }
@@ -486,6 +488,49 @@
   }
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
+  function setFormStep(step) {
+    formStep = step;
+    document.querySelectorAll("[data-form-step]").forEach((panel) => {
+      panel.hidden = Number(panel.dataset.formStep) !== step;
+    });
+    document.querySelectorAll("[data-progress-step]").forEach((indicator) => {
+      const indicatorStep = Number(indicator.dataset.progressStep);
+      indicator.classList.toggle("active", indicatorStep === step);
+      indicator.classList.toggle("complete", indicatorStep < step);
+    });
+    document.querySelectorAll(".form-progress-line").forEach((line, index) => {
+      line.classList.toggle("complete", index < step - 1);
+    });
+    $("previousFormStep").hidden = step === 1;
+    $("nextFormStep").hidden = step === 3;
+    $("saveForm").hidden = step !== 3;
+    $("formError").hidden = true;
+  }
+
+  function validateFormStep(step) {
+    const err = $("formError");
+    if (step === 1 && (!$('fName').value.trim() || !$("fPhone").value.trim())) {
+      err.textContent = "Enter the customer's name and phone.";
+    } else if (step === 2 && !$("fDevice").value.trim()) {
+      err.textContent = "Enter the device model.";
+    } else if (step === 2 && !buildIssuesString()) {
+      err.textContent = "Select at least one issue.";
+    } else if (step === 3 && (!$("fRepairCost").checkValidity() || !$("fAmountPaid").checkValidity())) {
+      err.textContent = "Enter valid non-negative payment amounts.";
+    } else {
+      return true;
+    }
+    err.hidden = false;
+    return false;
+  }
+
+  $("nextFormStep").addEventListener("click", () => {
+    if (!validateFormStep(formStep)) return;
+    setFormStep(formStep + 1);
+    const firstField = document.querySelector(`[data-form-step="${formStep}"] input, [data-form-step="${formStep}"] select, [data-form-step="${formStep}"] button`);
+    if (firstField) firstField.focus();
+  });
+  $("previousFormStep").addEventListener("click", () => setFormStep(formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
   $("closeIntakeFormModal").addEventListener("click", closeForm);
   $("intakeFormModal").addEventListener("click", (e) => {
