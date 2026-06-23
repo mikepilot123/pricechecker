@@ -62,6 +62,9 @@
   let formStep = 1;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
+  // A "log this repair" request from the Prices tab that arrived before the
+  // device was connected; applied right after a successful PIN connect.
+  let pendingLogDevice = null;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -118,6 +121,13 @@
       showMain();
       renderStatusChips();
       render();
+      // If they got here by clicking a repair on the Prices tab before
+      // connecting, open the prefilled Log device form now.
+      if (pendingLogDevice) {
+        const detail = pendingLogDevice;
+        pendingLogDevice = null;
+        applyLogDevicePrefill(detail);
+      }
     } catch (e) {
       err.textContent = "Couldn't connect: " + e.message + ". Check the PIN.";
       err.hidden = false;
@@ -565,17 +575,31 @@
     return hit ? hit[1] : null;
   }
 
-  window.addEventListener("rpc-log-device", (e) => {
-    const { device, repairType, price } = e.detail || {};
-    const intakeNav = document.querySelector('.nav-btn[data-target="intake"]');
-    if (intakeNav) intakeNav.click();
-    if (!isConfigured()) return; // setup screen is now showing; nothing to prefill yet
-
+  // Prefills and opens the Log device wizard for a repair picked on the
+  // Prices tab: device, matched issue, and the quoted repair cost are all
+  // filled in, so staff only enter the customer's name, phone, and how much
+  // they actually paid.
+  function applyLogDevicePrefill(detail) {
+    const { device, repairType, priceValue } = detail || {};
     openForm(null);
     $("fDevice").value = device || "";
     setIssueTags(guessIssueFromRepairType(repairType) || (repairType ? "Other: " + repairType : ""));
-    if (repairType) $("fNotes").value = `Quoted: ${price || "—"} — ${repairType}`;
+    if (priceValue != null) $("fRepairCost").value = priceValue;
     $("fName").focus();
+  }
+
+  window.addEventListener("rpc-log-device", (e) => {
+    const detail = e.detail || {};
+    const intakeNav = document.querySelector('.nav-btn[data-target="intake"]');
+    if (intakeNav) intakeNav.click();
+    // If this device hasn't been connected yet, the PIN setup screen is now
+    // showing. Hold onto the request and apply it the moment they connect,
+    // instead of silently dropping what they clicked.
+    if (!isConfigured()) {
+      pendingLogDevice = detail;
+      return;
+    }
+    applyLogDevicePrefill(detail);
   });
 
   // ---- Customer info modal --------------------------------------------------

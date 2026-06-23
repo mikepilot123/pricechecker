@@ -348,9 +348,17 @@ function card(m, expand = false) {
 // that exact repair, instead of re-typing the model/issue in the Intake tab.
 // assets/intake.js listens for this event (it owns the actual modal/form).
 function logDeviceFromPrice(model, priceEntry) {
+  // Pull a clean number out of the raw cell ("$650", "650.00", etc.) so the
+  // intake form can drop it straight into its numeric Repair-cost field.
+  const num = parseFloat(String(priceEntry.value).replace(/[^0-9.]/g, ""));
   window.dispatchEvent(
     new CustomEvent("rpc-log-device", {
-      detail: { device: model.name, repairType: priceEntry.type, price: formatPrice(priceEntry.value) },
+      detail: {
+        device: model.name,
+        repairType: priceEntry.type,
+        price: formatPrice(priceEntry.value),
+        priceValue: Number.isNaN(num) ? null : num,
+      },
     })
   );
 }
