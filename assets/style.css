@@ -357,21 +357,29 @@ body {
 .price-row:focus-visible > span {
   background: var(--accent-soft);
 }
-.price-name { color: var(--text-dim); }
+.price-name { color: var(--text-dim); display: inline-flex; align-items: center; }
 .price-val { text-align: right; font-weight: 700; color: var(--price); font-family: var(--font-mono); }
-.price-row-hint {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  font-family: inherit;
+.price-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-right: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
   color: var(--accent);
-  opacity: 0;
-  transition: opacity 0.12s ease;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  transition: transform 0.12s ease;
 }
-.price-row:hover .price-row-hint,
-.price-row:focus-visible .price-row-hint {
-  opacity: 1;
+.price-row:hover .price-add-btn,
+.price-row:focus-visible .price-add-btn {
+  transform: scale(1.15);
 }
 .no-prices {
   margin-top: 10px;
@@ -447,6 +455,13 @@ body {
 }
 .view[hidden] { display: none; }
 .refresh-btn[data-view][hidden] { display: none; }
+/* Animation is on the element itself (not a toggled class), so it replays
+   automatically each time `hidden` is removed and the view re-enters layout. */
+.view:not([hidden]) { animation: view-in 0.22s ease; }
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 /* ---------- Buttons / inputs (shared) ---------- */
 .primary-btn {
@@ -479,8 +494,10 @@ body {
   padding: 10px 13px;
   font-size: 1rem;
   cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
 }
 .ghost-btn:hover { background: var(--card-hover); }
+.ghost-btn:active { transform: scale(0.97); }
 .icon-btn { width: 42px; height: 42px; padding: 0; }
 .icon-btn .icon { width: 19px; height: 19px; }
 .danger-btn {
@@ -657,6 +674,22 @@ body {
 .form-step[hidden],
 .form-actions > [hidden] { display: none !important; }
 .form-progress { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 22px; }
+/* Quick-log from a price row already knows the device/issue, so the wizard
+   skips straight from Customer to Payment — collapse the middle step visually. */
+#intakeFormModal.quick-log [data-progress-step="2"],
+#intakeFormModal.quick-log .form-progress-line:first-of-type {
+  display: none;
+}
+#repairCostField[hidden] { display: none; }
+.quoted-price-summary {
+  margin: -4px 0 16px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
 .form-progress-step { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 50%; color: var(--text-dim); font-size: 0.74rem; font-weight: 700; line-height: 1; }
 .form-progress-step > span { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); color: var(--text-dim); font-size: 0.67rem; font-weight: 600; line-height: 1; white-space: nowrap; }
 .form-progress-step.active { border-color: var(--accent); background: var(--accent); color: #fff; }
@@ -913,6 +946,18 @@ body {
   padding: 0;
 }
 .modal-backdrop[hidden] { display: none; }
+/* Applies to every modal that reuses this backdrop/panel pattern. Defined on
+   the element itself, so it replays each time `hidden` is removed. */
+.modal-backdrop:not([hidden]) { animation: modal-fade 0.18s ease; }
+.modal-backdrop:not([hidden]) .modal-panel { animation: modal-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 @media (min-width: 560px) {
   .modal-backdrop { align-items: center; padding: 20px; }
 }
