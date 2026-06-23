@@ -1,0 +1,9 @@
+{
+  "name": "pricechecker-intake-api",
+  "private": true,
+  "type": "module",
+  "description": "Vercel serverless API for the Repair Hub intake feature (assets/intake.js). The static site itself stays on GitHub Pages; this project only hosts /api/intake.js + its Postgres backend.",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4"
+  }
+}
