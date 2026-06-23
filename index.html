@@ -86,8 +86,7 @@
       <div class="repairs-toolbar">
         <button id="newIntakeBtn" class="primary-btn">+ Log device</button>
         <button id="reloadIntake" class="ghost-btn" title="Reload">↻</button>
-        <button id="intakeSettings" class="ghost-btn" title="Connection settings">⚙︎</button>
-        <button id="clearAllIntake" class="ghost-btn danger-btn" title="Delete all devices">🗑 Clear all</button>
+        <button id="intakeSettings" class="ghost-btn" title="Settings">⚙︎</button>
       </div>
 
       <div class="search-wrap">
@@ -200,6 +199,31 @@
       </div>
       <div class="modal-footer">
         <button type="button" id="saveClientModal" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal: connection, clear all, version history -->
+  <div id="settingsModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+      <div class="modal-header">
+        <h3 id="settingsModalTitle">Settings</h3>
+        <button type="button" id="closeSettingsModal" class="modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-section-label">Connection</div>
+        <p class="empty-sub">The team PIN is saved on this device.</p>
+        <button type="button" id="settingsChangePin" class="ghost-btn">Change PIN</button>
+
+        <div class="form-section-label">Version history</div>
+        <p class="empty-sub field-hint">
+          Restore a deleted device or roll back an edit. Coming soon — this
+          needs the backend upgrade that's in progress.
+        </p>
+        <button type="button" id="openVersionHistory" class="ghost-btn" disabled>View version history</button>
+
+        <div class="form-section-label">Danger zone</div>
+        <button type="button" id="clearAllIntake" class="ghost-btn danger-btn" title="Delete all devices">🗑 Clear all devices</button>
       </div>
     </div>
   </div>

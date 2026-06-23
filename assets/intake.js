@@ -175,11 +175,31 @@
   }
 
   $("reloadIntake").addEventListener("click", loadTickets);
-  $("intakeSettings").addEventListener("click", () => showSetup(true));
+
+  // ---- Settings modal --------------------------------------------------------
+  function openSettingsModal() {
+    $("settingsModal").hidden = false;
+  }
+  function closeSettingsModal() {
+    $("settingsModal").hidden = true;
+  }
+  $("intakeSettings").addEventListener("click", openSettingsModal);
+  $("closeSettingsModal").addEventListener("click", closeSettingsModal);
+  $("settingsModal").addEventListener("click", (e) => {
+    if (e.target.id === "settingsModal") closeSettingsModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("settingsModal").hidden) closeSettingsModal();
+  });
+  $("settingsChangePin").addEventListener("click", () => {
+    closeSettingsModal();
+    showSetup(true);
+  });
 
   // ---- Clear all -------------------------------------------------------------
   function openClearAllModal() {
     if (!TICKETS.length) return;
+    closeSettingsModal();
     $("clearAllPin").value = "";
     $("clearAllError").hidden = true;
     $("clearAllModal").hidden = false;
@@ -617,6 +637,7 @@
           <span class="ticket-num mono">#${esc(t.id || "")}</span>
           <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
         </div>
+        <div class="ticket-device-img-wrap"></div>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
@@ -624,6 +645,7 @@
       </div>`;
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
+    attachDeviceImage(head.querySelector(".ticket-device-img-wrap"), t.device);
 
     const body = document.createElement("div");
     body.className = "ticket-body";
@@ -674,6 +696,61 @@
     el.appendChild(head);
     el.appendChild(body);
     return el;
+  }
+
+  // ---- Device images (Wikipedia thumbnail lookup) --------------------------
+  // Looks up a free, openly-licensed photo of the device model from Wikipedia's
+  // PageImages API. Results are cached in localStorage (including "not found")
+  // so repeated renders of the same device don't re-query on every render.
+  const LS_IMG_PREFIX = "rpc_device_img_";
+  const IMG_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const IMG_NOT_FOUND = "__none__";
+
+  function imgCacheKey(device) {
+    return LS_IMG_PREFIX + String(device || "").trim().toLowerCase().replace(/\s+/g, "-");
+  }
+
+  async function fetchDeviceImage(device) {
+    device = String(device || "").trim();
+    if (!device) return null;
+    const key = imgCacheKey(device);
+    try {
+      const cached = JSON.parse(localStorage.getItem(key) || "null");
+      if (cached && Date.now() - cached.fetchedAt < IMG_STALE_MS) {
+        return cached.url === IMG_NOT_FOUND ? null : cached.url;
+      }
+    } catch (e) { /* ignore bad cache entry */ }
+
+    let url = null;
+    try {
+      const res = await fetch(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(device),
+        { headers: { Accept: "application/json" } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.thumbnail && data.thumbnail.source) url = data.thumbnail.source;
+      }
+    } catch (e) { /* network/lookup failure — fall through to "not found" */ }
+
+    try {
+      localStorage.setItem(key, JSON.stringify({ url: url || IMG_NOT_FOUND, fetchedAt: Date.now() }));
+    } catch (e) { /* localStorage full/unavailable — skip caching */ }
+    return url;
+  }
+
+  function attachDeviceImage(wrap, device) {
+    fetchDeviceImage(device).then((url) => {
+      if (!url) return;
+      const img = document.createElement("img");
+      img.className = "ticket-device-img";
+      img.loading = "lazy";
+      img.alt = device || "";
+      img.onload = () => img.classList.add("loaded");
+      img.src = url;
+      wrap.appendChild(img);
+      wrap.classList.add("has-image");
+    });
   }
 
   // ---- Device autosuggest (from price list) --------------------------------
