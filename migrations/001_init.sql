@@ -35,3 +35,18 @@ CREATE TABLE IF NOT EXISTS ticket_versions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_versions_ticket_id ON ticket_versions (ticket_id, version_number DESC);
+
+-- Whole-list snapshots, matching the existing frontend's Settings -> Restore
+-- UI (assets/intake.js openRestoreBackupModal/confirmRestoreBackup), which
+-- expects a flat list of {id, created, count} and a single restoreBackup(id)
+-- action that swaps in an entire prior ticket set at once. One is created
+-- automatically on every "clear", and again as a safety net before every
+-- restore, so neither action ever loses data permanently.
+CREATE TABLE IF NOT EXISTS intake_backups (
+  id          TEXT PRIMARY KEY,        -- "B" + millis, same id scheme as the old Apps Script backup sheets
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  snapshot    JSONB NOT NULL,          -- array of ticket rows (full tickets.* shape) at backup time
+  count       INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_intake_backups_created_at ON intake_backups (created_at DESC);

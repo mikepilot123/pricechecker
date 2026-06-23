@@ -42,13 +42,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, deletedId: await deleteTicket(body) });
     }
     if (action === "clear") {
-      return res.status(200).json({ ok: true, deletedCount: await clearAll() });
+      const { deletedCount, backup } = await clearAll();
+      return res.status(200).json({ ok: true, deletedCount, backup });
     }
     if (action === "listBackups") {
-      return res.status(200).json({ ok: true, backups: await listBackups(body) });
+      return res.status(200).json({ ok: true, backups: await listBackups() });
     }
     if (action === "restoreBackup") {
-      return res.status(200).json({ ok: true, ticket: await restoreBackup(body) });
+      const { restoredCount, backup, tickets } = await restoreBackup(body);
+      return res.status(200).json({ ok: true, restoredCount, backup, tickets });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
