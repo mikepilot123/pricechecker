@@ -702,6 +702,35 @@ body {
 .form-step-heading .form-section-label { margin: 0 0 5px; }
 .form-step-heading h4 { margin: 0; font-family: var(--font-display); font-size: 1.18rem; }
 .form-step-heading p:last-child { margin: 5px 0 0; color: var(--text-dim); font-size: 0.88rem; line-height: 1.45; }
+.invoice-request {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--text);
+  cursor: pointer;
+}
+.invoice-request input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+.invoice-request strong, .invoice-request small { display: block; }
+.invoice-request strong { font-size: 0.9rem; }
+.invoice-request small { margin-top: 2px; color: var(--text-dim); font-size: 0.78rem; line-height: 1.35; }
+.form-success { text-align: center; padding: 24px 8px 12px; }
+.success-check {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: rgba(15, 122, 76, 0.12);
+  color: var(--price);
+  font-size: 2rem;
+  font-weight: 800;
+}
+.form-success .form-step-heading { margin-bottom: 0; }
 
 .select-wrap { position: relative; }
 .select-input {

@@ -579,10 +579,12 @@
     $("fNotes").value = ticket ? ticket.notes || "" : "";
     $("fRepairCost").value = ticket ? ticket.repairCost ?? "" : "";
     $("fAmountPaid").value = ticket ? ticket.amountPaid ?? "" : "";
+    $("fSendInvoice").checked = !ticket;
     setIssueTags(ticket ? ticket.issues || "" : "");
 
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
+    $("formSuccessMessage").textContent = "";
     setFormStep(1);
     $("intakeFormModal").hidden = false;
     $("fName").focus();
@@ -607,9 +609,12 @@
     document.querySelectorAll(".form-progress-line").forEach((line, index) => {
       line.classList.toggle("complete", index < step - 1);
     });
-    $("previousFormStep").hidden = step === 1;
-    $("nextFormStep").hidden = step === 3;
+    const isComplete = step === 4;
+    $("previousFormStep").hidden = step === 1 || isComplete;
+    $("nextFormStep").hidden = step >= 3;
     $("saveForm").hidden = step !== 3;
+    $("cancelForm").hidden = isComplete;
+    $("doneForm").hidden = !isComplete;
     $("formError").hidden = true;
   }
 
@@ -649,6 +654,7 @@
   });
   $("previousFormStep").addEventListener("click", () => setFormStep(quickLogMode && formStep === 3 ? 1 : formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
+  $("doneForm").addEventListener("click", closeForm);
   $("closeIntakeFormModal").addEventListener("click", closeForm);
   $("intakeFormModal").addEventListener("click", (e) => {
     if (e.target.id === "intakeFormModal") closeForm();
@@ -821,6 +827,8 @@
       err.hidden = false;
       return;
     }
+    const notes = $("fNotes").value.trim();
+    const invoiceNote = $("fSendInvoice").checked && !editingId ? "Invoice to send to client." : "";
     const payload = {
       action: editingId ? "update" : "add",
       id: editingId || undefined,
@@ -834,7 +842,7 @@
       issues: issuesStr,
       issue: issuesStr,
       status: $("fStatus").value,
-      notes: $("fNotes").value.trim(),
+      notes: [invoiceNote, notes].filter(Boolean).join("\n"),
       repairCost: $("fRepairCost").value.trim(),
       amountPaid: $("fAmountPaid").value.trim(),
     };
@@ -844,10 +852,17 @@
     try {
       const res = await api(payload);
       if (!res.ok) throw new Error(res.error || "Rejected");
+      const wasEditing = Boolean(editingId);
       mergeTicket(res.ticket);
-      closeForm();
       renderStatusChips();
       render();
+      $("intakeFormTitle").textContent = wasEditing ? "Device updated" : "Device logged";
+      $("formSuccessTitle").textContent = wasEditing ? "Device successfully updated" : "Device successfully logged";
+      $("formSuccessMessage").textContent = $("fSendInvoice").checked && !wasEditing
+        ? "The device was logged and marked to send an invoice to the client."
+        : "The device intake has been saved.";
+      setFormStep(4);
+      $("doneForm").focus();
     } catch (ex) {
       err.textContent = "Couldn't save: " + ex.message;
       err.hidden = false;
