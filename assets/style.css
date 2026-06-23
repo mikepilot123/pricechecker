@@ -631,6 +631,20 @@ body {
   margin: 18px 0 10px;
 }
 .form-section-label:first-child { margin-top: 2px; }
+.form-progress { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 22px; }
+.form-progress-step { display: grid; justify-items: center; gap: 5px; flex: none; color: var(--text-dim); font-size: 0.68rem; font-weight: 700; }
+.form-progress-step::first-line { font-size: 0.74rem; }
+.form-progress-step > span { font-size: 0.67rem; font-weight: 600; }
+.form-progress-step { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 50%; padding-top: 6px; }
+.form-progress-step > span { position: relative; top: 11px; white-space: nowrap; }
+.form-progress-step.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.form-progress-step.complete { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.form-progress-line { height: 1px; flex: 1; min-width: 18px; margin-top: 14px; background: var(--border); }
+.form-progress-line.complete { background: var(--accent); }
+.form-step-heading { margin: 0 0 18px; }
+.form-step-heading .form-section-label { margin: 0 0 5px; }
+.form-step-heading h4 { margin: 0; font-family: var(--font-display); font-size: 1.18rem; }
+.form-step-heading p:last-child { margin: 5px 0 0; color: var(--text-dim); font-size: 0.88rem; line-height: 1.45; }
 
 .select-wrap { position: relative; }
 .select-input {
