@@ -853,72 +853,27 @@
   }
 
   // ---- Device images --------------------------------------------------------
-  // Prefer a model-specific rear-device photo from Wikimedia Commons. When a
-  // rear photo does not exist for a model, fall back to that model's Wikipedia
-  // image, then the local neutral device placeholder.
-  const LS_IMG_PREFIX = "rpc_device_back_img_v2_";
-  const IMG_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-  const IMG_NOT_FOUND = "__none__";
+  // The catalog and image files are bundled with this app. Intake therefore
+  // never sends the logged model name to an image API at runtime. Models that
+  // have not yet been added to the catalog keep the neutral local placeholder.
+  const DEVICE_IMAGE_CATALOG_URL = "assets/device-images/catalog.json";
+  let deviceImageCatalogPromise = null;
 
-  function imgCacheKey(device) {
-    return LS_IMG_PREFIX + String(device || "").trim().toLowerCase().replace(/\s+/g, "-");
+  function deviceImageKey(device) {
+    return String(device || "").trim().toLowerCase().replace(/\s+/g, " ");
   }
 
   async function fetchDeviceImage(device) {
-    device = String(device || "").trim();
-    if (!device) return null;
-    const key = imgCacheKey(device);
-    try {
-      const cached = JSON.parse(localStorage.getItem(key) || "null");
-      if (cached && Date.now() - cached.fetchedAt < IMG_STALE_MS) {
-        return cached.url === IMG_NOT_FOUND ? null : cached.url;
-      }
-    } catch (e) { /* ignore bad cache entry */ }
-
-    let url = await fetchCommonsBackImage(device);
-    if (!url) {
-      try {
-        const res = await fetch(
-          "https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(device),
-          { headers: { Accept: "application/json" } }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.thumbnail && data.thumbnail.source) url = data.thumbnail.source;
-        }
-      } catch (e) { /* network/lookup failure — retain local placeholder */ }
+    const key = deviceImageKey(device);
+    if (!key) return null;
+    if (!deviceImageCatalogPromise) {
+      deviceImageCatalogPromise = fetch(DEVICE_IMAGE_CATALOG_URL)
+        .then((res) => (res.ok ? res.json() : {}))
+        .catch(() => ({}));
     }
-
-    try {
-      localStorage.setItem(key, JSON.stringify({ url: url || IMG_NOT_FOUND, fetchedAt: Date.now() }));
-    } catch (e) { /* localStorage full/unavailable — skip caching */ }
-    return url;
-  }
-
-  async function fetchCommonsBackImage(device) {
-    try {
-      const params = new URLSearchParams({
-        action: "query",
-        generator: "search",
-        gsrsearch: `${device} back`,
-        gsrnamespace: "6",
-        gsrlimit: "8",
-        prop: "imageinfo",
-        iiprop: "url",
-        iiurlwidth: "360",
-        format: "json",
-        origin: "*",
-      });
-      const res = await fetch("https://commons.wikimedia.org/w/api.php?" + params.toString());
-      if (!res.ok) return null;
-      const data = await res.json();
-      const pages = Object.values((data.query && data.query.pages) || {});
-      const image = pages.find((page) => /\b(back|rear)\b/i.test(page.title || "")) || pages[0];
-      const info = image && image.imageinfo && image.imageinfo[0];
-      return (info && (info.thumburl || info.url)) || null;
-    } catch (e) {
-      return null;
-    }
+    const catalog = await deviceImageCatalogPromise;
+    const item = catalog[key];
+    return item && item.file ? "assets/device-images/" + item.file : null;
   }
 
   // ---- Device autosuggest (from price list) --------------------------------
