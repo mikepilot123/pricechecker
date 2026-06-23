@@ -1,20 +1,19 @@
 /* ============================================================
    Device intake — log devices, select one or more issues, track
    status, and keep a timestamped activity log of every change.
-   Talks to a Google Apps Script web app that reads/writes a
-   dedicated "JQ Reapirs" spreadsheet.
+   Talks to a Vercel serverless API (api/intake.js) backed by Postgres,
+   which mirrors the old Google Apps Script backend's request/response
+   shape exactly.
 
-   The Apps Script URL is fixed below (it's not secret on its own —
-   every request still requires the team PIN, checked server-side in
-   apps-script/Code.gs). Only the PIN is entered once per device and
-   stored in localStorage.
+   The API URL is fixed below (it's not secret on its own — every
+   request still requires the team PIN, checked server-side). Only the
+   PIN is entered once per device and stored in localStorage.
    ============================================================ */
 
 (function () {
-  // Fixed Apps Script web app URL — update if you ever redeploy to a
-  // new URL. The PIN (set server-side in Code.gs) is the real gate.
-  const SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbyNDPA3RSYJfpoQ0sWqPZ1Ebyui9xyeVXzC00RDTZ3F0ilOg8nPnNGn9dYqlId2YiBaUw/exec";
+  // Stable production alias for the Vercel project (auto-updates on every
+  // push to main) — update if the project or domain ever changes.
+  const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
 
   // Status pipeline — keep in sync with apps-script/Code.gs STATUSES.
   const STATUSES = [
