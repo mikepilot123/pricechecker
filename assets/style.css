@@ -631,6 +631,8 @@ body {
   margin: 18px 0 10px;
 }
 .form-section-label:first-child { margin-top: 2px; }
+.form-step[hidden],
+.form-actions > [hidden] { display: none !important; }
 .form-progress { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 22px; }
 .form-progress-step { display: grid; justify-items: center; gap: 5px; flex: none; color: var(--text-dim); font-size: 0.68rem; font-weight: 700; }
 .form-progress-step::first-line { font-size: 0.74rem; }
