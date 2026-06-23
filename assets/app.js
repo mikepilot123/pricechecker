@@ -41,6 +41,7 @@ let infoLines = [];       // standing info banner text
 let activeBrand = "all";
 let lastFetchTime = null;
 let tickTimer = null;
+let lastAutoScrolledModel = null;
 
 // --- CSV parsing ------------------------------------------------------------
 // Robust CSV -> array of rows (handles quoted fields, commas, newlines).
@@ -250,8 +251,35 @@ function render() {
   const expand = els.search.value.trim().length > 0;
 
   const frag = document.createDocumentFragment();
-  for (const m of list) frag.appendChild(card(m, expand));
+  let firstEl = null;
+  for (const m of list) {
+    const el = card(m, expand);
+    if (!firstEl) firstEl = el;
+    frag.appendChild(el);
+  }
   els.results.appendChild(frag);
+
+  // Once a search narrows it down to exactly one model, scroll so its whole
+  // card (head + full price list) is visible — staff shouldn't have to
+  // manually scroll past the sticky search bar to see prices they just found.
+  if (expand && list.length === 1 && list[0].name !== lastAutoScrolledModel) {
+    lastAutoScrolledModel = list[0].name;
+    requestAnimationFrame(() => scrollCardIntoView(firstEl));
+  } else if (!expand || list.length !== 1) {
+    lastAutoScrolledModel = null;
+  }
+}
+
+function scrollCardIntoView(cardEl) {
+  if (!cardEl) return;
+  const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 0;
+  const searchWrap = document.querySelector(".search-wrap");
+  const stickyOffset = headerH + (searchWrap ? searchWrap.offsetHeight : 0) + 12;
+  const rect = cardEl.getBoundingClientRect();
+  // Skip the scroll if the card already fits cleanly below the sticky bar.
+  if (rect.top >= stickyOffset && rect.bottom <= window.innerHeight) return;
+  const top = window.scrollY + rect.top - stickyOffset;
+  window.scrollTo({ top: Math.max(top, 0), behavior: "smooth" });
 }
 
 function card(m, expand = false) {
@@ -283,12 +311,27 @@ function card(m, expand = false) {
     grid.className = "price-grid";
     grid.innerHTML = m.prices
       .map(
-        (p) => `<div class="price-row">
+        (p, i) => `<div class="price-row" role="button" tabindex="0" data-idx="${i}"
+            aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
           <span class="price-name">${escapeHtml(p.type)}</span>
-          <span class="price-val">${formatPrice(p.value)}</span>
+          <span class="price-val">${formatPrice(p.value)}<span class="price-row-hint">+ Log device</span></span>
         </div>`
       )
       .join("");
+    grid.querySelectorAll(".price-row").forEach((rowEl) => {
+      const p = m.prices[Number(rowEl.dataset.idx)];
+      const go = (e) => {
+        e.stopPropagation();
+        logDeviceFromPrice(m, p);
+      };
+      rowEl.addEventListener("click", go);
+      rowEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          go(e);
+        }
+      });
+    });
     body.appendChild(grid);
   } else {
     body.innerHTML = `<p class="no-prices">No set price for this model yet — please call to confirm a quote.</p>`;
@@ -298,6 +341,18 @@ function card(m, expand = false) {
   el.appendChild(head);
   el.appendChild(body);
   return el;
+}
+
+// --- Log device from a price row --------------------------------------------
+// Lets staff jump straight from "how much for X" to logging the device for
+// that exact repair, instead of re-typing the model/issue in the Intake tab.
+// assets/intake.js listens for this event (it owns the actual modal/form).
+function logDeviceFromPrice(model, priceEntry) {
+  window.dispatchEvent(
+    new CustomEvent("rpc-log-device", {
+      detail: { device: model.name, repairType: priceEntry.type, price: formatPrice(priceEntry.value) },
+    })
+  );
 }
 
 // --- Status / timestamp -----------------------------------------------------

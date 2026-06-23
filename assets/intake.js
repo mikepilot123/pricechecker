@@ -544,6 +544,40 @@
     if (e.key === "Escape" && !$("intakeFormModal").hidden) closeForm();
   });
 
+  // ---- Log device straight from a price row ---------------------------------
+  // assets/app.js dispatches this when staff click/tap a repair price on the
+  // Prices tab, so they don't have to re-type the model or hunt for the
+  // matching issue tag — just confirm the customer and save.
+  const REPAIR_TYPE_TO_ISSUE = [
+    [/screen|lcd|display/i, "Screen Cracked / Broken"],
+    [/battery/i, "Battery Issue"],
+    [/charg/i, "Charging Port"],
+    [/power/i, "Won't Power On"],
+    [/water/i, "Water Damage"],
+    [/camera/i, "Camera Issue"],
+    [/speaker|mic/i, "Speaker / Mic Issue"],
+    [/back glass|housing/i, "Back Glass Cracked"],
+    [/software|restore|unlock/i, "Software Issue"],
+    [/diagnos/i, "Diagnostic Needed"],
+  ];
+  function guessIssueFromRepairType(type) {
+    const hit = REPAIR_TYPE_TO_ISSUE.find(([re]) => re.test(type || ""));
+    return hit ? hit[1] : null;
+  }
+
+  window.addEventListener("rpc-log-device", (e) => {
+    const { device, repairType, price } = e.detail || {};
+    const intakeNav = document.querySelector('.nav-btn[data-target="intake"]');
+    if (intakeNav) intakeNav.click();
+    if (!isConfigured()) return; // setup screen is now showing; nothing to prefill yet
+
+    openForm(null);
+    $("fDevice").value = device || "";
+    setIssueTags(guessIssueFromRepairType(repairType) || (repairType ? "Other: " + repairType : ""));
+    if (repairType) $("fNotes").value = `Quoted: ${price || "—"} — ${repairType}`;
+    $("fName").focus();
+  });
+
   // ---- Customer info modal --------------------------------------------------
   // Quick-edits a ticket's customer details straight from its card.
   let clientModalTicket = null;
