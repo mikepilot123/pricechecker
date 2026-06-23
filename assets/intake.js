@@ -65,8 +65,8 @@
   let quickLogMode = false;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
-  // A "log this repair" request from the Prices tab that arrived before the
-  // device was connected; applied right after a successful PIN connect.
+  // If Intake is not configured yet, retain a price-row selection until the
+  // user has manually connected the Intake tab.
   let pendingLogDevice = null;
 
   // ---- View navigation -----------------------------------------------------
@@ -124,8 +124,6 @@
       showMain();
       renderStatusChips();
       render();
-      // If they got here by clicking a repair on the Prices tab before
-      // connecting, open the prefilled Log device form now.
       if (pendingLogDevice) {
         const detail = pendingLogDevice;
         pendingLogDevice = null;
@@ -655,6 +653,27 @@
   $("intakeFormModal").addEventListener("click", (e) => {
     if (e.target.id === "intakeFormModal") closeForm();
   });
+
+  // A quick-log form is opened over the Prices view. On phone-sized screens,
+  // a deliberate left swipe is another way to dismiss it and return to the
+  // price list without changing tabs.
+  let formSwipeStart = null;
+  $("intakeFormModal").addEventListener("touchstart", (e) => {
+    if (!window.matchMedia("(max-width: 559px)").matches) return;
+    const touch = e.changedTouches[0];
+    formSwipeStart = { x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+  $("intakeFormModal").addEventListener("touchend", (e) => {
+    if (!formSwipeStart || !window.matchMedia("(max-width: 559px)").matches) return;
+    const touch = e.changedTouches[0];
+    const horizontalDistance = touch.clientX - formSwipeStart.x;
+    const verticalDistance = touch.clientY - formSwipeStart.y;
+    formSwipeStart = null;
+    if (horizontalDistance <= -72 && Math.abs(horizontalDistance) > Math.abs(verticalDistance) * 1.25) {
+      closeForm();
+    }
+  }, { passive: true });
+  $("intakeFormModal").addEventListener("touchcancel", () => { formSwipeStart = null; }, { passive: true });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("intakeFormModal").hidden) closeForm();
   });
@@ -697,13 +716,9 @@
 
   window.addEventListener("rpc-log-device", (e) => {
     const detail = e.detail || {};
-    const intakeNav = document.querySelector('.nav-btn[data-target="intake"]');
-    if (intakeNav) intakeNav.click();
-    // If this device hasn't been connected yet, the PIN setup screen is now
-    // showing. Hold onto the request and apply it the moment they connect,
-    // instead of silently dropping what they clicked.
     if (!isConfigured()) {
       pendingLogDevice = detail;
+      window.alert("Set up the Intake PIN from the Intake tab before logging a device.");
       return;
     }
     applyLogDevicePrefill(detail);
