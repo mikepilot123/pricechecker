@@ -10,13 +10,14 @@ const SHEET_BASE =
 
 const TABS = [
   { key: "apple", gid: "0", label: "iPhones" },
+  { key: "techno", gid: "1021598529", label: "Techno" },
   { key: "samsung", gid: "1256027568", label: "Samsung" },
 ];
 
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // every 5 minutes
 // Bump this when the sheet parser changes so an old, incorrectly parsed
 // price list is never used as the offline fallback.
-const CACHE_KEY = "rpc_cache_v2";
+const CACHE_KEY = "rpc_cache_v3";
 
 // Section labels in the sheet that are dividers, not real models.
 const SECTION_RE = /(series|^table\d*$)/i;
@@ -133,6 +134,7 @@ function deriveBrand(name, tabKey) {
   const n = name.toLowerCase();
   if (n.startsWith("ipad")) return "iPad";
   if (n.startsWith("iphone")) return "iPhone";
+  if (tabKey === "techno" || n.startsWith("techno") || n.startsWith("tecno")) return "Techno";
   if (tabKey === "samsung" || n.startsWith("samsung")) return "Samsung";
   return "Other";
 }
@@ -219,7 +221,7 @@ function renderInfo() {
 
 function buildChips() {
   const brands = ["all", ...new Set(MODELS.map((m) => m.brand))];
-  const labels = { all: "All", iPhone: "iPhone", iPad: "iPad", Samsung: "Samsung", Other: "Other" };
+  const labels = { all: "All", iPhone: "iPhone", iPad: "iPad", Techno: "Techno", Samsung: "Samsung", Other: "Other" };
   els.chips.innerHTML = "";
   brands.forEach((b) => {
     const btn = document.createElement("button");

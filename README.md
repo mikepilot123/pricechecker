@@ -25,11 +25,12 @@ It opens full-screen and even loads offline (showing the last saved prices).
 
 ## How it stays in sync with the sheet
 
-The app reads two tabs of the published Google Sheet as CSV:
+The app reads three tabs of the published Google Sheet as CSV:
 
 | Tab | Sheet `gid` |
 |-----|-------------|
 | iPhones (incl. iPads) | `0` |
+| Techno | `1021598529` |
 | Samsung | `1256027568` |
 
 - Prices load **on open**, **auto-refresh every 5 minutes**, on **manual
@@ -57,15 +58,17 @@ at the top of [`assets/app.js`](assets/app.js):
 const SHEET_BASE = "https://docs.google.com/.../pub";
 const TABS = [
   { key: "apple",   gid: "0",          label: "iPhones" },
+  { key: "techno",  gid: "1021598529", label: "Techno" },
   { key: "samsung", gid: "1256027568", label: "Samsung" },
 ];
 ```
 
 ---
 
-## Intake — logging devices & repair status
+## Check In — logging devices & repair status
 
-The **Intake** tab lets the team log a customer's device, pick **one or
+The **Check In** tab guides the team through the device and its issues first,
+then client details and payment. It also lets the team pick **one or
 more issues** (tag-style multi-select, plus "Other" for anything not
 listed), and track status through the repair pipeline: `Received →
 Diagnosing → Waiting for Parts → In Progress → Repaired → Picked Up` (or
@@ -75,14 +78,14 @@ timeline of what happened, not just the current state.
 
 It captures Customer Name, Phone, Device, Issues, Status, and Notes. The
 call button on each card dials the customer directly (`tel:` link) using
-the phone number captured at intake.
+the phone number captured at check-in.
 
 Open any ticket card to edit its client details, or use **Delete record** to
 remove it after a confirmation prompt. Older tickets created before client
 details were added do not contain a recoverable name or phone number; use
 **Add client info** once on each of those records.
 
-To reset the intake completely, use **Clear all** in the Intake toolbar and
+To reset the check-in list completely, use **Clear all** in the Check In toolbar and
 confirm twice. It removes all ticket rows from the Sheet and dashboard, while
 retaining the header row and the app's connection settings.
 
@@ -112,7 +115,7 @@ only the PIN is entered by staff.
 5. Copy the resulting `.../exec` URL and update the `SCRIPT_URL` constant
    near the top of [`assets/intake.js`](assets/intake.js) (only needed if
    you redeploy to a new URL — the current one is already set).
-6. In the app, open the **Intake** tab — staff just enter the PIN once per
+6. In the app, open the **Check In** tab — staff just enter the PIN once per
    device; it's remembered locally after that (never uploaded or committed).
 
 If you already had an earlier version of `Code.gs` deployed, re-paste the
@@ -136,11 +139,11 @@ served by GitHub Pages. Includes a PWA manifest + service worker so it can be
 installed to a home screen and opened offline.
 
 ```
-index.html                 # markup (Prices + Intake views)
+index.html                 # markup (Prices + Check In views)
 assets/style.css           # styling (mobile-first, dark theme)
 assets/app.js              # CSV fetch + parse + search/filter UI (Prices)
-assets/intake.js           # device intake UI (talks to Apps Script backend)
-apps-script/Code.gs         # Apps Script backend for the Intake sheet
+assets/intake.js           # device check-in UI (talks to Apps Script backend)
+apps-script/Code.gs         # Apps Script backend for the check-in sheet
 manifest.webmanifest       # installable PWA
 sw.js                      # offline app shell
 ```
