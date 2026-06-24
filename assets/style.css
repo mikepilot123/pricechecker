@@ -67,7 +67,7 @@ body {
   justify-content: space-between;
   gap: 12px;
   width: min(100%, var(--workspace-max));
-  margin: 0;
+  margin: 0 auto;
 }
 
 .brand {
@@ -153,7 +153,7 @@ body {
 /* ---------- Container ---------- */
 .container {
   width: min(100%, var(--workspace-max));
-  margin: 0;
+  margin: 0 auto;
   padding: 20px var(--workspace-pad) 48px;
 }
 
@@ -453,10 +453,8 @@ body {
 .view-nav {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin: 12px auto 0;
   width: min(100%, var(--workspace-max));
-  margin-right: 0;
-  margin-left: 0;
   background: var(--bg-soft);
   padding: 4px;
   border-radius: 12px;
