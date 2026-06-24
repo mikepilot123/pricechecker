@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=check-in-flow-1" />
+  <link rel="stylesheet" href="assets/style.css?v=ticket-summary-stack-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -157,15 +157,37 @@
       <div class="modal-body">
         <form id="intakeForm" autocomplete="off">
           <div class="form-progress" aria-label="Device check-in progress">
-            <span class="form-progress-step active" data-progress-step="1">1<span>Device</span></span>
+            <span class="form-progress-step active" data-progress-step="1">1<span>Customer</span></span>
             <span class="form-progress-line"></span>
-            <span class="form-progress-step" data-progress-step="2">2<span>Client</span></span>
+            <span class="form-progress-step" data-progress-step="2">2<span>Device</span></span>
             <span class="form-progress-line"></span>
             <span class="form-progress-step" data-progress-step="3">3<span>Payment</span></span>
           </div>
 
           <section class="form-step" data-form-step="1">
-            <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Device and repair</h4><p>Choose the device, then select what needs attention.</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Customer details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
+            <div class="form-grid">
+              <div class="form-field form-field-full">
+                <label class="field-label" for="fName">Name *</label>
+                <input id="fName" class="text-input" required placeholder="e.g. Anita Singh" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="fPhone">Phone *</label>
+                <input id="fPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="fEmail">Email *</label>
+                <input id="fEmail" class="text-input" type="email" required autocomplete="email" placeholder="e.g. anita@example.com" />
+              </div>
+              <label class="invoice-request form-field-full">
+                <input id="fSendInvoice" type="checkbox" checked />
+                <span><strong>Send invoice to client</strong><small>Mark this check-in for an invoice after it is saved.</small></span>
+              </label>
+            </div>
+          </section>
+
+          <section class="form-step" data-form-step="2" hidden>
+            <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Device and repair</h4><p>Choose the device, then select what needs attention.</p></div>
             <div class="form-grid">
               <div class="form-field form-field-full">
                 <label class="field-label" for="fDevice">Device *</label>
@@ -190,28 +212,6 @@
                 <label class="field-label" for="fNotes">Notes</label>
                 <textarea id="fNotes" class="text-input" rows="3" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
               </div>
-            </div>
-          </section>
-
-          <section class="form-step" data-form-step="2" hidden>
-            <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Client details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
-            <div class="form-grid">
-              <div class="form-field form-field-full">
-                <label class="field-label" for="fName">Name *</label>
-                <input id="fName" class="text-input" required placeholder="e.g. Anita Singh" />
-              </div>
-              <div class="form-field form-field-full">
-                <label class="field-label" for="fPhone">Phone *</label>
-                <input id="fPhone" class="text-input" type="tel" required placeholder="e.g. 868 712 3456" />
-              </div>
-              <div class="form-field form-field-full">
-                <label class="field-label" for="fEmail">Email *</label>
-                <input id="fEmail" class="text-input" type="email" required autocomplete="email" placeholder="e.g. anita@example.com" />
-              </div>
-              <label class="invoice-request form-field-full">
-                <input id="fSendInvoice" type="checkbox" checked />
-                <span><strong>Send invoice to client</strong><small>Mark this check-in for an invoice after it is saved.</small></span>
-              </label>
             </div>
           </section>
 

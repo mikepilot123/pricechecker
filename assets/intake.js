@@ -61,7 +61,7 @@
   let editingId = null;
   let formStep = 1;
   // True when the form was opened from a Prices-tab repair click — device and
-  // issue are already known, so the wizard starts at Client details.
+  // issue are already known, so the wizard skips straight to Payment.
   let quickLogMode = false;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
@@ -587,7 +587,7 @@
     $("formSuccessMessage").textContent = "";
     setFormStep(1);
     $("intakeFormModal").hidden = false;
-    $("fDevice").focus();
+    $("fName").focus();
   }
   function closeForm() {
     $("intakeFormModal").hidden = true;
@@ -610,7 +610,7 @@
       line.classList.toggle("complete", index < step - 1);
     });
     const isComplete = step === 4;
-    $("previousFormStep").hidden = step === 1 || isComplete || (quickLogMode && step === 2);
+    $("previousFormStep").hidden = step === 1 || isComplete;
     $("nextFormStep").hidden = step >= 3;
     $("saveForm").hidden = step !== 3;
     $("cancelForm").hidden = isComplete;
@@ -629,14 +629,14 @@
 
   function validateFormStep(step) {
     const err = $("formError");
-    if (step === 1 && !$("fDevice").value.trim()) {
-      err.textContent = "Enter the device model.";
-    } else if (step === 1 && !buildIssuesString()) {
-      err.textContent = "Select at least one issue.";
-    } else if (step === 2) {
+    if (step === 1) {
       const message = customerFieldsError();
       if (message) err.textContent = message;
       else return true;
+    } else if (step === 2 && !$("fDevice").value.trim()) {
+      err.textContent = "Enter the device model.";
+    } else if (step === 2 && !buildIssuesString()) {
+      err.textContent = "Select at least one issue.";
     } else if (step === 3 && (!$("fRepairCost").checkValidity() || !$("fAmountPaid").checkValidity())) {
       err.textContent = "Enter valid non-negative payment amounts.";
     } else {
@@ -648,11 +648,11 @@
 
   $("nextFormStep").addEventListener("click", () => {
     if (!validateFormStep(formStep)) return;
-    setFormStep(formStep + 1);
+    setFormStep(quickLogMode && formStep === 1 ? 3 : formStep + 1);
     const firstField = document.querySelector(`[data-form-step="${formStep}"] input, [data-form-step="${formStep}"] select, [data-form-step="${formStep}"] button`);
     if (firstField) firstField.focus();
   });
-  $("previousFormStep").addEventListener("click", () => setFormStep(formStep - 1));
+  $("previousFormStep").addEventListener("click", () => setFormStep(quickLogMode && formStep === 3 ? 1 : formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
   $("doneForm").addEventListener("click", closeForm);
   $("closeIntakeFormModal").addEventListener("click", closeForm);
@@ -717,7 +717,6 @@
     if (priceValue != null) $("fRepairCost").value = priceValue;
     setQuickLogMode(true);
     $("quotedPriceSummary").textContent = `Quoted ${price || (priceValue != null ? "$" + priceValue : "—")} — ${repairType || device || ""}`;
-    setFormStep(2);
     $("fName").focus();
   }
 
