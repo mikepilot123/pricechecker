@@ -398,10 +398,7 @@
     const label = count
       ? `View ${count} update${count === 1 ? "" : "s"} and notes`
       : "View updates and notes";
-    const shortLabel = count
-      ? `${count} update${count === 1 ? "" : "s"} / note${count === 1 ? "" : "s"}`
-      : "Updates & notes";
-    return `<button type="button" class="activity-log-btn" id="${id}" aria-label="${esc(label)}" title="${esc(shortLabel)}">
+    return `<button type="button" class="activity-log-btn" id="${id}" aria-label="${esc(label)}" title="Updates & notes">
       <svg class="icon" aria-hidden="true"><use href="#i-note"></use></svg>
       ${count ? `<span class="activity-log-badge" aria-hidden="true">${count}</span>` : ""}
     </button>`;
@@ -941,8 +938,7 @@
     box.innerHTML = "";
     const make = (key, label) => {
       const b = document.createElement("button");
-      const statusClass = STATUS_CLASS[key];
-      b.className = "chip" + (statusClass ? ` status-chip ${statusClass}` : "") + (key === statusFilter ? " active" : "");
+      b.className = "chip" + (key === statusFilter ? " active" : "");
       b.textContent = label;
       b.onclick = () => {
         statusFilter = key;
@@ -954,7 +950,9 @@
       box.appendChild(b);
     };
     make("all", `All (${counts.all})`);
-    STATUSES.forEach((s) => make(s, `${s} (${counts[s]})`));
+    STATUSES.forEach((s) => {
+      if (counts[s]) make(s, `${s} (${counts[s]})`);
+    });
   }
 
   function currentList() {
@@ -1001,8 +999,7 @@
 
   function ticketCard(t) {
     const el = document.createElement("div");
-    const statusClass = STATUS_CLASS[t.status] || "st-received";
-    el.className = `ticket ${statusClass}`;
+    el.className = "ticket";
 
     const head = document.createElement("div");
     head.className = "ticket-head";
@@ -1013,40 +1010,37 @@
     const phoneLine = hasPhone
       ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
       : `<span class="ticket-phone no-phone">No number on file</span>`;
-    const deviceIcon = isTabletDevice(t.device) ? "i-tablet" : "i-device";
     head.innerHTML = `
-      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
-        <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
-        <img alt="" />
-      </div>
-      <div class="ticket-identity">
-        <span class="ticket-num mono">#${esc(t.id || "")}</span>
+      <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
+      <div class="ticket-main">
+        <div class="ticket-toprow">
+          <span class="ticket-num mono">#${esc(t.id || "")}</span>
+        </div>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
       </div>
-      <div class="ticket-repair">
-        <span class="ticket-repair-label">Repair</span>
-        <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
+      <div class="ticket-summary-meta">
+        <div class="ticket-summary-actions">
+          <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
+          ${activityLogBtnHtml(t, "")}
+        </div>
+        <div class="ticket-repair-note">
+          <span class="ticket-repair-label">Repair</span>
+          <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
+        </div>
       </div>
-      <div class="ticket-status">
-        <span class="status-badge ${statusClass}">${esc(t.status || "—")}</span>
-      </div>
-      <div class="ticket-activity">
-        ${activityLogBtnHtml(t, "")}
+      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
+        <img src="assets/branding/device-thumbnail.png" alt="" />
       </div>`;
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
     if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
     bindActivityLogBtn(head.querySelector(".activity-log-btn"), t);
-    const thumb = head.querySelector(".ticket-device-thumb");
     const thumbImg = head.querySelector(".ticket-device-thumb img");
     if (thumbImg) {
       fetchDeviceImage(t.device).then((url) => {
-        if (!url) return;
-        thumbImg.onload = () => thumb.classList.add("has-image");
-        thumbImg.onerror = () => thumb.classList.remove("has-image");
-        thumbImg.src = url;
+        if (url) thumbImg.src = url;
       });
     }
     head.onclick = () => openTicketModal(t);
@@ -1066,10 +1060,6 @@
   // have not yet been added to the catalog keep the neutral local placeholder.
   const DEVICE_IMAGE_CATALOG_URL = "assets/device-images/catalog.json";
   let deviceImageCatalogPromise = null;
-
-  function isTabletDevice(device) {
-    return /\b(ipad|tablet|tab)\b/i.test(String(device || ""));
-  }
 
   function deviceImageKey(device) {
     return String(device || "").trim().toLowerCase().replace(/\s+/g, " ");
