@@ -67,8 +67,8 @@ const TABS = [
 
 ## Check In — logging devices & repair status
 
-The **Check In** tab guides the team through the device and its issues first,
-then client details and payment. It also lets the team pick **one or
+The **Check In** tab guides the team through customer details first, then the
+device and its issues, and finally payment. It also lets the team pick **one or
 more issues** (tag-style multi-select, plus "Other" for anything not
 listed), and track status through the repair pipeline: `Received →
 Diagnosing → Waiting for Parts → In Progress → Repaired → Picked Up` (or

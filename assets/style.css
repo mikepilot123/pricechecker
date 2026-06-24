@@ -675,8 +675,8 @@ body {
 .form-actions > [hidden] { display: none !important; }
 .form-progress { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 22px; }
 /* Quick-log from a price row already knows the device/issue, so the wizard
-   starts with Client details and then Payment — collapse the first step visually. */
-#intakeFormModal.quick-log [data-progress-step="1"],
+   skips from Customer details to Payment — collapse the middle step visually. */
+#intakeFormModal.quick-log [data-progress-step="2"],
 #intakeFormModal.quick-log .form-progress-line:first-of-type {
   display: none;
 }
@@ -784,17 +784,25 @@ body {
 .ticket-main { grid-area: main; min-width: 0; }
 .ticket-summary-meta {
   grid-area: summary;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
   min-width: 0;
+  padding-right: 42px;
 }
 .ticket-summary-actions {
   display: inline-flex;
+  align-self: stretch;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+.ticket-summary-actions .activity-log-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 .ticket-repair-note {
   display: flex;
@@ -866,6 +874,7 @@ body {
   .ticket-device-thumb { width: 64px; height: 78px; }
   .ticket-summary-meta,
   .ticket-repair-note { align-items: flex-start; }
+  .ticket-summary-actions { justify-content: flex-start; }
   .ticket-summary-meta .issue-tags { justify-content: flex-start; max-width: none; }
 }
 @media (max-width: 390px) {
