@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#f5f7fb" />
-  <meta name="description" content="Live repair price checker + device intake tracker for the team." />
+  <meta name="description" content="Live repair price checker + device check-in tracker for the team." />
   <title>JQ Electronics</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232756e0'/><path d='m58 31 12-12a16 16 0 0 1-21 21L28 61a8 8 0 1 0 11 11l21-21a16 16 0 0 1 21-21L69 42' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=intake-steps-2" />
+  <link rel="stylesheet" href="assets/style.css?v=check-in-flow-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -47,7 +47,7 @@
     </div>
     <nav class="view-nav" role="tablist" aria-label="Sections">
       <button class="nav-btn active" data-target="prices" role="tab"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
-      <button class="nav-btn" data-target="intake" role="tab"><svg class="icon"><use href="#i-clipboard"></use></svg>Intake</button>
+      <button class="nav-btn" data-target="intake" role="tab"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
     </nav>
   </header>
 
@@ -92,7 +92,7 @@
   <main class="container view" id="view-intake" hidden>
     <!-- Setup panel: shown until the script URL + PIN are saved on this device -->
     <section id="intakeSetup" class="setup-card" hidden>
-      <h2 class="setup-title">Connect device intake</h2>
+      <h2 class="setup-title">Connect device check-in</h2>
       <p class="setup-sub">
         Enter the team PIN (your manager has it). Stored only on this
         device — entered once.
@@ -102,14 +102,14 @@
       <button id="cfgSave" class="primary-btn">Save & connect</button>
       <p id="cfgError" class="field-error" hidden></p>
       <div id="settingsMaintenance" class="settings-maintenance" hidden>
-        <p class="field-label">Intake records</p>
-        <p class="settings-help">Refresh records, restore a saved backup, or clear the current intake list.</p>
+        <p class="field-label">Check-in records</p>
+        <p class="settings-help">Refresh records, restore a saved backup, or clear the current check-in list.</p>
         <div class="settings-actions">
           <button id="reloadIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
           <button id="restoreIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-restore"></use></svg>Restore</button>
           <button id="clearAllIntake" class="ghost-btn danger-btn" type="button"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
         </div>
-        <button id="closeIntakeSettings" class="ghost-btn settings-back" type="button">Back to intake</button>
+        <button id="closeIntakeSettings" class="ghost-btn settings-back" type="button">Back to Check In</button>
       </div>
     </section>
 
@@ -156,14 +156,45 @@
       </div>
       <div class="modal-body">
         <form id="intakeForm" autocomplete="off">
-          <div class="form-progress" aria-label="Device intake progress">
-            <span class="form-progress-step active" data-progress-step="1">1<span>Customer</span></span>
+          <div class="form-progress" aria-label="Device check-in progress">
+            <span class="form-progress-step active" data-progress-step="1">1<span>Device</span></span>
             <span class="form-progress-line"></span>
-            <span class="form-progress-step" data-progress-step="2">2<span>Device</span></span>
+            <span class="form-progress-step" data-progress-step="2">2<span>Client</span></span>
+            <span class="form-progress-line"></span>
+            <span class="form-progress-step" data-progress-step="3">3<span>Payment</span></span>
           </div>
 
           <section class="form-step" data-form-step="1">
-            <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Customer details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Device and repair</h4><p>Choose the device, then select what needs attention.</p></div>
+            <div class="form-grid">
+              <div class="form-field form-field-full">
+                <label class="field-label" for="fDevice">Device *</label>
+                <input id="fDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
+                <datalist id="modelList"></datalist>
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label">Issues *</label>
+                <button type="button" id="openIssueModal" class="issue-select-btn">
+                  <span id="issueSelectLabel">Select issues…</span>
+                  <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
+                </button>
+                <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
+              </div>
+              <div class="form-field">
+                <label class="field-label" for="fStatus">Status</label>
+                <div class="select-wrap">
+                  <select id="fStatus" class="text-input select-input"></select>
+                </div>
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="fNotes">Notes</label>
+                <textarea id="fNotes" class="text-input" rows="3" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <section class="form-step" data-form-step="2" hidden>
+            <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Client details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
             <div class="form-grid">
               <div class="form-field form-field-full">
                 <label class="field-label" for="fName">Name *</label>
@@ -179,42 +210,13 @@
               </div>
               <label class="invoice-request form-field-full">
                 <input id="fSendInvoice" type="checkbox" checked />
-                <span><strong>Send invoice to client</strong><small>Mark this intake for an invoice after it is logged.</small></span>
+                <span><strong>Send invoice to client</strong><small>Mark this check-in for an invoice after it is saved.</small></span>
               </label>
             </div>
           </section>
 
-          <section class="form-step" data-form-step="2" hidden>
-            <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Device and repair</h4><p>Record the device, its status, and what needs attention.</p></div>
-            <div class="form-grid">
-              <div class="form-field">
-                <label class="field-label" for="fDevice">Device *</label>
-                <input id="fDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
-                <datalist id="modelList"></datalist>
-              </div>
-              <div class="form-field">
-                <label class="field-label" for="fStatus">Status</label>
-                <div class="select-wrap">
-                  <select id="fStatus" class="text-input select-input"></select>
-                </div>
-              </div>
-              <div class="form-field form-field-full">
-                <label class="field-label">Issues *</label>
-                <button type="button" id="openIssueModal" class="issue-select-btn">
-                  <span id="issueSelectLabel">Select issues…</span>
-                  <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
-                </button>
-                <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
-              </div>
-              <div class="form-field form-field-full">
-                <label class="field-label" for="fNotes">Notes</label>
-                <textarea id="fNotes" class="text-input" rows="3" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
-              </div>
-            </div>
-          </section>
-
           <section class="form-step" data-form-step="3" hidden>
-            <div class="form-step-heading"><p class="form-section-label">Payment</p><h4>Payment</h4><p>Optional—add the quoted repair cost and any payment received.</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 3</p><h4>Payment</h4><p>Add the repair cost and how much the client paid today.</p></div>
             <p id="quotedPriceSummary" class="quoted-price-summary" hidden></p>
             <div class="form-grid">
               <div id="repairCostField" class="form-field">
@@ -230,7 +232,7 @@
           <section class="form-step form-success" data-form-step="4" hidden aria-live="polite">
             <div class="success-check" aria-hidden="true">✓</div>
             <div class="form-step-heading">
-              <p class="form-section-label">Intake complete</p>
+              <p class="form-section-label">Check-in complete</p>
               <h4 id="formSuccessTitle">Device successfully logged</h4>
               <p id="formSuccessMessage"></p>
             </div>
@@ -325,11 +327,11 @@
   <div id="restoreBackupModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="restoreBackupTitle">
       <div class="modal-header">
-        <div><p class="modal-eyebrow">Intake version history</p><h3 id="restoreBackupTitle">Restore a backup</h3></div>
+        <div><p class="modal-eyebrow">Check-in version history</p><h3 id="restoreBackupTitle">Restore a backup</h3></div>
         <button type="button" id="closeRestoreBackupModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div class="modal-body">
-        <p class="empty-sub">Restoring replaces the current intake list. Your current records are backed up automatically first.</p>
+        <p class="empty-sub">Restoring replaces the current check-in list. Your current records are backed up automatically first.</p>
         <label class="field-label" for="backupSelect">Available backups</label>
         <div class="select-wrap"><select id="backupSelect" class="text-input select-input"></select></div>
         <p id="restoreBackupEmpty" class="empty-sub" hidden>No backups are available yet.</p>
@@ -345,7 +347,7 @@
   <div id="ticketModal" class="modal-backdrop" hidden>
     <section class="modal-panel ticket-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ticketModalTitle">
       <div class="modal-header">
-        <div><p class="modal-eyebrow">Intake record</p><h3 id="ticketModalTitle">Device details</h3></div>
+        <div><p class="modal-eyebrow">Check-in record</p><h3 id="ticketModalTitle">Device details</h3></div>
         <button type="button" id="closeTicketModal" class="modal-close" aria-label="Close device details"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div id="ticketModalBody" class="modal-body"></div>
@@ -364,7 +366,7 @@
     </section>
   </div>
 
-  <script src="assets/app.js?v=multi-table-1"></script>
-  <script src="assets/intake.js?v=intake-steps-2"></script>
+  <script src="assets/app.js?v=techno-1"></script>
+  <script src="assets/intake.js?v=check-in-flow-1"></script>
 </body>
 </html>

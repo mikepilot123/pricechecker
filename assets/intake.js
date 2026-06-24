@@ -1,5 +1,5 @@
 /* ============================================================
-   Device intake — log devices, select one or more issues, track
+   Device check-in — log devices, select one or more issues, track
    status, and keep a timestamped activity log of every change.
    Talks to a Vercel serverless API (api/intake.js) backed by Postgres,
    which mirrors the old Google Apps Script backend's request/response
@@ -61,12 +61,12 @@
   let editingId = null;
   let formStep = 1;
   // True when the form was opened from a Prices-tab repair click — device and
-  // issue are already known, so the wizard skips straight to Payment.
+  // issue are already known, so the wizard starts at Client details.
   let quickLogMode = false;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
-  // If Intake is not configured yet, retain a price-row selection until the
-  // user has manually connected the Intake tab.
+  // If Check In is not configured yet, retain a price-row selection until the
+  // user has manually connected the Check In tab.
   let pendingLogDevice = null;
 
   // ---- View navigation -----------------------------------------------------
@@ -287,7 +287,7 @@
     const err = $("restoreBackupError");
     err.hidden = true;
     if (!id) return;
-    if (!window.confirm("Restore this intake backup? Your current records will first be saved as a new backup.")) return;
+    if (!window.confirm("Restore this check-in backup? Your current records will first be saved as a new backup.")) return;
     const btn = $("confirmRestoreBackup");
     btn.disabled = true;
     const original = btn.innerHTML;
@@ -301,7 +301,7 @@
       renderStatusChips();
       render();
       closeRestoreBackupModal();
-      alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous intake is backed up as ${res.backup.id}.`);
+      alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous check-in list is backed up as ${res.backup.id}.`);
     } catch (e) {
       err.textContent = "Couldn't restore backup: " + e.message;
       err.hidden = false;
@@ -587,7 +587,7 @@
     $("formSuccessMessage").textContent = "";
     setFormStep(1);
     $("intakeFormModal").hidden = false;
-    $("fName").focus();
+    $("fDevice").focus();
   }
   function closeForm() {
     $("intakeFormModal").hidden = true;
@@ -610,7 +610,7 @@
       line.classList.toggle("complete", index < step - 1);
     });
     const isComplete = step === 4;
-    $("previousFormStep").hidden = step === 1 || isComplete;
+    $("previousFormStep").hidden = step === 1 || isComplete || (quickLogMode && step === 2);
     $("nextFormStep").hidden = step >= 3;
     $("saveForm").hidden = step !== 3;
     $("cancelForm").hidden = isComplete;
@@ -622,21 +622,21 @@
     const name = $("fName").value.trim();
     const phone = $("fPhone").value.trim();
     const email = $("fEmail").value.trim();
-    if (!name || !phone || !email) return "Enter the customer's name, phone, and email.";
+    if (!name || !phone || !email) return "Enter the client's name, phone, and email.";
     if (!$("fEmail").checkValidity()) return "Enter a valid email address for the invoice.";
     return null;
   }
 
   function validateFormStep(step) {
     const err = $("formError");
-    if (step === 1) {
+    if (step === 1 && !$("fDevice").value.trim()) {
+      err.textContent = "Enter the device model.";
+    } else if (step === 1 && !buildIssuesString()) {
+      err.textContent = "Select at least one issue.";
+    } else if (step === 2) {
       const message = customerFieldsError();
       if (message) err.textContent = message;
       else return true;
-    } else if (step === 2 && !$("fDevice").value.trim()) {
-      err.textContent = "Enter the device model.";
-    } else if (step === 2 && !buildIssuesString()) {
-      err.textContent = "Select at least one issue.";
     } else if (step === 3 && (!$("fRepairCost").checkValidity() || !$("fAmountPaid").checkValidity())) {
       err.textContent = "Enter valid non-negative payment amounts.";
     } else {
@@ -648,11 +648,11 @@
 
   $("nextFormStep").addEventListener("click", () => {
     if (!validateFormStep(formStep)) return;
-    setFormStep(quickLogMode && formStep === 1 ? 3 : formStep + 1);
+    setFormStep(formStep + 1);
     const firstField = document.querySelector(`[data-form-step="${formStep}"] input, [data-form-step="${formStep}"] select, [data-form-step="${formStep}"] button`);
     if (firstField) firstField.focus();
   });
-  $("previousFormStep").addEventListener("click", () => setFormStep(quickLogMode && formStep === 3 ? 1 : formStep - 1));
+  $("previousFormStep").addEventListener("click", () => setFormStep(formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
   $("doneForm").addEventListener("click", closeForm);
   $("closeIntakeFormModal").addEventListener("click", closeForm);
@@ -707,7 +707,7 @@
 
   // Prefills and opens the Log device wizard for a repair picked on the
   // Prices tab: device, matched issue, and the quoted repair cost are all
-  // filled in, so staff only enter the customer's name, phone, email, and how much
+  // filled in, so staff only enter the client's name, phone, email, and how much
   // they actually paid.
   function applyLogDevicePrefill(detail) {
     const { device, repairType, price, priceValue } = detail || {};
@@ -717,6 +717,7 @@
     if (priceValue != null) $("fRepairCost").value = priceValue;
     setQuickLogMode(true);
     $("quotedPriceSummary").textContent = `Quoted ${price || (priceValue != null ? "$" + priceValue : "—")} — ${repairType || device || ""}`;
+    setFormStep(2);
     $("fName").focus();
   }
 
@@ -724,7 +725,7 @@
     const detail = e.detail || {};
     if (!isConfigured()) {
       pendingLogDevice = detail;
-      window.alert("Set up the Intake PIN from the Intake tab before logging a device.");
+      window.alert("Set up the Check In PIN from the Check In tab before logging a device.");
       return;
     }
     applyLogDevicePrefill(detail);
@@ -860,7 +861,7 @@
       $("formSuccessTitle").textContent = wasEditing ? "Device successfully updated" : "Device successfully logged";
       $("formSuccessMessage").textContent = $("fSendInvoice").checked && !wasEditing
         ? "The device was logged and marked to send an invoice to the client."
-        : "The device intake has been saved.";
+        : "The device check-in has been saved.";
       setFormStep(4);
       $("doneForm").focus();
     } catch (ex) {
@@ -1015,15 +1016,20 @@
       <div class="ticket-main">
         <div class="ticket-toprow">
           <span class="ticket-num mono">#${esc(t.id || "")}</span>
-          <div class="ticket-toprow-actions">
-            ${activityLogBtnHtml(t, "")}
-            <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
-          </div>
         </div>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
-        <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
+      </div>
+      <div class="ticket-summary-meta">
+        <div class="ticket-summary-actions">
+          <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
+          ${activityLogBtnHtml(t, "")}
+        </div>
+        <div class="ticket-repair-note">
+          <span class="ticket-repair-label">Repair</span>
+          <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
+        </div>
       </div>
       <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
         <img src="assets/branding/device-thumbnail.png" alt="" />
