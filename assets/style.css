@@ -19,6 +19,8 @@
   --font-display: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "IBM Plex Mono", "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", monospace;
   --header-h: 112px; /* fallback; app.js sets the real measured height */
+  --workspace-max: 1100px;
+  --workspace-pad: clamp(16px, 4vw, 48px);
 }
 
 * { box-sizing: border-box; }
@@ -56,7 +58,7 @@ body {
   z-index: 10;
   background: var(--card);
   border-bottom: 1px solid var(--border);
-  padding: max(env(safe-area-inset-top), 14px) 16px 12px;
+  padding: max(env(safe-area-inset-top), 14px) var(--workspace-pad) 12px;
 }
 
 .header-row {
@@ -64,6 +66,8 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: min(100%, var(--workspace-max));
+  margin: 0 auto;
 }
 
 .brand {
@@ -148,9 +152,9 @@ body {
 
 /* ---------- Container ---------- */
 .container {
-  max-width: 760px;
+  width: min(100%, var(--workspace-max));
   margin: 0 auto;
-  padding: 16px 16px 40px;
+  padding: 20px var(--workspace-pad) 48px;
 }
 
 /* ---------- Search ---------- */
@@ -202,9 +206,11 @@ body {
 /* ---------- Filter chips ---------- */
 .filter-chips {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 6px;
+  overscroll-behavior-x: contain;
+  padding: 2px 2px 8px;
   margin-bottom: 12px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -212,6 +218,9 @@ body {
 .filter-chips::-webkit-scrollbar { display: none; }
 .chip {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   background: var(--card);
   border: 1px solid var(--border);
   color: var(--text-dim);
@@ -229,6 +238,25 @@ body {
   border-color: var(--accent);
   color: #fff;
 }
+.status-chip {
+  gap: 7px;
+  background: var(--status-bg);
+  border-color: var(--status-border);
+  color: var(--status-ink);
+}
+.status-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-dot);
+}
+.status-chip.active {
+  background: var(--status-ink);
+  border-color: var(--status-ink);
+  color: #fff;
+}
+.status-chip.active::before { background: #fff; }
 
 /* ---------- Results ---------- */
 .result-count {
@@ -425,7 +453,8 @@ body {
 .view-nav {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin: 12px auto 0;
+  width: min(100%, var(--workspace-max));
   background: var(--bg-soft);
   padding: 4px;
   border-radius: 12px;
@@ -756,96 +785,44 @@ body {
 .ticket {
   background: var(--card);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--status-dot, var(--border));
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
 }
 .ticket-head {
-  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(132px, 250px) 72px;
-  grid-template-areas: "main summary thumb";
-  align-items: flex-start;
-  gap: 12px;
-  padding: 13px 15px 13px 19px;
+  grid-template-columns: 64px minmax(180px, 0.85fr) minmax(180px, 1.45fr) minmax(128px, auto) 44px;
+  grid-template-areas: "thumb identity repair status activity";
+  align-items: center;
+  gap: 16px;
+  min-height: 104px;
+  padding: 16px 18px;
   cursor: pointer;
 }
 .ticket-head:hover { background: var(--card-hover); }
 .ticket-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.ticket-accent {
-  position: absolute;
-  left: 0;
-  top: 10px;
-  bottom: 10px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--dot, var(--accent));
-}
-.ticket-main { grid-area: main; min-width: 0; }
-.ticket-summary-meta {
-  grid-area: summary;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  min-width: 0;
-  padding-right: 42px;
-}
-.ticket-summary-actions {
-  display: inline-flex;
-  align-self: stretch;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.ticket-summary-actions .activity-log-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-.ticket-repair-note {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  min-width: 0;
-}
-.ticket-repair-label {
-  color: var(--text-dim);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.ticket-summary-meta .issue-tags {
-  justify-content: flex-end;
-  margin-top: 0;
-  max-width: 250px;
-}
 .ticket-device-thumb {
   grid-area: thumb;
   display: grid;
   place-items: center;
-  flex: none;
-  width: 72px;
-  height: 86px;
-  margin-top: 2px;
+  width: 64px;
+  height: 64px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: linear-gradient(145deg, var(--bg-soft), var(--card));
+  color: var(--accent);
 }
-.ticket-device-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
-.ticket-toprow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 5px;
-}
+.ticket-device-fallback { width: 30px; height: 30px; stroke-width: 1.6; }
+.ticket-device-thumb img { display: none; width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.ticket-device-thumb.has-image img { display: block; }
+.ticket-device-thumb.has-image .ticket-device-fallback { display: none; }
+.ticket-identity { grid-area: identity; min-width: 0; }
 .ticket-num {
-  font-size: 0.74rem;
+  display: block;
+  margin-bottom: 3px;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--text-dim);
   letter-spacing: 0.02em;
@@ -858,35 +835,74 @@ body {
   text-overflow: ellipsis;
 }
 .ticket-sub {
-  font-size: 0.82rem;
+  margin-top: 1px;
+  font-size: 0.86rem;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-@media (max-width: 560px) {
+.ticket-repair {
+  grid-area: repair;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+.ticket-repair-label {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ticket-repair .issue-tags {
+  justify-content: flex-start;
+  margin-top: 0;
+  max-width: 100%;
+}
+.ticket-status {
+  grid-area: status;
+  justify-self: end;
+  min-width: 128px;
+  text-align: right;
+}
+.ticket-activity {
+  grid-area: activity;
+  justify-self: end;
+}
+.ticket-activity .activity-log-btn { width: 44px; height: 44px; }
+@media (max-width: 760px) {
   .ticket-head {
-    grid-template-columns: minmax(0, 1fr) 64px;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
     grid-template-areas:
-      "main thumb"
-      "summary summary";
+      "thumb identity activity"
+      "repair repair status";
+    align-items: start;
+    gap: 12px;
+    padding: 14px;
   }
-  .ticket-device-thumb { width: 64px; height: 78px; }
-  .ticket-summary-meta,
-  .ticket-repair-note { align-items: flex-start; }
-  .ticket-summary-actions { justify-content: flex-start; }
-  .ticket-summary-meta .issue-tags { justify-content: flex-start; max-width: none; }
+  .ticket-status { min-width: 0; align-self: center; }
+  .ticket-activity { align-self: start; }
+  .ticket-repair { padding-top: 2px; }
 }
 @media (max-width: 390px) {
-  .ticket-device-thumb { width: 58px; height: 72px; border-radius: 12px; }
+  .ticket-head {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 12px;
+  }
+  .ticket-device-thumb { width: 56px; height: 56px; border-radius: 12px; }
 }
 /* Tap-to-call number shown right on the card */
 .ticket-phone {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 44px;
   margin-top: 6px;
-  padding: 6px 12px 6px 10px;
+  padding: 8px 12px 8px 10px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
@@ -915,13 +931,15 @@ body {
   padding: 5px 10px;
   border-radius: 999px;
   white-space: nowrap;
+  background: var(--status-bg, var(--accent-soft));
+  color: var(--status-ink, var(--accent));
 }
 .status-badge::before {
   content: "";
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--dot, currentColor);
+  background: var(--status-dot, currentColor);
 }
 .ticket-body {
   display: none;
@@ -979,14 +997,49 @@ body {
 }
 .ticket-tel:hover { text-decoration: underline; }
 
-/* Status colour map — tinted surface + saturated text + matching LED dot */
-.st-received   { background: #e7ecfc; color: #2756e0; --dot: #2756e0; }
-.st-diagnosing { background: #f1eafe; color: #7c3aed; --dot: #7c3aed; }
-.st-parts      { background: #fcefdc; color: #ad640d; --dot: #e08a1e; }
-.st-progress   { background: #e6f7ee; color: #14804e; --dot: #1fae6e; }
-.st-repaired   { background: #e1f7ec; color: #0f7a4c; --dot: #0f7a4c; }
-.st-pickedup   { background: #ecedf3; color: #5b6577; --dot: #8b94a6; }
-.st-cancelled  { background: #fce7e5; color: #b8281e; --dot: #c8362b; }
+/* Status colour map — one palette powers card borders, pills, and filters. */
+.st-received {
+  --status-bg: #e7ecfc;
+  --status-border: #cbd6fb;
+  --status-ink: #2756e0;
+  --status-dot: #2756e0;
+}
+.st-diagnosing {
+  --status-bg: #f1eafe;
+  --status-border: #dfcffb;
+  --status-ink: #7c3aed;
+  --status-dot: #7c3aed;
+}
+.st-parts {
+  --status-bg: #fcefdc;
+  --status-border: #f6d7a9;
+  --status-ink: #ad640d;
+  --status-dot: #e08a1e;
+}
+.st-progress {
+  --status-bg: #e6f7ee;
+  --status-border: #bee9d2;
+  --status-ink: #14804e;
+  --status-dot: #1fae6e;
+}
+.st-repaired {
+  --status-bg: #e1f7ec;
+  --status-border: #b9e9d3;
+  --status-ink: #0f7a4c;
+  --status-dot: #0f7a4c;
+}
+.st-pickedup {
+  --status-bg: #ecedf3;
+  --status-border: #d8dbe5;
+  --status-ink: #5b6577;
+  --status-dot: #8b94a6;
+}
+.st-cancelled {
+  --status-bg: #fce7e5;
+  --status-border: #f3c7c1;
+  --status-ink: #b8281e;
+  --status-dot: #c8362b;
+}
 
 /* ---------- Mono utility (ticket IDs, PIN dots) ---------- */
 .mono { font-family: var(--font-mono); }
@@ -1034,7 +1087,6 @@ body {
   line-height: 16px;
   text-align: center;
 }
-.ticket-toprow-actions,
 .ticket-detail-hero-actions {
   display: inline-flex;
   align-items: center;
