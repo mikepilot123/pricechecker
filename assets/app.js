@@ -14,7 +14,9 @@ const TABS = [
 ];
 
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // every 5 minutes
-const CACHE_KEY = "rpc_cache_v1";
+// Bump this when the sheet parser changes so an old, incorrectly parsed
+// price list is never used as the offline fallback.
+const CACHE_KEY = "rpc_cache_v2";
 
 // Section labels in the sheet that are dividers, not real models.
 const SECTION_RE = /(series|^table\d*$)/i;
@@ -74,48 +76,55 @@ function rowsToModels(rows, tabKey) {
   const out = [];
   const banner = [];
 
-  // Find header row (first cell trimmed === "Model").
-  let headerIdx = rows.findIndex((r) => (r[0] || "").trim().toLowerCase() === "model");
-  if (headerIdx === -1) return { models: out, banner };
+  // A sheet tab can contain more than one table. For example, the iPhone
+  // table uses "Incell Screen", while the iPad table below it uses
+  // "Front Glass". Each "Model" row starts a new table with its own headers.
+  const headerIndexes = rows
+    .map((row, index) => ((row[0] || "").trim().toLowerCase() === "model" ? index : -1))
+    .filter((index) => index !== -1);
+  if (!headerIndexes.length) return { models: out, banner };
 
-  // Capture any info text above the header (skip the title row 0).
-  for (let i = 0; i < headerIdx; i++) {
+  // Capture any info text above the first table header (skip the title row).
+  for (let i = 0; i < headerIndexes[0]; i++) {
     const cell = (rows[i][0] || "").trim();
     if (cell && i > 0 && !SECTION_RE.test(cell)) banner.push(cell);
   }
 
-  // Repair-type column names.
-  const header = rows[headerIdx].map((h) => (h || "").trim());
-  const repairCols = [];
-  for (let c = 1; c < header.length; c++) {
-    const name = header[c];
-    if (name && name.toLowerCase() !== "pricing structure") {
-      repairCols.push({ idx: c, name });
-    }
-  }
-
-  for (let r = headerIdx + 1; r < rows.length; r++) {
-    const cells = rows[r];
-    const model = (cells[0] || "").trim();
-    if (!model) continue;                 // blank separator
-    if (SECTION_RE.test(model)) continue; // "S Series", "Table1", etc.
-
-    const prices = [];
-    let min = Infinity;
-    for (const col of repairCols) {
-      const raw = (cells[col.idx] || "").trim();
-      if (!raw || raw.toUpperCase() === "N/A") continue;
-      prices.push({ type: col.name, value: raw });
-      const num = parseFloat(raw.replace(/[^0-9.]/g, ""));
-      if (!isNaN(num) && num < min) min = num;
+  for (let t = 0; t < headerIndexes.length; t++) {
+    const headerIdx = headerIndexes[t];
+    const endIdx = headerIndexes[t + 1] || rows.length;
+    const header = rows[headerIdx].map((h) => (h || "").trim());
+    const repairCols = [];
+    for (let c = 1; c < header.length; c++) {
+      const name = header[c];
+      if (name && name.toLowerCase() !== "pricing structure") {
+        repairCols.push({ idx: c, name });
+      }
     }
 
-    out.push({
-      name: model,
-      brand: deriveBrand(model, tabKey),
-      prices,
-      minPrice: min === Infinity ? null : min,
-    });
+    for (let r = headerIdx + 1; r < endIdx; r++) {
+      const cells = rows[r];
+      const model = (cells[0] || "").trim();
+      if (!model) continue;                 // blank separator
+      if (SECTION_RE.test(model)) continue; // "S Series", "Table1", etc.
+
+      const prices = [];
+      let min = Infinity;
+      for (const col of repairCols) {
+        const raw = (cells[col.idx] || "").trim();
+        if (!raw || raw.toUpperCase() === "N/A") continue;
+        prices.push({ type: col.name, value: raw });
+        const num = parseFloat(raw.replace(/[^0-9.]/g, ""));
+        if (!isNaN(num) && num < min) min = num;
+      }
+
+      out.push({
+        name: model,
+        brand: deriveBrand(model, tabKey),
+        prices,
+        minPrice: min === Infinity ? null : min,
+      });
+    }
   }
   return { models: out, banner };
 }

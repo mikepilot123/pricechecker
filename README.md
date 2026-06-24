@@ -44,7 +44,9 @@ The app reads two tabs of the published Google Sheet as CSV:
 
 Just edit the Google Sheet. No code changes, no redeploy — new models,
 new prices, and new repair columns all flow through automatically because
-the app reads the sheet's structure dynamically.
+the app reads each table's structure dynamically. A tab may contain multiple
+tables with different repair columns: for example, the iPhone table can use
+`Incell Screen` while an iPad table in the same tab uses `Front Glass`.
 
 ### If the sheet link ever changes
 
