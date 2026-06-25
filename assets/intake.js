@@ -68,6 +68,7 @@
   // If Check In is not configured yet, retain a price-row selection until the
   // user has manually connected the Check In tab.
   let pendingLogDevice = null;
+  let technicianModalTicket = null;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -460,6 +461,7 @@
 
   function openTicketModal(ticket) {
     const hasPhone = !!ticket.phone;
+    const technician = ticket.technician || "Unassigned";
     $("ticketModalBody").innerHTML = `
       <div class="ticket-detail-hero">
         <span class="ticket-device-icon"><svg class="icon"><use href="#i-device"></use></svg></span>
@@ -474,6 +476,7 @@
         ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
         ${detailRow("i-mail", "Email", ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—")}
         ${detailRow("i-device", "Device", ticket.device || "—")}
+        ${detailRow("i-user", "Technician", esc(technician))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
         ${detailRow("i-cash", "Repair cost", formatMoney(ticket.repairCost), "money-positive")}
@@ -484,9 +487,11 @@
 
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit details</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     bindActivityLogBtn($("ticketModalActivity"), ticket);
+    $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     $("ticketModal").hidden = false;
@@ -814,6 +819,74 @@
     }
   });
 
+  // ---- Technician assignment -----------------------------------------------
+  // Assignment is intentionally post-check-in only: the Log device wizard never
+  // shows this field. Staff assign or reassign from a saved ticket card/detail.
+  function technicianOptionsHtml() {
+    const names = [...new Set(TICKETS.map((t) => (t.technician || "").trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    return names.map((name) => `<option value="${esc(name)}"></option>`).join("");
+  }
+
+  function openTechnicianModalForTicket(ticket) {
+    technicianModalTicket = ticket;
+    $("technicianModalTitle").textContent = ticket.technician ? "Reassign technician" : "Assign technician";
+    $("technicianModalSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
+    $("technicianList").innerHTML = technicianOptionsHtml();
+    $("fTechnician").value = ticket.technician || "";
+    $("technicianModalError").hidden = true;
+    $("technicianModal").hidden = false;
+    $("fTechnician").focus();
+  }
+
+  function closeTechnicianModal() {
+    $("technicianModal").hidden = true;
+    technicianModalTicket = null;
+  }
+
+  async function saveTechnicianAssignment(value) {
+    const ticket = technicianModalTicket;
+    if (!ticket) return;
+    const err = $("technicianModalError");
+    err.hidden = true;
+    const technician = String(value || "").trim();
+    const btn = $("saveTechnician");
+    const clearBtn = $("clearTechnician");
+    const original = btn.textContent;
+    btn.disabled = true;
+    clearBtn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const res = await api({
+        action: "update",
+        id: ticket.id,
+        technician,
+      });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      mergeTicket(res.ticket);
+      renderStatusChips();
+      render();
+      closeTechnicianModal();
+    } catch (e) {
+      err.textContent = "Couldn't save assignment: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      clearBtn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  $("closeTechnicianModal").addEventListener("click", closeTechnicianModal);
+  $("technicianModal").addEventListener("click", (e) => {
+    if (e.target.id === "technicianModal") closeTechnicianModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("technicianModal").hidden) closeTechnicianModal();
+  });
+  $("saveTechnician").addEventListener("click", () => saveTechnicianAssignment($("fTechnician").value));
+  $("clearTechnician").addEventListener("click", () => saveTechnicianAssignment(""));
+
   $("intakeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = $("formError");
@@ -962,7 +1035,7 @@
     return TICKETS.filter((t) => {
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (!q) return true;
-      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email]
+      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
@@ -1010,6 +1083,7 @@
     head.setAttribute("role", "button");
     head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
     const hasPhone = !!t.phone;
+    const technicianLabel = t.technician ? `Assigned to ${t.technician}` : "Assign technician";
     const phoneLine = hasPhone
       ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
       : `<span class="ticket-phone no-phone">No number on file</span>`;
@@ -1031,6 +1105,7 @@
       </div>
       <div class="ticket-status">
         <span class="status-badge ${statusClass}">${esc(t.status || "—")}</span>
+        <button type="button" class="ticket-tech-btn" aria-label="${esc(technicianLabel)}">${esc(technicianLabel)}</button>
       </div>
       <div class="ticket-activity">
         ${activityLogBtnHtml(t, "")}
@@ -1038,6 +1113,14 @@
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
     if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
+    const techBtn = head.querySelector(".ticket-tech-btn");
+    if (techBtn) {
+      techBtn.onclick = (e) => {
+        e.stopPropagation();
+        openTechnicianModalForTicket(t);
+      };
+      techBtn.onkeydown = (e) => e.stopPropagation();
+    }
     bindActivityLogBtn(head.querySelector(".activity-log-btn"), t);
     const thumb = head.querySelector(".ticket-device-thumb");
     const thumbImg = head.querySelector(".ticket-device-thumb img");
@@ -1107,6 +1190,7 @@
       issues: ticket.issues || ticket.issue || "",
       repairCost: ticket.repairCost ?? ticket.cost ?? "",
       amountPaid: ticket.amountPaid ?? ticket.paid ?? "",
+      technician: ticket.technician || "",
     });
   }
 
