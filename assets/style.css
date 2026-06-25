@@ -657,6 +657,153 @@ body {
 .settings-actions .ghost-btn { justify-content: center; min-height: 42px; }
 .settings-actions .danger-btn { grid-column: 1 / -1; }
 .settings-back { width: 100%; justify-content: center; margin-top: 12px; }
+.technician-settings {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.technician-create-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+.technician-create-row .primary-btn {
+  width: auto;
+  min-height: 44px;
+  margin-top: 0;
+  padding-inline: 14px;
+}
+.technician-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.technician-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+.technician-row span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.technician-row .icon {
+  width: 17px;
+  height: 17px;
+  color: var(--accent);
+}
+.technician-delete {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  color: var(--danger);
+  flex: none;
+}
+.technician-delete .icon { width: 16px; height: 16px; }
+.technician-default {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+@media (max-width: 420px) {
+  .technician-create-row { grid-template-columns: 1fr; }
+  .technician-create-row .primary-btn { width: 100%; }
+}
+.technician-combobox {
+  position: relative;
+}
+.technician-combobox .text-input {
+  padding-right: 44px;
+}
+.technician-dropdown-btn {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.technician-dropdown-btn:hover,
+.technician-combobox.open .technician-dropdown-btn {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.technician-dropdown-btn .icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+.technician-combobox.open .technician-dropdown-btn .icon {
+  transform: rotate(180deg);
+}
+.technician-dropdown {
+  position: absolute;
+  z-index: 130;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.technician-option {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.technician-option:hover,
+.technician-option:focus-visible,
+.technician-option.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
+}
+.technician-option.add-option {
+  color: var(--price);
+}
+.technician-option.add-option .icon {
+  width: 16px;
+  height: 16px;
+}
 
 /* ---------- Toolbar ---------- */
 .repairs-toolbar {
