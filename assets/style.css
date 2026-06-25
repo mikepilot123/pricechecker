@@ -64,7 +64,7 @@ body {
 .header-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   width: min(100%, var(--workspace-max));
   margin: 0 auto;
@@ -102,26 +102,6 @@ body {
   70%  { box-shadow: 0 0 0 6px rgba(15, 122, 76, 0); }
   100% { box-shadow: 0 0 0 0 rgba(15, 122, 76, 0); }
 }
-
-.refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
-}
-.refresh-btn:active { transform: scale(0.96); }
-.refresh-btn:hover { background: #dde6fb; }
-.refresh-icon { font-size: 1rem; display: inline-block; }
-.refresh-btn.spinning .refresh-icon { animation: spin 0.7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .info-banner {
   margin: 16px 0 0;
@@ -503,7 +483,6 @@ body {
   box-shadow: 0 1px 2px rgba(18, 24, 38, 0.08);
 }
 .view[hidden] { display: none; }
-.refresh-btn[data-view][hidden] { display: none; }
 /* Animation is on the element itself (not a toggled class), so it replays
    automatically each time `hidden` is removed and the view re-enters layout. */
 .view:not([hidden]) { animation: view-in 0.22s ease; }

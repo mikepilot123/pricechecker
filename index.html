@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=technician-dropdown-zindex-1" />
+  <link rel="stylesheet" href="assets/style.css?v=auto-live-sync-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -46,10 +46,6 @@
   <header class="app-header">
     <div class="header-row">
       <div class="brand"><img class="brand-logo" src="assets/branding/jq-electronics-logo.png" alt="JQ Electronics" /></div>
-      <button id="refreshBtn" class="refresh-btn" title="Refresh prices" aria-label="Refresh prices" data-view="prices">
-        <svg class="icon refresh-icon"><use href="#i-refresh"></use></svg>
-        <span class="refresh-label">Refresh</span>
-      </button>
     </div>
     <nav class="view-nav" role="tablist" aria-label="Sections">
       <button class="nav-btn active" data-target="prices" role="tab"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
@@ -90,7 +86,7 @@
     <div id="errorState" class="error-state" hidden>
       <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
       <p class="empty-title">Couldn't load the latest prices</p>
-      <p class="empty-sub" id="errorSub">Check your internet connection and tap Refresh.</p>
+      <p class="empty-sub" id="errorSub">Check your internet connection. The app will keep retrying automatically.</p>
     </div>
   </main>
 
@@ -409,7 +405,7 @@
     </section>
   </div>
 
-  <script src="assets/app.js?v=enter-scroll-filters-1"></script>
-  <script src="assets/intake.js?v=tech-dropdown-full-roster-1"></script>
+  <script src="assets/app.js?v=auto-live-sync-1"></script>
+  <script src="assets/intake.js?v=auto-live-sync-1"></script>
 </body>
 </html>

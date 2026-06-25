@@ -1,7 +1,7 @@
 /* ============================================================
    Repair Price Checker
    Live data from the shop's published Google Sheet (CSV).
-   Edit the sheet -> prices update here on next load / refresh.
+   Edit the sheet -> prices update here on next automatic sync.
    ============================================================ */
 
 // --- Data source: published Google Sheet tabs (CSV) -------------------------
@@ -14,7 +14,10 @@ const TABS = [
   { key: "samsung", gid: "1256027568", label: "Samsung" },
 ];
 
-const AUTO_REFRESH_MS = 5 * 60 * 1000; // every 5 minutes
+const AUTO_REFRESH_MS = 60 * 1000; // fallback sync when no price update socket is configured
+const WS_RECONNECT_MAX_MS = 60 * 1000;
+const WS_URL_STORAGE_KEY = "rpc_price_update_ws";
+const DEFAULT_PRICE_UPDATE_WS_URL = "wss://pricechecker-cyan.vercel.app/api/price-updates";
 // Bump this when the sheet parser changes so an old, incorrectly parsed
 // price list is never used as the offline fallback.
 const CACHE_KEY = "rpc_cache_v3";
@@ -36,7 +39,6 @@ const els = {
   info: document.getElementById("infoBanner"),
   lastUpdated: document.getElementById("lastUpdated"),
   statusDot: document.getElementById("statusDot"),
-  refresh: document.getElementById("refreshBtn"),
 };
 
 // --- State ------------------------------------------------------------------
@@ -47,6 +49,11 @@ let lastFetchTime = null;
 let tickTimer = null;
 let lastAutoScrolledModel = null;
 let forceSearchScroll = false;
+let priceSocket = null;
+let socketReconnectTimer = null;
+let socketReconnectDelay = 2000;
+let syncTimer = null;
+let loadInFlight = null;
 
 // --- CSV parsing ------------------------------------------------------------
 // Robust CSV -> array of rows (handles quoted fields, commas, newlines).
@@ -149,47 +156,50 @@ async function fetchTab(tab) {
   return parseCSV(await res.text());
 }
 
-async function loadData({ manual = false } = {}) {
-  setRefreshing(true);
-  try {
-    const results = await Promise.all(TABS.map((t) => fetchTab(t).then((rows) => ({ t, rows }))));
-    const all = [];
-    let banner = [];
-    for (const { t, rows } of results) {
-      const { models, banner: b } = rowsToModels(rows, t.key);
-      all.push(...models);
-      if (b.length > banner.length) banner = b; // keep the richest info line
-    }
-    MODELS = all;
-    // Expose model names so the Intake form can autosuggest devices.
-    window.RPC_MODEL_NAMES = all.map((m) => m.name.trim());
-    window.dispatchEvent(new Event("rpc-models"));
-    infoLines = banner;
-    lastFetchTime = Date.now();
-    persistCache();
-    renderInfo();
-    buildChips();
-    render();
-    setStatus("live");
-    els.error.hidden = true;
-  } catch (err) {
-    console.error("Load failed:", err);
-    const restored = restoreCache();
-    if (restored) {
+async function loadData({ reason = "auto" } = {}) {
+  if (loadInFlight) return loadInFlight;
+  loadInFlight = (async () => {
+    try {
+      const results = await Promise.all(TABS.map((t) => fetchTab(t).then((rows) => ({ t, rows }))));
+      const all = [];
+      let banner = [];
+      for (const { t, rows } of results) {
+        const { models, banner: b } = rowsToModels(rows, t.key);
+        all.push(...models);
+        if (b.length > banner.length) banner = b; // keep the richest info line
+      }
+      MODELS = all;
+      // Expose model names so the Intake form can autosuggest devices.
+      window.RPC_MODEL_NAMES = all.map((m) => m.name.trim());
+      window.dispatchEvent(new Event("rpc-models"));
+      infoLines = banner;
+      lastFetchTime = Date.now();
+      persistCache();
       renderInfo();
       buildChips();
       render();
-      setStatus("stale");
-      els.errorSub.textContent =
-        "Showing the last saved prices — couldn't reach the sheet. Tap Refresh to retry.";
-    } else {
-      setStatus("error");
-      showError("Check your internet connection and tap Refresh.");
+      setStatus("live");
+      els.error.hidden = true;
+    } catch (err) {
+      console.error("Load failed:", err);
+      const restored = restoreCache();
+      if (restored) {
+        renderInfo();
+        buildChips();
+        render();
+        setStatus("stale");
+        els.errorSub.textContent =
+          "Showing the last saved prices — couldn't reach the sheet. The app will keep retrying automatically.";
+      } else {
+        setStatus("error");
+        showError("Check your internet connection. The app will keep retrying automatically.");
+      }
+    } finally {
+      startTicking();
+      loadInFlight = null;
     }
-  } finally {
-    setRefreshing(false);
-    startTicking();
-  }
+  })();
+  return loadInFlight;
 }
 
 // --- Cache (offline resilience) ---------------------------------------------
@@ -435,11 +445,6 @@ function startTicking() {
   tickTimer = setInterval(updateTimestamp, 15000);
 }
 
-function setRefreshing(on) {
-  els.refresh.classList.toggle("spinning", on);
-  els.refresh.disabled = on;
-}
-
 function showError(msg) {
   els.results.innerHTML = "";
   els.count.textContent = "";
@@ -483,17 +488,65 @@ els.clearSearch.addEventListener("click", () => {
   els.search.focus();
   render();
 });
-els.refresh.addEventListener("click", () => loadData({ manual: true }));
-
 // Refresh when the tab regains focus (counter staff reopening the app).
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && lastFetchTime && Date.now() - lastFetchTime > 60000) {
-    loadData();
+    loadData({ reason: "focus" });
   }
 });
 
-// Auto-refresh on an interval.
-setInterval(loadData, AUTO_REFRESH_MS);
+// Automatic live updates ------------------------------------------------------
+// GitHub Pages cannot receive Google Sheet updates directly, so it listens to
+// the Vercel WebSocket watcher and falls back to this one-minute no-button sync
+// if the socket is unavailable.
+function startAutoSync() {
+  if (syncTimer) clearInterval(syncTimer);
+  syncTimer = setInterval(() => loadData({ reason: "interval" }), AUTO_REFRESH_MS);
+}
+
+function priceUpdateSocketUrl() {
+  try {
+    const saved = localStorage.getItem(WS_URL_STORAGE_KEY);
+    if (saved === "off") return "";
+    return saved || DEFAULT_PRICE_UPDATE_WS_URL;
+  } catch (_) {
+    return DEFAULT_PRICE_UPDATE_WS_URL;
+  }
+}
+
+function startPriceUpdateSocket() {
+  const url = priceUpdateSocketUrl();
+  if (!url || !("WebSocket" in window)) return;
+  try {
+    priceSocket = new WebSocket(url);
+  } catch (err) {
+    console.warn("Price update socket couldn't start:", err);
+    return;
+  }
+
+  priceSocket.addEventListener("open", () => {
+    socketReconnectDelay = 2000;
+  });
+  priceSocket.addEventListener("message", (event) => {
+    let message = event.data;
+    try { message = JSON.parse(event.data); } catch (_) {}
+    const type = typeof message === "string" ? message : message && message.type;
+    if (type === "price:update" || type === "prices:update" || type === "refresh") {
+      loadData({ reason: "socket" });
+    }
+  });
+  priceSocket.addEventListener("close", scheduleSocketReconnect);
+  priceSocket.addEventListener("error", () => {
+    if (priceSocket) priceSocket.close();
+  });
+}
+
+function scheduleSocketReconnect() {
+  if (!priceUpdateSocketUrl()) return;
+  if (socketReconnectTimer) clearTimeout(socketReconnectTimer);
+  socketReconnectTimer = setTimeout(startPriceUpdateSocket, socketReconnectDelay);
+  socketReconnectDelay = Math.min(socketReconnectDelay * 1.7, WS_RECONNECT_MAX_MS);
+}
 
 // --- Service worker (offline shell) -----------------------------------------
 if ("serviceWorker" in navigator) {
@@ -504,7 +557,7 @@ if ("serviceWorker" in navigator) {
 
 // --- Sticky search offset -----------------------------------------------
 // Search bars stick just below the header; track its real height (it can
-// change with font load, wrapping, or the refresh button showing/hiding)
+// change with font load or wrapping)
 // so the sticky offset never overlaps or gaps.
 (function () {
   const header = document.querySelector(".app-header");
@@ -517,4 +570,6 @@ if ("serviceWorker" in navigator) {
 
 // --- Go ---------------------------------------------------------------------
 showSkeleton();
-loadData();
+startAutoSync();
+startPriceUpdateSocket();
+loadData({ reason: "initial" });
