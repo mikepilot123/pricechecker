@@ -747,6 +747,7 @@ body {
 }
 .technician-combobox {
   position: relative;
+  z-index: 1200;
 }
 .technician-combobox .text-input {
   padding-right: 44px;
@@ -781,7 +782,7 @@ body {
 }
 .technician-dropdown {
   position: absolute;
-  z-index: 130;
+  z-index: 2000;
   top: calc(100% + 6px);
   left: 0;
   right: 0;
@@ -1405,6 +1406,7 @@ body {
 }
 #technicianModal .modal-body {
   min-height: 360px;
+  overflow: visible;
 }
 .technician-modal-footer {
   display: flex;
