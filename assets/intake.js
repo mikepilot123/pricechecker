@@ -52,11 +52,13 @@
 
   const LS_PIN = "rpc_intake_pin";
   const TICKET_PAGE_SIZE = 12;
+  const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
 
   const $ = (id) => document.getElementById(id);
 
   // State
   let TICKETS = [];
+  let TECHNICIANS = [];
   let statusFilter = "all";
   let editingId = null;
   let formStep = 1;
@@ -97,6 +99,7 @@
     $("intakeMain").hidden = true;
     $("settingsMaintenance").hidden = !prefill;
     if (prefill) $("cfgPin").value = getCfg().pin;
+    if (prefill && isConfigured()) loadTechnicians();
   }
   function showMain() {
     $("intakeSetup").hidden = true;
@@ -176,6 +179,7 @@
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
+      await loadTechnicians();
       visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       renderStatusChips();
@@ -194,6 +198,126 @@
   $("reloadIntake").addEventListener("click", loadTickets);
   $("intakeSettings").addEventListener("click", () => showSetup(true));
   $("closeIntakeSettings").addEventListener("click", showMain);
+
+  // ---- Technician roster ----------------------------------------------------
+  function normalizeTechnicians(list) {
+    return (list || [])
+      .map((t) => ({ id: t.id || t.name, name: String(t.name || "").trim() }))
+      .filter((t) => t.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async function loadTechnicians() {
+    try {
+      const res = await api({ action: "listTechnicians" });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TECHNICIANS = normalizeTechnicians(res.technicians);
+      renderTechnicianSettings();
+      return TECHNICIANS;
+    } catch (e) {
+      renderTechnicianSettings("Couldn't load technicians: " + e.message);
+      return TECHNICIANS;
+    }
+  }
+
+  function technicianNamesWithLegacy(ticket) {
+    const names = new Set(DEFAULT_TECHNICIANS.concat(TECHNICIANS.map((t) => t.name)));
+    if (ticket && ticket.technician) names.add(ticket.technician);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }
+
+  function findCanonicalTechnicianName(name, ticket = technicianModalTicket) {
+    const wanted = String(name || "").trim().toLowerCase();
+    if (!wanted) return "";
+    return technicianNamesWithLegacy(ticket).find((candidate) => candidate.toLowerCase() === wanted) || "";
+  }
+
+  function isDefaultTechnician(name) {
+    return DEFAULT_TECHNICIANS.some((defaultName) => defaultName.toLowerCase() === String(name || "").toLowerCase());
+  }
+
+  function renderTechnicianSettings(message = "") {
+    const box = $("technicianSettingsList");
+    if (!box) return;
+    const err = $("technicianSettingsError");
+    err.hidden = !message;
+    if (message) err.textContent = message;
+    if (!TECHNICIANS.length) {
+      box.innerHTML = `<p class="empty-sub">No technicians created yet.</p>`;
+      return;
+    }
+    box.innerHTML = TECHNICIANS.map((tech) => `
+      <div class="technician-row">
+        <span><svg class="icon"><use href="#i-user"></use></svg>${esc(tech.name)}</span>
+        ${isDefaultTechnician(tech.name)
+          ? `<small class="technician-default">Default</small>`
+          : `<button type="button" class="ghost-btn technician-delete" data-tech="${esc(tech.name)}" aria-label="Delete ${esc(tech.name)}"><svg class="icon"><use href="#i-trash"></use></svg></button>`}
+      </div>
+    `).join("");
+    box.querySelectorAll(".technician-delete").forEach((btn) => {
+      btn.addEventListener("click", () => deleteTechnician(btn.dataset.tech || ""));
+    });
+  }
+
+  async function createTechnician(name) {
+    const cleanName = String(name || "").trim().replace(/\s+/g, " ");
+    if (!cleanName) throw new Error("Technician name is required");
+    const res = await api({ action: "addTechnician", name: cleanName });
+    if (!res.ok) throw new Error(res.error || "Rejected");
+    TECHNICIANS = normalizeTechnicians(res.technicians);
+    renderTechnicianSettings();
+    return findCanonicalTechnicianName(cleanName) || cleanName;
+  }
+
+  async function addTechnicianFromSettings() {
+    const input = $("newTechnicianName");
+    const name = input.value.trim();
+    const err = $("technicianSettingsError");
+    err.hidden = true;
+    if (!name) {
+      err.textContent = "Enter a technician name.";
+      err.hidden = false;
+      return;
+    }
+    const btn = $("addTechnician");
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    try {
+      await createTechnician(name);
+      input.value = "";
+    } catch (e) {
+      err.textContent = "Couldn't add technician: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function deleteTechnician(name) {
+    if (!name) return;
+    if (!window.confirm(`Delete technician "${name}" from the roster? Existing tickets keep their assignment.`)) return;
+    const err = $("technicianSettingsError");
+    err.hidden = true;
+    try {
+      const res = await api({ action: "deleteTechnician", name });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TECHNICIANS = normalizeTechnicians(res.technicians);
+      renderTechnicianSettings();
+    } catch (e) {
+      err.textContent = "Couldn't delete technician: " + e.message;
+      err.hidden = false;
+    }
+  }
+
+  $("addTechnician").addEventListener("click", addTechnicianFromSettings);
+  $("newTechnicianName").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTechnicianFromSettings();
+    }
+  });
 
   // ---- Clear all -------------------------------------------------------------
   function openClearAllModal() {
@@ -464,7 +588,7 @@
     const technician = ticket.technician || "Unassigned";
     $("ticketModalBody").innerHTML = `
       <div class="ticket-detail-hero">
-        <span class="ticket-device-icon"><svg class="icon"><use href="#i-device"></use></svg></span>
+        <span class="ticket-device-icon"><svg class="icon"><use href="#${deviceTypeIcon(ticket.device)}"></use></svg></span>
         <div class="ticket-detail-hero-main"><h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4><p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p></div>
         <div class="ticket-detail-hero-actions">
           ${activityLogBtnHtml(ticket, "ticketModalActivity")}
@@ -822,26 +946,88 @@
   // ---- Technician assignment -----------------------------------------------
   // Assignment is intentionally post-check-in only: the Log device wizard never
   // shows this field. Staff assign or reassign from a saved ticket card/detail.
-  function technicianOptionsHtml() {
-    const names = [...new Set(TICKETS.map((t) => (t.technician || "").trim()).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b));
-    return names.map((name) => `<option value="${esc(name)}"></option>`).join("");
-  }
-
   function openTechnicianModalForTicket(ticket) {
     technicianModalTicket = ticket;
     $("technicianModalTitle").textContent = ticket.technician ? "Reassign technician" : "Assign technician";
     $("technicianModalSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
-    $("technicianList").innerHTML = technicianOptionsHtml();
     $("fTechnician").value = ticket.technician || "";
+    $("fTechnician").setAttribute("aria-expanded", "false");
     $("technicianModalError").hidden = true;
+    renderTechnicianDropdown();
     $("technicianModal").hidden = false;
     $("fTechnician").focus();
+    openTechnicianDropdown();
   }
 
   function closeTechnicianModal() {
     $("technicianModal").hidden = true;
+    closeTechnicianDropdown();
     technicianModalTicket = null;
+  }
+
+  function technicianDropdownOptions() {
+    const query = $("fTechnician").value.trim().toLowerCase();
+    const names = technicianNamesWithLegacy(technicianModalTicket);
+    return query ? names.filter((name) => name.toLowerCase().includes(query)) : names;
+  }
+
+  function renderTechnicianDropdown() {
+    const box = $("technicianDropdown");
+    const input = $("fTechnician");
+    const query = input.value.trim();
+    const options = technicianDropdownOptions();
+    const exact = findCanonicalTechnicianName(query);
+    const rows = [
+      `<button type="button" class="technician-option ${query ? "" : "active"}" role="option" data-tech="">Unassigned</button>`,
+      ...options.map((name) =>
+        `<button type="button" class="technician-option ${name === exact ? "active" : ""}" role="option" data-tech="${esc(name)}">${esc(name)}</button>`
+      ),
+    ];
+    if (query && !exact) {
+      rows.push(`<button type="button" class="technician-option add-option" role="option" data-add="${esc(query)}"><svg class="icon"><use href="#i-plus"></use></svg>Add technician “${esc(query)}”</button>`);
+    }
+    box.innerHTML = rows.join("");
+    box.querySelectorAll("[data-tech]").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+      btn.addEventListener("click", () => chooseTechnicianOption(btn.dataset.tech || ""));
+    });
+    box.querySelectorAll("[data-add]").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+      btn.addEventListener("click", () => addTechnicianFromDropdown(btn.dataset.add || query));
+    });
+  }
+
+  function openTechnicianDropdown() {
+    renderTechnicianDropdown();
+    $("technicianDropdown").hidden = false;
+    $("fTechnician").setAttribute("aria-expanded", "true");
+    $("technicianCombobox").classList.add("open");
+  }
+
+  function closeTechnicianDropdown() {
+    $("technicianDropdown").hidden = true;
+    $("fTechnician").setAttribute("aria-expanded", "false");
+    $("technicianCombobox").classList.remove("open");
+  }
+
+  function chooseTechnicianOption(name) {
+    $("fTechnician").value = name;
+    closeTechnicianDropdown();
+    $("fTechnician").focus();
+  }
+
+  async function addTechnicianFromDropdown(name) {
+    const err = $("technicianModalError");
+    err.hidden = true;
+    try {
+      const created = await createTechnician(name);
+      $("fTechnician").value = created;
+      closeTechnicianDropdown();
+      $("fTechnician").focus();
+    } catch (e) {
+      err.textContent = "Couldn't add technician: " + e.message;
+      err.hidden = false;
+    }
   }
 
   async function saveTechnicianAssignment(value) {
@@ -849,7 +1035,7 @@
     if (!ticket) return;
     const err = $("technicianModalError");
     err.hidden = true;
-    const technician = String(value || "").trim();
+    let technician = String(value || "").trim().replace(/\s+/g, " ");
     const btn = $("saveTechnician");
     const clearBtn = $("clearTechnician");
     const original = btn.textContent;
@@ -857,6 +1043,11 @@
     clearBtn.disabled = true;
     btn.textContent = "Saving…";
     try {
+      if (technician && !findCanonicalTechnicianName(technician, ticket)) {
+        technician = await createTechnician(technician);
+      } else if (technician) {
+        technician = findCanonicalTechnicianName(technician, ticket);
+      }
       const res = await api({
         action: "update",
         id: ticket.id,
@@ -883,6 +1074,48 @@
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("technicianModal").hidden) closeTechnicianModal();
+  });
+  document.addEventListener("click", (e) => {
+    if ($("technicianModal").hidden || $("technicianCombobox").contains(e.target)) return;
+    closeTechnicianDropdown();
+  });
+  $("fTechnician").addEventListener("focus", openTechnicianDropdown);
+  $("fTechnician").addEventListener("click", openTechnicianDropdown);
+  $("fTechnician").addEventListener("input", openTechnicianDropdown);
+  $("fTechnician").addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      openTechnicianDropdown();
+      const first = $("technicianDropdown").querySelector(".technician-option");
+      if (first) first.focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const value = $("fTechnician").value.trim();
+      const exact = findCanonicalTechnicianName(value);
+      if (exact || !value) chooseTechnicianOption(exact);
+      else addTechnicianFromDropdown(value);
+    } else if (e.key === "Escape") {
+      closeTechnicianDropdown();
+    }
+  });
+  $("technicianDropdown").addEventListener("keydown", (e) => {
+    const options = [...$("technicianDropdown").querySelectorAll(".technician-option")];
+    const i = options.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      (options[i + 1] || options[0])?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      (options[i - 1] || options[options.length - 1])?.focus();
+    } else if (e.key === "Escape") {
+      closeTechnicianDropdown();
+      $("fTechnician").focus();
+    }
+  });
+  $("openTechnicianDropdown").addEventListener("click", () => {
+    if ($("technicianDropdown").hidden) openTechnicianDropdown();
+    else closeTechnicianDropdown();
+    $("fTechnician").focus();
   });
   $("saveTechnician").addEventListener("click", () => saveTechnicianAssignment($("fTechnician").value));
   $("clearTechnician").addEventListener("click", () => saveTechnicianAssignment(""));
@@ -1087,7 +1320,7 @@
     const phoneLine = hasPhone
       ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
       : `<span class="ticket-phone no-phone">No number on file</span>`;
-    const deviceIcon = isTabletDevice(t.device) ? "i-tablet" : "i-device";
+    const deviceIcon = deviceTypeIcon(t.device);
     head.innerHTML = `
       <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
         <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
@@ -1150,8 +1383,15 @@
   const DEVICE_IMAGE_CATALOG_URL = "assets/device-images/catalog.json";
   let deviceImageCatalogPromise = null;
 
-  function isTabletDevice(device) {
-    return /\b(ipad|tablet|tab)\b/i.test(String(device || ""));
+  function deviceTypeIcon(device) {
+    const text = String(device || "").toLowerCase();
+    if (/\b(ipad|tablet|tab)\b/.test(text)) return "i-tablet";
+    if (/\b(watch|iwatch|galaxy watch|apple watch)\b/.test(text)) return "i-watch";
+    if (/\b(macbook|laptop|notebook|chromebook|surface|thinkpad)\b/.test(text)) return "i-laptop";
+    if (/\b(playstation|xbox|nintendo|switch|console|controller|gamepad)\b/.test(text)) return "i-gamepad";
+    if (/\b(airpods|earbuds|earphones|headphones|beats|buds)\b/.test(text)) return "i-earbuds";
+    if (/\b(iphone|phone|galaxy|pixel|tecno|techno|redmi|xiaomi|huawei|honor|oppo|vivo|oneplus|motorola|moto|samsung)\b/.test(text)) return "i-smartphone";
+    return "i-device";
   }
 
   function deviceImageKey(device) {

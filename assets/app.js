@@ -45,6 +45,7 @@ let activeBrand = "all";
 let lastFetchTime = null;
 let tickTimer = null;
 let lastAutoScrolledModel = null;
+let forceSearchScroll = false;
 
 // --- CSV parsing ------------------------------------------------------------
 // Robust CSV -> array of rows (handles quoted fields, commas, newlines).
@@ -263,12 +264,22 @@ function render() {
 
   const frag = document.createDocumentFragment();
   let firstEl = null;
+  let forcedScrollEl = null;
+  const forcedModel = forceSearchScroll ? bestSearchMatch(list) : null;
   for (const m of list) {
     const el = card(m, expand);
     if (!firstEl) firstEl = el;
+    if (forcedModel && m === forcedModel) forcedScrollEl = el;
     frag.appendChild(el);
   }
   els.results.appendChild(frag);
+
+  if (forceSearchScroll) {
+    forceSearchScroll = false;
+    lastAutoScrolledModel = forcedModel ? forcedModel.name : null;
+    requestAnimationFrame(() => scrollCardIntoView(forcedScrollEl || firstEl));
+    return;
+  }
 
   // Once a search narrows it down to exactly one model, scroll so its whole
   // card (head + full price list) is visible — staff shouldn't have to
@@ -279,6 +290,19 @@ function render() {
   } else if (!expand || list.length !== 1) {
     lastAutoScrolledModel = null;
   }
+}
+
+function normalizeSearchText(text) {
+  return String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function bestSearchMatch(list) {
+  if (!list.length) return null;
+  const q = normalizeSearchText(els.search.value);
+  if (!q) return list[0];
+  return list.find((m) => normalizeSearchText(m.name) === q)
+    || list.find((m) => normalizeSearchText(m.name).startsWith(q))
+    || list[0];
 }
 
 function scrollCardIntoView(cardEl) {
@@ -437,6 +461,12 @@ function showSkeleton() {
 
 // --- Wire up events ---------------------------------------------------------
 els.search.addEventListener("input", render);
+els.search.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  forceSearchScroll = true;
+  render();
+});
 els.clearSearch.addEventListener("click", () => {
   els.search.value = "";
   els.search.focus();
