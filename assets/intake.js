@@ -71,6 +71,7 @@
   // user has manually connected the Check In tab.
   let pendingLogDevice = null;
   let technicianModalTicket = null;
+  let suppressTechnicianFocusOpen = false;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -953,10 +954,9 @@
     $("fTechnician").value = ticket.technician || "";
     $("fTechnician").setAttribute("aria-expanded", "false");
     $("technicianModalError").hidden = true;
-    renderTechnicianDropdown();
     $("technicianModal").hidden = false;
     $("fTechnician").focus();
-    openTechnicianDropdown();
+    openTechnicianDropdown({ showAll: true });
   }
 
   function closeTechnicianModal() {
@@ -965,17 +965,17 @@
     technicianModalTicket = null;
   }
 
-  function technicianDropdownOptions() {
-    const query = $("fTechnician").value.trim().toLowerCase();
+  function technicianDropdownOptions(showAll = false) {
+    const query = showAll ? "" : $("fTechnician").value.trim().toLowerCase();
     const names = technicianNamesWithLegacy(technicianModalTicket);
     return query ? names.filter((name) => name.toLowerCase().includes(query)) : names;
   }
 
-  function renderTechnicianDropdown() {
+  function renderTechnicianDropdown({ showAll = false } = {}) {
     const box = $("technicianDropdown");
     const input = $("fTechnician");
-    const query = input.value.trim();
-    const options = technicianDropdownOptions();
+    const query = showAll ? "" : input.value.trim();
+    const options = technicianDropdownOptions(showAll);
     const exact = findCanonicalTechnicianName(query);
     const rows = [
       `<button type="button" class="technician-option ${query ? "" : "active"}" role="option" data-tech="">Unassigned</button>`,
@@ -997,8 +997,8 @@
     });
   }
 
-  function openTechnicianDropdown() {
-    renderTechnicianDropdown();
+  function openTechnicianDropdown({ showAll = false } = {}) {
+    renderTechnicianDropdown({ showAll });
     $("technicianDropdown").hidden = false;
     $("fTechnician").setAttribute("aria-expanded", "true");
     $("technicianCombobox").classList.add("open");
@@ -1013,7 +1013,9 @@
   function chooseTechnicianOption(name) {
     $("fTechnician").value = name;
     closeTechnicianDropdown();
+    suppressTechnicianFocusOpen = true;
     $("fTechnician").focus();
+    setTimeout(() => { suppressTechnicianFocusOpen = false; }, 0);
   }
 
   async function addTechnicianFromDropdown(name) {
@@ -1079,13 +1081,16 @@
     if ($("technicianModal").hidden || $("technicianCombobox").contains(e.target)) return;
     closeTechnicianDropdown();
   });
-  $("fTechnician").addEventListener("focus", openTechnicianDropdown);
-  $("fTechnician").addEventListener("click", openTechnicianDropdown);
-  $("fTechnician").addEventListener("input", openTechnicianDropdown);
+  $("fTechnician").addEventListener("focus", () => {
+    if (suppressTechnicianFocusOpen) return;
+    openTechnicianDropdown({ showAll: true });
+  });
+  $("fTechnician").addEventListener("click", () => openTechnicianDropdown({ showAll: true }));
+  $("fTechnician").addEventListener("input", () => openTechnicianDropdown());
   $("fTechnician").addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      openTechnicianDropdown();
+      openTechnicianDropdown({ showAll: true });
       const first = $("technicianDropdown").querySelector(".technician-option");
       if (first) first.focus();
     } else if (e.key === "Enter") {
@@ -1113,7 +1118,7 @@
     }
   });
   $("openTechnicianDropdown").addEventListener("click", () => {
-    if ($("technicianDropdown").hidden) openTechnicianDropdown();
+    if ($("technicianDropdown").hidden) openTechnicianDropdown({ showAll: true });
     else closeTechnicianDropdown();
     $("fTechnician").focus();
   });
