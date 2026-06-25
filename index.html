@@ -285,6 +285,29 @@
     </div>
   </div>
 
+  <!-- Technician assignment: only available from already-logged tickets -->
+  <div id="technicianModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="technicianModalTitle">
+      <div class="modal-header">
+        <div><p class="modal-eyebrow">Post check-in</p><h3 id="technicianModalTitle">Assign technician</h3></div>
+        <button type="button" id="closeTechnicianModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="technicianModalSub" class="empty-sub"></p>
+        <div class="form-field">
+          <label class="field-label" for="fTechnician">Technician</label>
+          <input id="fTechnician" class="text-input" list="technicianList" placeholder="e.g. Marcus" />
+          <datalist id="technicianList"></datalist>
+        </div>
+        <p id="technicianModalError" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer technician-modal-footer">
+        <button type="button" id="clearTechnician" class="ghost-btn">Clear assignment</button>
+        <button type="button" id="saveTechnician" class="primary-btn">Save assignment</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Issue picker modal -->
   <div id="issueModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="issueModalTitle">
@@ -368,6 +391,6 @@
   </div>
 
   <script src="assets/app.js?v=techno-1"></script>
-  <script src="assets/intake.js?v=dashboard-row-centered-1"></script>
+  <script src="assets/intake.js?v=technician-assign-1"></script>
 </body>
 </html>

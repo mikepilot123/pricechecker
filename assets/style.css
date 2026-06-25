@@ -867,6 +867,10 @@ body {
   justify-self: end;
   min-width: 128px;
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
 }
 .ticket-activity {
   grid-area: activity;
@@ -978,6 +982,28 @@ body {
 }
 .status-set:hover { background: var(--card-hover); color: var(--text); }
 .status-set.current { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.ticket-tech-btn {
+  min-height: 30px;
+  max-width: 190px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ticket-tech-btn:hover,
+.ticket-tech-btn:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  outline: none;
+}
 .ticket-edit-btn { margin-top: 12px; }
 .ticket-client-btn { margin-top: 12px; margin-left: 8px; }
 .ticket-delete-btn { margin-top: 12px; margin-left: 8px; color: var(--danger); }
@@ -1206,6 +1232,15 @@ body {
 .modal-footer .form-actions { margin-top: 0; }
 .modal-footer .form-actions .ghost-btn,
 .modal-footer .form-actions .primary-btn { flex: 1; width: auto; }
+.technician-modal-footer {
+  display: flex;
+  gap: 8px;
+}
+.technician-modal-footer .ghost-btn,
+.technician-modal-footer .primary-btn {
+  flex: 1;
+  width: auto;
+}
 
 /* ---------- Ticket detail sheet ---------- */
 .ticket-modal-panel { max-width: 560px; }
