@@ -169,6 +169,14 @@ body {
   padding: 16px 0 14px;
   margin: 0;
 }
+#view-prices .search-wrap {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 20;
+}
+#view-prices.focused-search-result .search-wrap {
+  box-shadow: 0 8px 18px rgba(35, 45, 72, 0.08);
+}
 .search-input {
   width: 100%;
   background: var(--card);
@@ -210,12 +218,24 @@ body {
   gap: 8px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  max-height: 58px;
   padding: 2px 2px 8px;
   margin-bottom: 12px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  opacity: 1;
+  transition: max-height 0.18s ease, opacity 0.16s ease, padding 0.18s ease, margin 0.18s ease;
 }
 .filter-chips::-webkit-scrollbar { display: none; }
+.brand-filter-chips.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 .chip {
   flex: none;
   display: inline-flex;

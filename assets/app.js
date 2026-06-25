@@ -27,6 +27,7 @@ const els = {
   search: document.getElementById("searchInput"),
   clearSearch: document.getElementById("clearSearch"),
   chips: document.getElementById("filterChips"),
+  pricesView: document.getElementById("view-prices"),
   results: document.getElementById("results"),
   count: document.getElementById("resultCount"),
   empty: document.getElementById("emptyState"),
@@ -249,7 +250,9 @@ function currentFilter() {
 
 function render() {
   const list = currentFilter();
+  const hasQuery = els.search.value.trim().length > 0;
   els.clearSearch.hidden = !els.search.value;
+  if (!hasQuery) setPriceFiltersCollapsed(false);
   els.results.innerHTML = "";
   els.empty.hidden = list.length > 0;
   els.error.hidden = true;
@@ -260,7 +263,7 @@ function render() {
 
   // When the team is searching, auto-expand matches so prices show
   // immediately. While browsing (no query), keep cards collapsed.
-  const expand = els.search.value.trim().length > 0;
+  const expand = hasQuery;
 
   const frag = document.createDocumentFragment();
   let firstEl = null;
@@ -277,6 +280,7 @@ function render() {
   if (forceSearchScroll) {
     forceSearchScroll = false;
     lastAutoScrolledModel = forcedModel ? forcedModel.name : null;
+    if (forcedScrollEl || firstEl) setPriceFiltersCollapsed(true);
     requestAnimationFrame(() => scrollCardIntoView(forcedScrollEl || firstEl));
     return;
   }
@@ -286,10 +290,17 @@ function render() {
   // manually scroll past the sticky search bar to see prices they just found.
   if (expand && list.length === 1 && list[0].name !== lastAutoScrolledModel) {
     lastAutoScrolledModel = list[0].name;
+    setPriceFiltersCollapsed(true);
     requestAnimationFrame(() => scrollCardIntoView(firstEl));
   } else if (!expand || list.length !== 1) {
     lastAutoScrolledModel = null;
   }
+}
+
+function setPriceFiltersCollapsed(collapsed) {
+  els.chips.classList.toggle("collapsed", collapsed);
+  els.chips.setAttribute("aria-hidden", collapsed ? "true" : "false");
+  if (els.pricesView) els.pricesView.classList.toggle("focused-search-result", collapsed);
 }
 
 function normalizeSearchText(text) {
