@@ -16,7 +16,7 @@ Both pull from Google Sheets — edit the sheet and the app updates.
 - Tap **iPhone / iPad / Samsung** chips to browse a brand.
 - Each card shows the cheapest repair (`from $…`); tap it to see the full
   breakdown (screen, battery, charging port, etc.).
-- Tap **Refresh** any time, or just reopen — it pulls the latest prices.
+- Leave the app open — it keeps the price list synced automatically.
 
 Tip: on a phone, use **Share → Add to Home Screen** to install it like an app.
 It opens full-screen and even loads offline (showing the last saved prices).
@@ -33,8 +33,20 @@ The app reads three tabs of the published Google Sheet as CSV:
 | Techno | `1021598529` |
 | Samsung | `1256027568` |
 
-- Prices load **on open**, **auto-refresh every 5 minutes**, on **manual
-  refresh**, and when you reopen the tab.
+- Prices load **on open**, **auto-sync in the background**, and when you
+  reopen the tab.
+- The front end connects to the Vercel WebSocket watcher at
+  `wss://pricechecker-cyan.vercel.app/api/price-updates`. When that watcher
+  detects sheet changes, it sends `price:update` and the app reloads
+  immediately.
+- To override the watcher on a shop device, use:
+
+  ```js
+  localStorage.setItem("rpc_price_update_ws", "wss://your-update-server.example");
+  ```
+
+  Set it to `"off"` to disable the socket. If the watcher is unavailable, the
+  app falls back to a one-minute sync interval.
 - A **"Updated just now"** timestamp shows how fresh the prices are.
 - If the network is down, it shows the **last saved prices** with a notice.
 
@@ -143,6 +155,7 @@ index.html                 # markup (Prices + Check In views)
 assets/style.css           # styling (mobile-first, dark theme)
 assets/app.js              # CSV fetch + parse + search/filter UI (Prices)
 assets/intake.js           # device check-in UI (talks to Apps Script backend)
+api/price-updates.js       # Vercel WebSocket watcher for price sheet changes
 apps-script/Code.gs         # Apps Script backend for the check-in sheet
 manifest.webmanifest       # installable PWA
 sw.js                      # offline app shell

@@ -81,9 +81,6 @@
       const target = btn.dataset.target;
       navBtns.forEach((b) => b.classList.toggle("active", b === btn));
       Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
-      // Refresh button only makes sense on the prices view.
-      const rb = $("refreshBtn");
-      if (rb) rb.hidden = target !== "prices";
       if (target === "intake") enterIntake();
     });
   });
