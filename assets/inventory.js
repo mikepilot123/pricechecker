@@ -93,22 +93,18 @@
   }
 
   function renderChips() {
-    const box = $("inventoryChips");
-    if (!box) return;
+    const select = $("inventorySectionFilter");
+    if (!select) return;
     const counts = new Map();
     ITEMS.forEach((item) => counts.set(item.section, (counts.get(item.section) || 0) + 1));
-    const chips = [{ key: "all", label: "All", count: ITEMS.length }].concat(
+    const filters = [{ key: "all", label: "All", count: ITEMS.length }].concat(
       sections.map((section) => ({ key: section, label: titleCase(section), count: counts.get(section) || 0 }))
     );
-    box.innerHTML = chips.map((chip) =>
-      `<button type="button" class="chip ${chip.key === activeSection ? "active" : ""}" data-section="${esc(chip.key)}">${esc(chip.label)} (${chip.count})</button>`
+    const current = activeSection;
+    select.innerHTML = filters.map((filter) =>
+      `<option value="${esc(filter.key)}">${esc(filter.label)} (${filter.count})</option>`
     ).join("");
-    box.querySelectorAll(".chip").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        activeSection = btn.dataset.section || "all";
-        render();
-      });
-    });
+    select.value = filters.some((filter) => filter.key === current) ? current : "all";
   }
 
   function filteredItems() {
@@ -128,28 +124,63 @@
     renderChips();
     const list = filteredItems();
     $("inventoryCount").textContent = list.length
-      ? `Showing ${list.length} item${list.length === 1 ? "" : "s"}`
+      ? `1-${list.length} of ${list.length}`
       : "";
+    renderSummary(list);
     $("inventoryEmpty").hidden = list.length > 0 || !loadedOnce;
-    $("inventoryList").innerHTML = list.map(inventoryCardHtml).join("");
+    $("inventoryList").innerHTML = list.map(inventoryRowHtml).join("");
     $("clearInventorySearch").hidden = !($("inventorySearch").value || "").trim();
   }
 
-  function inventoryCardHtml(item) {
+  function renderSummary(list) {
+    const box = $("inventorySummary");
+    if (!box) return;
+    const source = list.length || ($("inventorySearch")?.value || activeSection !== "all") ? list : ITEMS;
+    const total = source.length;
+    const low = source.filter((item) => item.quantity > 0 && item.quantity <= 1).length;
+    const out = source.filter((item) => item.quantity <= 0).length;
+    const onHand = source.reduce((sum, item) => sum + item.quantity, 0);
+    box.innerHTML = [
+      summaryTile("Items", total),
+      summaryTile("On hand", onHand),
+      summaryTile("Low stock", low, "warn"),
+      summaryTile("Out", out, "danger"),
+    ].join("");
+  }
+
+  function summaryTile(label, value, tone = "") {
+    return `<div class="inventory-summary-tile ${tone ? "is-" + tone : ""}">
+      <span>${esc(label)}</span>
+      <strong>${esc(String(value))}</strong>
+    </div>`;
+  }
+
+  function inventoryRowHtml(item) {
     const status = item.quantity <= 0 ? "out" : item.quantity <= 1 ? "low" : "ok";
     const statusLabel = item.quantity <= 0 ? "Out of stock" : item.quantity <= 1 ? "Low stock" : "In stock";
-    return `<article class="inventory-card inventory-${status}">
-      <div class="inventory-main">
-        <span class="inventory-section">${esc(titleCase(item.section))}</span>
-        <h3>${esc(item.item || item.label || "Inventory item")}</h3>
-        ${item.quality ? `<p>${esc(item.quality)}</p>` : ""}
-        ${item.note ? `<p class="inventory-note">${esc(item.note)}</p>` : ""}
-      </div>
-      <div class="inventory-qty">
-        <span class="inventory-qty-num">${esc(String(item.quantity))}</span>
-        <span class="inventory-qty-label">${esc(statusLabel)}</span>
-      </div>
-    </article>`;
+    const product = item.item || item.label || "Inventory item";
+    const avatarIcon = item.section === "TOOLS" ? "i-tools" : item.section === "BATTERIES" ? "i-cash" : "i-device";
+    const unavailable = item.quantity <= 0 ? 1 : 0;
+    const committed = item.note && /sold/i.test(item.note) ? 1 : 0;
+    const available = Math.max(0, item.quantity - committed);
+    return `<tr class="inventory-row inventory-${status}">
+      <td data-label="Product">
+        <div class="inventory-product">
+          <span class="inventory-thumb"><svg class="icon"><use href="#${avatarIcon}"></use></svg></span>
+          <span class="inventory-product-text">
+            <strong>${esc(product)}</strong>
+            <span class="inventory-product-meta">
+              ${item.quality ? `<span class="inventory-pill">${esc(item.quality)}</span>` : `<span>${esc(titleCase(item.section))}</span>`}
+              ${item.note ? `<span class="inventory-note">${esc(item.note)}</span>` : ""}
+            </span>
+          </span>
+        </div>
+      </td>
+      <td data-label="Category"><span class="inventory-category">${esc(titleCase(item.section))}</span></td>
+      <td data-label="Status"><span class="inventory-stock-status">${esc(statusLabel)}</span>${unavailable ? `<span class="inventory-unavailable">Unavailable ${unavailable}</span>` : ""}</td>
+      <td class="num" data-label="Available">${available}</td>
+      <td class="num" data-label="On hand">${esc(String(item.quantity))}</td>
+    </tr>`;
   }
 
   function titleCase(text) {
@@ -167,6 +198,10 @@
   }
 
   $("inventorySearch")?.addEventListener("input", render);
+  $("inventorySectionFilter")?.addEventListener("change", () => {
+    activeSection = $("inventorySectionFilter").value || "all";
+    render();
+  });
   $("clearInventorySearch")?.addEventListener("click", () => {
     $("inventorySearch").value = "";
     render();
