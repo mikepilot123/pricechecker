@@ -12,6 +12,7 @@
   let ITEMS = [];
   let sections = [];
   let activeSection = "all";
+  let activeStock = "all";
   let lastUpdated = null;
   let loadedOnce = false;
   let loadInFlight = null;
@@ -114,12 +115,42 @@
       `<option value="${esc(filter.key)}">${esc(filter.label)} (${filter.count})</option>`
     ).join("");
     select.value = filters.some((filter) => filter.key === current) ? current : "all";
+    renderStockFilters();
+  }
+
+  function stockStatus(item) {
+    if (item.quantity <= 0) return "out";
+    if (item.quantity <= 1) return "low";
+    return "ok";
+  }
+
+  function renderStockFilters() {
+    const box = $("inventoryStockFilters");
+    if (!box) return;
+    const counts = ITEMS.reduce((acc, item) => {
+      const status = stockStatus(item);
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, { all: ITEMS.length, ok: 0, low: 0, out: 0 });
+    const filters = [
+      { key: "all", label: "All", tone: "all" },
+      { key: "ok", label: "In stock", tone: "ok" },
+      { key: "low", label: "Low stock", tone: "low" },
+      { key: "out", label: "Out of stock", tone: "out" },
+    ];
+    box.innerHTML = filters.map((filter) => `
+      <button type="button" class="inventory-stock-filter inventory-stock-filter-${filter.tone} ${activeStock === filter.key ? "active" : ""}"
+        data-stock-filter="${esc(filter.key)}" role="tab" aria-selected="${activeStock === filter.key ? "true" : "false"}">
+        <span class="inventory-stock-dot" aria-hidden="true"></span>${esc(filter.label)} (${counts[filter.key] || 0})
+      </button>
+    `).join("");
   }
 
   function filteredItems() {
     const q = ($("inventorySearch")?.value || "").trim().toLowerCase();
     return ITEMS.filter((item) => {
       if (activeSection !== "all" && item.section !== activeSection) return false;
+      if (activeStock !== "all" && stockStatus(item) !== activeStock) return false;
       if (!q) return true;
       return [item.section, item.item, item.device, item.quality, item.note, item.label]
         .join(" ")
@@ -145,7 +176,7 @@
   function renderSummary(list) {
     const box = $("inventorySummary");
     if (!box) return;
-    const source = list.length || ($("inventorySearch")?.value || activeSection !== "all") ? list : ITEMS;
+    const source = list.length || ($("inventorySearch")?.value || activeSection !== "all" || activeStock !== "all") ? list : ITEMS;
     const total = source.length;
     const low = source.filter((item) => item.quantity > 0 && item.quantity <= 1).length;
     const out = source.filter((item) => item.quantity <= 0).length;
@@ -166,7 +197,7 @@
   }
 
   function inventoryRowHtml(item) {
-    const status = item.quantity <= 0 ? "out" : item.quantity <= 1 ? "low" : "ok";
+    const status = stockStatus(item);
     const statusLabel = item.quantity <= 0 ? "Out of stock" : item.quantity <= 1 ? "Low stock" : "In stock";
     const product = item.item || item.label || "Inventory item";
     const avatarIcon = item.section === "BATTERIES" ? "i-cash" : "i-device";
@@ -305,6 +336,12 @@
   $("inventorySearch")?.addEventListener("input", render);
   $("inventorySectionFilter")?.addEventListener("change", () => {
     activeSection = $("inventorySectionFilter").value || "all";
+    render();
+  });
+  $("inventoryStockFilters")?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-stock-filter]");
+    if (!btn) return;
+    activeStock = btn.dataset.stockFilter || "all";
     render();
   });
   $("clearInventorySearch")?.addEventListener("click", () => {

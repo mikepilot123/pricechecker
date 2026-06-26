@@ -77,17 +77,25 @@
   let inventoryLoadPromise = null;
 
   // ---- View navigation -----------------------------------------------------
-  const navBtns = document.querySelectorAll(".nav-btn");
+  const navBtns = document.querySelectorAll(".nav-btn[data-target]");
+  const settingsNavBtn = $("intakeSettings");
   const views = { prices: $("view-prices"), intake: $("view-intake"), inventory: $("view-inventory") };
+  function setActiveNav(target) {
+    navBtns.forEach((b) => {
+      const active = b.dataset.target === target;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (settingsNavBtn) settingsNavBtn.classList.toggle("active", target === "settings");
+  }
+  function showView(target) {
+    Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
+  }
   navBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.target;
-      navBtns.forEach((b) => {
-        const active = b === btn;
-        b.classList.toggle("active", active);
-        b.setAttribute("aria-selected", active ? "true" : "false");
-      });
-      Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
+      setActiveNav(target);
+      showView(target);
       if (target === "intake") enterIntake();
       if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
     });
@@ -202,8 +210,15 @@
   }
 
   $("reloadIntake").addEventListener("click", loadTickets);
-  $("intakeSettings").addEventListener("click", () => showSetup(true));
-  $("closeIntakeSettings").addEventListener("click", showMain);
+  settingsNavBtn?.addEventListener("click", () => {
+    setActiveNav("settings");
+    showView("intake");
+    showSetup(true);
+  });
+  $("closeIntakeSettings").addEventListener("click", () => {
+    setActiveNav("intake");
+    enterIntake();
+  });
 
   // ---- Inventory used by repair tickets -----------------------------------
   async function loadInventoryForForm() {
@@ -708,10 +723,15 @@
   function openTicketModal(ticket) {
     const hasPhone = !!ticket.phone;
     const technician = ticket.technician || "Unassigned";
+    const issueSummary = issueSummaryText(ticket.issues);
     $("ticketModalBody").innerHTML = `
       <div class="ticket-detail-hero">
         <span class="ticket-device-icon"><svg class="icon"><use href="#${deviceTypeIcon(ticket.device)}"></use></svg></span>
-        <div class="ticket-detail-hero-main"><h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4><p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p></div>
+        <div class="ticket-detail-hero-main">
+          <h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4>
+          ${issueSummary ? `<p class="ticket-detail-issue">${esc(issueSummary)}</p>` : ""}
+          <p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p>
+        </div>
         <div class="ticket-detail-hero-actions">
           ${activityLogBtnHtml(ticket, "ticketModalActivity")}
           <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
@@ -1442,6 +1462,10 @@
     const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
     if (!parts.length) return `<span class="issue-chip muted">No issues recorded</span>`;
     return parts.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
+  }
+
+  function issueSummaryText(issuesStr) {
+    return (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean).join(", ");
   }
 
   function ticketCard(t) {

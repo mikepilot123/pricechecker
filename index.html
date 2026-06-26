@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=professional-palette-1" />
+  <link rel="stylesheet" href="assets/style.css?v=inventory-stock-filter-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -52,6 +52,7 @@
       <button class="nav-btn active" data-target="prices" role="tab" aria-selected="true"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
       <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
+      <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
     </nav>
   </header>
 
@@ -107,6 +108,7 @@
             <option value="all">All</option>
           </select>
         </div>
+        <div id="inventoryStockFilters" class="inventory-stock-filters" role="tablist" aria-label="Filter inventory stock status"></div>
         <div class="inventory-search">
           <svg class="icon"><use href="#i-search"></use></svg>
           <input
@@ -189,9 +191,6 @@
 
     <!-- Main intake UI: shown once configured -->
     <section id="intakeMain" hidden>
-      <div class="repairs-toolbar">
-        <button id="intakeSettings" class="ghost-btn icon-btn" title="Connection settings" aria-label="Connection settings"><svg class="icon"><use href="#i-gear"></use></svg></button>
-      </div>
       <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg></button>
 
       <div class="search-wrap">
@@ -477,7 +476,7 @@
   </div>
 
   <script src="assets/app.js?v=side-nav-1"></script>
-  <script src="assets/inventory.js?v=inventory-ui-polish-1"></script>
-  <script src="assets/intake.js?v=side-nav-1"></script>
+  <script src="assets/inventory.js?v=inventory-stock-filter-1"></script>
+  <script src="assets/intake.js?v=detail-settings-1"></script>
 </body>
 </html>
