@@ -392,7 +392,10 @@ function inventoryDeviceMatches(modelName, itemName) {
   const model = normalizeDeviceName(modelName);
   const item = normalizeDeviceName(itemName);
   if (!model || !item) return false;
-  return model === item || item.includes(model) || model.includes(item);
+  // Strict equality only — substring matching let a bare "iPhone 13" inventory
+  // entry falsely match "iPhone 13 Mini"/"Pro"/"Pro Max" price rows, since the
+  // shorter normalized name is a substring of the longer ones.
+  return model === item;
 }
 
 function normalizePartQuality(text) {
