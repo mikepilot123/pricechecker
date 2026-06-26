@@ -1,8 +1,9 @@
 # 🔧 Repair Hub
 
 A live, mobile-friendly tool for the phone & tablet repair team: look up
-repair prices, and log devices coming in for repair with their status.
-Both pull from Google Sheets — edit the sheet and the app updates.
+repair prices, check inventory, and log devices coming in for repair with
+their status. Prices and inventory pull from Google Sheets — edit the sheet
+and the app updates.
 
 **Live app:** https://mikepilot123.github.io/pricechecker/
 
@@ -92,6 +93,10 @@ It captures Customer Name, Phone, Device, Issues, Status, and Notes. The
 call button on each card dials the customer directly (`tel:` link) using
 the phone number captured at check-in.
 
+When a repair uses stock, staff can choose the exact inventory item during
+check-in. The backend deducts one from that item in the inventory sheet when
+the ticket is saved, and restores one if that ticket is deleted.
+
 Open any ticket card to edit its client details, or use **Delete record** to
 remove it after a confirmation prompt. Older tickets created before client
 details were added do not contain a recoverable name or phone number; use
@@ -144,6 +149,34 @@ version"), and re-enter the new PIN on each device.
 
 ---
 
+## Inventory
+
+The **Inventory** tab reads the shop inventory spreadsheet tab:
+
+```txt
+https://docs.google.com/spreadsheets/d/1CtKYaNkcrlU1-76NvIQUK31V0OAEhwNZHkzWZOUDZVA/edit?gid=85811363
+```
+
+It parses the current section layout (`SCREENS`, `BATTERIES`, and `TOOLS`)
+and shows device/item, quality, quantity, and notes. The app reads inventory
+publicly through `/api/inventory`.
+
+To let the backend write stock deductions/restocks back to the sheet, configure
+these Vercel environment variables and share the spreadsheet with the service
+account email:
+
+```txt
+GOOGLE_SERVICE_ACCOUNT_EMAIL
+GOOGLE_PRIVATE_KEY
+INVENTORY_SHEET_ID=1CtKYaNkcrlU1-76NvIQUK31V0OAEhwNZHkzWZOUDZVA
+INVENTORY_SHEET_GID=85811363
+```
+
+If write credentials are not configured, the Inventory tab can still load, but
+ticket saves with a selected stock item will fail with a setup message.
+
+---
+
 ## Tech
 
 Plain HTML/CSS/JS — **no build step, no dependencies**. Just static files
@@ -154,7 +187,9 @@ installed to a home screen and opened offline.
 index.html                 # markup (Prices + Check In views)
 assets/style.css           # styling (mobile-first, dark theme)
 assets/app.js              # CSV fetch + parse + search/filter UI (Prices)
+assets/inventory.js        # Inventory tab UI and stock list loader
 assets/intake.js           # device check-in UI (talks to Apps Script backend)
+api/inventory.js           # Vercel API for inventory reads
 api/price-updates.js       # Vercel WebSocket watcher for price sheet changes
 apps-script/Code.gs         # Apps Script backend for the check-in sheet
 manifest.webmanifest       # installable PWA

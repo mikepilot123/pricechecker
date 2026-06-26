@@ -14,6 +14,7 @@
   // Stable production alias for the Vercel project (auto-updates on every
   // push to main) — update if the project or domain ever changes.
   const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
+  const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
 
   // Status pipeline — keep in sync with apps-script/Code.gs STATUSES.
   const STATUSES = [
@@ -72,16 +73,19 @@
   let pendingLogDevice = null;
   let technicianModalTicket = null;
   let suppressTechnicianFocusOpen = false;
+  let INVENTORY_ITEMS = [];
+  let inventoryLoadPromise = null;
 
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn");
-  const views = { prices: $("view-prices"), intake: $("view-intake") };
+  const views = { prices: $("view-prices"), intake: $("view-intake"), inventory: $("view-inventory") };
   navBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.target;
       navBtns.forEach((b) => b.classList.toggle("active", b === btn));
       Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
       if (target === "intake") enterIntake();
+      if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
     });
   });
 
@@ -196,6 +200,119 @@
   $("reloadIntake").addEventListener("click", loadTickets);
   $("intakeSettings").addEventListener("click", () => showSetup(true));
   $("closeIntakeSettings").addEventListener("click", showMain);
+
+  // ---- Inventory used by repair tickets -----------------------------------
+  async function loadInventoryForForm() {
+    if (Array.isArray(window.RPC_INVENTORY_ITEMS) && window.RPC_INVENTORY_ITEMS.length) {
+      INVENTORY_ITEMS = window.RPC_INVENTORY_ITEMS.slice();
+      return INVENTORY_ITEMS;
+    }
+    if (window.RPC_LOAD_INVENTORY) {
+      const result = await window.RPC_LOAD_INVENTORY({ force: false });
+      INVENTORY_ITEMS = (result && result.items) || window.RPC_INVENTORY_ITEMS || [];
+      return INVENTORY_ITEMS;
+    }
+    if (inventoryLoadPromise) return inventoryLoadPromise;
+    inventoryLoadPromise = fetch(INVENTORY_URL + "?_=" + Date.now(), { cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || "Rejected");
+        INVENTORY_ITEMS = data.items || [];
+        window.RPC_INVENTORY_ITEMS = INVENTORY_ITEMS.slice();
+        return INVENTORY_ITEMS;
+      })
+      .finally(() => { inventoryLoadPromise = null; });
+    return inventoryLoadPromise;
+  }
+
+  window.addEventListener("rpc-inventory", (e) => {
+    INVENTORY_ITEMS = (e.detail && e.detail.items) || window.RPC_INVENTORY_ITEMS || [];
+    updateInventoryOptions($("fInventoryItem")?.value || "");
+  });
+
+  function repairNeedsInventory(issuesStr) {
+    const text = String(issuesStr || "").toLowerCase();
+    if (/battery/.test(text)) return "BATTERIES";
+    if (/screen|lcd|display|front glass/.test(text)) return "SCREENS";
+    return "";
+  }
+
+  function matchingInventoryItems(device, issuesStr) {
+    const wantedSection = repairNeedsInventory(issuesStr);
+    if (!wantedSection) return [];
+    const model = normalizeDeviceText(device);
+    return INVENTORY_ITEMS.filter((item) => {
+      if (item.section !== wantedSection) return false;
+      if (!model) return true;
+      return inventoryDeviceMatches(model, normalizeDeviceText(item.device || item.item || ""));
+    });
+  }
+
+  function normalizeDeviceText(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/\bapple\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function inventoryDeviceMatches(device, inventoryDevice) {
+    if (!device || !inventoryDevice) return false;
+    return device === inventoryDevice || device.includes(inventoryDevice) || inventoryDevice.includes(device);
+  }
+
+  function updateInventoryOptions(selectedKey = "") {
+    const select = $("fInventoryItem");
+    if (!select) return;
+    const device = $("fDevice").value.trim();
+    const issues = buildIssuesString();
+    const suggested = matchingInventoryItems(device, issues);
+    const suggestedKeys = new Set(suggested.map((item) => item.key));
+    const available = INVENTORY_ITEMS.filter((item) => item.quantity > 0 || item.key === selectedKey);
+    const other = available.filter((item) => !suggestedKeys.has(item.key));
+    const parts = [`<option value="">No stock item used</option>`];
+    if (suggested.length) {
+      parts.push(`<optgroup label="Suggested">`);
+      suggested.forEach((item) => parts.push(inventoryOptionHtml(item, selectedKey)));
+      parts.push(`</optgroup>`);
+    }
+    if (other.length) {
+      parts.push(`<optgroup label="All inventory">`);
+      other.forEach((item) => parts.push(inventoryOptionHtml(item, selectedKey)));
+      parts.push(`</optgroup>`);
+    }
+    select.innerHTML = parts.join("");
+    const hasSelectedKey = selectedKey && Array.from(select.options).some((option) => option.value === selectedKey);
+    select.value = hasSelectedKey ? selectedKey : "";
+    const hint = $("inventoryHint");
+    const need = repairNeedsInventory(issues);
+    if (!need) {
+      hint.textContent = "Choose a stock item only if this repair uses one.";
+    } else if (suggested.length) {
+      hint.textContent = `${suggested.length} matching ${need.toLowerCase()} item${suggested.length === 1 ? "" : "s"} found.`;
+    } else {
+      hint.textContent = `No matching ${need.toLowerCase()} stock found for this device.`;
+    }
+  }
+
+  function inventoryOptionHtml(item, selectedKey) {
+    const isSelected = item.key === selectedKey;
+    const disabled = item.quantity <= 0 && !isSelected;
+    const bits = [item.item || item.device || item.label, item.quality, item.section].filter(Boolean);
+    const label = `${bits.join(" · ")} — ${item.quantity} in stock${item.note ? " · " + item.note : ""}`;
+    return `<option value="${esc(item.key)}"${disabled ? " disabled" : ""}>${esc(label)}</option>`;
+  }
+
+  function refreshInventoryAfterStockChange() {
+    if (window.RPC_LOAD_INVENTORY) {
+      window.RPC_LOAD_INVENTORY({ force: true }).catch(() => {});
+    } else {
+      INVENTORY_ITEMS = [];
+    }
+  }
 
   // ---- Technician roster ----------------------------------------------------
   function normalizeTechnicians(list) {
@@ -356,6 +473,7 @@
       TICKETS = [];
       visibleTicketCount = TICKET_PAGE_SIZE;
       statusFilter = "all";
+      refreshInventoryAfterStockChange();
       closeForm();
       closeClearAllModal();
       renderStatusChips();
@@ -421,6 +539,7 @@
       TICKETS = (res.tickets || []).map(normalizeTicket);
       statusFilter = "all";
       visibleTicketCount = TICKET_PAGE_SIZE;
+      refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
       closeRestoreBackupModal();
@@ -479,6 +598,7 @@
       : "Select issues…";
     btn.classList.toggle("has-selection", count > 0);
     $("issueSummary").innerHTML = count ? issueTagsHtml(str) : "";
+    updateInventoryOptions($("fInventoryItem")?.value || "");
   }
 
   // ---- Issue picker modal ---------------------------------------------------
@@ -599,6 +719,7 @@
         ${detailRow("i-mail", "Email", ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—")}
         ${detailRow("i-device", "Device", ticket.device || "—")}
         ${detailRow("i-user", "Technician", esc(technician))}
+        ${detailRow("i-tools", "Stock used", esc(ticket.inventoryItemLabel || "No stock item used"))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
         ${detailRow("i-cash", "Repair cost", formatMoney(ticket.repairCost), "money-positive")}
@@ -711,6 +832,13 @@
     $("fAmountPaid").value = ticket ? ticket.amountPaid ?? "" : "";
     $("fSendInvoice").checked = !ticket;
     setIssueTags(ticket ? ticket.issues || "" : "");
+    $("fInventoryItem").innerHTML = `<option value="">Loading inventory…</option>`;
+    loadInventoryForForm()
+      .then(() => updateInventoryOptions(ticket ? ticket.inventoryItemKey || "" : ""))
+      .catch((err) => {
+        $("fInventoryItem").innerHTML = `<option value="">No stock item used</option>`;
+        $("inventoryHint").textContent = "Inventory couldn't load: " + err.message;
+      });
 
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
@@ -724,6 +852,7 @@
     editingId = null;
     setQuickLogMode(false);
   }
+  $("fDevice").addEventListener("input", () => updateInventoryOptions($("fInventoryItem").value));
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
   function setFormStep(step) {
@@ -845,6 +974,7 @@
     $("fDevice").value = device || "";
     setIssueTags(guessIssueFromRepairType(repairType) || (repairType ? "Other: " + repairType : ""));
     if (priceValue != null) $("fRepairCost").value = priceValue;
+    loadInventoryForForm().then(() => updateInventoryOptions("")).catch(() => {});
     setQuickLogMode(true);
     $("quotedPriceSummary").textContent = `Quoted ${price || (priceValue != null ? "$" + priceValue : "—")} — ${repairType || device || ""}`;
     $("fName").focus();
@@ -1156,6 +1286,7 @@
       notes: [invoiceNote, notes].filter(Boolean).join("\n"),
       repairCost: $("fRepairCost").value.trim(),
       amountPaid: $("fAmountPaid").value.trim(),
+      inventoryItemKey: $("fInventoryItem").value,
     };
     $("saveForm").disabled = true;
     const original = $("saveForm").textContent;
@@ -1165,6 +1296,7 @@
       if (!res.ok) throw new Error(res.error || "Rejected");
       const wasEditing = Boolean(editingId);
       mergeTicket(res.ticket);
+      refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
       $("intakeFormTitle").textContent = wasEditing ? "Device updated" : "Device logged";
@@ -1227,6 +1359,7 @@
       const res = await api({ action: "delete", id: ticket.id });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = TICKETS.filter((t) => t.id !== ticket.id);
+      refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
       return true;
@@ -1433,6 +1566,10 @@
       repairCost: ticket.repairCost ?? ticket.cost ?? "",
       amountPaid: ticket.amountPaid ?? ticket.paid ?? "",
       technician: ticket.technician || "",
+      inventoryItemKey: ticket.inventoryItemKey || "",
+      inventoryItemLabel: ticket.inventoryItemLabel || "",
+      inventorySection: ticket.inventorySection || "",
+      inventoryQuantityDelta: ticket.inventoryQuantityDelta || 0,
     });
   }
 

@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=auto-live-sync-1" />
+  <link rel="stylesheet" href="assets/style.css?v=inventory-checker-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -50,6 +50,7 @@
     <nav class="view-nav" role="tablist" aria-label="Sections">
       <button class="nav-btn active" data-target="prices" role="tab"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
+      <button class="nav-btn" data-target="inventory" role="tab"><svg class="icon"><use href="#i-tools"></use></svg>Inventory</button>
     </nav>
   </header>
 
@@ -87,6 +88,40 @@
       <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
       <p class="empty-title">Couldn't load the latest prices</p>
       <p class="empty-sub" id="errorSub">Check your internet connection. The app will keep retrying automatically.</p>
+    </div>
+  </main>
+
+  <!-- ============ INVENTORY VIEW ============ -->
+  <main class="container view" id="view-inventory" hidden>
+    <p class="info-banner">Live inventory from the shop sheet.</p>
+    <p class="status-line">
+      <span id="inventoryStatusDot" class="status-dot"></span>
+      <span id="inventoryUpdated">Loading inventory…</span>
+    </p>
+    <div class="search-wrap">
+      <input
+        id="inventorySearch"
+        class="search-input"
+        type="search"
+        inputmode="search"
+        autocomplete="off"
+        placeholder="Search inventory — e.g. iPhone 14, battery, glue…"
+        aria-label="Search inventory"
+      />
+      <button id="clearInventorySearch" class="clear-search" aria-label="Clear inventory search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+    </div>
+    <div id="inventoryChips" class="filter-chips" role="tablist" aria-label="Filter inventory"></div>
+    <p id="inventoryCount" class="result-count"></p>
+    <div id="inventoryList" class="inventory-list" aria-live="polite"></div>
+    <div id="inventoryEmpty" class="empty-state" hidden>
+      <div class="empty-icon"><svg class="icon"><use href="#i-search"></use></svg></div>
+      <p class="empty-title">No matching inventory</p>
+      <p class="empty-sub">Try another model, part, or section.</p>
+    </div>
+    <div id="inventoryError" class="error-state" hidden>
+      <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
+      <p class="empty-title">Couldn't load inventory</p>
+      <p class="empty-sub" id="inventoryErrorSub">Check the connection and try again.</p>
     </div>
   </main>
 
@@ -219,6 +254,15 @@
                 <div class="select-wrap">
                   <select id="fStatus" class="text-input select-input"></select>
                 </div>
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="fInventoryItem">Inventory item used</label>
+                <div class="select-wrap">
+                  <select id="fInventoryItem" class="text-input select-input">
+                    <option value="">No stock item used</option>
+                  </select>
+                </div>
+                <p id="inventoryHint" class="field-hint">Choose the part to deduct from stock, if this repair uses one.</p>
               </div>
               <div class="form-field form-field-full">
                 <label class="field-label" for="fNotes">Notes</label>
@@ -406,6 +450,7 @@
   </div>
 
   <script src="assets/app.js?v=auto-live-sync-1"></script>
-  <script src="assets/intake.js?v=auto-live-sync-1"></script>
+  <script src="assets/inventory.js?v=inventory-checker-1"></script>
+  <script src="assets/intake.js?v=inventory-checker-1"></script>
 </body>
 </html>
