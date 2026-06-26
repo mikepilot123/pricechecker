@@ -5,6 +5,7 @@
 
 (function () {
   const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
+  const LS_PIN = "rpc_intake_pin";
   const AUTO_REFRESH_MS = 60 * 1000;
   const $ = (id) => document.getElementById(id);
 
@@ -14,6 +15,7 @@
   let lastUpdated = null;
   let loadedOnce = false;
   let loadInFlight = null;
+  const pendingAdjustments = new Map();
 
   function publishInventory() {
     window.RPC_INVENTORY_ITEMS = ITEMS.slice();
@@ -33,7 +35,7 @@
         if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "Rejected");
-        ITEMS = (data.items || []).map(normalizeItem);
+        setInventoryData(data);
         sections = data.sections || [...new Set(ITEMS.map((item) => item.section))];
         lastUpdated = Date.now();
         loadedOnce = true;
@@ -56,6 +58,11 @@
   }
 
   window.RPC_LOAD_INVENTORY = loadInventory;
+
+  function setInventoryData(data) {
+    ITEMS = (data.items || []).map(normalizeItem);
+    sections = data.sections || [...new Set(ITEMS.map((item) => item.section))];
+  }
 
   function normalizeItem(item) {
     return Object.assign({}, item, {
@@ -129,6 +136,7 @@
     renderSummary(list);
     $("inventoryEmpty").hidden = list.length > 0 || !loadedOnce;
     $("inventoryList").innerHTML = list.map(inventoryRowHtml).join("");
+    bindAdjustmentControls();
     $("clearInventorySearch").hidden = !($("inventorySearch").value || "").trim();
   }
 
@@ -163,6 +171,10 @@
     const unavailable = item.quantity <= 0 ? 1 : 0;
     const committed = item.note && /sold/i.test(item.note) ? 1 : 0;
     const available = Math.max(0, item.quantity - committed);
+    const pending = pendingAdjustments.get(item.key) || 0;
+    const canSave = pending !== 0;
+    const saving = !!item.saving;
+    const error = item.error || "";
     return `<tr class="inventory-row inventory-${status}">
       <td data-label="Product">
         <div class="inventory-product">
@@ -180,7 +192,98 @@
       <td data-label="Status"><span class="inventory-stock-status">${esc(statusLabel)}</span>${unavailable ? `<span class="inventory-unavailable">Unavailable ${unavailable}</span>` : ""}</td>
       <td class="num" data-label="Available">${available}</td>
       <td class="num" data-label="On hand">${esc(String(item.quantity))}</td>
+      <td data-label="Update">
+        <div class="inventory-adjust" data-key="${esc(item.key)}">
+          <button type="button" class="inventory-adjust-btn inventory-delta-btn" data-delta="-1" aria-label="Decrease ${esc(product)} stock">−</button>
+          <span class="inventory-delta ${pending > 0 ? "is-positive" : pending < 0 ? "is-negative" : ""}" data-delta-label>${pending > 0 ? "+" : ""}${pending}</span>
+          <button type="button" class="inventory-adjust-btn inventory-delta-btn" data-delta="1" aria-label="Increase ${esc(product)} stock">+</button>
+          <button type="button" class="inventory-update-btn" data-save ${canSave && !saving ? "" : "disabled"}>${saving ? "Saving…" : "Update"}</button>
+        </div>
+        <p class="inventory-row-error" data-row-error ${error ? "" : "hidden"}>${esc(error)}</p>
+      </td>
     </tr>`;
+  }
+
+  function bindAdjustmentControls() {
+    document.querySelectorAll(".inventory-delta-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const wrap = btn.closest(".inventory-adjust");
+        const key = wrap?.dataset.key || "";
+        adjustPending(key, Number(btn.dataset.delta || 0));
+      });
+    });
+    document.querySelectorAll(".inventory-update-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const wrap = btn.closest(".inventory-adjust");
+        saveAdjustment(wrap?.dataset.key || "");
+      });
+    });
+  }
+
+  function adjustPending(key, step) {
+    if (!key || !Number.isInteger(step) || step === 0) return;
+    const item = ITEMS.find((candidate) => candidate.key === key);
+    if (!item) return;
+    const current = pendingAdjustments.get(key) || 0;
+    const next = Math.max(-item.quantity, current + step);
+    if (next === 0) pendingAdjustments.delete(key);
+    else pendingAdjustments.set(key, next);
+    render();
+  }
+
+  async function saveAdjustment(key) {
+    const delta = pendingAdjustments.get(key) || 0;
+    if (!key || !delta) return;
+    const pin = safeLocalStorageGet(LS_PIN);
+    if (!pin) {
+      setRowError(key, "Enter Check In PIN first.");
+      return;
+    }
+    setSaving(key, true);
+    try {
+      const res = await fetch(INVENTORY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "adjust", itemKey: key, delta, pin }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Inventory update failed");
+      pendingAdjustments.delete(key);
+      setInventoryData(data);
+      lastUpdated = Date.now();
+      loadedOnce = true;
+      publishInventory();
+      render();
+      setStatus("live");
+      $("inventoryError").hidden = true;
+    } catch (err) {
+      console.error("Inventory update failed:", err);
+      setRowError(key, err.message || "Inventory update failed");
+    } finally {
+      setSaving(key, false, { rerender: false });
+    }
+  }
+
+  function setSaving(key, saving, { rerender = true } = {}) {
+    ITEMS = ITEMS.map((item) => {
+      if (item.key !== key) return item;
+      return Object.assign({}, item, saving ? { saving, error: "" } : { saving });
+    });
+    if (rerender) render();
+  }
+
+  function setRowError(key, error) {
+    ITEMS = ITEMS.map((item) => item.key === key ? Object.assign({}, item, { saving: false, error }) : item);
+    render();
+  }
+
+  function safeLocalStorageGet(key) {
+    try {
+      return localStorage.getItem(key) || "";
+    } catch (_) {
+      return "";
+    }
   }
 
   function titleCase(text) {

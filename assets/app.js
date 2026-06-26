@@ -18,6 +18,7 @@ const AUTO_REFRESH_MS = 60 * 1000; // fallback sync when no price update socket 
 const WS_RECONNECT_MAX_MS = 60 * 1000;
 const WS_URL_STORAGE_KEY = "rpc_price_update_ws";
 const DEFAULT_PRICE_UPDATE_WS_URL = "wss://pricechecker-cyan.vercel.app/api/price-updates";
+const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
 // Bump this when the sheet parser changes so an old, incorrectly parsed
 // price list is never used as the offline fallback.
 const CACHE_KEY = "rpc_cache_v3";
@@ -54,6 +55,8 @@ let socketReconnectTimer = null;
 let socketReconnectDelay = 2000;
 let syncTimer = null;
 let loadInFlight = null;
+let INVENTORY_ITEMS = [];
+let inventoryLoadInFlight = null;
 
 // --- CSV parsing ------------------------------------------------------------
 // Robust CSV -> array of rows (handles quoted fields, commas, newlines).
@@ -202,6 +205,33 @@ async function loadData({ reason = "auto" } = {}) {
   return loadInFlight;
 }
 
+async function loadInventoryForPrices({ force = false } = {}) {
+  if (!force && Array.isArray(window.RPC_INVENTORY_ITEMS) && window.RPC_INVENTORY_ITEMS.length) {
+    INVENTORY_ITEMS = window.RPC_INVENTORY_ITEMS.map(normalizeInventoryItemForPrices);
+    if (MODELS.length) render();
+    return INVENTORY_ITEMS;
+  }
+  if (inventoryLoadInFlight) return inventoryLoadInFlight;
+  inventoryLoadInFlight = (async () => {
+    try {
+      const res = await fetch(INVENTORY_URL + "?_=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Inventory rejected");
+      INVENTORY_ITEMS = (data.items || []).map(normalizeInventoryItemForPrices);
+      window.RPC_INVENTORY_ITEMS = INVENTORY_ITEMS.slice();
+      if (MODELS.length) render();
+      return INVENTORY_ITEMS;
+    } catch (err) {
+      console.warn("Inventory stock indicators unavailable:", err);
+      return INVENTORY_ITEMS;
+    } finally {
+      inventoryLoadInFlight = null;
+    }
+  })();
+  return inventoryLoadInFlight;
+}
+
 // --- Cache (offline resilience) ---------------------------------------------
 function persistCache() {
   try {
@@ -326,6 +356,55 @@ function bestSearchMatch(list) {
     || list[0];
 }
 
+function normalizeInventoryItemForPrices(item) {
+  const quantity = Number(item.quantity || 0);
+  const note = String(item.note || "");
+  const committed = note && /sold/i.test(note) ? 1 : 0;
+  return Object.assign({}, item, {
+    key: item.key || "",
+    section: String(item.section || "").toUpperCase(),
+    item: item.item || item.device || "",
+    device: item.device || item.item || "",
+    quality: item.quality || "",
+    quantity,
+    available: Math.max(0, quantity - committed),
+  });
+}
+
+function inventorySectionForRepair(repairType) {
+  const text = String(repairType || "").toLowerCase();
+  if (/(screen|lcd|display|front\s*glass)/i.test(text)) return "SCREENS";
+  if (/battery/i.test(text)) return "BATTERIES";
+  return "";
+}
+
+function normalizeDeviceName(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/\b(apple|cell|phone|tablet)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\bgen(?:eration)?\b/g, "gen")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function inventoryDeviceMatches(modelName, itemName) {
+  const model = normalizeDeviceName(modelName);
+  const item = normalizeDeviceName(itemName);
+  if (!model || !item) return false;
+  return model === item || item.includes(model) || model.includes(item);
+}
+
+function isPricePartInStock(modelName, repairType) {
+  const section = inventorySectionForRepair(repairType);
+  if (!section || !INVENTORY_ITEMS.length) return false;
+  return INVENTORY_ITEMS.some((item) =>
+    item.section === section
+    && item.available > 0
+    && inventoryDeviceMatches(modelName, item.device || item.item || item.label)
+  );
+}
+
 function scrollCardIntoView(cardEl) {
   if (!cardEl) return;
   const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 0;
@@ -367,11 +446,14 @@ function card(m, expand = false) {
     grid.className = "price-grid";
     grid.innerHTML = m.prices
       .map(
-        (p, i) => `<div class="price-row" role="button" tabindex="0" data-idx="${i}"
+        (p, i) => {
+          const inStock = isPricePartInStock(m.name, p.type);
+          return `<div class="price-row" role="button" tabindex="0" data-idx="${i}"
             aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
-          <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}</span>
+          <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${inStock ? `<span class="price-stock-tick" title="In stock" aria-label="In stock">✓</span>` : ""}</span>
           <span class="price-val">${formatPrice(p.value)}</span>
-        </div>`
+        </div>`;
+        }
       )
       .join("");
     grid.querySelectorAll(".price-row").forEach((rowEl) => {
@@ -488,6 +570,11 @@ els.clearSearch.addEventListener("click", () => {
   els.search.focus();
   render();
 });
+window.addEventListener("rpc-inventory", (event) => {
+  INVENTORY_ITEMS = ((event.detail && event.detail.items) || window.RPC_INVENTORY_ITEMS || [])
+    .map(normalizeInventoryItemForPrices);
+  if (MODELS.length) render();
+});
 // Refresh when the tab regains focus (counter staff reopening the app).
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && lastFetchTime && Date.now() - lastFetchTime > 60000) {
@@ -573,3 +660,4 @@ showSkeleton();
 startAutoSync();
 startPriceUpdateSocket();
 loadData({ reason: "initial" });
+loadInventoryForPrices();
