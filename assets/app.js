@@ -395,6 +395,48 @@ function inventoryDeviceMatches(modelName, itemName) {
   return model === item || item.includes(model) || model.includes(item);
 }
 
+function normalizePartQuality(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/oled/g, " oled ")
+    .replace(/lcd/g, " lcd ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function screenQualityMatches(repairType, inventoryItem) {
+  const repair = normalizePartQuality(repairType);
+  const quality = normalizePartQuality([inventoryItem.quality, inventoryItem.label].filter(Boolean).join(" "));
+
+  if (/front\s*glass|glass\s*only/.test(repair)) {
+    return /front\s*glass|glass/.test(quality);
+  }
+  if (/\bincell\b/.test(repair)) {
+    return /\bincell\b/.test(quality);
+  }
+  if (/\bsoft\b/.test(repair)) {
+    return /\bsoft\b/.test(quality);
+  }
+  if (/\bhard\b/.test(repair)) {
+    return /\bhard\b/.test(quality);
+  }
+  if (/\boled\b/.test(repair)) {
+    return /\boled\b|\bsoft\b|\bhard\b/.test(quality) && !/\bincell\b|front\s*glass|\bglass\b/.test(quality);
+  }
+  if (/\blcd\b/.test(repair)) {
+    return /\blcd\b/.test(quality);
+  }
+  return true;
+}
+
+function inventoryPartMatchesRepair(repairType, item) {
+  const section = inventorySectionForRepair(repairType);
+  if (section === "SCREENS") return screenQualityMatches(repairType, item);
+  if (section === "BATTERIES") return true;
+  return false;
+}
+
 function isPricePartInStock(modelName, repairType) {
   const section = inventorySectionForRepair(repairType);
   if (!section || !INVENTORY_ITEMS.length) return false;
@@ -402,6 +444,7 @@ function isPricePartInStock(modelName, repairType) {
     item.section === section
     && item.available > 0
     && inventoryDeviceMatches(modelName, item.device || item.item || item.label)
+    && inventoryPartMatchesRepair(repairType, item)
   );
 }
 
@@ -649,7 +692,10 @@ if ("serviceWorker" in navigator) {
 (function () {
   const header = document.querySelector(".app-header");
   if (!header) return;
-  const setH = () => document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+  const setH = () => {
+    const sideNav = window.matchMedia("(min-width: 900px)").matches;
+    document.documentElement.style.setProperty("--header-h", sideNav ? "0px" : header.offsetHeight + "px");
+  };
   setH();
   if ("ResizeObserver" in window) new ResizeObserver(setH).observe(header);
   window.addEventListener("resize", setH);

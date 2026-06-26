@@ -36,7 +36,6 @@
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "Rejected");
         setInventoryData(data);
-        sections = data.sections || [...new Set(ITEMS.map((item) => item.section))];
         lastUpdated = Date.now();
         loadedOnce = true;
         publishInventory();
@@ -60,8 +59,11 @@
   window.RPC_LOAD_INVENTORY = loadInventory;
 
   function setInventoryData(data) {
-    ITEMS = (data.items || []).map(normalizeItem);
+    ITEMS = (data.items || [])
+      .map(normalizeItem)
+      .filter((item) => item.section !== "TOOLS");
     sections = data.sections || [...new Set(ITEMS.map((item) => item.section))];
+    sections = sections.filter((section) => section !== "TOOLS" && ITEMS.some((item) => item.section === section));
   }
 
   function normalizeItem(item) {
@@ -167,7 +169,7 @@
     const status = item.quantity <= 0 ? "out" : item.quantity <= 1 ? "low" : "ok";
     const statusLabel = item.quantity <= 0 ? "Out of stock" : item.quantity <= 1 ? "Low stock" : "In stock";
     const product = item.item || item.label || "Inventory item";
-    const avatarIcon = item.section === "TOOLS" ? "i-tools" : item.section === "BATTERIES" ? "i-cash" : "i-device";
+    const avatarIcon = item.section === "BATTERIES" ? "i-cash" : "i-device";
     const unavailable = item.quantity <= 0 ? 1 : 0;
     const committed = item.note && /sold/i.test(item.note) ? 1 : 0;
     const available = Math.max(0, item.quantity - committed);
@@ -189,7 +191,7 @@
         </div>
       </td>
       <td data-label="Category"><span class="inventory-category">${esc(titleCase(item.section))}</span></td>
-      <td data-label="Status"><span class="inventory-stock-status">${esc(statusLabel)}</span>${unavailable ? `<span class="inventory-unavailable">Unavailable ${unavailable}</span>` : ""}</td>
+      <td data-label="Status"><span class="inventory-stock-status inventory-stock-${status}">${esc(statusLabel)}</span>${unavailable ? `<span class="inventory-unavailable">Unavailable ${unavailable}</span>` : ""}</td>
       <td class="num" data-label="Available">${available}</td>
       <td class="num" data-label="On hand">${esc(String(item.quantity))}</td>
       <td data-label="Update">

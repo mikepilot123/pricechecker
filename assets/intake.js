@@ -82,7 +82,11 @@
   navBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.target;
-      navBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      navBtns.forEach((b) => {
+        const active = b === btn;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-selected", active ? "true" : "false");
+      });
       Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
       if (target === "intake") enterIntake();
       if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
