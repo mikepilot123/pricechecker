@@ -119,7 +119,6 @@
         selectedTime = null;
         renderCalendar();
         renderSlots();
-        updateStepGating();
       });
     });
 
@@ -147,7 +146,7 @@
       btn.addEventListener("click", () => {
         selectedTime = btn.dataset.time;
         renderSlots();
-        updateStepGating();
+        if (selectedDate && selectedTime) setTimeout(() => setStep(2), 250);
       });
     });
   }
@@ -174,22 +173,11 @@
     });
 
     const prevBtn = $("apptPrevStep");
-    const nextBtn = $("apptNextStep");
     const confirmBtn = $("apptConfirmBtn");
     if (prevBtn) prevBtn.hidden = n === 1;
-    if (nextBtn) nextBtn.hidden = n === 3;
     if (confirmBtn) confirmBtn.hidden = n !== 3;
 
     if (n === 3) renderSummary();
-    updateStepGating();
-  }
-
-  function updateStepGating() {
-    const nextBtn = $("apptNextStep");
-    if (!nextBtn || nextBtn.hidden) return;
-    if (currentStep === 1) nextBtn.disabled = !(selectedDate && selectedTime);
-    else if (currentStep === 2) nextBtn.disabled = !($("appointmentDevice")?.value || "").trim();
-    else nextBtn.disabled = false;
   }
 
   function renderSummary() {
@@ -261,6 +249,7 @@
       btn.addEventListener("click", () => {
         selectedTechnician = btn.dataset.technician || "";
         renderTechnicianPicker();
+        maybeAdvanceFromDevice();
       });
     });
   }
@@ -282,6 +271,13 @@
     const catalog = await deviceImageCatalogPromise;
     const item = catalog[key];
     return item && item.file ? "assets/device-images/" + item.file : null;
+  }
+
+  function maybeAdvanceFromDevice() {
+    if (currentStep !== 2) return;
+    const device = ($("appointmentDevice")?.value || "").trim();
+    if (!device) return;
+    setTimeout(() => setStep(3), 250);
   }
 
   function updateDeviceThumb(device) {
@@ -361,28 +357,17 @@
       viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1);
       renderCalendar();
     });
-    $("cancelBookingDetails")?.addEventListener("click", () => resetSelection());
-
     $("appointmentDevice")?.addEventListener("input", (event) => {
       updateDeviceThumb(event.target.value.trim());
-      updateStepGating();
     });
-
-    $("apptNextStep")?.addEventListener("click", () => {
-      const msg = $("appointmentStep2Message");
-      if (currentStep === 1) {
-        if (!selectedDate || !selectedTime) return;
-        setStep(2);
-      } else if (currentStep === 2) {
-        const device = ($("appointmentDevice")?.value || "").trim();
-        if (!device) {
-          if (msg) { msg.textContent = "Add the device or model."; msg.hidden = false; }
-          return;
-        }
-        if (msg) msg.hidden = true;
-        setStep(3);
+    $("appointmentDevice")?.addEventListener("blur", () => maybeAdvanceFromDevice());
+    $("appointmentDevice")?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        maybeAdvanceFromDevice();
       }
     });
+
     $("apptPrevStep")?.addEventListener("click", () => {
       if (currentStep > 1) setStep(currentStep - 1);
     });
