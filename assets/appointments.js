@@ -1,9 +1,12 @@
 /* ============================================================
-   Appointments — Cal.com-style booking: pick a day on a month
-   calendar, pick an open time slot, then add the client's
-   details to confirm. Stored locally (no backend yet); booked
-   slots are excluded from the picker so two clients can't be
-   double-booked into the same time.
+   Appointments — Cal.com-style booking, now a 3-step wizard:
+   1) pick a day + time on a month calendar, 2) pick the device
+   (synced with the same model datalist/catalog images as Check-In)
+   and a technician (Fresha-style chip picker, shared technician
+   list), 3) add the client's details to confirm. Stored locally
+   (no backend yet for the booking itself); booked slots are
+   excluded from the picker so two clients can't be double-booked
+   into the same time.
    ============================================================ */
 
 (function () {
@@ -13,6 +16,11 @@
   const SLOT_MINUTES = 30;
   const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+  const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
+  const LS_PIN = "rpc_intake_pin";
+  const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
+  const DEVICE_IMAGE_CATALOG_URL = "assets/device-images/catalog.json";
+
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -20,6 +28,10 @@
   let viewMonth = startOfMonth(new Date());
   let selectedDate = null; // "YYYY-MM-DD"
   let selectedTime = null; // "HH:MM"
+  let selectedTechnician = ""; // "" = Any professional
+  let technicians = [];
+  let deviceImageCatalogPromise = null;
+  let currentStep = 1;
   let bound = false;
 
   function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
@@ -107,6 +119,7 @@
         selectedTime = null;
         renderCalendar();
         renderSlots();
+        updateStepGating();
       });
     });
 
@@ -121,7 +134,6 @@
     if (!selectedDate) {
       label.textContent = "Pick a day to see times";
       list.innerHTML = "";
-      hideDetails();
       return;
     }
     const [y, m, d] = selectedDate.split("-").map(Number);
@@ -135,7 +147,7 @@
       btn.addEventListener("click", () => {
         selectedTime = btn.dataset.time;
         renderSlots();
-        showDetails();
+        updateStepGating();
       });
     });
   }
@@ -145,30 +157,149 @@
     return h * 60 + m;
   }
 
-  function showDetails() {
-    const card = $("bookingDetailsCard");
-    const summary = $("bookingSelectedSummary");
-    if (!card || !summary || !selectedDate || !selectedTime) return;
-    const [y, m, d] = selectedDate.split("-").map(Number);
-    const dateLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-    summary.textContent = `${dateLabel} at ${minutesToLabel(timeToMinutes(selectedTime))} · 30 min · In-store`;
-    card.hidden = false;
+  // ---------- step wizard ----------
+
+  function setStep(n) {
+    currentStep = n;
+    document.querySelectorAll(".form-step[data-appt-step]").forEach((section) => {
+      section.hidden = Number(section.dataset.apptStep) !== n;
+    });
+    document.querySelectorAll(".form-progress-step[data-appt-progress-step]").forEach((chip) => {
+      const stepNum = Number(chip.dataset.apptProgressStep);
+      chip.classList.toggle("active", stepNum === n);
+      chip.classList.toggle("complete", stepNum < n);
+    });
+    document.querySelectorAll(".form-progress-line").forEach((line, idx) => {
+      line.classList.toggle("complete", idx + 1 < n);
+    });
+
+    const prevBtn = $("apptPrevStep");
+    const nextBtn = $("apptNextStep");
+    const confirmBtn = $("apptConfirmBtn");
+    if (prevBtn) prevBtn.hidden = n === 1;
+    if (nextBtn) nextBtn.hidden = n === 3;
+    if (confirmBtn) confirmBtn.hidden = n !== 3;
+
+    if (n === 3) renderSummary();
+    updateStepGating();
   }
 
-  function hideDetails() {
-    const card = $("bookingDetailsCard");
-    if (card) card.hidden = true;
+  function updateStepGating() {
+    const nextBtn = $("apptNextStep");
+    if (!nextBtn || nextBtn.hidden) return;
+    if (currentStep === 1) nextBtn.disabled = !(selectedDate && selectedTime);
+    else if (currentStep === 2) nextBtn.disabled = !($("appointmentDevice")?.value || "").trim();
+    else nextBtn.disabled = false;
+  }
+
+  function renderSummary() {
+    const summary = $("bookingSelectedSummary");
+    if (!summary || !selectedDate || !selectedTime) return;
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const dateLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    const device = ($("appointmentDevice")?.value || "").trim();
+    const techLabel = selectedTechnician || "Any professional";
+    summary.textContent = `${dateLabel} at ${minutesToLabel(timeToMinutes(selectedTime))} · ${device || "Device"} · ${techLabel}`;
   }
 
   function resetSelection() {
     selectedDate = null;
     selectedTime = null;
+    selectedTechnician = "";
     const form = $("appointmentForm");
     if (form) form.reset();
-    hideDetails();
+    const deviceInput = $("appointmentDevice");
+    if (deviceInput) deviceInput.value = "";
+    const issueInput = $("appointmentIssue");
+    if (issueInput) issueInput.value = "";
+    updateDeviceThumb("");
+    renderTechnicianPicker();
     renderCalendar();
     renderSlots();
+    setStep(1);
   }
+
+  // ---------- technicians (Fresha-style chip picker, shared with Check-In) ----------
+
+  async function fetchTechnicians() {
+    try {
+      const pin = localStorage.getItem(LS_PIN) || "";
+      const res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "listTechnicians", pin }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Rejected");
+      const names = (data.technicians || []).map((t) => (typeof t === "string" ? t : t.name)).filter(Boolean);
+      technicians = names.length ? names : DEFAULT_TECHNICIANS.slice();
+    } catch (_) {
+      technicians = DEFAULT_TECHNICIANS.slice();
+    }
+    renderTechnicianPicker();
+  }
+
+  function initials(name) {
+    const parts = String(name).trim().split(/\s+/);
+    return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";
+  }
+
+  function renderTechnicianPicker() {
+    const wrap = $("technicianPicker");
+    if (!wrap) return;
+    const chips = [{ name: "Any professional", value: "" }].concat(
+      technicians.map((name) => ({ name, value: name }))
+    );
+    wrap.innerHTML = chips.map((chip) => `
+      <button type="button" class="technician-chip ${chip.value === selectedTechnician ? "is-selected" : ""}" data-technician="${esc(chip.value)}">
+        <span class="technician-chip-avatar">${chip.value ? esc(initials(chip.name)) : "<svg class=\"icon\"><use href=\"#i-user\"></use></svg>"}</span>
+        <span class="technician-chip-name">${esc(chip.name)}</span>
+      </button>
+    `).join("");
+    wrap.querySelectorAll(".technician-chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedTechnician = btn.dataset.technician || "";
+        renderTechnicianPicker();
+      });
+    });
+  }
+
+  // ---------- device sync (shared datalist + catalog thumbnail) ----------
+
+  function deviceImageKey(device) {
+    return String(device || "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  async function fetchDeviceImage(device) {
+    const key = deviceImageKey(device);
+    if (!key) return null;
+    if (!deviceImageCatalogPromise) {
+      deviceImageCatalogPromise = fetch(DEVICE_IMAGE_CATALOG_URL)
+        .then((res) => (res.ok ? res.json() : {}))
+        .catch(() => ({}));
+    }
+    const catalog = await deviceImageCatalogPromise;
+    const item = catalog[key];
+    return item && item.file ? "assets/device-images/" + item.file : null;
+  }
+
+  function updateDeviceThumb(device) {
+    const thumb = $("apptDeviceThumb");
+    const img = thumb?.querySelector("img");
+    if (!thumb || !img) return;
+    thumb.title = device || "";
+    thumb.classList.remove("has-image");
+    if (!device) return;
+    fetchDeviceImage(device).then((url) => {
+      if (!url) return;
+      img.onload = () => thumb.classList.add("has-image");
+      img.onerror = () => thumb.classList.remove("has-image");
+      img.src = url;
+    });
+  }
+
+  // ---------- appointment list ----------
 
   function renderList() {
     const list = $("appointmentList");
@@ -179,7 +310,7 @@
         <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}">
           <div class="booking-row-main">
             <strong>${esc(item.client)}</strong>
-            <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}</p>
+            <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
             <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
           </div>
           <div class="booking-row-actions">
@@ -232,6 +363,30 @@
     });
     $("cancelBookingDetails")?.addEventListener("click", () => resetSelection());
 
+    $("appointmentDevice")?.addEventListener("input", (event) => {
+      updateDeviceThumb(event.target.value.trim());
+      updateStepGating();
+    });
+
+    $("apptNextStep")?.addEventListener("click", () => {
+      const msg = $("appointmentStep2Message");
+      if (currentStep === 1) {
+        if (!selectedDate || !selectedTime) return;
+        setStep(2);
+      } else if (currentStep === 2) {
+        const device = ($("appointmentDevice")?.value || "").trim();
+        if (!device) {
+          if (msg) { msg.textContent = "Add the device or model."; msg.hidden = false; }
+          return;
+        }
+        if (msg) msg.hidden = true;
+        setStep(3);
+      }
+    });
+    $("apptPrevStep")?.addEventListener("click", () => {
+      if (currentStep > 1) setStep(currentStep - 1);
+    });
+
     const form = $("appointmentForm");
     if (form) {
       form.addEventListener("submit", (event) => {
@@ -249,6 +404,7 @@
           phone: ($("appointmentPhone")?.value || "").trim(),
           device,
           issue: ($("appointmentIssue")?.value || "").trim(),
+          technician: selectedTechnician || "",
           date: selectedDate,
           time: selectedTime,
           notes: ($("appointmentNotes")?.value || "").trim(),
@@ -269,6 +425,9 @@
     renderCalendar();
     renderSlots();
     renderList();
+    renderTechnicianPicker();
+    fetchTechnicians();
+    setStep(1);
   }
 
   window.addEventListener("rpc-enter-appointments", init);

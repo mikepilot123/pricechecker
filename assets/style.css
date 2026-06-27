@@ -2059,7 +2059,7 @@ body {
   color: var(--accent);
 }
 .ticket-device-fallback { width: 30px; height: 30px; stroke-width: 1.6; }
-.ticket-device-thumb img { display: none; width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+.ticket-device-thumb img { display: none; width: 100%; height: 100%; object-fit: contain; padding: 9px; }
 .ticket-device-thumb.has-image img { display: block; }
 .ticket-device-thumb.has-image .ticket-device-fallback { display: none; }
 .ticket-identity { grid-area: identity; min-width: 0; }
@@ -2142,6 +2142,7 @@ body {
     padding: 12px;
   }
   .ticket-device-thumb { width: 56px; height: 56px; border-radius: var(--radius-md); }
+  .ticket-device-thumb img { padding: 8px; }
 }
 /* Tap-to-call number shown right on the card */
 .ticket-phone {
@@ -2505,13 +2506,20 @@ body {
 .ticket-detail-section { margin-top: 18px; }
 .ticket-detail-section .field-label { margin-bottom: 8px; }
 .ticket-detail-grid { border-top: 1px solid var(--border); }
-.ticket-detail-row { display: grid; grid-template-columns: 26px minmax(88px, 0.6fr) minmax(0, 1.4fr); align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.ticket-detail-row { display: grid; grid-template-columns: 26px minmax(88px, 0.6fr) minmax(0, 1.4fr) auto; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
 .ticket-detail-row .icon { width: 17px; height: 17px; color: var(--text-dim); }
 .ticket-detail-label { color: var(--text-dim); }
 .ticket-detail-value { min-width: 0; text-align: right; font-weight: 500; overflow-wrap: anywhere; }
 .ticket-detail-value.money-positive { color: var(--price); }
 .ticket-detail-value.money-due { color: var(--danger); }
 .ticket-detail-value .ticket-tel { font-size: inherit; }
+.ticket-detail-edit-btn { width: 28px; height: 28px; padding: 0; flex: none; }
+.ticket-detail-edit-btn .icon { width: 14px; height: 14px; }
+.ticket-detail-value.ticket-detail-editing { grid-column: 3 / span 2; display: flex; align-items: center; gap: 6px; text-align: left; }
+.ticket-detail-value.ticket-detail-editing .ticket-inline-input { flex: 1; min-width: 0; padding: 6px 8px; font-size: 0.85rem; }
+.ticket-detail-value.ticket-detail-editing .icon-btn { width: 28px; height: 28px; padding: 0; flex: none; }
+.ticket-detail-value.ticket-detail-editing .icon-btn .icon { width: 14px; height: 14px; }
+.ticket-inline-input.field-error-input { border-color: var(--danger); }
 .ticket-detail-notes { margin: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 12px; color: var(--text-dim); font-size: 0.88rem; white-space: pre-wrap; }
 .ticket-modal-footer { display: flex; gap: 8px; }
 .ticket-modal-footer .primary-btn { flex: 1; width: auto; }
@@ -2567,6 +2575,9 @@ body {
 }
 .booking-day {
   aspect-ratio: 1;
+  max-width: 44px;
+  max-height: 44px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2651,3 +2662,50 @@ body {
   cursor: pointer;
 }
 .booking-row-actions .danger-text { color: var(--danger); border-color: var(--danger); }
+
+.booking-wizard-card {
+  max-width: min(760px, 100%);
+  margin: 0 auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.booking-wizard-card .booking-card { border: none; box-shadow: none; border-radius: 0; }
+.appt-wizard-footer { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px; background: none; }
+.booking-list-card { max-width: min(760px, 100%); margin-left: auto; margin-right: auto; }
+
+.appt-device-row { display: flex; align-items: center; gap: 12px; }
+.appt-device-row .text-input { flex: 1; }
+.appt-device-thumb { flex: none; width: 56px; height: 56px; }
+
+.technician-picker { display: flex; flex-wrap: wrap; gap: 10px; }
+.technician-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 76px;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px;
+}
+.technician-chip-avatar {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: var(--card);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.technician-chip-avatar .icon { width: 20px; height: 20px; }
+.technician-chip-name { font-size: 0.74rem; text-align: center; line-height: 1.25; color: var(--text-dim); }
+.technician-chip.is-selected .technician-chip-avatar { background: var(--accent); color: #fff; }
+.technician-chip.is-selected .technician-chip-name { color: var(--text); font-weight: 600; }

@@ -32,6 +32,7 @@
     <symbol id="i-phone" viewBox="0 0 24 24"><path d="M7.1 3.8 4.6 5.1c-.8.4-1.1 1.3-.8 2.1 2.5 6.5 7.6 11.6 14.1 14.1.8.3 1.7 0 2.1-.8l1.3-2.5a1.7 1.7 0 0 0-.4-2l-2.8-2.3a1.7 1.7 0 0 0-2-.1l-1.7 1.1a13.2 13.2 0 0 1-5.2-5.2l1.1-1.7a1.7 1.7 0 0 0-.1-2L9.1 4.2a1.7 1.7 0 0 0-2-.4Z"/></symbol>
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m4 16.8-.8 4 4-.8L19 8.2 15.8 5 4 16.8Z"/><path d="m13.8 7 3.2 3.2M18 4.8l1.2-1.2a1.5 1.5 0 0 1 2.1 2.1L20 6.9"/></symbol>
     <symbol id="i-xmark" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
     <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6.5 9 5.5 5.5L17.5 9"/></symbol>
     <symbol id="i-device" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.2"/><path d="M10 18.5h4"/></symbol>
     <symbol id="i-smartphone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M10.5 18.3h3"/></symbol>
@@ -142,65 +143,100 @@
   <main class="container view" id="view-appointments" hidden>
     <p class="info-banner">Book in-store repair visits — pick a day and time, then add the client's details.</p>
 
-    <section class="booking-card">
-      <div class="booking-info-panel">
-        <p class="form-section-label">Appointments</p>
-        <h2 class="booking-title">Repair visit</h2>
-        <span class="booking-badge">Requires confirmation</span>
-        <ul class="booking-meta">
-          <li><svg class="icon"><use href="#i-clock"></use></svg>30 minutes</li>
-          <li><svg class="icon"><use href="#i-pin"></use></svg>In-store · JQ Electronics</li>
-          <li><svg class="icon"><use href="#i-calendar"></use></svg>Mon–Sat, 8:30 AM–4:00 PM</li>
-        </ul>
+    <section class="booking-wizard-card">
+      <div class="form-progress" aria-label="Booking progress">
+        <span class="form-progress-step active" data-appt-progress-step="1">1<span>When</span></span>
+        <span class="form-progress-line"></span>
+        <span class="form-progress-step" data-appt-progress-step="2">2<span>Device</span></span>
+        <span class="form-progress-line"></span>
+        <span class="form-progress-step" data-appt-progress-step="3">3<span>Details</span></span>
       </div>
 
-      <div class="booking-calendar-panel">
-        <div class="booking-calendar-header">
-          <button type="button" id="bookingPrevMonth" class="icon-btn ghost-btn" aria-label="Previous month"><svg class="icon"><use href="#i-chevron-left"></use></svg></button>
-          <strong id="bookingMonthLabel"></strong>
-          <button type="button" id="bookingNextMonth" class="icon-btn ghost-btn" aria-label="Next month"><svg class="icon"><use href="#i-chevron-right"></use></svg></button>
-        </div>
-        <div class="booking-calendar-weekdays">
-          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
-        </div>
-        <div id="bookingCalendarGrid" class="booking-calendar-grid"></div>
-      </div>
+      <section class="form-step" data-appt-step="1">
+        <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Pick a day and time</h4><p>Choose when you'd like to bring the device in.</p></div>
+        <div class="booking-card">
+          <div class="booking-info-panel">
+            <h2 class="booking-title">Repair visit</h2>
+            <span class="booking-badge">Requires confirmation</span>
+            <ul class="booking-meta">
+              <li><svg class="icon"><use href="#i-clock"></use></svg>30 minutes</li>
+              <li><svg class="icon"><use href="#i-pin"></use></svg>In-store · JQ Electronics</li>
+              <li><svg class="icon"><use href="#i-calendar"></use></svg>Mon–Sat, 8:30 AM–4:00 PM</li>
+            </ul>
+          </div>
 
-      <div class="booking-slots-panel">
-        <p id="bookingSlotsLabel" class="booking-slots-label">Pick a day to see times</p>
-        <div id="bookingSlotsList" class="booking-slots-list"></div>
-      </div>
-    </section>
+          <div class="booking-calendar-panel">
+            <div class="booking-calendar-header">
+              <button type="button" id="bookingPrevMonth" class="icon-btn ghost-btn" aria-label="Previous month"><svg class="icon"><use href="#i-chevron-left"></use></svg></button>
+              <strong id="bookingMonthLabel"></strong>
+              <button type="button" id="bookingNextMonth" class="icon-btn ghost-btn" aria-label="Next month"><svg class="icon"><use href="#i-chevron-right"></use></svg></button>
+            </div>
+            <div class="booking-calendar-weekdays">
+              <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+            </div>
+            <div id="bookingCalendarGrid" class="booking-calendar-grid"></div>
+          </div>
 
-    <section id="bookingDetailsCard" class="booking-details-card" hidden>
-      <p id="bookingSelectedSummary" class="booking-selected-summary"></p>
-      <form id="appointmentForm" class="form-grid">
-        <div class="form-field form-field-full">
-          <label class="field-label" for="appointmentClient">Client name *</label>
-          <input id="appointmentClient" class="text-input" required placeholder="e.g. Anita Singh" />
+          <div class="booking-slots-panel">
+            <p id="bookingSlotsLabel" class="booking-slots-label">Pick a day to see times</p>
+            <div id="bookingSlotsList" class="booking-slots-list"></div>
+          </div>
         </div>
-        <div class="form-field">
-          <label class="field-label" for="appointmentPhone">Phone</label>
-          <input id="appointmentPhone" class="text-input" type="tel" placeholder="e.g. 868 712 3456" />
+      </section>
+
+      <section class="form-step" data-appt-step="2" hidden>
+        <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Device and technician</h4><p>Tell us what's coming in, and pick a technician if you have a preference.</p></div>
+        <div class="form-grid">
+          <div class="form-field form-field-full appt-device-field">
+            <label class="field-label" for="appointmentDevice">Device / model *</label>
+            <div class="appt-device-row">
+              <input id="appointmentDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
+              <div id="apptDeviceThumb" class="ticket-device-thumb appt-device-thumb" title="">
+                <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#i-device"></use></svg>
+                <img alt="" />
+              </div>
+            </div>
+          </div>
+          <div class="form-field form-field-full">
+            <label class="field-label" for="appointmentIssue">Repair needed</label>
+            <input id="appointmentIssue" class="text-input" placeholder="e.g. Screen replacement" />
+          </div>
+          <div class="form-field form-field-full">
+            <label class="field-label">Technician</label>
+            <div id="technicianPicker" class="technician-picker"></div>
+          </div>
         </div>
-        <div class="form-field">
-          <label class="field-label" for="appointmentDevice">Device / model *</label>
-          <input id="appointmentDevice" class="text-input" required placeholder="e.g. iPhone 13 Pro" />
-        </div>
-        <div class="form-field form-field-full">
-          <label class="field-label" for="appointmentIssue">Repair needed</label>
-          <input id="appointmentIssue" class="text-input" placeholder="e.g. Screen replacement" />
-        </div>
-        <div class="form-field form-field-full">
-          <label class="field-label" for="appointmentNotes">Notes</label>
-          <textarea id="appointmentNotes" class="text-input" rows="2" placeholder="Optional details"></textarea>
-        </div>
-        <p id="appointmentMessage" class="field-error" hidden></p>
-        <div class="form-actions form-field-full">
+        <p id="appointmentStep2Message" class="field-error" hidden></p>
+      </section>
+
+      <section class="form-step" data-appt-step="3" hidden>
+        <div class="form-step-heading"><p class="form-section-label">Step 3</p><h4>Your details</h4><p>Last step — how should we reach you?</p></div>
+        <p id="bookingSelectedSummary" class="booking-selected-summary"></p>
+        <form id="appointmentForm" class="form-grid">
+          <div class="form-field form-field-full">
+            <label class="field-label" for="appointmentClient">Client name *</label>
+            <input id="appointmentClient" class="text-input" required placeholder="e.g. Anita Singh" />
+          </div>
+          <div class="form-field form-field-full">
+            <label class="field-label" for="appointmentPhone">Phone</label>
+            <input id="appointmentPhone" class="text-input" type="tel" placeholder="e.g. 868 712 3456" />
+          </div>
+          <div class="form-field form-field-full">
+            <label class="field-label" for="appointmentNotes">Notes</label>
+            <textarea id="appointmentNotes" class="text-input" rows="2" placeholder="Optional details"></textarea>
+          </div>
+          <p id="appointmentMessage" class="field-error" hidden></p>
+        </form>
+      </section>
+
+      <div class="modal-footer appt-wizard-footer">
+        <div class="form-actions">
           <button type="button" id="cancelBookingDetails" class="ghost-btn">Cancel</button>
-          <button type="submit" class="primary-btn">Confirm appointment</button>
+          <button type="button" id="apptPrevStep" class="ghost-btn" hidden>Back</button>
+          <button type="button" id="apptNextStep" class="primary-btn">Continue</button>
+          <button type="submit" id="apptConfirmBtn" class="primary-btn" form="appointmentForm" hidden>Confirm appointment</button>
         </div>
-      </form>
+      </div>
     </section>
 
     <section class="booking-list-card">

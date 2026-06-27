@@ -745,7 +745,31 @@
     if (e.key === "Escape" && !$("activityLogModal").hidden) closeActivityLogModal();
   });
 
+  let currentModalTicket = null;
+
+  const INLINE_EDIT_FIELDS = {
+    customerName: { type: "text", required: true },
+    phone: { type: "tel", required: false },
+    email: { type: "email", required: false },
+    device: { type: "text", required: true },
+    repairCost: { type: "number", required: false },
+    amountPaid: { type: "number", required: false },
+  };
+
+  function fieldDisplayHtml(field, ticket) {
+    switch (field) {
+      case "customerName": return esc(ticket.customerName || "Unknown customer");
+      case "phone": return ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—";
+      case "email": return ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—";
+      case "device": return esc(ticket.device || "—");
+      case "repairCost": return formatMoney(ticket.repairCost);
+      case "amountPaid": return formatMoney(ticket.amountPaid);
+      default: return "—";
+    }
+  }
+
   function openTicketModal(ticket) {
+    currentModalTicket = ticket;
     const hasPhone = !!ticket.phone;
     const technician = ticket.technician || "Unassigned";
     const issueSummary = issueSummaryText(ticket.issues);
@@ -763,16 +787,16 @@
         </div>
       </div>
       <section class="ticket-detail-section"><p class="field-label">Customer & device</p><div class="ticket-detail-grid">
-        ${detailRow("i-user", "Customer", ticket.customerName || "Unknown customer")}
-        ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
-        ${detailRow("i-mail", "Email", ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—")}
-        ${detailRow("i-device", "Device", ticket.device || "—")}
+        ${detailRow("i-user", "Customer", fieldDisplayHtml("customerName", ticket), "", "customerName")}
+        ${detailRow("i-phone", "Phone", fieldDisplayHtml("phone", ticket), "", "phone")}
+        ${detailRow("i-mail", "Email", fieldDisplayHtml("email", ticket), "", "email")}
+        ${detailRow("i-device", "Device", fieldDisplayHtml("device", ticket), "", "device")}
         ${detailRow("i-user", "Technician", esc(technician))}
         ${detailRow("i-tools", "Stock used", esc(ticket.inventoryItemLabel || "No stock item used"))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
-        ${detailRow("i-cash", "Repair cost", formatMoney(ticket.repairCost), "money-positive")}
-        ${detailRow("i-cash", "Amount paid", formatMoney(ticket.amountPaid), "money-positive")}
+        ${detailRow("i-cash", "Repair cost", fieldDisplayHtml("repairCost", ticket), "money-positive", "repairCost")}
+        ${detailRow("i-cash", "Amount paid", fieldDisplayHtml("amountPaid", ticket), "money-positive", "amountPaid")}
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>`;
@@ -790,13 +814,74 @@
     $("closeTicketModal").focus();
   }
 
-  function closeTicketModal() { $("ticketModal").hidden = true; }
+  function closeTicketModal() { $("ticketModal").hidden = true; currentModalTicket = null; }
   $("closeTicketModal").addEventListener("click", closeTicketModal);
   $("ticketModal").addEventListener("click", (e) => { if (e.target.id === "ticketModal") closeTicketModal(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal(); });
 
-  function detailRow(iconName, label, value, valueClass = "") {
-    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value ${valueClass}">${value}</span></div>`;
+  $("ticketModalBody").addEventListener("click", (e) => {
+    const pencilBtn = e.target.closest("[data-edit-field]");
+    if (pencilBtn) { startInlineEdit(pencilBtn.closest(".ticket-detail-row"), pencilBtn.dataset.editField); return; }
+    const saveBtn = e.target.closest("[data-save-field]");
+    if (saveBtn) { saveInlineEdit(saveBtn.closest(".ticket-detail-row"), saveBtn.dataset.saveField); return; }
+    const cancelBtn = e.target.closest("[data-cancel-field]");
+    if (cancelBtn) { renderDetailRowStatic(cancelBtn.closest(".ticket-detail-row"), cancelBtn.dataset.cancelField); return; }
+  });
+
+  function startInlineEdit(rowEl, field) {
+    if (!rowEl || !currentModalTicket) return;
+    const cfg = INLINE_EDIT_FIELDS[field];
+    if (!cfg) return;
+    const currentValue = currentModalTicket[field] == null ? "" : currentModalTicket[field];
+    rowEl.querySelector(".ticket-detail-value").outerHTML = `
+      <span class="ticket-detail-value ticket-detail-editing">
+        <input type="${cfg.type}" class="text-input ticket-inline-input" value="${esc(currentValue)}" ${cfg.type === "number" ? 'min="0" step="0.01"' : ""} />
+        <button type="button" class="icon-btn ghost-btn" data-save-field="${field}" aria-label="Save"><svg class="icon"><use href="#i-check"></use></svg></button>
+        <button type="button" class="icon-btn ghost-btn" data-cancel-field="${field}" aria-label="Cancel"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </span>`;
+    rowEl.querySelector(".ticket-inline-input")?.focus();
+    rowEl.querySelector("[data-edit-field]")?.remove();
+  }
+
+  function renderDetailRowStatic(rowEl, field) {
+    if (!rowEl || !currentModalTicket) return;
+    rowEl.querySelector(".ticket-detail-value")?.remove();
+    const valueClass = field === "repairCost" || field === "amountPaid" ? "money-positive" : "";
+    rowEl.insertAdjacentHTML("beforeend", detailValueHtml(fieldDisplayHtml(field, currentModalTicket), valueClass, field));
+  }
+
+  async function saveInlineEdit(rowEl, field) {
+    if (!rowEl || !currentModalTicket) return;
+    const cfg = INLINE_EDIT_FIELDS[field];
+    const input = rowEl.querySelector(".ticket-inline-input");
+    if (!cfg || !input) return;
+    const raw = input.value.trim();
+    if (cfg.required && !raw) {
+      input.classList.add("field-error-input");
+      return;
+    }
+    const value = cfg.type === "number" ? (raw === "" ? null : Number(raw)) : raw;
+    const saveBtn = rowEl.querySelector("[data-save-field]");
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      const res = await api({ action: "update", id: currentModalTicket.id, [field]: value });
+      if (!res.ok) throw new Error(res.error || "Save failed");
+      mergeTicket(res.ticket);
+      currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
+      renderDetailRowStatic(rowEl, field);
+    } catch (err) {
+      if (saveBtn) saveBtn.disabled = false;
+      input.classList.add("field-error-input");
+    }
+  }
+
+  function detailValueHtml(value, valueClass, field) {
+    const pencil = field ? `<button type="button" class="icon-btn ghost-btn ticket-detail-edit-btn" data-edit-field="${field}" aria-label="Edit"><svg class="icon"><use href="#i-pencil"></use></svg></button>` : "";
+    return `<span class="ticket-detail-value ${valueClass}">${value}</span>${pencil}`;
+  }
+
+  function detailRow(iconName, label, value, valueClass = "", field = "") {
+    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span>${detailValueHtml(value, valueClass, field)}</div>`;
   }
 
   function formatMoney(value) {
