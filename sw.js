@@ -6,7 +6,7 @@
 
    Google Sheet requests are never touched here — prices/intake always go
    straight to the network (with their own localStorage fallback in app.js). */
-const CACHE = "rpc-shell-v25";
+const CACHE = "rpc-shell-v26";
 const SHELL = [
   "./",
   "./index.html",

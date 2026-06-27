@@ -16,6 +16,7 @@
   let inventoryItems = [];
   let lastUpdated = null;
   let loadInFlight = null;
+  let goalFormBound = false;
 
   function pin() {
     try { return localStorage.getItem(LS_PIN) || ""; }
@@ -93,6 +94,7 @@
 
   function render(loadState) {
     const metrics = buildMetrics();
+    renderGoalEditor(metrics);
     renderKpis(metrics, loadState);
     renderFocus(metrics, loadState);
   }
@@ -117,8 +119,6 @@
       .map((ticket) => Object.assign({}, ticket, { balance: Math.max(0, ticket.repairCost - ticket.amountPaid) }))
       .filter((ticket) => ticket.balance > 0);
     const waitingOverFiveDays = activeRepairs.filter((ticket) => ageInDays(ticketDate(ticket)) > 5);
-    const daysLeft = daysRemainingInMonth(now);
-    const remainingSales = Math.max(0, goal - salesThisMonth);
 
     return {
       goal,
@@ -131,8 +131,35 @@
       outstandingTickets,
       outstandingBalance: outstandingTickets.reduce((sum, ticket) => sum + ticket.balance, 0),
       waitingOverFiveDays,
-      salesNeededPerDay: daysLeft > 0 ? Math.ceil(remainingSales / daysLeft) : remainingSales,
     };
+  }
+
+  function renderGoalEditor(metrics) {
+    const input = $("dashboardGoalInput");
+    if (input && document.activeElement !== input) input.value = Math.round(metrics.goal || DEFAULT_MONTHLY_GOAL);
+    bindGoalForm();
+  }
+
+  function bindGoalForm() {
+    if (goalFormBound) return;
+    const form = $("dashboardGoalForm");
+    if (!form) return;
+    goalFormBound = true;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const input = $("dashboardGoalInput");
+      const msg = $("dashboardGoalMessage");
+      const value = Number(input?.value || 0);
+      if (!value || value < 0) {
+        if (msg) msg.textContent = "Enter a monthly target greater than 0.";
+        return;
+      }
+      try {
+        localStorage.setItem(GOAL_KEY, String(Math.round(value)));
+      } catch (_) {}
+      if (msg) msg.textContent = "Target saved.";
+      render({});
+    });
   }
 
   function renderKpis(metrics, loadState) {
@@ -161,7 +188,7 @@
         title: "Active Repairs",
         value: ticketUnavailable ? "—" : String(metrics.activeRepairs.length),
         sub: "Open active repair jobs",
-        icon: "i-tools",
+        icon: "i-repair-progress",
         action: "active-repairs",
       },
       {
@@ -249,8 +276,9 @@
       },
       {
         label: "Sales needed per day",
-        value: money(metrics.salesNeededPerDay),
-        sub: "To hit this month’s target",
+        value: "",
+        hideValue: true,
+        sub: "Use the monthly target above to pace this month",
       },
     ];
     box.innerHTML = items.map(focusItemHtml).join("");
@@ -266,7 +294,7 @@
         <strong>${esc(item.label)}</strong>
         <small>${esc(item.sub)}</small>
       </span>
-      <b>${esc(String(item.value))}</b>
+      ${item.hideValue ? "" : `<b>${esc(String(item.value))}</b>`}
     </button>`;
   }
 
@@ -304,11 +332,6 @@
 
   function ageInDays(date) {
     return Math.floor((Date.now() - date.getTime()) / 86400000);
-  }
-
-  function daysRemainingInMonth(date) {
-    const last = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-    return Math.max(1, last - date.getDate() + 1);
   }
 
   function signedPercent(current, previous) {
