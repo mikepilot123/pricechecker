@@ -6,6 +6,9 @@ import {
   clearAll,
   listBackups,
   restoreBackup,
+  listTechnicians,
+  addTechnician,
+  deleteTechnician,
 } from "../lib/tickets.js";
 import { ensureSchema } from "../lib/db.js";
 
@@ -53,6 +56,15 @@ export default async function handler(req, res) {
     if (action === "restoreBackup") {
       const { restoredCount, backup, tickets } = await restoreBackup(body);
       return res.status(200).json({ ok: true, restoredCount, backup, tickets });
+    }
+    if (action === "listTechnicians") {
+      return res.status(200).json({ ok: true, technicians: await listTechnicians() });
+    }
+    if (action === "addTechnician") {
+      return res.status(200).json({ ok: true, technicians: await addTechnician(body) });
+    }
+    if (action === "deleteTechnician") {
+      return res.status(200).json({ ok: true, technicians: await deleteTechnician(body) });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {

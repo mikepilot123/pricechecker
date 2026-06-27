@@ -1,5 +1,5 @@
 /* ============================================================
-   Device intake — log devices, select one or more issues, track
+   Device check-in — log devices, select one or more issues, track
    status, and keep a timestamped activity log of every change.
    Talks to a Vercel serverless API (api/intake.js) backed by Postgres,
    which mirrors the old Google Apps Script backend's request/response
@@ -14,6 +14,7 @@
   // Stable production alias for the Vercel project (auto-updates on every
   // push to main) — update if the project or domain ever changes.
   const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
+  const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
 
   // Status pipeline — keep in sync with apps-script/Code.gs STATUSES.
   const STATUSES = [
@@ -34,6 +35,7 @@
     "Picked Up": "st-pickedup",
     "Cancelled": "st-cancelled",
   };
+  const ACTIVE_REPAIR_STATUSES = new Set(["Received", "Diagnosing", "Waiting for Parts", "In Progress"]);
 
   // Common issue presets — "Other" reveals a free-text field.
   const ISSUES = [
@@ -52,11 +54,13 @@
 
   const LS_PIN = "rpc_intake_pin";
   const TICKET_PAGE_SIZE = 12;
+  const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
 
   const $ = (id) => document.getElementById(id);
 
   // State
   let TICKETS = [];
+  let TECHNICIANS = [];
   let statusFilter = "all";
   let editingId = null;
   let formStep = 1;
@@ -65,23 +69,51 @@
   let quickLogMode = false;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
-  // A "log this repair" request from the Prices tab that arrived before the
-  // device was connected; applied right after a successful PIN connect.
+  // If Check In is not configured yet, retain a price-row selection until the
+  // user has manually connected the Check In tab.
   let pendingLogDevice = null;
+  let technicianModalTicket = null;
+  let suppressTechnicianFocusOpen = false;
+  let INVENTORY_ITEMS = [];
+  let inventoryLoadPromise = null;
 
   // ---- View navigation -----------------------------------------------------
-  const navBtns = document.querySelectorAll(".nav-btn");
-  const views = { prices: $("view-prices"), intake: $("view-intake"), appointments: $("view-appointments") };
+  const navBtns = document.querySelectorAll(".nav-btn[data-target]");
+  const settingsNavBtn = $("intakeSettings");
+  const views = {
+    dashboard: $("view-dashboard"),
+    targets: $("view-targets"),
+    appointments: $("view-appointments"),
+    prices: $("view-prices"),
+    intake: $("view-intake"),
+    inventory: $("view-inventory"),
+    expenses: $("view-expenses"),
+  };
+  function setActiveNav(target) {
+    navBtns.forEach((b) => {
+      const active = b.dataset.target === target;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (settingsNavBtn) settingsNavBtn.classList.toggle("active", target === "settings");
+  }
+  function showView(target) {
+    Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
+  }
+  function navigateTo(target) {
+    setActiveNav(target);
+    showView(target);
+    if (target === "dashboard") window.dispatchEvent(new Event("rpc-enter-dashboard"));
+    if (target === "targets") window.dispatchEvent(new Event("rpc-enter-targets"));
+    if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
+    if (target === "intake") enterIntake();
+    if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
+    if (target === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
+  }
+  window.RPC_SHOW_VIEW = navigateTo;
   navBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const target = btn.dataset.target;
-      navBtns.forEach((b) => b.classList.toggle("active", b === btn));
-      Object.entries(views).forEach(([k, v]) => { if (v) v.hidden = k !== target; });
-      // Refresh button only makes sense on the prices view.
-      const rb = $("refreshBtn");
-      if (rb) rb.hidden = target !== "prices";
-      if (target === "intake") enterIntake();
-      if (target === "appointments") window.dispatchEvent(new CustomEvent("rpc-enter-appointments"));
+      navigateTo(btn.dataset.target);
     });
   });
 
@@ -97,6 +129,7 @@
     $("intakeMain").hidden = true;
     $("settingsMaintenance").hidden = !prefill;
     if (prefill) $("cfgPin").value = getCfg().pin;
+    if (prefill && isConfigured()) loadTechnicians();
   }
   function showMain() {
     $("intakeSetup").hidden = true;
@@ -125,8 +158,7 @@
       showMain();
       renderStatusChips();
       render();
-      // If they got here by clicking a repair on the Prices tab before
-      // connecting, open the prefilled Log device form now.
+      publishTickets();
       if (pendingLogDevice) {
         const detail = pendingLogDevice;
         pendingLogDevice = null;
@@ -178,10 +210,12 @@
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
+      await loadTechnicians();
       visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       renderStatusChips();
       render();
+      publishTickets();
     } catch (e) {
       $("intakeList").innerHTML = "";
       $("intakeEmpty").hidden = true;
@@ -193,9 +227,254 @@
     }
   }
 
+  function publishTickets() {
+    window.RPC_INTAKE_TICKETS = TICKETS.slice();
+    window.dispatchEvent(new CustomEvent("rpc-tickets", { detail: { tickets: TICKETS.slice() } }));
+  }
+
   $("reloadIntake").addEventListener("click", loadTickets);
-  $("intakeSettings").addEventListener("click", () => showSetup(true));
-  $("closeIntakeSettings").addEventListener("click", showMain);
+  settingsNavBtn?.addEventListener("click", () => {
+    setActiveNav("settings");
+    showView("intake");
+    showSetup(true);
+  });
+  $("closeIntakeSettings").addEventListener("click", () => {
+    setActiveNav("intake");
+    enterIntake();
+  });
+
+  // ---- Inventory used by repair tickets -----------------------------------
+  async function loadInventoryForForm() {
+    if (Array.isArray(window.RPC_INVENTORY_ITEMS) && window.RPC_INVENTORY_ITEMS.length) {
+      INVENTORY_ITEMS = window.RPC_INVENTORY_ITEMS.slice();
+      return INVENTORY_ITEMS;
+    }
+    if (window.RPC_LOAD_INVENTORY) {
+      const result = await window.RPC_LOAD_INVENTORY({ force: false });
+      INVENTORY_ITEMS = (result && result.items) || window.RPC_INVENTORY_ITEMS || [];
+      return INVENTORY_ITEMS;
+    }
+    if (inventoryLoadPromise) return inventoryLoadPromise;
+    inventoryLoadPromise = fetch(INVENTORY_URL + "?_=" + Date.now(), { cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then((data) => {
+        if (!data.ok) throw new Error(data.error || "Rejected");
+        INVENTORY_ITEMS = data.items || [];
+        window.RPC_INVENTORY_ITEMS = INVENTORY_ITEMS.slice();
+        return INVENTORY_ITEMS;
+      })
+      .finally(() => { inventoryLoadPromise = null; });
+    return inventoryLoadPromise;
+  }
+
+  window.addEventListener("rpc-inventory", (e) => {
+    INVENTORY_ITEMS = (e.detail && e.detail.items) || window.RPC_INVENTORY_ITEMS || [];
+    updateInventoryOptions($("fInventoryItem")?.value || "");
+  });
+
+  function repairNeedsInventory(issuesStr) {
+    const text = String(issuesStr || "").toLowerCase();
+    if (/battery/.test(text)) return "BATTERIES";
+    if (/screen|lcd|display|front glass/.test(text)) return "SCREENS";
+    return "";
+  }
+
+  function matchingInventoryItems(device, issuesStr) {
+    const wantedSection = repairNeedsInventory(issuesStr);
+    if (!wantedSection) return [];
+    const model = normalizeDeviceText(device);
+    return INVENTORY_ITEMS.filter((item) => {
+      if (item.section !== wantedSection) return false;
+      if (!model) return true;
+      return inventoryDeviceMatches(model, normalizeDeviceText(item.device || item.item || ""));
+    });
+  }
+
+  function normalizeDeviceText(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/\bapple\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function inventoryDeviceMatches(device, inventoryDevice) {
+    if (!device || !inventoryDevice) return false;
+    return device === inventoryDevice || device.includes(inventoryDevice) || inventoryDevice.includes(device);
+  }
+
+  function updateInventoryOptions(selectedKey = "") {
+    const select = $("fInventoryItem");
+    if (!select) return;
+    const device = $("fDevice").value.trim();
+    const issues = buildIssuesString();
+    const suggested = matchingInventoryItems(device, issues);
+    const suggestedKeys = new Set(suggested.map((item) => item.key));
+    const available = INVENTORY_ITEMS.filter((item) => item.quantity > 0 || item.key === selectedKey);
+    const other = available.filter((item) => !suggestedKeys.has(item.key));
+    const parts = [`<option value="">No stock item used</option>`];
+    if (suggested.length) {
+      parts.push(`<optgroup label="Suggested">`);
+      suggested.forEach((item) => parts.push(inventoryOptionHtml(item, selectedKey)));
+      parts.push(`</optgroup>`);
+    }
+    if (other.length) {
+      parts.push(`<optgroup label="All inventory">`);
+      other.forEach((item) => parts.push(inventoryOptionHtml(item, selectedKey)));
+      parts.push(`</optgroup>`);
+    }
+    select.innerHTML = parts.join("");
+    const hasSelectedKey = selectedKey && Array.from(select.options).some((option) => option.value === selectedKey);
+    select.value = hasSelectedKey ? selectedKey : "";
+    const hint = $("inventoryHint");
+    const need = repairNeedsInventory(issues);
+    if (!need) {
+      hint.textContent = "Choose a stock item only if this repair uses one.";
+    } else if (suggested.length) {
+      hint.textContent = `${suggested.length} matching ${need.toLowerCase()} item${suggested.length === 1 ? "" : "s"} found.`;
+    } else {
+      hint.textContent = `No matching ${need.toLowerCase()} stock found for this device.`;
+    }
+  }
+
+  function inventoryOptionHtml(item, selectedKey) {
+    const isSelected = item.key === selectedKey;
+    const disabled = item.quantity <= 0 && !isSelected;
+    const bits = [item.item || item.device || item.label, item.quality, item.section].filter(Boolean);
+    const label = `${bits.join(" · ")} — ${item.quantity} in stock${item.note ? " · " + item.note : ""}`;
+    return `<option value="${esc(item.key)}"${disabled ? " disabled" : ""}>${esc(label)}</option>`;
+  }
+
+  function refreshInventoryAfterStockChange() {
+    if (window.RPC_LOAD_INVENTORY) {
+      window.RPC_LOAD_INVENTORY({ force: true }).catch(() => {});
+    } else {
+      INVENTORY_ITEMS = [];
+    }
+  }
+
+  // ---- Technician roster ----------------------------------------------------
+  function normalizeTechnicians(list) {
+    return (list || [])
+      .map((t) => ({ id: t.id || t.name, name: String(t.name || "").trim() }))
+      .filter((t) => t.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async function loadTechnicians() {
+    try {
+      const res = await api({ action: "listTechnicians" });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TECHNICIANS = normalizeTechnicians(res.technicians);
+      renderTechnicianSettings();
+      return TECHNICIANS;
+    } catch (e) {
+      renderTechnicianSettings("Couldn't load technicians: " + e.message);
+      return TECHNICIANS;
+    }
+  }
+
+  function technicianNamesWithLegacy(ticket) {
+    const names = new Set(DEFAULT_TECHNICIANS.concat(TECHNICIANS.map((t) => t.name)));
+    if (ticket && ticket.technician) names.add(ticket.technician);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }
+
+  function findCanonicalTechnicianName(name, ticket = technicianModalTicket) {
+    const wanted = String(name || "").trim().toLowerCase();
+    if (!wanted) return "";
+    return technicianNamesWithLegacy(ticket).find((candidate) => candidate.toLowerCase() === wanted) || "";
+  }
+
+  function isDefaultTechnician(name) {
+    return DEFAULT_TECHNICIANS.some((defaultName) => defaultName.toLowerCase() === String(name || "").toLowerCase());
+  }
+
+  function renderTechnicianSettings(message = "") {
+    const box = $("technicianSettingsList");
+    if (!box) return;
+    const err = $("technicianSettingsError");
+    err.hidden = !message;
+    if (message) err.textContent = message;
+    if (!TECHNICIANS.length) {
+      box.innerHTML = `<p class="empty-sub">No technicians created yet.</p>`;
+      return;
+    }
+    box.innerHTML = TECHNICIANS.map((tech) => `
+      <div class="technician-row">
+        <span><svg class="icon"><use href="#i-user"></use></svg>${esc(tech.name)}</span>
+        ${isDefaultTechnician(tech.name)
+          ? `<small class="technician-default">Default</small>`
+          : `<button type="button" class="ghost-btn technician-delete" data-tech="${esc(tech.name)}" aria-label="Delete ${esc(tech.name)}"><svg class="icon"><use href="#i-trash"></use></svg></button>`}
+      </div>
+    `).join("");
+    box.querySelectorAll(".technician-delete").forEach((btn) => {
+      btn.addEventListener("click", () => deleteTechnician(btn.dataset.tech || ""));
+    });
+  }
+
+  async function createTechnician(name) {
+    const cleanName = String(name || "").trim().replace(/\s+/g, " ");
+    if (!cleanName) throw new Error("Technician name is required");
+    const res = await api({ action: "addTechnician", name: cleanName });
+    if (!res.ok) throw new Error(res.error || "Rejected");
+    TECHNICIANS = normalizeTechnicians(res.technicians);
+    renderTechnicianSettings();
+    return findCanonicalTechnicianName(cleanName) || cleanName;
+  }
+
+  async function addTechnicianFromSettings() {
+    const input = $("newTechnicianName");
+    const name = input.value.trim();
+    const err = $("technicianSettingsError");
+    err.hidden = true;
+    if (!name) {
+      err.textContent = "Enter a technician name.";
+      err.hidden = false;
+      return;
+    }
+    const btn = $("addTechnician");
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = "Adding…";
+    try {
+      await createTechnician(name);
+      input.value = "";
+    } catch (e) {
+      err.textContent = "Couldn't add technician: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
+  async function deleteTechnician(name) {
+    if (!name) return;
+    if (!window.confirm(`Delete technician "${name}" from the roster? Existing tickets keep their assignment.`)) return;
+    const err = $("technicianSettingsError");
+    err.hidden = true;
+    try {
+      const res = await api({ action: "deleteTechnician", name });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      TECHNICIANS = normalizeTechnicians(res.technicians);
+      renderTechnicianSettings();
+    } catch (e) {
+      err.textContent = "Couldn't delete technician: " + e.message;
+      err.hidden = false;
+    }
+  }
+
+  $("addTechnician").addEventListener("click", addTechnicianFromSettings);
+  $("newTechnicianName").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTechnicianFromSettings();
+    }
+  });
 
   // ---- Clear all -------------------------------------------------------------
   function openClearAllModal() {
@@ -236,10 +515,12 @@
       TICKETS = [];
       visibleTicketCount = TICKET_PAGE_SIZE;
       statusFilter = "all";
+      refreshInventoryAfterStockChange();
       closeForm();
       closeClearAllModal();
       renderStatusChips();
       render();
+      publishTickets();
       if (res.backup) alert(`Deleted ${res.deletedCount} record${res.deletedCount === 1 ? "" : "s"}. Backup ${res.backup.id} is ready to restore if needed.`);
     } catch (e) {
       err.textContent = "Couldn't clear devices: " + e.message;
@@ -290,7 +571,7 @@
     const err = $("restoreBackupError");
     err.hidden = true;
     if (!id) return;
-    if (!window.confirm("Restore this intake backup? Your current records will first be saved as a new backup.")) return;
+    if (!window.confirm("Restore this check-in backup? Your current records will first be saved as a new backup.")) return;
     const btn = $("confirmRestoreBackup");
     btn.disabled = true;
     const original = btn.innerHTML;
@@ -301,10 +582,12 @@
       TICKETS = (res.tickets || []).map(normalizeTicket);
       statusFilter = "all";
       visibleTicketCount = TICKET_PAGE_SIZE;
+      refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
+      publishTickets();
       closeRestoreBackupModal();
-      alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous intake is backed up as ${res.backup.id}.`);
+      alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous check-in list is backed up as ${res.backup.id}.`);
     } catch (e) {
       err.textContent = "Couldn't restore backup: " + e.message;
       err.hidden = false;
@@ -359,6 +642,7 @@
       : "Select issues…";
     btn.classList.toggle("has-selection", count > 0);
     $("issueSummary").innerHTML = count ? issueTagsHtml(str) : "";
+    updateInventoryOptions($("fInventoryItem")?.value || "");
   }
 
   // ---- Issue picker modal ---------------------------------------------------
@@ -401,7 +685,10 @@
     const label = count
       ? `View ${count} update${count === 1 ? "" : "s"} and notes`
       : "View updates and notes";
-    return `<button type="button" class="activity-log-btn" id="${id}" aria-label="${esc(label)}" title="Updates & notes">
+    const shortLabel = count
+      ? `${count} update${count === 1 ? "" : "s"} / note${count === 1 ? "" : "s"}`
+      : "Updates & notes";
+    return `<button type="button" class="activity-log-btn" id="${id}" aria-label="${esc(label)}" title="${esc(shortLabel)}">
       <svg class="icon" aria-hidden="true"><use href="#i-note"></use></svg>
       ${count ? `<span class="activity-log-badge" aria-hidden="true">${count}</span>` : ""}
     </button>`;
@@ -460,10 +747,16 @@
 
   function openTicketModal(ticket) {
     const hasPhone = !!ticket.phone;
+    const technician = ticket.technician || "Unassigned";
+    const issueSummary = issueSummaryText(ticket.issues);
     $("ticketModalBody").innerHTML = `
       <div class="ticket-detail-hero">
-        <span class="ticket-device-icon"><svg class="icon"><use href="#i-device"></use></svg></span>
-        <div class="ticket-detail-hero-main"><h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4><p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p></div>
+        <span class="ticket-device-icon"><svg class="icon"><use href="#${deviceTypeIcon(ticket.device)}"></use></svg></span>
+        <div class="ticket-detail-hero-main">
+          <h4 class="ticket-detail-title">${esc(ticket.device || "Device")}</h4>
+          ${issueSummary ? `<p class="ticket-detail-issue">${esc(issueSummary)}</p>` : ""}
+          <p class="ticket-detail-id mono">#${esc(ticket.id || "")}</p>
+        </div>
         <div class="ticket-detail-hero-actions">
           ${activityLogBtnHtml(ticket, "ticketModalActivity")}
           <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
@@ -474,6 +767,8 @@
         ${detailRow("i-phone", "Phone", ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—")}
         ${detailRow("i-mail", "Email", ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—")}
         ${detailRow("i-device", "Device", ticket.device || "—")}
+        ${detailRow("i-user", "Technician", esc(technician))}
+        ${detailRow("i-tools", "Stock used", esc(ticket.inventoryItemLabel || "No stock item used"))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
         ${detailRow("i-cash", "Repair cost", formatMoney(ticket.repairCost), "money-positive")}
@@ -484,9 +779,11 @@
 
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit details</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     bindActivityLogBtn($("ticketModalActivity"), ticket);
+    $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     $("ticketModal").hidden = false;
@@ -582,10 +879,19 @@
     $("fNotes").value = ticket ? ticket.notes || "" : "";
     $("fRepairCost").value = ticket ? ticket.repairCost ?? "" : "";
     $("fAmountPaid").value = ticket ? ticket.amountPaid ?? "" : "";
+    $("fSendInvoice").checked = !ticket;
     setIssueTags(ticket ? ticket.issues || "" : "");
+    $("fInventoryItem").innerHTML = `<option value="">Loading inventory…</option>`;
+    loadInventoryForForm()
+      .then(() => updateInventoryOptions(ticket ? ticket.inventoryItemKey || "" : ""))
+      .catch((err) => {
+        $("fInventoryItem").innerHTML = `<option value="">No stock item used</option>`;
+        $("inventoryHint").textContent = "Inventory couldn't load: " + err.message;
+      });
 
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
+    $("formSuccessMessage").textContent = "";
     setFormStep(1);
     $("intakeFormModal").hidden = false;
     $("fName").focus();
@@ -595,6 +901,7 @@
     editingId = null;
     setQuickLogMode(false);
   }
+  $("fDevice").addEventListener("input", () => updateInventoryOptions($("fInventoryItem").value));
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
   function setFormStep(step) {
@@ -610,9 +917,12 @@
     document.querySelectorAll(".form-progress-line").forEach((line, index) => {
       line.classList.toggle("complete", index < step - 1);
     });
-    $("previousFormStep").hidden = step === 1;
-    $("nextFormStep").hidden = step === 3;
+    const isComplete = step === 4;
+    $("previousFormStep").hidden = step === 1 || isComplete;
+    $("nextFormStep").hidden = step >= 3;
     $("saveForm").hidden = step !== 3;
+    $("cancelForm").hidden = isComplete;
+    $("doneForm").hidden = !isComplete;
     $("formError").hidden = true;
   }
 
@@ -620,7 +930,7 @@
     const name = $("fName").value.trim();
     const phone = $("fPhone").value.trim();
     const email = $("fEmail").value.trim();
-    if (!name || !phone || !email) return "Enter the customer's name, phone, and email.";
+    if (!name || !phone || !email) return "Enter the client's name, phone, and email.";
     if (!$("fEmail").checkValidity()) return "Enter a valid email address for the invoice.";
     return null;
   }
@@ -652,10 +962,32 @@
   });
   $("previousFormStep").addEventListener("click", () => setFormStep(quickLogMode && formStep === 3 ? 1 : formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
+  $("doneForm").addEventListener("click", closeForm);
   $("closeIntakeFormModal").addEventListener("click", closeForm);
   $("intakeFormModal").addEventListener("click", (e) => {
     if (e.target.id === "intakeFormModal") closeForm();
   });
+
+  // A quick-log form is opened over the Prices view. On phone-sized screens,
+  // a deliberate left swipe is another way to dismiss it and return to the
+  // price list without changing tabs.
+  let formSwipeStart = null;
+  $("intakeFormModal").addEventListener("touchstart", (e) => {
+    if (!window.matchMedia("(max-width: 559px)").matches) return;
+    const touch = e.changedTouches[0];
+    formSwipeStart = { x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+  $("intakeFormModal").addEventListener("touchend", (e) => {
+    if (!formSwipeStart || !window.matchMedia("(max-width: 559px)").matches) return;
+    const touch = e.changedTouches[0];
+    const horizontalDistance = touch.clientX - formSwipeStart.x;
+    const verticalDistance = touch.clientY - formSwipeStart.y;
+    formSwipeStart = null;
+    if (horizontalDistance <= -72 && Math.abs(horizontalDistance) > Math.abs(verticalDistance) * 1.25) {
+      closeForm();
+    }
+  }, { passive: true });
+  $("intakeFormModal").addEventListener("touchcancel", () => { formSwipeStart = null; }, { passive: true });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("intakeFormModal").hidden) closeForm();
   });
@@ -683,7 +1015,7 @@
 
   // Prefills and opens the Log device wizard for a repair picked on the
   // Prices tab: device, matched issue, and the quoted repair cost are all
-  // filled in, so staff only enter the customer's name, phone, email, and how much
+  // filled in, so staff only enter the client's name, phone, email, and how much
   // they actually paid.
   function applyLogDevicePrefill(detail) {
     const { device, repairType, price, priceValue } = detail || {};
@@ -691,6 +1023,7 @@
     $("fDevice").value = device || "";
     setIssueTags(guessIssueFromRepairType(repairType) || (repairType ? "Other: " + repairType : ""));
     if (priceValue != null) $("fRepairCost").value = priceValue;
+    loadInventoryForForm().then(() => updateInventoryOptions("")).catch(() => {});
     setQuickLogMode(true);
     $("quotedPriceSummary").textContent = `Quoted ${price || (priceValue != null ? "$" + priceValue : "—")} — ${repairType || device || ""}`;
     $("fName").focus();
@@ -698,13 +1031,9 @@
 
   window.addEventListener("rpc-log-device", (e) => {
     const detail = e.detail || {};
-    const intakeNav = document.querySelector('.nav-btn[data-target="intake"]');
-    if (intakeNav) intakeNav.click();
-    // If this device hasn't been connected yet, the PIN setup screen is now
-    // showing. Hold onto the request and apply it the moment they connect,
-    // instead of silently dropping what they clicked.
     if (!isConfigured()) {
       pendingLogDevice = detail;
+      window.alert("Set up the Check In PIN from the Check In tab before logging a device.");
       return;
     }
     applyLogDevicePrefill(detail);
@@ -791,6 +1120,187 @@
     }
   });
 
+  // ---- Technician assignment -----------------------------------------------
+  // Assignment is intentionally post-check-in only: the Log device wizard never
+  // shows this field. Staff assign or reassign from a saved ticket card/detail.
+  function openTechnicianModalForTicket(ticket) {
+    technicianModalTicket = ticket;
+    $("technicianModalTitle").textContent = ticket.technician ? "Reassign technician" : "Assign technician";
+    $("technicianModalSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
+    $("fTechnician").value = ticket.technician || "";
+    $("fTechnician").setAttribute("aria-expanded", "false");
+    $("technicianModalError").hidden = true;
+    $("technicianModal").hidden = false;
+    $("fTechnician").focus();
+    openTechnicianDropdown({ showAll: true });
+  }
+
+  function closeTechnicianModal() {
+    $("technicianModal").hidden = true;
+    closeTechnicianDropdown();
+    technicianModalTicket = null;
+  }
+
+  function technicianDropdownOptions(showAll = false) {
+    const query = showAll ? "" : $("fTechnician").value.trim().toLowerCase();
+    const names = technicianNamesWithLegacy(technicianModalTicket);
+    return query ? names.filter((name) => name.toLowerCase().includes(query)) : names;
+  }
+
+  function renderTechnicianDropdown({ showAll = false } = {}) {
+    const box = $("technicianDropdown");
+    const input = $("fTechnician");
+    const query = showAll ? "" : input.value.trim();
+    const options = technicianDropdownOptions(showAll);
+    const exact = findCanonicalTechnicianName(query);
+    const rows = [
+      `<button type="button" class="technician-option ${query ? "" : "active"}" role="option" data-tech="">Unassigned</button>`,
+      ...options.map((name) =>
+        `<button type="button" class="technician-option ${name === exact ? "active" : ""}" role="option" data-tech="${esc(name)}">${esc(name)}</button>`
+      ),
+    ];
+    if (query && !exact) {
+      rows.push(`<button type="button" class="technician-option add-option" role="option" data-add="${esc(query)}"><svg class="icon"><use href="#i-plus"></use></svg>Add technician “${esc(query)}”</button>`);
+    }
+    box.innerHTML = rows.join("");
+    box.querySelectorAll("[data-tech]").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+      btn.addEventListener("click", () => chooseTechnicianOption(btn.dataset.tech || ""));
+    });
+    box.querySelectorAll("[data-add]").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+      btn.addEventListener("click", () => addTechnicianFromDropdown(btn.dataset.add || query));
+    });
+  }
+
+  function openTechnicianDropdown({ showAll = false } = {}) {
+    renderTechnicianDropdown({ showAll });
+    $("technicianDropdown").hidden = false;
+    $("fTechnician").setAttribute("aria-expanded", "true");
+    $("technicianCombobox").classList.add("open");
+  }
+
+  function closeTechnicianDropdown() {
+    $("technicianDropdown").hidden = true;
+    $("fTechnician").setAttribute("aria-expanded", "false");
+    $("technicianCombobox").classList.remove("open");
+  }
+
+  function chooseTechnicianOption(name) {
+    $("fTechnician").value = name;
+    closeTechnicianDropdown();
+    suppressTechnicianFocusOpen = true;
+    $("fTechnician").focus();
+    setTimeout(() => { suppressTechnicianFocusOpen = false; }, 0);
+  }
+
+  async function addTechnicianFromDropdown(name) {
+    const err = $("technicianModalError");
+    err.hidden = true;
+    try {
+      const created = await createTechnician(name);
+      $("fTechnician").value = created;
+      closeTechnicianDropdown();
+      $("fTechnician").focus();
+    } catch (e) {
+      err.textContent = "Couldn't add technician: " + e.message;
+      err.hidden = false;
+    }
+  }
+
+  async function saveTechnicianAssignment(value) {
+    const ticket = technicianModalTicket;
+    if (!ticket) return;
+    const err = $("technicianModalError");
+    err.hidden = true;
+    let technician = String(value || "").trim().replace(/\s+/g, " ");
+    const btn = $("saveTechnician");
+    const clearBtn = $("clearTechnician");
+    const original = btn.textContent;
+    btn.disabled = true;
+    clearBtn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      if (technician && !findCanonicalTechnicianName(technician, ticket)) {
+        technician = await createTechnician(technician);
+      } else if (technician) {
+        technician = findCanonicalTechnicianName(technician, ticket);
+      }
+      const res = await api({
+        action: "update",
+        id: ticket.id,
+        technician,
+      });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      mergeTicket(res.ticket);
+      renderStatusChips();
+      render();
+      closeTechnicianModal();
+    } catch (e) {
+      err.textContent = "Couldn't save assignment: " + e.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+      clearBtn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  $("closeTechnicianModal").addEventListener("click", closeTechnicianModal);
+  $("technicianModal").addEventListener("click", (e) => {
+    if (e.target.id === "technicianModal") closeTechnicianModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("technicianModal").hidden) closeTechnicianModal();
+  });
+  document.addEventListener("click", (e) => {
+    if ($("technicianModal").hidden || $("technicianCombobox").contains(e.target)) return;
+    closeTechnicianDropdown();
+  });
+  $("fTechnician").addEventListener("focus", () => {
+    if (suppressTechnicianFocusOpen) return;
+    openTechnicianDropdown({ showAll: true });
+  });
+  $("fTechnician").addEventListener("click", () => openTechnicianDropdown({ showAll: true }));
+  $("fTechnician").addEventListener("input", () => openTechnicianDropdown());
+  $("fTechnician").addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      openTechnicianDropdown({ showAll: true });
+      const first = $("technicianDropdown").querySelector(".technician-option");
+      if (first) first.focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const value = $("fTechnician").value.trim();
+      const exact = findCanonicalTechnicianName(value);
+      if (exact || !value) chooseTechnicianOption(exact);
+      else addTechnicianFromDropdown(value);
+    } else if (e.key === "Escape") {
+      closeTechnicianDropdown();
+    }
+  });
+  $("technicianDropdown").addEventListener("keydown", (e) => {
+    const options = [...$("technicianDropdown").querySelectorAll(".technician-option")];
+    const i = options.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      (options[i + 1] || options[0])?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      (options[i - 1] || options[options.length - 1])?.focus();
+    } else if (e.key === "Escape") {
+      closeTechnicianDropdown();
+      $("fTechnician").focus();
+    }
+  });
+  $("openTechnicianDropdown").addEventListener("click", () => {
+    if ($("technicianDropdown").hidden) openTechnicianDropdown({ showAll: true });
+    else closeTechnicianDropdown();
+    $("fTechnician").focus();
+  });
+  $("saveTechnician").addEventListener("click", () => saveTechnicianAssignment($("fTechnician").value));
+  $("clearTechnician").addEventListener("click", () => saveTechnicianAssignment(""));
+
   $("intakeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = $("formError");
@@ -807,6 +1317,8 @@
       err.hidden = false;
       return;
     }
+    const notes = $("fNotes").value.trim();
+    const invoiceNote = $("fSendInvoice").checked && !editingId ? "Invoice to send to client." : "";
     const payload = {
       action: editingId ? "update" : "add",
       id: editingId || undefined,
@@ -820,9 +1332,10 @@
       issues: issuesStr,
       issue: issuesStr,
       status: $("fStatus").value,
-      notes: $("fNotes").value.trim(),
+      notes: [invoiceNote, notes].filter(Boolean).join("\n"),
       repairCost: $("fRepairCost").value.trim(),
       amountPaid: $("fAmountPaid").value.trim(),
+      inventoryItemKey: $("fInventoryItem").value,
     };
     $("saveForm").disabled = true;
     const original = $("saveForm").textContent;
@@ -830,10 +1343,18 @@
     try {
       const res = await api(payload);
       if (!res.ok) throw new Error(res.error || "Rejected");
+      const wasEditing = Boolean(editingId);
       mergeTicket(res.ticket);
-      closeForm();
+      refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
+      $("intakeFormTitle").textContent = wasEditing ? "Device updated" : "Device logged";
+      $("formSuccessTitle").textContent = wasEditing ? "Device successfully updated" : "Device successfully logged";
+      $("formSuccessMessage").textContent = $("fSendInvoice").checked && !wasEditing
+        ? "The device was logged and marked to send an invoice to the client."
+        : "The device check-in has been saved.";
+      setFormStep(4);
+      $("doneForm").focus();
     } catch (ex) {
       err.textContent = "Couldn't save: " + ex.message;
       err.hidden = false;
@@ -849,6 +1370,7 @@
     const i = TICKETS.findIndex((x) => x.id === t.id);
     if (i >= 0) TICKETS[i] = t;
     else TICKETS.unshift(t);
+    publishTickets();
   }
 
   // ---- Quick status change -------------------------------------------------
@@ -887,8 +1409,10 @@
       const res = await api({ action: "delete", id: ticket.id });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = TICKETS.filter((t) => t.id !== ticket.id);
+      refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
+      publishTickets();
       return true;
     } catch (e) {
       alert("Couldn't delete record: " + e.message);
@@ -901,37 +1425,52 @@
     visibleTicketCount = TICKET_PAGE_SIZE;
     render();
   });
+  $("statusFilterSelect")?.addEventListener("change", () => {
+    statusFilter = $("statusFilterSelect").value || "all";
+    visibleTicketCount = TICKET_PAGE_SIZE;
+    render();
+  });
+
+  window.addEventListener("rpc-filter-intake", (event) => {
+    const detail = event.detail || {};
+    const filter = detail.filter || detail.status || "all";
+    if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("intake");
+    else {
+      setActiveNav("intake");
+      showView("intake");
+      enterIntake();
+    }
+    statusFilter = filter === "active" ? "__active" : filter === "ready" ? "Repaired" : filter;
+    if ($("intakeSearch")) $("intakeSearch").value = "";
+    visibleTicketCount = TICKET_PAGE_SIZE;
+    if (loadedOnce) {
+      renderStatusChips();
+      render();
+    }
+  });
 
   function renderStatusChips() {
     const counts = { all: TICKETS.length };
     STATUSES.forEach((s) => (counts[s] = TICKETS.filter((t) => t.status === s).length));
-    const box = $("statusChips");
-    box.innerHTML = "";
-    const make = (key, label) => {
-      const b = document.createElement("button");
-      b.className = "chip" + (key === statusFilter ? " active" : "");
-      b.textContent = label;
-      b.onclick = () => {
-        statusFilter = key;
-        visibleTicketCount = TICKET_PAGE_SIZE;
-        [...box.children].forEach((c) => c.classList.remove("active"));
-        b.classList.add("active");
-        render();
-      };
-      box.appendChild(b);
-    };
-    make("all", `All (${counts.all})`);
-    STATUSES.forEach((s) => {
-      if (counts[s]) make(s, `${s} (${counts[s]})`);
-    });
+    const select = $("statusFilterSelect");
+    if (!select) return;
+    const options = [{ key: "all", label: `All (${counts.all})` }]
+      .concat(STATUSES.map((status) => ({ key: status, label: `${status} (${counts[status]})` })));
+    const current = statusFilter === "__active" ? "all" : statusFilter;
+    select.innerHTML = options.map((option) =>
+      `<option value="${esc(option.key)}">${esc(option.label)}</option>`
+    ).join("");
+    select.value = options.some((option) => option.key === current) ? current : "all";
   }
 
   function currentList() {
     const q = $("intakeSearch").value.trim().toLowerCase();
     return TICKETS.filter((t) => {
-      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (statusFilter === "__active") {
+        if (!ACTIVE_REPAIR_STATUSES.has(t.status)) return false;
+      } else if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (!q) return true;
-      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email]
+      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
@@ -968,9 +1507,14 @@
     return parts.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
   }
 
+  function issueSummaryText(issuesStr) {
+    return (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean).join(", ");
+  }
+
   function ticketCard(t) {
     const el = document.createElement("div");
-    el.className = "ticket";
+    const statusClass = STATUS_CLASS[t.status] || "st-received";
+    el.className = `ticket ${statusClass}`;
 
     const head = document.createElement("div");
     head.className = "ticket-head";
@@ -978,35 +1522,53 @@
     head.setAttribute("role", "button");
     head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
     const hasPhone = !!t.phone;
+    const technicianLabel = t.technician ? `Assigned to ${t.technician}` : "Assign technician";
     const phoneLine = hasPhone
       ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
       : `<span class="ticket-phone no-phone">No number on file</span>`;
+    const deviceIcon = deviceTypeIcon(t.device);
     head.innerHTML = `
-      <span class="ticket-accent ${STATUS_CLASS[t.status] || "st-received"}"></span>
-      <div class="ticket-main">
-        <div class="ticket-toprow">
-          <span class="ticket-num mono">#${esc(t.id || "")}</span>
-          <div class="ticket-toprow-actions">
-            ${activityLogBtnHtml(t, "")}
-            <span class="status-badge ${STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span>
-          </div>
-        </div>
+      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
+        <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
+        <img alt="" />
+      </div>
+      <div class="ticket-identity">
+        <span class="ticket-num mono">#${esc(t.id || "")}</span>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
+      </div>
+      <div class="ticket-repair">
+        <span class="ticket-repair-label">Repair</span>
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
       </div>
-      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
-        <img src="assets/branding/device-thumbnail.png" alt="" />
+      <div class="ticket-status">
+        <span class="status-badge ${statusClass}">${esc(t.status || "—")}</span>
+        <button type="button" class="ticket-tech-btn" aria-label="${esc(technicianLabel)}">${esc(technicianLabel)}</button>
+      </div>
+      <div class="ticket-activity">
+        ${activityLogBtnHtml(t, "")}
       </div>`;
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
     if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
+    const techBtn = head.querySelector(".ticket-tech-btn");
+    if (techBtn) {
+      techBtn.onclick = (e) => {
+        e.stopPropagation();
+        openTechnicianModalForTicket(t);
+      };
+      techBtn.onkeydown = (e) => e.stopPropagation();
+    }
     bindActivityLogBtn(head.querySelector(".activity-log-btn"), t);
+    const thumb = head.querySelector(".ticket-device-thumb");
     const thumbImg = head.querySelector(".ticket-device-thumb img");
     if (thumbImg) {
       fetchDeviceImage(t.device).then((url) => {
-        if (url) thumbImg.src = url;
+        if (!url) return;
+        thumbImg.onload = () => thumb.classList.add("has-image");
+        thumbImg.onerror = () => thumb.classList.remove("has-image");
+        thumbImg.src = url;
       });
     }
     head.onclick = () => openTicketModal(t);
@@ -1026,6 +1588,17 @@
   // have not yet been added to the catalog keep the neutral local placeholder.
   const DEVICE_IMAGE_CATALOG_URL = "assets/device-images/catalog.json";
   let deviceImageCatalogPromise = null;
+
+  function deviceTypeIcon(device) {
+    const text = String(device || "").toLowerCase();
+    if (/\b(ipad|tablet|tab)\b/.test(text)) return "i-tablet";
+    if (/\b(watch|iwatch|galaxy watch|apple watch)\b/.test(text)) return "i-watch";
+    if (/\b(macbook|laptop|notebook|chromebook|surface|thinkpad)\b/.test(text)) return "i-laptop";
+    if (/\b(playstation|xbox|nintendo|switch|console|controller|gamepad)\b/.test(text)) return "i-gamepad";
+    if (/\b(airpods|earbuds|earphones|headphones|beats|buds)\b/.test(text)) return "i-earbuds";
+    if (/\b(iphone|phone|galaxy|pixel|tecno|techno|redmi|xiaomi|huawei|honor|oppo|vivo|oneplus|motorola|moto|samsung)\b/.test(text)) return "i-smartphone";
+    return "i-device";
+  }
 
   function deviceImageKey(device) {
     return String(device || "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -1063,6 +1636,11 @@
       issues: ticket.issues || ticket.issue || "",
       repairCost: ticket.repairCost ?? ticket.cost ?? "",
       amountPaid: ticket.amountPaid ?? ticket.paid ?? "",
+      technician: ticket.technician || "",
+      inventoryItemKey: ticket.inventoryItemKey || "",
+      inventoryItemLabel: ticket.inventoryItemLabel || "",
+      inventorySection: ticket.inventorySection || "",
+      inventoryQuantityDelta: ticket.inventoryQuantityDelta || 0,
     });
   }
 
