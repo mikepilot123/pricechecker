@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=targets-tab-1" />
+  <link rel="stylesheet" href="assets/style.css?v=targets-page-4" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -53,10 +53,10 @@
     </div>
     <nav class="view-nav" role="tablist" aria-label="Sections">
       <button class="nav-btn active" data-target="dashboard" role="tab" aria-selected="true"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
-      <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
       <button class="nav-btn" data-target="prices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
       <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
+      <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
     </nav>
   </header>
@@ -88,17 +88,38 @@
     <p class="info-banner">Set business targets used across the dashboard.</p>
     <section class="dashboard-target-card targets-page-card" aria-labelledby="dashboardTargetTitle">
       <div>
-        <p class="dashboard-eyebrow" id="dashboardTargetTitle">Monthly sales target</p>
-        <h2 class="targets-title">Sales goal</h2>
-        <p class="dashboard-target-help">This target powers the Dashboard’s monthly progress card.</p>
+        <p class="dashboard-eyebrow" id="dashboardTargetTitle">Sales targets</p>
+        <h2 class="targets-title">Monthly and daily goals</h2>
+        <p class="dashboard-target-help">Monthly target powers the Dashboard progress card. Daily target helps the team pace each day.</p>
       </div>
       <form id="dashboardGoalForm" class="dashboard-target-form">
-        <label class="visually-hidden" for="dashboardGoalInput">Monthly sales target</label>
-        <span class="dashboard-currency" aria-hidden="true">$</span>
-        <input id="dashboardGoalInput" type="number" min="0" step="100" inputmode="decimal" placeholder="80000" />
-        <button type="submit" class="ghost-btn">Save target</button>
+        <label class="target-input-group" for="dashboardGoalInput">
+          <span>Monthly target</span>
+          <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardGoalInput" type="number" min="0" step="100" inputmode="decimal" placeholder="80000" /></span>
+        </label>
+        <label class="target-input-group" for="dashboardDailyGoalInput">
+          <span>Daily target</span>
+          <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardDailyGoalInput" type="number" min="0" step="50" inputmode="decimal" placeholder="2500" /></span>
+        </label>
+        <button type="submit" class="ghost-btn">Save targets</button>
       </form>
       <p id="dashboardGoalMessage" class="dashboard-target-message" aria-live="polite"></p>
+    </section>
+
+    <section class="targets-action-card" aria-labelledby="targetsActionTitle">
+      <div class="today-focus-header">
+        <div>
+          <p class="dashboard-eyebrow">Action plans</p>
+          <h2 id="targetsActionTitle">Daily sales actions</h2>
+        </div>
+      </div>
+      <div id="targetActionChecklist" class="target-action-list"></div>
+      <form id="targetPlanForm" class="target-plan-form">
+        <label class="field-label" for="targetPlanNotes">Team action plan</label>
+        <textarea id="targetPlanNotes" class="text-input" rows="4" placeholder="Example: Call all ready pickups before lunch, follow up unpaid balances, and push battery/screen repairs today."></textarea>
+        <button type="submit" class="ghost-btn">Save action plan</button>
+        <p id="targetPlanMessage" class="dashboard-target-message" aria-live="polite"></p>
+      </form>
     </section>
   </main>
 
@@ -237,7 +258,7 @@
 
     <!-- Main intake UI: shown once configured -->
     <section id="intakeMain" hidden>
-      <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg></button>
+      <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg><span>Log device</span></button>
 
       <div class="search-wrap">
         <input id="intakeSearch" class="search-input" type="search" autocomplete="off"
@@ -523,7 +544,7 @@
 
   <script src="assets/app.js?v=side-nav-1"></script>
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
-  <script src="assets/intake.js?v=business-dashboard-1"></script>
-  <script src="assets/dashboard.js?v=targets-tab-1"></script>
+  <script src="assets/intake.js?v=targets-page-4"></script>
+  <script src="assets/dashboard.js?v=targets-page-4"></script>
 </body>
 </html>

@@ -7,7 +7,17 @@
   const INTAKE_URL = "https://pricechecker-cyan.vercel.app/api/intake";
   const LS_PIN = "rpc_intake_pin";
   const GOAL_KEY = "rpc_monthly_sales_goal";
+  const DAILY_GOAL_KEY = "rpc_daily_sales_goal";
+  const ACTION_PLAN_KEY = "rpc_target_action_plan";
+  const ACTION_DONE_KEY = "rpc_target_action_done";
   const DEFAULT_MONTHLY_GOAL = 80000;
+  const DEFAULT_DAILY_GOAL = 2500;
+  const DEFAULT_ACTIONS = [
+    "Call every device marked ready for pickup",
+    "Follow up customers with outstanding balances",
+    "Review repairs waiting more than 5 days",
+    "Check low-stock repair parts before closing",
+  ];
   const ACTIVE_STATUSES = new Set(["Received", "Diagnosing", "Waiting for Parts", "In Progress"]);
   const FINAL_STATUSES = new Set(["Picked Up", "Cancelled"]);
   const $ = (id) => document.getElementById(id);
@@ -29,6 +39,15 @@
       return saved > 0 ? saved : DEFAULT_MONTHLY_GOAL;
     } catch (_) {
       return DEFAULT_MONTHLY_GOAL;
+    }
+  }
+
+  function dailyGoal() {
+    try {
+      const saved = Number(localStorage.getItem(DAILY_GOAL_KEY) || 0);
+      return saved > 0 ? saved : DEFAULT_DAILY_GOAL;
+    } catch (_) {
+      return DEFAULT_DAILY_GOAL;
     }
   }
 
@@ -136,9 +155,12 @@
 
   function renderGoalEditor(metrics) {
     const input = $("dashboardGoalInput");
+    const dailyInput = $("dashboardDailyGoalInput");
     const goal = Math.round((metrics && metrics.goal) || monthlyGoal() || DEFAULT_MONTHLY_GOAL);
     if (input && document.activeElement !== input) input.value = goal;
+    if (dailyInput && document.activeElement !== dailyInput) dailyInput.value = Math.round(dailyGoal());
     bindGoalForm();
+    renderActionPlan();
   }
 
   function bindGoalForm() {
@@ -149,18 +171,72 @@
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const input = $("dashboardGoalInput");
+      const dailyInput = $("dashboardDailyGoalInput");
       const msg = $("dashboardGoalMessage");
       const value = Number(input?.value || 0);
+      const dailyValue = Number(dailyInput?.value || 0);
       if (!value || value < 0) {
         if (msg) msg.textContent = "Enter a monthly target greater than 0.";
         return;
       }
+      if (!dailyValue || dailyValue < 0) {
+        if (msg) msg.textContent = "Enter a daily target greater than 0.";
+        return;
+      }
       try {
         localStorage.setItem(GOAL_KEY, String(Math.round(value)));
+        localStorage.setItem(DAILY_GOAL_KEY, String(Math.round(dailyValue)));
       } catch (_) {}
-      if (msg) msg.textContent = "Target saved.";
+      if (msg) msg.textContent = "Targets saved.";
       render({});
     });
+  }
+
+  function renderActionPlan() {
+    const checklist = $("targetActionChecklist");
+    const notes = $("targetPlanNotes");
+    if (notes && document.activeElement !== notes) notes.value = safeLocalStorageGet(ACTION_PLAN_KEY);
+    if (checklist) {
+      const done = readDoneActions();
+      checklist.innerHTML = DEFAULT_ACTIONS.map((action, index) => `
+        <label class="target-action-item">
+          <input type="checkbox" data-action-index="${index}" ${done.includes(index) ? "checked" : ""} />
+          <span>${esc(action)}</span>
+        </label>
+      `).join("");
+      checklist.querySelectorAll("[data-action-index]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const next = Array.from(checklist.querySelectorAll("[data-action-index]:checked"))
+            .map((node) => Number(node.dataset.actionIndex))
+            .filter((value) => Number.isInteger(value));
+          try { localStorage.setItem(ACTION_DONE_KEY, JSON.stringify(next)); } catch (_) {}
+        });
+      });
+    }
+    const form = $("targetPlanForm");
+    if (form && !form.dataset.bound) {
+      form.dataset.bound = "true";
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        try { localStorage.setItem(ACTION_PLAN_KEY, $("targetPlanNotes")?.value || ""); } catch (_) {}
+        const msg = $("targetPlanMessage");
+        if (msg) msg.textContent = "Action plan saved.";
+      });
+    }
+  }
+
+  function readDoneActions() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(ACTION_DONE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function safeLocalStorageGet(key) {
+    try { return localStorage.getItem(key) || ""; }
+    catch (_) { return ""; }
   }
 
   function renderKpis(metrics, loadState) {
