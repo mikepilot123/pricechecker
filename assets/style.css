@@ -2575,8 +2575,8 @@ body {
 }
 .booking-day {
   aspect-ratio: 1;
-  max-width: 60px;
-  max-height: 60px;
+  max-width: 76px;
+  max-height: 76px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -2586,7 +2586,7 @@ body {
   background: transparent;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: 1.12rem;
   cursor: pointer;
 }
 .booking-day.is-empty { visibility: hidden; cursor: default; }
@@ -2663,8 +2663,23 @@ body {
 }
 .booking-row-actions .danger-text { color: var(--danger); border-color: var(--danger); }
 
+.appt-sidebar-subnav { display: none; }
+.appt-subnav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.appt-subnav-btn {
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.appt-subnav-btn:hover { background: var(--card-hover); }
+.appt-subnav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 .booking-wizard-card {
-  max-width: min(1060px, 100%);
+  max-width: min(1200px, 100%);
   margin: 0 auto;
   background: var(--card);
   border: 1px solid var(--border);
@@ -2709,3 +2724,182 @@ body {
 .technician-chip-name { font-size: 0.74rem; text-align: center; line-height: 1.25; color: var(--text-dim); }
 .technician-chip.is-selected .technician-chip-avatar { background: var(--accent); color: #fff; }
 .technician-chip.is-selected .technician-chip-name { color: var(--text); font-weight: 600; }
+
+@media (min-width: 900px) {
+  .nav-btn[data-target="appointments"]:not(.active) + .appt-sidebar-subnav {
+    display: none;
+  }
+  .appt-sidebar-subnav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: -1px 0 6px 34px;
+    padding: 0 0 2px;
+  }
+  .appt-sidebar-subnav .appt-subnav-btn {
+    position: relative;
+    justify-content: flex-start;
+    min-height: 34px;
+    padding: 7px 10px 7px 22px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    box-shadow: none;
+    color: #475569;
+    font-size: 0.84rem;
+    font-weight: 500;
+    text-align: left;
+  }
+  .appt-sidebar-subnav .appt-subnav-btn::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+  .appt-sidebar-subnav .appt-subnav-btn:hover {
+    background: rgba(255, 255, 255, 0.64);
+    color: var(--text);
+  }
+  .appt-sidebar-subnav .appt-subnav-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .appt-sidebar-subnav .appt-subnav-btn.active::before {
+    background: currentColor;
+  }
+
+  #view-appointments:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(8px, 1.2vh, 12px);
+    height: 100dvh;
+    max-width: none;
+    padding-top: clamp(12px, 1.8vh, 20px);
+    padding-bottom: clamp(12px, 1.8vh, 20px);
+    overflow-y: auto;
+  }
+  #view-appointments > .info-banner {
+    flex: none;
+    margin: 0;
+  }
+  #view-appointments > .appt-content-subnav {
+    display: none;
+  }
+  #view-appointments > .appt-panel[data-appt-panel-section="create"]:not([hidden]) {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  #view-appointments .booking-wizard-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: clamp(14px, 1.8vh, 20px);
+    overflow: hidden;
+  }
+  #view-appointments .form-progress {
+    flex: none;
+    margin-bottom: clamp(16px, 2vh, 22px);
+  }
+  #view-appointments .booking-wizard-card .form-step:not([hidden]) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+  #view-appointments .form-step-heading {
+    flex: none;
+    margin-bottom: clamp(10px, 1.5vh, 16px);
+  }
+  #view-appointments .booking-card {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(180px, 0.75fr) minmax(360px, 1.75fr) minmax(190px, 0.8fr);
+  }
+  #view-appointments .booking-info-panel,
+  #view-appointments .booking-calendar-panel,
+  #view-appointments .booking-slots-panel {
+    min-height: 0;
+    padding: clamp(14px, 1.8vh, 20px);
+  }
+  #view-appointments .booking-title {
+    margin-top: 0;
+    font-size: 1.15rem;
+  }
+  #view-appointments .booking-badge {
+    margin-bottom: 10px;
+  }
+  #view-appointments .booking-meta {
+    gap: 8px;
+  }
+  #view-appointments .booking-calendar-panel,
+  #view-appointments .booking-slots-panel {
+    display: flex;
+    flex-direction: column;
+  }
+  #view-appointments .booking-calendar-header {
+    flex: none;
+    margin-bottom: clamp(8px, 1.3vh, 14px);
+  }
+  #view-appointments .booking-calendar-weekdays {
+    flex: none;
+    margin-bottom: 8px;
+  }
+  #view-appointments .booking-calendar-grid {
+    flex: none;
+    gap: 4px;
+    align-content: start;
+  }
+  #view-appointments .booking-day {
+    width: min(42px, 5.2vh);
+    height: min(42px, 5.2vh);
+    max-width: none;
+    max-height: none;
+    aspect-ratio: auto;
+    font-size: clamp(0.88rem, 1.9vh, 1rem);
+  }
+  #view-appointments .booking-slots-label {
+    flex: none;
+    margin-bottom: 10px;
+  }
+  #view-appointments .booking-slots-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+  #view-appointments .booking-slot-btn {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+  }
+  #view-appointments .appt-wizard-footer {
+    flex: none;
+    margin-top: clamp(10px, 1.4vh, 14px);
+    padding-top: clamp(10px, 1.4vh, 14px);
+  }
+  #view-appointments .appt-wizard-footer .form-actions {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1080px) {
+  #view-appointments .booking-card {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  #view-appointments .booking-info-panel,
+  #view-appointments .booking-calendar-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}

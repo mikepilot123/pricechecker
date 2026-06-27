@@ -295,28 +295,25 @@
     });
   }
 
-  // ---------- appointment list ----------
+  // ---------- appointment lists ----------
 
-  function renderList() {
-    const list = $("appointmentList");
-    if (!list) return;
-    const appointments = readAppointments().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
-    list.innerHTML = appointments.length
-      ? appointments.map((item) => `
-        <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}">
-          <div class="booking-row-main">
-            <strong>${esc(item.client)}</strong>
-            <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
-            <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
-          </div>
-          <div class="booking-row-actions">
-            <button type="button" data-complete="${esc(item.id)}">${item.status === "completed" ? "Reopen" : "Done"}</button>
-            <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
-          </div>
-        </article>
-      `).join("")
-      : `<p class="booking-empty">No appointments scheduled yet.</p>`;
+  function appointmentRowHtml(item) {
+    return `
+      <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}">
+        <div class="booking-row-main">
+          <strong>${esc(item.client)}</strong>
+          <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
+          <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
+        </div>
+        <div class="booking-row-actions">
+          <button type="button" data-complete="${esc(item.id)}">${item.status === "completed" ? "Reopen" : "Done"}</button>
+          <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
+        </div>
+      </article>
+    `;
+  }
 
+  function bindRowActions(list) {
     list.querySelectorAll("[data-complete]").forEach((btn) => {
       btn.addEventListener("click", () => {
         writeAppointments(readAppointments().map((item) =>
@@ -336,15 +333,51 @@
     });
   }
 
+  function renderList() {
+    const upcomingList = $("appointmentList");
+    const completedList = $("appointmentCompletedList");
+    const appointments = readAppointments().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+    const upcoming = appointments.filter((a) => a.status !== "completed");
+    const completed = appointments.filter((a) => a.status === "completed");
+
+    if (upcomingList) {
+      upcomingList.innerHTML = upcoming.length
+        ? upcoming.map(appointmentRowHtml).join("")
+        : `<p class="booking-empty">No appointments scheduled yet.</p>`;
+      bindRowActions(upcomingList);
+    }
+    if (completedList) {
+      completedList.innerHTML = completed.length
+        ? completed.map(appointmentRowHtml).join("")
+        : `<p class="booking-empty">No completed appointments yet.</p>`;
+      bindRowActions(completedList);
+    }
+  }
+
   function formatDateTime(dateStr, timeStr) {
     const [y, m, d] = dateStr.split("-").map(Number);
     const dateLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
     return `${dateLabel} at ${minutesToLabel(timeToMinutes(timeStr))}`;
   }
 
+  function setPanel(panel) {
+    document.querySelectorAll(".appt-panel[data-appt-panel-section]").forEach((section) => {
+      section.hidden = section.dataset.apptPanelSection !== panel;
+    });
+    document.querySelectorAll(".appt-subnav-btn[data-appt-panel]").forEach((btn) => {
+      const active = btn.dataset.apptPanel === panel;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+  }
+
   function bindOnce() {
     if (bound) return;
     bound = true;
+
+    document.querySelectorAll(".appt-subnav-btn[data-appt-panel]").forEach((btn) => {
+      btn.addEventListener("click", () => setPanel(btn.dataset.apptPanel));
+    });
 
     $("bookingPrevMonth")?.addEventListener("click", () => {
       const prev = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1);
@@ -413,6 +446,7 @@
     renderTechnicianPicker();
     fetchTechnicians();
     setStep(1);
+    setPanel("create");
   }
 
   window.addEventListener("rpc-enter-appointments", init);
