@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=checkin-filter-toolbar-1" />
+  <link rel="stylesheet" href="assets/style.css?v=checkin-filter-toolbar-2" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -45,6 +45,9 @@
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
     <symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M7 9h.01M17 15h.01"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M7.5 3.5v4M16.5 3.5v4M4 9h16M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 6.5-5.5 5.5 5.5 5.5"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6.5 5.5 5.5-5.5 5.5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.4 7-11.5A7 7 0 0 0 5 9.5C5 14.6 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.4"/></symbol>
     <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2v-17Z"/><path d="M9 8h6M9 11.5h6M9 15h3"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><path d="M8 3.5h8a2 2 0 0 1 2 2v14.5l-3-2.5-3 2.5-3-2.5-3 2.5V5.5a2 2 0 0 1 2-2Z"/><path d="M9 8h6M9 11.5h4"/></symbol>
     <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4.5 9.5V4.8m0 0h4.7M4.6 4.9A8.4 8.4 0 1 1 3.5 14"/><path d="M12 7v5l3 2"/></symbol>
@@ -137,26 +140,72 @@
 
   <!-- ============ APPOINTMENTS VIEW ============ -->
   <main class="container view" id="view-appointments" hidden>
-    <p class="info-banner">Book repair visits for clients who want to come in.</p>
-    <section class="ops-card" aria-labelledby="appointmentTitle">
-      <div class="today-focus-header">
-        <div>
-          <p class="dashboard-eyebrow">Appointments</p>
-          <h2 id="appointmentTitle">Schedule repair visit</h2>
-        </div>
+    <p class="info-banner">Book in-store repair visits — pick a day and time, then add the client's details.</p>
+
+    <section class="booking-card">
+      <div class="booking-info-panel">
+        <p class="form-section-label">Appointments</p>
+        <h2 class="booking-title">Repair visit</h2>
+        <span class="booking-badge">Requires confirmation</span>
+        <ul class="booking-meta">
+          <li><svg class="icon"><use href="#i-clock"></use></svg>30 minutes</li>
+          <li><svg class="icon"><use href="#i-pin"></use></svg>In-store · JQ Electronics</li>
+          <li><svg class="icon"><use href="#i-calendar"></use></svg>Mon–Sat, 8:30 AM–4:00 PM</li>
+        </ul>
       </div>
-      <form id="appointmentForm" class="ops-form">
-        <input id="appointmentClient" class="text-input" placeholder="Client name" required />
-        <input id="appointmentPhone" class="text-input" placeholder="Phone" />
-        <input id="appointmentDevice" class="text-input" placeholder="Device / model" required />
-        <input id="appointmentIssue" class="text-input" placeholder="Repair needed" />
-        <input id="appointmentDate" class="text-input" type="date" required />
-        <input id="appointmentTime" class="text-input" type="time" required />
-        <textarea id="appointmentNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
-        <button type="submit" class="ghost-btn">Create appointment</button>
+
+      <div class="booking-calendar-panel">
+        <div class="booking-calendar-header">
+          <button type="button" id="bookingPrevMonth" class="icon-btn ghost-btn" aria-label="Previous month"><svg class="icon"><use href="#i-chevron-left"></use></svg></button>
+          <strong id="bookingMonthLabel"></strong>
+          <button type="button" id="bookingNextMonth" class="icon-btn ghost-btn" aria-label="Next month"><svg class="icon"><use href="#i-chevron-right"></use></svg></button>
+        </div>
+        <div class="booking-calendar-weekdays">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div id="bookingCalendarGrid" class="booking-calendar-grid"></div>
+      </div>
+
+      <div class="booking-slots-panel">
+        <p id="bookingSlotsLabel" class="booking-slots-label">Pick a day to see times</p>
+        <div id="bookingSlotsList" class="booking-slots-list"></div>
+      </div>
+    </section>
+
+    <section id="bookingDetailsCard" class="booking-details-card" hidden>
+      <p id="bookingSelectedSummary" class="booking-selected-summary"></p>
+      <form id="appointmentForm" class="form-grid">
+        <div class="form-field form-field-full">
+          <label class="field-label" for="appointmentClient">Client name *</label>
+          <input id="appointmentClient" class="text-input" required placeholder="e.g. Anita Singh" />
+        </div>
+        <div class="form-field">
+          <label class="field-label" for="appointmentPhone">Phone</label>
+          <input id="appointmentPhone" class="text-input" type="tel" placeholder="e.g. 868 712 3456" />
+        </div>
+        <div class="form-field">
+          <label class="field-label" for="appointmentDevice">Device / model *</label>
+          <input id="appointmentDevice" class="text-input" required placeholder="e.g. iPhone 13 Pro" />
+        </div>
+        <div class="form-field form-field-full">
+          <label class="field-label" for="appointmentIssue">Repair needed</label>
+          <input id="appointmentIssue" class="text-input" placeholder="e.g. Screen replacement" />
+        </div>
+        <div class="form-field form-field-full">
+          <label class="field-label" for="appointmentNotes">Notes</label>
+          <textarea id="appointmentNotes" class="text-input" rows="2" placeholder="Optional details"></textarea>
+        </div>
+        <p id="appointmentMessage" class="field-error" hidden></p>
+        <div class="form-actions form-field-full">
+          <button type="button" id="cancelBookingDetails" class="ghost-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Confirm appointment</button>
+        </div>
       </form>
-      <p id="appointmentMessage" class="dashboard-target-message" aria-live="polite"></p>
-      <div id="appointmentList" class="ops-list" aria-live="polite"></div>
+    </section>
+
+    <section class="booking-list-card">
+      <h2 class="booking-list-title">Upcoming appointments</h2>
+      <div id="appointmentList" class="booking-list" aria-live="polite"></div>
     </section>
   </main>
 
@@ -621,5 +670,6 @@
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
   <script src="assets/intake.js?v=checkin-filter-toolbar-1"></script>
   <script src="assets/dashboard.js?v=ops-tools-1"></script>
+  <script src="assets/appointments.js?v=1"></script>
 </body>
 </html>

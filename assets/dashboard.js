@@ -9,7 +9,6 @@
   const GOAL_KEY = "rpc_monthly_sales_goal";
   const DAILY_GOAL_KEY = "rpc_daily_sales_goal";
   const ACTION_CARDS_KEY = "rpc_target_action_cards";
-  const APPOINTMENTS_KEY = "rpc_repair_appointments";
   const EXPENSES_KEY = "rpc_expenses";
   const DEFAULT_MONTHLY_GOAL = 80000;
   const DEFAULT_DAILY_GOAL = 2500;
@@ -283,81 +282,6 @@
   function safeLocalStorageGet(key) {
     try { return localStorage.getItem(key) || ""; }
     catch (_) { return ""; }
-  }
-
-  function initAppointments() {
-    const form = $("appointmentForm");
-    if (form && !form.dataset.bound) {
-      form.dataset.bound = "true";
-      const dateInput = $("appointmentDate");
-      if (dateInput && !dateInput.value) dateInput.valueAsDate = new Date();
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const appointment = {
-          id: uid(),
-          client: ($("appointmentClient")?.value || "").trim(),
-          phone: ($("appointmentPhone")?.value || "").trim(),
-          device: ($("appointmentDevice")?.value || "").trim(),
-          issue: ($("appointmentIssue")?.value || "").trim(),
-          date: $("appointmentDate")?.value || "",
-          time: $("appointmentTime")?.value || "",
-          notes: ($("appointmentNotes")?.value || "").trim(),
-          status: "scheduled",
-          created: new Date().toISOString(),
-        };
-        const msg = $("appointmentMessage");
-        if (!appointment.client || !appointment.device || !appointment.date || !appointment.time) {
-          if (msg) msg.textContent = "Add client, device, date, and time.";
-          return;
-        }
-        writeJson(APPOINTMENTS_KEY, [appointment].concat(readAppointments()));
-        form.reset();
-        if (dateInput) dateInput.valueAsDate = new Date();
-        if (msg) msg.textContent = "Appointment created.";
-        renderAppointments();
-      });
-    }
-    renderAppointments();
-  }
-
-  function readAppointments() {
-    return readJson(APPOINTMENTS_KEY, []);
-  }
-
-  function renderAppointments() {
-    const list = $("appointmentList");
-    if (!list) return;
-    const appointments = readAppointments().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
-    list.innerHTML = appointments.length ? appointments.map((item) => `
-      <article class="ops-row ${item.status === "completed" ? "is-complete" : ""}">
-        <div>
-          <strong>${esc(item.client)}</strong>
-          <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}</p>
-          <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
-          ${item.notes ? `<small>${esc(item.notes)}</small>` : ""}
-        </div>
-        <div class="ops-row-actions">
-          <button type="button" data-appointment-complete="${esc(item.id)}">${item.status === "completed" ? "Reopen" : "Done"}</button>
-          <button type="button" class="danger-text" data-appointment-delete="${esc(item.id)}">Delete</button>
-        </div>
-      </article>
-    `).join("") : `<p class="ops-empty">No appointments scheduled yet.</p>`;
-    list.querySelectorAll("[data-appointment-complete]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        writeJson(APPOINTMENTS_KEY, readAppointments().map((item) =>
-          item.id === btn.dataset.appointmentComplete
-            ? Object.assign({}, item, { status: item.status === "completed" ? "scheduled" : "completed" })
-            : item
-        ));
-        renderAppointments();
-      });
-    });
-    list.querySelectorAll("[data-appointment-delete]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        writeJson(APPOINTMENTS_KEY, readAppointments().filter((item) => item.id !== btn.dataset.appointmentDelete));
-        renderAppointments();
-      });
-    });
   }
 
   function initExpenses() {
@@ -660,7 +584,6 @@
 
   window.addEventListener("rpc-enter-dashboard", () => loadDashboard({ force: true }));
   window.addEventListener("rpc-enter-targets", () => renderGoalEditor({ goal: monthlyGoal() }));
-  window.addEventListener("rpc-enter-appointments", initAppointments);
   window.addEventListener("rpc-enter-expenses", initExpenses);
   window.addEventListener("rpc-tickets", (event) => {
     tickets = (event.detail?.tickets || []).map(normalizeTicket);
