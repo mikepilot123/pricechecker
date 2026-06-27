@@ -4,23 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#f5f7fb" />
-  <meta name="description" content="Live repair price checker + device check-in tracker for the team." />
+  <meta name="description" content="Live repair price checker + device intake tracker for the team." />
   <title>JQ Electronics</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232756e0'/><path d='m58 31 12-12a16 16 0 0 1-21 21L28 61a8 8 0 1 0 11 11l21-21a16 16 0 0 1 21-21L69 42' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%232756e0'/><path d='m58 31 12-12a16 16 0 0 1-21 21L28 61a8 8 0 1 0 11 11l21-21a16 16 0 0 1 21-21L69 42' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=checkin-filter-toolbar-1" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/style.css?v=wizard-3" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
     <symbol id="i-tools" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5.2 5.2l-7.8 7.8a2.1 2.1 0 0 0 3 3l7.8-7.8a4 4 0 0 1 5.2-5.2l-3 3"/><path d="m6.2 6.2 4.2 4.2"/></symbol>
-    <symbol id="i-inventory-flow" viewBox="0 0 24 24"><path d="m12 3.2 4.2 2.4-4.2 2.5-4.2-2.5L12 3.2Z"/><path d="M7.8 5.6v4.8l4.2 2.5 4.2-2.5V5.6M12 8.1v4.8"/><path d="m6.2 12 3.7 2.2-3.7 2.2-3.7-2.2L6.2 12Z"/><path d="M2.5 14.2v4.2l3.7 2.2 3.7-2.2v-4.2M6.2 16.4v4.2"/><path d="m17.8 12 3.7 2.2-3.7 2.2-3.7-2.2 3.7-2.2Z"/><path d="M14.1 14.2v4.2l3.7 2.2 3.7-2.2v-4.2M17.8 16.4v4.2"/><path d="M5.3 9.8a8.4 8.4 0 0 0-.8 7.1"/><path d="M18.7 14.2a8.4 8.4 0 0 0-.3-6.8"/><path d="m3.4 9.7 2-.4.4 2M20.6 14.7l-2 .4-.4-2"/></symbol>
-    <symbol id="i-dashboard" viewBox="0 0 24 24"><rect x="3.5" y="4" width="7" height="7" rx="1.5"/><rect x="13.5" y="4" width="7" height="4.8" rx="1.5"/><rect x="13.5" y="11.2" width="7" height="8.8" rx="1.5"/><rect x="3.5" y="14.2" width="7" height="5.8" rx="1.5"/></symbol>
-    <symbol id="i-repair-progress" viewBox="0 0 24 24"><rect x="4" y="4.5" width="10" height="15" rx="2"/><path d="M7.2 8.2h3.7M7.2 11.5h2.4M17.4 6.4l1.9-1.9a2.5 2.5 0 0 1-3.2 3.2l-5.9 5.9a1.4 1.4 0 0 0 2 2l5.9-5.9a2.5 2.5 0 0 1 3.2-3.2l-1.9 1.9"/></symbol>
-    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.8"/><circle cx="12" cy="12" r="1.5"/><path d="M18.2 5.8 21 3M21 3v4M21 3h-4"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></symbol>
     <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2A2 2 0 0 1 3 12V5a2 2 0 0 1 2-2h7a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.8Z"/><path d="M7.5 7.5h.01"/></symbol>
     <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6"/></symbol>
@@ -33,166 +29,35 @@
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m4 16.8-.8 4 4-.8L19 8.2 15.8 5 4 16.8Z"/><path d="m13.8 7 3.2 3.2M18 4.8l1.2-1.2a1.5 1.5 0 0 1 2.1 2.1L20 6.9"/></symbol>
     <symbol id="i-xmark" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
     <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6.5 9 5.5 5.5L17.5 9"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 6.5-5.5 5.5 5.5 5.5"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6.5 5.5 5.5-5.5 5.5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M7.5 3.5v4M16.5 3.5v4M4 9h16M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.4 7-11.5A7 7 0 0 0 5 9.5C5 14.6 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.4"/></symbol>
     <symbol id="i-device" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.2"/><path d="M10 18.5h4"/></symbol>
-    <symbol id="i-smartphone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M10.5 18.3h3"/></symbol>
-    <symbol id="i-tablet" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M11 16.5h2"/></symbol>
-    <symbol id="i-watch" viewBox="0 0 24 24"><path d="M9 3.5h6l.8 4.1M15.8 16.4 15 20.5H9l-.8-4.1"/><rect x="7" y="7" width="10" height="10" rx="3"/><path d="M11 12h2"/></symbol>
-    <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="10" rx="1.6"/><path d="M3.5 18.5h17l-2-4h-13l-2 4Z"/></symbol>
-    <symbol id="i-gamepad" viewBox="0 0 24 24"><path d="M7.5 9.5h9a4.5 4.5 0 0 1 4.2 3l1 3.1a2.4 2.4 0 0 1-4 2.4l-2-2H8.3l-2 2a2.4 2.4 0 0 1-4-2.4l1-3.1a4.5 4.5 0 0 1 4.2-3Z"/><path d="M7.5 13h3M9 11.5v3M16.7 12.5h.01M18.7 14.3h.01"/></symbol>
-    <symbol id="i-earbuds" viewBox="0 0 24 24"><path d="M7.5 5.5a3.2 3.2 0 0 0-3.2 3.2v2.8a2.2 2.2 0 0 0 4.4 0V8.7a3.2 3.2 0 0 0-1.2-2.5Z"/><path d="M16.5 5.5a3.2 3.2 0 0 1 3.2 3.2v2.8a2.2 2.2 0 0 1-4.4 0V8.7a3.2 3.2 0 0 1 1.2-2.5Z"/><path d="M8.7 12.2v5.3M15.3 12.2v5.3"/></symbol>
     <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.2 20c.8-3.3 3.2-5 6.8-5s6 1.7 6.8 5"/></symbol>
     <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
     <symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M7 9h.01M17 15h.01"/></symbol>
-    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M7.5 3.5v4M16.5 3.5v4M4 9h16M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01"/></symbol>
-    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2v-17Z"/><path d="M9 8h6M9 11.5h6M9 15h3"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><path d="M8 3.5h8a2 2 0 0 1 2 2v14.5l-3-2.5-3 2.5-3-2.5-3 2.5V5.5a2 2 0 0 1 2-2Z"/><path d="M9 8h6M9 11.5h4"/></symbol>
     <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4.5 9.5V4.8m0 0h4.7M4.6 4.9A8.4 8.4 0 1 1 3.5 14"/><path d="M12 7v5l3 2"/></symbol>
   </svg>
   <header class="app-header">
     <div class="header-row">
       <div class="brand"><img class="brand-logo" src="assets/branding/jq-electronics-logo.png" alt="JQ Electronics" /></div>
+      <button id="refreshBtn" class="refresh-btn" title="Refresh prices" aria-label="Refresh prices" data-view="prices">
+        <svg class="icon refresh-icon"><use href="#i-refresh"></use></svg>
+        <span class="refresh-label">Refresh</span>
+      </button>
     </div>
     <nav class="view-nav" role="tablist" aria-label="Sections">
-      <button class="nav-btn active" data-target="dashboard" role="tab" aria-selected="true"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
-      <button class="nav-btn" data-target="prices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
-      <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
-      <button class="nav-btn" data-target="appointments" role="tab" aria-selected="false"><svg class="icon"><use href="#i-calendar"></use></svg>Appointments</button>
-      <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
-      <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
-      <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
-      <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
+      <button class="nav-btn active" data-target="prices" role="tab"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
+      <button class="nav-btn" data-target="intake" role="tab"><svg class="icon"><use href="#i-clipboard"></use></svg>Intake</button>
+      <button class="nav-btn" data-target="appointments" role="tab"><svg class="icon"><use href="#i-calendar"></use></svg>Appointments</button>
     </nav>
   </header>
 
-  <!-- ============ DASHBOARD VIEW ============ -->
-  <main class="container view" id="view-dashboard">
-    <p class="info-banner">Repair business overview from check-ins and live inventory.</p>
-    <p class="status-line">
-      <span id="dashboardStatusDot" class="status-dot stale"></span>
-      <span id="dashboardUpdated">Loading dashboard…</span>
-    </p>
-
-    <section id="dashboardKpis" class="dashboard-kpi-grid" aria-live="polite"></section>
-
-    <section class="today-focus-card" aria-labelledby="todayFocusTitle">
-      <div class="today-focus-header">
-        <div>
-          <p class="dashboard-eyebrow">Today’s Focus</p>
-          <h2 id="todayFocusTitle">Action list</h2>
-        </div>
-        <span id="todayFocusDate" class="today-focus-date"></span>
-      </div>
-      <div id="dashboardFocus" class="today-focus-list" aria-live="polite"></div>
-    </section>
-  </main>
-
-  <!-- ============ TARGETS VIEW ============ -->
-  <main class="container view" id="view-targets" hidden>
-    <p class="info-banner">Set business targets used across the dashboard.</p>
-    <section class="dashboard-target-card targets-page-card" aria-labelledby="dashboardTargetTitle">
-      <div>
-        <p class="dashboard-eyebrow" id="dashboardTargetTitle">Sales targets</p>
-        <h2 class="targets-title">Monthly and daily goals</h2>
-        <p class="dashboard-target-help">Monthly target powers the Dashboard progress card. Daily target helps the team pace each day.</p>
-      </div>
-      <form id="dashboardGoalForm" class="dashboard-target-form">
-        <label class="target-input-group" for="dashboardGoalInput">
-          <span>Monthly target</span>
-          <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardGoalInput" type="number" min="0" step="100" inputmode="decimal" placeholder="80000" /></span>
-        </label>
-        <label class="target-input-group" for="dashboardDailyGoalInput">
-          <span>Daily target</span>
-          <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardDailyGoalInput" type="number" min="0" step="50" inputmode="decimal" placeholder="2500" /></span>
-        </label>
-        <button type="submit" class="ghost-btn">Save targets</button>
-      </form>
-      <p id="dashboardGoalMessage" class="dashboard-target-message" aria-live="polite"></p>
-    </section>
-
-    <section class="targets-action-card" aria-labelledby="targetsActionTitle">
-      <div class="today-focus-header">
-        <div>
-          <p class="dashboard-eyebrow">Action plans</p>
-          <h2 id="targetsActionTitle">Daily sales actions</h2>
-        </div>
-      </div>
-      <form id="targetPlanForm" class="target-plan-form target-card-form">
-        <label class="field-label" for="targetPlanTitle">Add action card</label>
-        <div class="target-card-create">
-          <input id="targetPlanTitle" class="text-input" placeholder="Example: Call Jack Johnson" />
-          <select id="targetPlanColumn" class="text-input select-input" aria-label="Action status">
-            <option value="todo">To do</option>
-            <option value="doing">Doing</option>
-            <option value="done">Done</option>
-          </select>
-          <button type="submit" class="ghost-btn">Add card</button>
-        </div>
-        <textarea id="targetPlanNotes" class="text-input" rows="2" placeholder="Optional details or next step"></textarea>
-        <p id="targetPlanMessage" class="dashboard-target-message" aria-live="polite"></p>
-      </form>
-      <div id="targetActionBoard" class="target-board" aria-live="polite"></div>
-    </section>
-  </main>
-
-  <!-- ============ APPOINTMENTS VIEW ============ -->
-  <main class="container view" id="view-appointments" hidden>
-    <p class="info-banner">Book repair visits for clients who want to come in.</p>
-    <section class="ops-card" aria-labelledby="appointmentTitle">
-      <div class="today-focus-header">
-        <div>
-          <p class="dashboard-eyebrow">Appointments</p>
-          <h2 id="appointmentTitle">Schedule repair visit</h2>
-        </div>
-      </div>
-      <form id="appointmentForm" class="ops-form">
-        <input id="appointmentClient" class="text-input" placeholder="Client name" required />
-        <input id="appointmentPhone" class="text-input" placeholder="Phone" />
-        <input id="appointmentDevice" class="text-input" placeholder="Device / model" required />
-        <input id="appointmentIssue" class="text-input" placeholder="Repair needed" />
-        <input id="appointmentDate" class="text-input" type="date" required />
-        <input id="appointmentTime" class="text-input" type="time" required />
-        <textarea id="appointmentNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
-        <button type="submit" class="ghost-btn">Create appointment</button>
-      </form>
-      <p id="appointmentMessage" class="dashboard-target-message" aria-live="polite"></p>
-      <div id="appointmentList" class="ops-list" aria-live="polite"></div>
-    </section>
-  </main>
-
-  <!-- ============ EXPENSES VIEW ============ -->
-  <main class="container view" id="view-expenses" hidden>
-    <p class="info-banner">Track shop expenses locally for quick monthly visibility.</p>
-    <section class="ops-card" aria-labelledby="expenseTitle">
-      <div class="today-focus-header">
-        <div>
-          <p class="dashboard-eyebrow">Expenses</p>
-          <h2 id="expenseTitle">Record expense</h2>
-        </div>
-        <div class="expense-total"><span>This month</span><strong id="expenseMonthTotal">$0</strong></div>
-      </div>
-      <form id="expenseForm" class="ops-form">
-        <input id="expenseDate" class="text-input" type="date" required />
-        <select id="expenseCategory" class="text-input select-input" required>
-          <option value="Parts">Parts</option>
-          <option value="Tools">Tools</option>
-          <option value="Rent">Rent</option>
-          <option value="Utilities">Utilities</option>
-          <option value="Marketing">Marketing</option>
-          <option value="Other">Other</option>
-        </select>
-        <input id="expenseVendor" class="text-input" placeholder="Vendor / payee" />
-        <input id="expenseAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" required />
-        <textarea id="expenseNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
-        <button type="submit" class="ghost-btn">Add expense</button>
-      </form>
-      <p id="expenseMessage" class="dashboard-target-message" aria-live="polite"></p>
-      <div id="expenseList" class="ops-list" aria-live="polite"></div>
-    </section>
-  </main>
-
   <!-- ============ PRICES VIEW ============ -->
-  <main class="container view" id="view-prices" hidden>
+  <main class="container view" id="view-prices">
     <p id="infoBanner" class="info-banner">Loading standing info…</p>
     <p class="status-line">
       <span id="statusDot" class="status-dot"></span>
@@ -212,7 +77,7 @@
       <button id="clearSearch" class="clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
     </div>
 
-    <div id="filterChips" class="filter-chips brand-filter-chips" role="tablist" aria-label="Filter by brand"></div>
+    <div id="filterChips" class="filter-chips" role="tablist" aria-label="Filter by brand"></div>
     <p id="resultCount" class="result-count"></p>
     <div id="results" class="results" aria-live="polite"></div>
 
@@ -224,68 +89,7 @@
     <div id="errorState" class="error-state" hidden>
       <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
       <p class="empty-title">Couldn't load the latest prices</p>
-      <p class="empty-sub" id="errorSub">Check your internet connection. The app will keep retrying automatically.</p>
-    </div>
-  </main>
-
-  <!-- ============ INVENTORY VIEW ============ -->
-  <main class="container view" id="view-inventory" hidden>
-    <p class="info-banner">Live inventory from the shop sheet.</p>
-    <p class="status-line">
-      <span id="inventoryStatusDot" class="status-dot"></span>
-      <span id="inventoryUpdated">Loading inventory…</span>
-    </p>
-    <div class="inventory-summary" id="inventorySummary" aria-live="polite"></div>
-    <section class="inventory-table-shell">
-      <div class="inventory-table-toolbar">
-        <div class="select-wrap inventory-filter-wrap">
-          <select id="inventorySectionFilter" class="inventory-filter" aria-label="Filter inventory section">
-            <option value="all">All</option>
-          </select>
-        </div>
-        <div id="inventoryStockFilters" class="inventory-stock-filters" role="tablist" aria-label="Filter inventory stock status"></div>
-        <div class="inventory-search">
-          <svg class="icon"><use href="#i-search"></use></svg>
-          <input
-            id="inventorySearch"
-            type="search"
-            inputmode="search"
-            autocomplete="off"
-            placeholder="Search and filter"
-            aria-label="Search inventory"
-          />
-          <button id="clearInventorySearch" class="inventory-clear-search" aria-label="Clear inventory search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
-        </div>
-        <button class="inventory-view-btn" type="button" title="Inventory table view" aria-label="Inventory table view">
-          <svg class="icon"><use href="#i-clipboard"></use></svg>
-        </button>
-      </div>
-      <div class="inventory-table-scroll">
-        <table class="inventory-table">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Category</th>
-              <th>Status</th>
-              <th class="num">Available</th>
-              <th class="num">On hand</th>
-              <th class="inventory-adjust-col">Update</th>
-            </tr>
-          </thead>
-          <tbody id="inventoryList" aria-live="polite"></tbody>
-        </table>
-      </div>
-    </section>
-    <p id="inventoryCount" class="result-count"></p>
-    <div id="inventoryEmpty" class="empty-state" hidden>
-      <div class="empty-icon"><svg class="icon"><use href="#i-search"></use></svg></div>
-      <p class="empty-title">No matching inventory</p>
-      <p class="empty-sub">Try another model, part, or section.</p>
-    </div>
-    <div id="inventoryError" class="error-state" hidden>
-      <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
-      <p class="empty-title">Couldn't load inventory</p>
-      <p class="empty-sub" id="inventoryErrorSub">Check the connection and try again.</p>
+      <p class="empty-sub" id="errorSub">Check your internet connection and tap Refresh.</p>
     </div>
   </main>
 
@@ -293,7 +97,7 @@
   <main class="container view" id="view-intake" hidden>
     <!-- Setup panel: shown until the script URL + PIN are saved on this device -->
     <section id="intakeSetup" class="setup-card" hidden>
-      <h2 class="setup-title">Connect device check-in</h2>
+      <h2 class="setup-title">Connect device intake</h2>
       <p class="setup-sub">
         Enter the team PIN (your manager has it). Stored only on this
         device — entered once.
@@ -303,43 +107,29 @@
       <button id="cfgSave" class="primary-btn">Save & connect</button>
       <p id="cfgError" class="field-error" hidden></p>
       <div id="settingsMaintenance" class="settings-maintenance" hidden>
-        <p class="field-label">Check-in records</p>
-        <p class="settings-help">Refresh records, restore a saved backup, or clear the current check-in list.</p>
+        <p class="field-label">Intake records</p>
+        <p class="settings-help">Refresh records, restore a saved backup, or clear the current intake list.</p>
         <div class="settings-actions">
           <button id="reloadIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
           <button id="restoreIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-restore"></use></svg>Restore</button>
           <button id="clearAllIntake" class="ghost-btn danger-btn" type="button"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
         </div>
-        <div class="technician-settings">
-          <p class="field-label">Technicians</p>
-          <p class="settings-help">Create the roster here, then assign a technician from any logged ticket.</p>
-          <div class="technician-create-row">
-            <input id="newTechnicianName" class="text-input" placeholder="Technician name" />
-            <button id="addTechnician" class="primary-btn" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Add</button>
-          </div>
-          <div id="technicianSettingsList" class="technician-list"></div>
-          <p id="technicianSettingsError" class="field-error" hidden></p>
-        </div>
-        <button id="closeIntakeSettings" class="ghost-btn settings-back" type="button">Back to Check In</button>
+        <button id="closeIntakeSettings" class="ghost-btn settings-back" type="button">Back to intake</button>
       </div>
     </section>
 
     <!-- Main intake UI: shown once configured -->
     <section id="intakeMain" hidden>
-      <div class="intake-action-row">
-        <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg><span>Log device</span></button>
+      <div class="repairs-toolbar">
+        <button id="newIntakeBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Log device</button>
+        <button id="intakeSettings" class="ghost-btn icon-btn" title="Connection settings" aria-label="Connection settings"><svg class="icon"><use href="#i-gear"></use></svg></button>
       </div>
 
-      <div class="intake-filter-bar">
-        <div class="select-wrap intake-status-filter-wrap">
-          <select id="statusFilterSelect" class="intake-status-select" aria-label="Filter devices by status"></select>
-        </div>
-        <div class="intake-search-field">
-          <svg class="icon"><use href="#i-search"></use></svg>
-          <input id="intakeSearch" type="search" autocomplete="off"
-            placeholder="Search device, issue, ticket…" aria-label="Search devices" />
-        </div>
+      <div class="search-wrap">
+        <input id="intakeSearch" class="search-input" type="search" autocomplete="off"
+          placeholder="Search device, issue, ticket…" aria-label="Search devices" />
       </div>
+      <div id="statusChips" class="filter-chips" role="tablist" aria-label="Filter by status"></div>
 
       <p id="intakeCount" class="result-count"></p>
       <div id="intakeList" class="results" aria-live="polite"></div>
@@ -358,6 +148,77 @@
     </section>
   </main>
 
+  <!-- ============ APPOINTMENTS VIEW ============ -->
+  <main class="container view" id="view-appointments" hidden>
+    <p class="info-banner">Book in-store repair visits — pick a day and time, then add the client's details.</p>
+
+    <section class="booking-card">
+      <div class="booking-info-panel">
+        <p class="form-section-label">Appointments</p>
+        <h2 class="booking-title">Repair visit</h2>
+        <span class="booking-badge">Requires confirmation</span>
+        <ul class="booking-meta">
+          <li><svg class="icon"><use href="#i-clock"></use></svg>30 minutes</li>
+          <li><svg class="icon"><use href="#i-pin"></use></svg>In-store · JQ Electronics</li>
+          <li><svg class="icon"><use href="#i-calendar"></use></svg>Mon–Sat, 8:30 AM–4:00 PM</li>
+        </ul>
+      </div>
+
+      <div class="booking-calendar-panel">
+        <div class="booking-calendar-header">
+          <button type="button" id="bookingPrevMonth" class="icon-btn ghost-btn" aria-label="Previous month"><svg class="icon"><use href="#i-chevron-left"></use></svg></button>
+          <strong id="bookingMonthLabel"></strong>
+          <button type="button" id="bookingNextMonth" class="icon-btn ghost-btn" aria-label="Next month"><svg class="icon"><use href="#i-chevron-right"></use></svg></button>
+        </div>
+        <div class="booking-calendar-weekdays">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div id="bookingCalendarGrid" class="booking-calendar-grid"></div>
+      </div>
+
+      <div class="booking-slots-panel">
+        <p id="bookingSlotsLabel" class="booking-slots-label">Pick a day to see times</p>
+        <div id="bookingSlotsList" class="booking-slots-list"></div>
+      </div>
+    </section>
+
+    <section id="bookingDetailsCard" class="booking-details-card" hidden>
+      <p id="bookingSelectedSummary" class="booking-selected-summary"></p>
+      <form id="appointmentForm" class="form-grid">
+        <div class="form-field form-field-full">
+          <label class="field-label" for="appointmentClient">Client name *</label>
+          <input id="appointmentClient" class="text-input" required placeholder="e.g. Anita Singh" />
+        </div>
+        <div class="form-field">
+          <label class="field-label" for="appointmentPhone">Phone</label>
+          <input id="appointmentPhone" class="text-input" type="tel" placeholder="e.g. 868 712 3456" />
+        </div>
+        <div class="form-field">
+          <label class="field-label" for="appointmentDevice">Device / model *</label>
+          <input id="appointmentDevice" class="text-input" required placeholder="e.g. iPhone 13 Pro" />
+        </div>
+        <div class="form-field form-field-full">
+          <label class="field-label" for="appointmentIssue">Repair needed</label>
+          <input id="appointmentIssue" class="text-input" placeholder="e.g. Screen replacement" />
+        </div>
+        <div class="form-field form-field-full">
+          <label class="field-label" for="appointmentNotes">Notes</label>
+          <textarea id="appointmentNotes" class="text-input" rows="2" placeholder="Optional details"></textarea>
+        </div>
+        <p id="appointmentMessage" class="field-error" hidden></p>
+        <div class="form-actions form-field-full">
+          <button type="button" id="cancelBookingDetails" class="ghost-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Confirm appointment</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="booking-list-card">
+      <h2 class="booking-list-title">Upcoming appointments</h2>
+      <div id="appointmentList" class="booking-list" aria-live="polite"></div>
+    </section>
+  </main>
+
   <footer class="app-footer">
     <p>Prices in TTD · Live from the shop sheet · Internal team use</p>
   </footer>
@@ -371,7 +232,7 @@
       </div>
       <div class="modal-body">
         <form id="intakeForm" autocomplete="off">
-          <div class="form-progress" aria-label="Device check-in progress">
+          <div class="form-progress" aria-label="Device intake progress">
             <span class="form-progress-step active" data-progress-step="1">1<span>Customer</span></span>
             <span class="form-progress-line"></span>
             <span class="form-progress-step" data-progress-step="2">2<span>Device</span></span>
@@ -380,7 +241,7 @@
           </div>
 
           <section class="form-step" data-form-step="1">
-            <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Customer details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 1 of 3</p><h4>Customer details</h4><p>Who should we contact about this device, and where should we send the invoice?</p></div>
             <div class="form-grid">
               <div class="form-field form-field-full">
                 <label class="field-label" for="fName">Name *</label>
@@ -394,20 +255,22 @@
                 <label class="field-label" for="fEmail">Email *</label>
                 <input id="fEmail" class="text-input" type="email" required autocomplete="email" placeholder="e.g. anita@example.com" />
               </div>
-              <label class="invoice-request form-field-full">
-                <input id="fSendInvoice" type="checkbox" checked />
-                <span><strong>Send invoice to client</strong><small>Mark this check-in for an invoice after it is saved.</small></span>
-              </label>
             </div>
           </section>
 
           <section class="form-step" data-form-step="2" hidden>
-            <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Device and repair</h4><p>Choose the device, then select what needs attention.</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 2 of 3</p><h4>Device and repair</h4><p>Record the device, its status, and what needs attention.</p></div>
             <div class="form-grid">
-              <div class="form-field form-field-full">
+              <div class="form-field">
                 <label class="field-label" for="fDevice">Device *</label>
                 <input id="fDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
                 <datalist id="modelList"></datalist>
+              </div>
+              <div class="form-field">
+                <label class="field-label" for="fStatus">Status</label>
+                <div class="select-wrap">
+                  <select id="fStatus" class="text-input select-input"></select>
+                </div>
               </div>
               <div class="form-field form-field-full">
                 <label class="field-label">Issues *</label>
@@ -417,21 +280,6 @@
                 </button>
                 <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
               </div>
-              <div class="form-field">
-                <label class="field-label" for="fStatus">Status</label>
-                <div class="select-wrap">
-                  <select id="fStatus" class="text-input select-input"></select>
-                </div>
-              </div>
-              <div class="form-field form-field-full">
-                <label class="field-label" for="fInventoryItem">Inventory item used</label>
-                <div class="select-wrap">
-                  <select id="fInventoryItem" class="text-input select-input">
-                    <option value="">No stock item used</option>
-                  </select>
-                </div>
-                <p id="inventoryHint" class="field-hint">Choose the part to deduct from stock, if this repair uses one.</p>
-              </div>
               <div class="form-field form-field-full">
                 <label class="field-label" for="fNotes">Notes</label>
                 <textarea id="fNotes" class="text-input" rows="3" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
@@ -440,7 +288,7 @@
           </section>
 
           <section class="form-step" data-form-step="3" hidden>
-            <div class="form-step-heading"><p class="form-section-label">Step 3</p><h4>Payment</h4><p>Add the repair cost and how much the client paid today.</p></div>
+            <div class="form-step-heading"><p class="form-section-label">Step 3 of 3</p><h4>Payment</h4><p>Optional—add the quoted repair cost and any payment received.</p></div>
             <p id="quotedPriceSummary" class="quoted-price-summary" hidden></p>
             <div class="form-grid">
               <div id="repairCostField" class="form-field">
@@ -453,14 +301,6 @@
               </div>
             </div>
           </section>
-          <section class="form-step form-success" data-form-step="4" hidden aria-live="polite">
-            <div class="success-check" aria-hidden="true">✓</div>
-            <div class="form-step-heading">
-              <p class="form-section-label">Check-in complete</p>
-              <h4 id="formSuccessTitle">Device successfully logged</h4>
-              <p id="formSuccessMessage"></p>
-            </div>
-          </section>
           <p id="formError" class="field-error" hidden></p>
         </form>
       </div>
@@ -470,7 +310,6 @@
           <button type="button" id="previousFormStep" class="ghost-btn" hidden>Back</button>
           <button type="button" id="nextFormStep" class="primary-btn">Continue</button>
           <button type="submit" id="saveForm" class="primary-btn" form="intakeForm" hidden>Save device</button>
-          <button type="button" id="doneForm" class="primary-btn" hidden>Done</button>
         </div>
       </div>
     </div>
@@ -504,33 +343,6 @@
       </div>
       <div class="modal-footer">
         <button type="button" id="saveClientModal" class="primary-btn">Done</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Technician assignment: only available from already-logged tickets -->
-  <div id="technicianModal" class="modal-backdrop" hidden>
-    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="technicianModalTitle">
-      <div class="modal-header">
-        <div><p class="modal-eyebrow">Post check-in</p><h3 id="technicianModalTitle">Assign technician</h3></div>
-        <button type="button" id="closeTechnicianModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
-      </div>
-      <div class="modal-body">
-        <p id="technicianModalSub" class="empty-sub"></p>
-        <div class="form-field">
-          <label class="field-label" for="fTechnician">Technician</label>
-          <div class="technician-combobox" id="technicianCombobox">
-            <input id="fTechnician" class="text-input" autocomplete="off" placeholder="Select or add a technician" aria-autocomplete="list" aria-expanded="false" aria-controls="technicianDropdown" />
-            <button type="button" id="openTechnicianDropdown" class="technician-dropdown-btn" aria-label="Show technicians"><svg class="icon"><use href="#i-chevron-down"></use></svg></button>
-            <div id="technicianDropdown" class="technician-dropdown" role="listbox" hidden></div>
-          </div>
-          <p class="settings-help">Choose Liana, Michael, Marcus, or add a new technician if needed.</p>
-        </div>
-        <p id="technicianModalError" class="field-error" hidden></p>
-      </div>
-      <div class="modal-footer technician-modal-footer">
-        <button type="button" id="clearTechnician" class="ghost-btn">Clear assignment</button>
-        <button type="button" id="saveTechnician" class="primary-btn">Save assignment</button>
       </div>
     </div>
   </div>
@@ -578,11 +390,11 @@
   <div id="restoreBackupModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="restoreBackupTitle">
       <div class="modal-header">
-        <div><p class="modal-eyebrow">Check-in version history</p><h3 id="restoreBackupTitle">Restore a backup</h3></div>
+        <div><p class="modal-eyebrow">Intake version history</p><h3 id="restoreBackupTitle">Restore a backup</h3></div>
         <button type="button" id="closeRestoreBackupModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div class="modal-body">
-        <p class="empty-sub">Restoring replaces the current check-in list. Your current records are backed up automatically first.</p>
+        <p class="empty-sub">Restoring replaces the current intake list. Your current records are backed up automatically first.</p>
         <label class="field-label" for="backupSelect">Available backups</label>
         <div class="select-wrap"><select id="backupSelect" class="text-input select-input"></select></div>
         <p id="restoreBackupEmpty" class="empty-sub" hidden>No backups are available yet.</p>
@@ -598,7 +410,7 @@
   <div id="ticketModal" class="modal-backdrop" hidden>
     <section class="modal-panel ticket-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ticketModalTitle">
       <div class="modal-header">
-        <div><p class="modal-eyebrow">Check-in record</p><h3 id="ticketModalTitle">Device details</h3></div>
+        <div><p class="modal-eyebrow">Intake record</p><h3 id="ticketModalTitle">Device details</h3></div>
         <button type="button" id="closeTicketModal" class="modal-close" aria-label="Close device details"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div id="ticketModalBody" class="modal-body"></div>
@@ -617,9 +429,8 @@
     </section>
   </div>
 
-  <script src="assets/app.js?v=side-nav-1"></script>
-  <script src="assets/inventory.js?v=business-dashboard-1"></script>
-  <script src="assets/intake.js?v=checkin-filter-toolbar-1"></script>
-  <script src="assets/dashboard.js?v=ops-tools-1"></script>
+  <script src="assets/app.js"></script>
+  <script src="assets/intake.js?v=device-catalog-1"></script>
+  <script src="assets/appointments.js?v=1"></script>
 </body>
 </html>
