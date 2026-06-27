@@ -35,6 +35,7 @@
     "Picked Up": "st-pickedup",
     "Cancelled": "st-cancelled",
   };
+  const ACTIVE_REPAIR_STATUSES = new Set(["Received", "Diagnosing", "Waiting for Parts", "In Progress"]);
 
   // Common issue presets — "Other" reveals a free-text field.
   const ISSUES = [
@@ -79,7 +80,12 @@
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn[data-target]");
   const settingsNavBtn = $("intakeSettings");
-  const views = { prices: $("view-prices"), intake: $("view-intake"), inventory: $("view-inventory") };
+  const views = {
+    dashboard: $("view-dashboard"),
+    prices: $("view-prices"),
+    intake: $("view-intake"),
+    inventory: $("view-inventory"),
+  };
   function setActiveNav(target) {
     navBtns.forEach((b) => {
       const active = b.dataset.target === target;
@@ -91,13 +97,17 @@
   function showView(target) {
     Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
   }
+  function navigateTo(target) {
+    setActiveNav(target);
+    showView(target);
+    if (target === "dashboard") window.dispatchEvent(new Event("rpc-enter-dashboard"));
+    if (target === "intake") enterIntake();
+    if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
+  }
+  window.RPC_SHOW_VIEW = navigateTo;
   navBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const target = btn.dataset.target;
-      setActiveNav(target);
-      showView(target);
-      if (target === "intake") enterIntake();
-      if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
+      navigateTo(btn.dataset.target);
     });
   });
 
@@ -142,6 +152,7 @@
       showMain();
       renderStatusChips();
       render();
+      publishTickets();
       if (pendingLogDevice) {
         const detail = pendingLogDevice;
         pendingLogDevice = null;
@@ -198,6 +209,7 @@
       loadedOnce = true;
       renderStatusChips();
       render();
+      publishTickets();
     } catch (e) {
       $("intakeList").innerHTML = "";
       $("intakeEmpty").hidden = true;
@@ -207,6 +219,11 @@
     } finally {
       $("intakeLoading").style.display = "none";
     }
+  }
+
+  function publishTickets() {
+    window.RPC_INTAKE_TICKETS = TICKETS.slice();
+    window.dispatchEvent(new CustomEvent("rpc-tickets", { detail: { tickets: TICKETS.slice() } }));
   }
 
   $("reloadIntake").addEventListener("click", loadTickets);
@@ -497,6 +514,7 @@
       closeClearAllModal();
       renderStatusChips();
       render();
+      publishTickets();
       if (res.backup) alert(`Deleted ${res.deletedCount} record${res.deletedCount === 1 ? "" : "s"}. Backup ${res.backup.id} is ready to restore if needed.`);
     } catch (e) {
       err.textContent = "Couldn't clear devices: " + e.message;
@@ -561,6 +579,7 @@
       refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
+      publishTickets();
       closeRestoreBackupModal();
       alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous check-in list is backed up as ${res.backup.id}.`);
     } catch (e) {
@@ -1345,6 +1364,7 @@
     const i = TICKETS.findIndex((x) => x.id === t.id);
     if (i >= 0) TICKETS[i] = t;
     else TICKETS.unshift(t);
+    publishTickets();
   }
 
   // ---- Quick status change -------------------------------------------------
@@ -1386,6 +1406,7 @@
       refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
+      publishTickets();
       return true;
     } catch (e) {
       alert("Couldn't delete record: " + e.message);
@@ -1397,6 +1418,24 @@
   $("intakeSearch").addEventListener("input", () => {
     visibleTicketCount = TICKET_PAGE_SIZE;
     render();
+  });
+
+  window.addEventListener("rpc-filter-intake", (event) => {
+    const detail = event.detail || {};
+    const filter = detail.filter || detail.status || "all";
+    if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("intake");
+    else {
+      setActiveNav("intake");
+      showView("intake");
+      enterIntake();
+    }
+    statusFilter = filter === "active" ? "__active" : filter === "ready" ? "Repaired" : filter;
+    if ($("intakeSearch")) $("intakeSearch").value = "";
+    visibleTicketCount = TICKET_PAGE_SIZE;
+    if (loadedOnce) {
+      renderStatusChips();
+      render();
+    }
   });
 
   function renderStatusChips() {
@@ -1425,7 +1464,9 @@
   function currentList() {
     const q = $("intakeSearch").value.trim().toLowerCase();
     return TICKETS.filter((t) => {
-      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (statusFilter === "__active") {
+        if (!ACTIVE_REPAIR_STATUSES.has(t.status)) return false;
+      } else if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (!q) return true;
       return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
         .map((x) => (x || "").toLowerCase())

@@ -349,6 +349,15 @@
     render();
     $("inventorySearch").focus();
   });
+  window.addEventListener("rpc-filter-inventory", async (event) => {
+    const detail = event.detail || {};
+    if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("inventory");
+    await loadInventory({ force: !loadedOnce });
+    activeSection = detail.section || "all";
+    activeStock = detail.stock || "all";
+    if ($("inventorySearch")) $("inventorySearch").value = detail.query || "";
+    render();
+  });
   window.addEventListener("rpc-enter-inventory", () => loadInventory({ force: !loadedOnce }));
   setInterval(() => {
     if (!$("view-inventory")?.hidden) loadInventory({ force: true });
