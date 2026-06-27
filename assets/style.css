@@ -1801,11 +1801,13 @@ body {
    `.view[hidden] { display: none }` rule hides it for free on other tabs.
    z-index 50 stays below .modal-backdrop's 100, so opening the device-log
    modal correctly dims/covers it instead of floating above it. */
+.intake-action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+}
 .intake-fab {
-  position: fixed;
-  right: 20px;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  z-index: 50;
+  position: static;
   min-width: 134px;
   height: 42px;
   padding: 0 15px;
@@ -1831,6 +1833,88 @@ body {
 }
 .intake-fab:active { transform: scale(0.98); }
 .intake-fab:focus-visible { outline: 2px solid #94a3b8; outline-offset: 3px; }
+.intake-filter-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 62px;
+  margin: 0 0 16px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.intake-status-filter-wrap {
+  width: 184px;
+}
+.intake-status-select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 34px 8px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+  color: var(--text);
+  font: 500 0.9rem var(--font-display);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.intake-status-filter-wrap::after {
+  content: "";
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-dim);
+  border-bottom: 2px solid var(--text-dim);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+}
+.intake-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.intake-search-field .icon {
+  width: 20px;
+  height: 20px;
+}
+.intake-search-field input {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: 500 0.98rem var(--font-display);
+}
+.intake-search-field input::placeholder {
+  color: var(--text-dim);
+}
+
+@media (max-width: 620px) {
+  .intake-action-row { justify-content: stretch; }
+  .intake-fab { width: 100%; }
+  .intake-filter-bar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .intake-status-filter-wrap { width: 100%; }
+  .intake-search-field {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+}
 
 /* ---------- Intake form ---------- */
 .form-grid {

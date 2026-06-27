@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=ops-tools-1" />
+  <link rel="stylesheet" href="assets/style.css?v=checkin-filter-toolbar-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -326,13 +326,20 @@
 
     <!-- Main intake UI: shown once configured -->
     <section id="intakeMain" hidden>
-      <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg><span>Log device</span></button>
-
-      <div class="search-wrap">
-        <input id="intakeSearch" class="search-input" type="search" autocomplete="off"
-          placeholder="Search device, issue, ticket…" aria-label="Search devices" />
+      <div class="intake-action-row">
+        <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg><span>Log device</span></button>
       </div>
-      <div id="statusChips" class="filter-chips" role="tablist" aria-label="Filter by status"></div>
+
+      <div class="intake-filter-bar">
+        <div class="select-wrap intake-status-filter-wrap">
+          <select id="statusFilterSelect" class="intake-status-select" aria-label="Filter devices by status"></select>
+        </div>
+        <div class="intake-search-field">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input id="intakeSearch" type="search" autocomplete="off"
+            placeholder="Search device, issue, ticket…" aria-label="Search devices" />
+        </div>
+      </div>
 
       <p id="intakeCount" class="result-count"></p>
       <div id="intakeList" class="results" aria-live="polite"></div>
@@ -612,7 +619,7 @@
 
   <script src="assets/app.js?v=side-nav-1"></script>
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
-  <script src="assets/intake.js?v=ops-tools-1"></script>
+  <script src="assets/intake.js?v=checkin-filter-toolbar-1"></script>
   <script src="assets/dashboard.js?v=ops-tools-1"></script>
 </body>
 </html>

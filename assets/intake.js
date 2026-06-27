@@ -1425,6 +1425,11 @@
     visibleTicketCount = TICKET_PAGE_SIZE;
     render();
   });
+  $("statusFilterSelect")?.addEventListener("change", () => {
+    statusFilter = $("statusFilterSelect").value || "all";
+    visibleTicketCount = TICKET_PAGE_SIZE;
+    render();
+  });
 
   window.addEventListener("rpc-filter-intake", (event) => {
     const detail = event.detail || {};
@@ -1447,24 +1452,15 @@
   function renderStatusChips() {
     const counts = { all: TICKETS.length };
     STATUSES.forEach((s) => (counts[s] = TICKETS.filter((t) => t.status === s).length));
-    const box = $("statusChips");
-    box.innerHTML = "";
-    const make = (key, label) => {
-      const b = document.createElement("button");
-      const statusClass = STATUS_CLASS[key];
-      b.className = "chip" + (statusClass ? ` status-chip ${statusClass}` : "") + (key === statusFilter ? " active" : "");
-      b.textContent = label;
-      b.onclick = () => {
-        statusFilter = key;
-        visibleTicketCount = TICKET_PAGE_SIZE;
-        [...box.children].forEach((c) => c.classList.remove("active"));
-        b.classList.add("active");
-        render();
-      };
-      box.appendChild(b);
-    };
-    make("all", `All (${counts.all})`);
-    STATUSES.forEach((s) => make(s, `${s} (${counts[s]})`));
+    const select = $("statusFilterSelect");
+    if (!select) return;
+    const options = [{ key: "all", label: `All (${counts.all})` }]
+      .concat(STATUSES.map((status) => ({ key: status, label: `${status} (${counts[status]})` })));
+    const current = statusFilter === "__active" ? "all" : statusFilter;
+    select.innerHTML = options.map((option) =>
+      `<option value="${esc(option.key)}">${esc(option.label)}</option>`
+    ).join("");
+    select.value = options.some((option) => option.key === current) ? current : "all";
   }
 
   function currentList() {
