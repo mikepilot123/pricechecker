@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=targets-page-4" />
+  <link rel="stylesheet" href="assets/style.css?v=ops-tools-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -44,6 +44,8 @@
     <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></symbol>
     <symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M7 9h.01M17 15h.01"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M7.5 3.5v4M16.5 3.5v4M4 9h16M8 13h.01M12 13h.01M16 13h.01M8 16.5h.01M12 16.5h.01"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2v-17Z"/><path d="M9 8h6M9 11.5h6M9 15h3"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><path d="M8 3.5h8a2 2 0 0 1 2 2v14.5l-3-2.5-3 2.5-3-2.5-3 2.5V5.5a2 2 0 0 1 2-2Z"/><path d="M9 8h6M9 11.5h4"/></symbol>
     <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4.5 9.5V4.8m0 0h4.7M4.6 4.9A8.4 8.4 0 1 1 3.5 14"/><path d="M12 7v5l3 2"/></symbol>
   </svg>
@@ -55,8 +57,10 @@
       <button class="nav-btn active" data-target="dashboard" role="tab" aria-selected="true"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
       <button class="nav-btn" data-target="prices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
+      <button class="nav-btn" data-target="appointments" role="tab" aria-selected="false"><svg class="icon"><use href="#i-calendar"></use></svg>Appointments</button>
       <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
       <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
+      <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
     </nav>
   </header>
@@ -113,13 +117,77 @@
           <h2 id="targetsActionTitle">Daily sales actions</h2>
         </div>
       </div>
-      <div id="targetActionChecklist" class="target-action-list"></div>
-      <form id="targetPlanForm" class="target-plan-form">
-        <label class="field-label" for="targetPlanNotes">Team action plan</label>
-        <textarea id="targetPlanNotes" class="text-input" rows="4" placeholder="Example: Call all ready pickups before lunch, follow up unpaid balances, and push battery/screen repairs today."></textarea>
-        <button type="submit" class="ghost-btn">Save action plan</button>
+      <form id="targetPlanForm" class="target-plan-form target-card-form">
+        <label class="field-label" for="targetPlanTitle">Add action card</label>
+        <div class="target-card-create">
+          <input id="targetPlanTitle" class="text-input" placeholder="Example: Call Jack Johnson" />
+          <select id="targetPlanColumn" class="text-input select-input" aria-label="Action status">
+            <option value="todo">To do</option>
+            <option value="doing">Doing</option>
+            <option value="done">Done</option>
+          </select>
+          <button type="submit" class="ghost-btn">Add card</button>
+        </div>
+        <textarea id="targetPlanNotes" class="text-input" rows="2" placeholder="Optional details or next step"></textarea>
         <p id="targetPlanMessage" class="dashboard-target-message" aria-live="polite"></p>
       </form>
+      <div id="targetActionBoard" class="target-board" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- ============ APPOINTMENTS VIEW ============ -->
+  <main class="container view" id="view-appointments" hidden>
+    <p class="info-banner">Book repair visits for clients who want to come in.</p>
+    <section class="ops-card" aria-labelledby="appointmentTitle">
+      <div class="today-focus-header">
+        <div>
+          <p class="dashboard-eyebrow">Appointments</p>
+          <h2 id="appointmentTitle">Schedule repair visit</h2>
+        </div>
+      </div>
+      <form id="appointmentForm" class="ops-form">
+        <input id="appointmentClient" class="text-input" placeholder="Client name" required />
+        <input id="appointmentPhone" class="text-input" placeholder="Phone" />
+        <input id="appointmentDevice" class="text-input" placeholder="Device / model" required />
+        <input id="appointmentIssue" class="text-input" placeholder="Repair needed" />
+        <input id="appointmentDate" class="text-input" type="date" required />
+        <input id="appointmentTime" class="text-input" type="time" required />
+        <textarea id="appointmentNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
+        <button type="submit" class="ghost-btn">Create appointment</button>
+      </form>
+      <p id="appointmentMessage" class="dashboard-target-message" aria-live="polite"></p>
+      <div id="appointmentList" class="ops-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- ============ EXPENSES VIEW ============ -->
+  <main class="container view" id="view-expenses" hidden>
+    <p class="info-banner">Track shop expenses locally for quick monthly visibility.</p>
+    <section class="ops-card" aria-labelledby="expenseTitle">
+      <div class="today-focus-header">
+        <div>
+          <p class="dashboard-eyebrow">Expenses</p>
+          <h2 id="expenseTitle">Record expense</h2>
+        </div>
+        <div class="expense-total"><span>This month</span><strong id="expenseMonthTotal">$0</strong></div>
+      </div>
+      <form id="expenseForm" class="ops-form">
+        <input id="expenseDate" class="text-input" type="date" required />
+        <select id="expenseCategory" class="text-input select-input" required>
+          <option value="Parts">Parts</option>
+          <option value="Tools">Tools</option>
+          <option value="Rent">Rent</option>
+          <option value="Utilities">Utilities</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Other">Other</option>
+        </select>
+        <input id="expenseVendor" class="text-input" placeholder="Vendor / payee" />
+        <input id="expenseAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" required />
+        <textarea id="expenseNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
+        <button type="submit" class="ghost-btn">Add expense</button>
+      </form>
+      <p id="expenseMessage" class="dashboard-target-message" aria-live="polite"></p>
+      <div id="expenseList" class="ops-list" aria-live="polite"></div>
     </section>
   </main>
 
@@ -544,7 +612,7 @@
 
   <script src="assets/app.js?v=side-nav-1"></script>
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
-  <script src="assets/intake.js?v=targets-page-4"></script>
-  <script src="assets/dashboard.js?v=targets-page-4"></script>
+  <script src="assets/intake.js?v=ops-tools-1"></script>
+  <script src="assets/dashboard.js?v=ops-tools-1"></script>
 </body>
 </html>

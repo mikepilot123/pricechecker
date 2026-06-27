@@ -83,9 +83,11 @@
   const views = {
     dashboard: $("view-dashboard"),
     targets: $("view-targets"),
+    appointments: $("view-appointments"),
     prices: $("view-prices"),
     intake: $("view-intake"),
     inventory: $("view-inventory"),
+    expenses: $("view-expenses"),
   };
   function setActiveNav(target) {
     navBtns.forEach((b) => {
@@ -103,8 +105,10 @@
     showView(target);
     if (target === "dashboard") window.dispatchEvent(new Event("rpc-enter-dashboard"));
     if (target === "targets") window.dispatchEvent(new Event("rpc-enter-targets"));
+    if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
     if (target === "intake") enterIntake();
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
+    if (target === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
   }
   window.RPC_SHOW_VIEW = navigateTo;
   navBtns.forEach((btn) => {

@@ -8,15 +8,16 @@
   const LS_PIN = "rpc_intake_pin";
   const GOAL_KEY = "rpc_monthly_sales_goal";
   const DAILY_GOAL_KEY = "rpc_daily_sales_goal";
-  const ACTION_PLAN_KEY = "rpc_target_action_plan";
-  const ACTION_DONE_KEY = "rpc_target_action_done";
+  const ACTION_CARDS_KEY = "rpc_target_action_cards";
+  const APPOINTMENTS_KEY = "rpc_repair_appointments";
+  const EXPENSES_KEY = "rpc_expenses";
   const DEFAULT_MONTHLY_GOAL = 80000;
   const DEFAULT_DAILY_GOAL = 2500;
   const DEFAULT_ACTIONS = [
-    "Call every device marked ready for pickup",
-    "Follow up customers with outstanding balances",
-    "Review repairs waiting more than 5 days",
-    "Check low-stock repair parts before closing",
+    { title: "Call every device marked ready for pickup", status: "todo", notes: "Turn completed repairs into collected revenue." },
+    { title: "Follow up customers with outstanding balances", status: "doing", notes: "Prioritize balances due before closing." },
+    { title: "Review repairs waiting more than 5 days", status: "todo", notes: "Move each ticket to its next clear step." },
+    { title: "Check low-stock repair parts before closing", status: "done", notes: "Confirm parts needed for tomorrow." },
   ];
   const ACTIVE_STATUSES = new Set(["Received", "Diagnosing", "Waiting for Parts", "In Progress"]);
   const FINAL_STATUSES = new Set(["Picked Up", "Cancelled"]);
@@ -193,50 +194,269 @@
   }
 
   function renderActionPlan() {
-    const checklist = $("targetActionChecklist");
-    const notes = $("targetPlanNotes");
-    if (notes && document.activeElement !== notes) notes.value = safeLocalStorageGet(ACTION_PLAN_KEY);
-    if (checklist) {
-      const done = readDoneActions();
-      checklist.innerHTML = DEFAULT_ACTIONS.map((action, index) => `
-        <label class="target-action-item">
-          <input type="checkbox" data-action-index="${index}" ${done.includes(index) ? "checked" : ""} />
-          <span>${esc(action)}</span>
-        </label>
-      `).join("");
-      checklist.querySelectorAll("[data-action-index]").forEach((input) => {
-        input.addEventListener("change", () => {
-          const next = Array.from(checklist.querySelectorAll("[data-action-index]:checked"))
-            .map((node) => Number(node.dataset.actionIndex))
-            .filter((value) => Number.isInteger(value));
-          try { localStorage.setItem(ACTION_DONE_KEY, JSON.stringify(next)); } catch (_) {}
-        });
-      });
-    }
     const form = $("targetPlanForm");
     if (form && !form.dataset.bound) {
       form.dataset.bound = "true";
       form.addEventListener("submit", (event) => {
         event.preventDefault();
-        try { localStorage.setItem(ACTION_PLAN_KEY, $("targetPlanNotes")?.value || ""); } catch (_) {}
+        const title = ($("targetPlanTitle")?.value || "").trim();
+        const notes = ($("targetPlanNotes")?.value || "").trim();
+        const status = $("targetPlanColumn")?.value || "todo";
         const msg = $("targetPlanMessage");
-        if (msg) msg.textContent = "Action plan saved.";
+        if (!title) {
+          if (msg) msg.textContent = "Add a card title first.";
+          return;
+        }
+        const cards = readActionCards();
+        cards.unshift({ id: uid(), title, notes, status, created: new Date().toISOString() });
+        writeJson(ACTION_CARDS_KEY, cards);
+        form.reset();
+        if (msg) msg.textContent = "Action card saved.";
+        renderActionPlan();
       });
     }
+    renderActionBoard();
   }
 
-  function readDoneActions() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(ACTION_DONE_KEY) || "[]");
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
+  function renderActionBoard() {
+    const board = $("targetActionBoard");
+    if (!board) return;
+    const cards = readActionCards();
+    const columns = [
+      { key: "todo", label: "To do" },
+      { key: "doing", label: "Doing" },
+      { key: "done", label: "Done" },
+    ];
+    board.innerHTML = columns.map((column) => {
+      const items = cards.filter((card) => card.status === column.key);
+      return `<section class="target-board-column">
+        <div class="target-board-heading"><span>${esc(column.label)}</span><b>${items.length}</b></div>
+        <div class="target-board-cards">
+          ${items.length ? items.map(actionCardHtml).join("") : `<p class="ops-empty">No cards yet.</p>`}
+        </div>
+      </section>`;
+    }).join("");
+    board.querySelectorAll("[data-action-move]").forEach((btn) => {
+      btn.addEventListener("click", () => updateActionCard(btn.dataset.actionId, { status: btn.dataset.actionMove }));
+    });
+    board.querySelectorAll("[data-action-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => deleteActionCard(btn.dataset.actionDelete));
+    });
+  }
+
+  function actionCardHtml(card) {
+    const moveButtons = [
+      ["todo", "To do"],
+      ["doing", "Doing"],
+      ["done", "Done"],
+    ].filter(([status]) => status !== card.status);
+    return `<article class="target-action-card">
+      <strong>${esc(card.title)}</strong>
+      ${card.notes ? `<p>${esc(card.notes)}</p>` : ""}
+      <div class="target-card-actions">
+        ${moveButtons.map(([status, label]) => `<button type="button" data-action-id="${esc(card.id)}" data-action-move="${esc(status)}">${esc(label)}</button>`).join("")}
+        <button type="button" class="danger-text" data-action-delete="${esc(card.id)}">Delete</button>
+      </div>
+    </article>`;
+  }
+
+  function readActionCards() {
+    const saved = readJson(ACTION_CARDS_KEY, null);
+    if (Array.isArray(saved)) return saved;
+    const seeded = DEFAULT_ACTIONS.map((card) => Object.assign({ id: uid(), created: new Date().toISOString() }, card));
+    writeJson(ACTION_CARDS_KEY, seeded);
+    return seeded;
+  }
+
+  function updateActionCard(id, patch) {
+    if (!id) return;
+    writeJson(ACTION_CARDS_KEY, readActionCards().map((card) => card.id === id ? Object.assign({}, card, patch) : card));
+    renderActionPlan();
+  }
+
+  function deleteActionCard(id) {
+    if (!id) return;
+    writeJson(ACTION_CARDS_KEY, readActionCards().filter((card) => card.id !== id));
+    renderActionPlan();
   }
 
   function safeLocalStorageGet(key) {
     try { return localStorage.getItem(key) || ""; }
     catch (_) { return ""; }
+  }
+
+  function initAppointments() {
+    const form = $("appointmentForm");
+    if (form && !form.dataset.bound) {
+      form.dataset.bound = "true";
+      const dateInput = $("appointmentDate");
+      if (dateInput && !dateInput.value) dateInput.valueAsDate = new Date();
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const appointment = {
+          id: uid(),
+          client: ($("appointmentClient")?.value || "").trim(),
+          phone: ($("appointmentPhone")?.value || "").trim(),
+          device: ($("appointmentDevice")?.value || "").trim(),
+          issue: ($("appointmentIssue")?.value || "").trim(),
+          date: $("appointmentDate")?.value || "",
+          time: $("appointmentTime")?.value || "",
+          notes: ($("appointmentNotes")?.value || "").trim(),
+          status: "scheduled",
+          created: new Date().toISOString(),
+        };
+        const msg = $("appointmentMessage");
+        if (!appointment.client || !appointment.device || !appointment.date || !appointment.time) {
+          if (msg) msg.textContent = "Add client, device, date, and time.";
+          return;
+        }
+        writeJson(APPOINTMENTS_KEY, [appointment].concat(readAppointments()));
+        form.reset();
+        if (dateInput) dateInput.valueAsDate = new Date();
+        if (msg) msg.textContent = "Appointment created.";
+        renderAppointments();
+      });
+    }
+    renderAppointments();
+  }
+
+  function readAppointments() {
+    return readJson(APPOINTMENTS_KEY, []);
+  }
+
+  function renderAppointments() {
+    const list = $("appointmentList");
+    if (!list) return;
+    const appointments = readAppointments().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+    list.innerHTML = appointments.length ? appointments.map((item) => `
+      <article class="ops-row ${item.status === "completed" ? "is-complete" : ""}">
+        <div>
+          <strong>${esc(item.client)}</strong>
+          <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}</p>
+          <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
+          ${item.notes ? `<small>${esc(item.notes)}</small>` : ""}
+        </div>
+        <div class="ops-row-actions">
+          <button type="button" data-appointment-complete="${esc(item.id)}">${item.status === "completed" ? "Reopen" : "Done"}</button>
+          <button type="button" class="danger-text" data-appointment-delete="${esc(item.id)}">Delete</button>
+        </div>
+      </article>
+    `).join("") : `<p class="ops-empty">No appointments scheduled yet.</p>`;
+    list.querySelectorAll("[data-appointment-complete]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        writeJson(APPOINTMENTS_KEY, readAppointments().map((item) =>
+          item.id === btn.dataset.appointmentComplete
+            ? Object.assign({}, item, { status: item.status === "completed" ? "scheduled" : "completed" })
+            : item
+        ));
+        renderAppointments();
+      });
+    });
+    list.querySelectorAll("[data-appointment-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        writeJson(APPOINTMENTS_KEY, readAppointments().filter((item) => item.id !== btn.dataset.appointmentDelete));
+        renderAppointments();
+      });
+    });
+  }
+
+  function initExpenses() {
+    const form = $("expenseForm");
+    if (form && !form.dataset.bound) {
+      form.dataset.bound = "true";
+      const dateInput = $("expenseDate");
+      if (dateInput && !dateInput.value) dateInput.valueAsDate = new Date();
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const expense = {
+          id: uid(),
+          date: $("expenseDate")?.value || "",
+          category: $("expenseCategory")?.value || "Other",
+          vendor: ($("expenseVendor")?.value || "").trim(),
+          amount: Number($("expenseAmount")?.value || 0),
+          notes: ($("expenseNotes")?.value || "").trim(),
+          created: new Date().toISOString(),
+        };
+        const msg = $("expenseMessage");
+        if (!expense.date || !expense.amount || expense.amount < 0) {
+          if (msg) msg.textContent = "Add a valid date and amount.";
+          return;
+        }
+        writeJson(EXPENSES_KEY, [expense].concat(readExpenses()));
+        form.reset();
+        if (dateInput) dateInput.valueAsDate = new Date();
+        if (msg) msg.textContent = "Expense added.";
+        renderExpenses();
+      });
+    }
+    renderExpenses();
+  }
+
+  function readExpenses() {
+    return readJson(EXPENSES_KEY, []);
+  }
+
+  function renderExpenses() {
+    const list = $("expenseList");
+    const total = $("expenseMonthTotal");
+    if (!list && !total) return;
+    const expenses = readExpenses().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const currentMonth = monthKey(new Date());
+    const monthTotal = expenses
+      .filter((item) => monthKey(new Date(item.date || Date.now())) === currentMonth)
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    if (total) total.textContent = money(monthTotal);
+    if (list) {
+      list.innerHTML = expenses.length ? expenses.map((item) => `
+        <article class="ops-row">
+          <div>
+            <strong>${esc(item.category)} · ${money(item.amount)}</strong>
+            <p>${esc(item.vendor || "No vendor")}</p>
+            <small>${esc(formatDate(item.date))}${item.notes ? " · " + esc(item.notes) : ""}</small>
+          </div>
+          <div class="ops-row-actions">
+            <button type="button" class="danger-text" data-expense-delete="${esc(item.id)}">Delete</button>
+          </div>
+        </article>
+      `).join("") : `<p class="ops-empty">No expenses recorded yet.</p>`;
+      list.querySelectorAll("[data-expense-delete]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          writeJson(EXPENSES_KEY, readExpenses().filter((item) => item.id !== btn.dataset.expenseDelete));
+          renderExpenses();
+        });
+      });
+    }
+  }
+
+  function readJson(key, fallback) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || "null");
+      return parsed == null ? fallback : parsed;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function formatDate(date) {
+    if (!date) return "No date";
+    const parsed = new Date(date + "T00:00:00");
+    return isNaN(parsed) ? date : parsed.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function formatDateTime(date, time) {
+    if (!date) return "No date";
+    const parsed = new Date(`${date}T${time || "00:00"}`);
+    if (isNaN(parsed)) return [date, time].filter(Boolean).join(" ");
+    return parsed.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) +
+      " · " + parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   }
 
   function renderKpis(metrics, loadState) {
@@ -440,6 +660,8 @@
 
   window.addEventListener("rpc-enter-dashboard", () => loadDashboard({ force: true }));
   window.addEventListener("rpc-enter-targets", () => renderGoalEditor({ goal: monthlyGoal() }));
+  window.addEventListener("rpc-enter-appointments", initAppointments);
+  window.addEventListener("rpc-enter-expenses", initExpenses);
   window.addEventListener("rpc-tickets", (event) => {
     tickets = (event.detail?.tickets || []).map(normalizeTicket);
     render({});
@@ -450,4 +672,7 @@
   });
 
   loadDashboard();
+  renderGoalEditor({ goal: monthlyGoal() });
+  initAppointments();
+  initExpenses();
 })();
