@@ -136,7 +136,8 @@
 
   function renderGoalEditor(metrics) {
     const input = $("dashboardGoalInput");
-    if (input && document.activeElement !== input) input.value = Math.round(metrics.goal || DEFAULT_MONTHLY_GOAL);
+    const goal = Math.round((metrics && metrics.goal) || monthlyGoal() || DEFAULT_MONTHLY_GOAL);
+    if (input && document.activeElement !== input) input.value = goal;
     bindGoalForm();
   }
 
@@ -362,6 +363,7 @@
   }
 
   window.addEventListener("rpc-enter-dashboard", () => loadDashboard({ force: true }));
+  window.addEventListener("rpc-enter-targets", () => renderGoalEditor({ goal: monthlyGoal() }));
   window.addEventListener("rpc-tickets", (event) => {
     tickets = (event.detail?.tickets || []).map(normalizeTicket);
     render({});

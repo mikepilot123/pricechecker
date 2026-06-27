@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=dashboard-target-1" />
+  <link rel="stylesheet" href="assets/style.css?v=targets-tab-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -20,6 +20,7 @@
     <symbol id="i-inventory-flow" viewBox="0 0 24 24"><path d="m12 3.2 4.2 2.4-4.2 2.5-4.2-2.5L12 3.2Z"/><path d="M7.8 5.6v4.8l4.2 2.5 4.2-2.5V5.6M12 8.1v4.8"/><path d="m6.2 12 3.7 2.2-3.7 2.2-3.7-2.2L6.2 12Z"/><path d="M2.5 14.2v4.2l3.7 2.2 3.7-2.2v-4.2M6.2 16.4v4.2"/><path d="m17.8 12 3.7 2.2-3.7 2.2-3.7-2.2 3.7-2.2Z"/><path d="M14.1 14.2v4.2l3.7 2.2 3.7-2.2v-4.2M17.8 16.4v4.2"/><path d="M5.3 9.8a8.4 8.4 0 0 0-.8 7.1"/><path d="M18.7 14.2a8.4 8.4 0 0 0-.3-6.8"/><path d="m3.4 9.7 2-.4.4 2M20.6 14.7l-2 .4-.4-2"/></symbol>
     <symbol id="i-dashboard" viewBox="0 0 24 24"><rect x="3.5" y="4" width="7" height="7" rx="1.5"/><rect x="13.5" y="4" width="7" height="4.8" rx="1.5"/><rect x="13.5" y="11.2" width="7" height="8.8" rx="1.5"/><rect x="3.5" y="14.2" width="7" height="5.8" rx="1.5"/></symbol>
     <symbol id="i-repair-progress" viewBox="0 0 24 24"><rect x="4" y="4.5" width="10" height="15" rx="2"/><path d="M7.2 8.2h3.7M7.2 11.5h2.4M17.4 6.4l1.9-1.9a2.5 2.5 0 0 1-3.2 3.2l-5.9 5.9a1.4 1.4 0 0 0 2 2l5.9-5.9a2.5 2.5 0 0 1 3.2-3.2l-1.9 1.9"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.8"/><circle cx="12" cy="12" r="1.5"/><path d="M18.2 5.8 21 3M21 3v4M21 3h-4"/></symbol>
     <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></symbol>
     <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2A2 2 0 0 1 3 12V5a2 2 0 0 1 2-2h7a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.8Z"/><path d="M7.5 7.5h.01"/></symbol>
     <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6"/></symbol>
@@ -52,6 +53,7 @@
     </div>
     <nav class="view-nav" role="tablist" aria-label="Sections">
       <button class="nav-btn active" data-target="dashboard" role="tab" aria-selected="true"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
+      <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
       <button class="nav-btn" data-target="prices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
       <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
@@ -67,20 +69,6 @@
       <span id="dashboardUpdated">Loading dashboard…</span>
     </p>
 
-    <section class="dashboard-target-card" aria-labelledby="dashboardTargetTitle">
-      <div>
-        <p class="dashboard-eyebrow" id="dashboardTargetTitle">Monthly sales target</p>
-        <p class="dashboard-target-help">Set the goal used by the progress card.</p>
-      </div>
-      <form id="dashboardGoalForm" class="dashboard-target-form">
-        <label class="visually-hidden" for="dashboardGoalInput">Monthly sales target</label>
-        <span class="dashboard-currency" aria-hidden="true">$</span>
-        <input id="dashboardGoalInput" type="number" min="0" step="100" inputmode="decimal" placeholder="80000" />
-        <button type="submit" class="ghost-btn">Save target</button>
-      </form>
-      <p id="dashboardGoalMessage" class="dashboard-target-message" aria-live="polite"></p>
-    </section>
-
     <section id="dashboardKpis" class="dashboard-kpi-grid" aria-live="polite"></section>
 
     <section class="today-focus-card" aria-labelledby="todayFocusTitle">
@@ -92,6 +80,25 @@
         <span id="todayFocusDate" class="today-focus-date"></span>
       </div>
       <div id="dashboardFocus" class="today-focus-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- ============ TARGETS VIEW ============ -->
+  <main class="container view" id="view-targets" hidden>
+    <p class="info-banner">Set business targets used across the dashboard.</p>
+    <section class="dashboard-target-card targets-page-card" aria-labelledby="dashboardTargetTitle">
+      <div>
+        <p class="dashboard-eyebrow" id="dashboardTargetTitle">Monthly sales target</p>
+        <h2 class="targets-title">Sales goal</h2>
+        <p class="dashboard-target-help">This target powers the Dashboard’s monthly progress card.</p>
+      </div>
+      <form id="dashboardGoalForm" class="dashboard-target-form">
+        <label class="visually-hidden" for="dashboardGoalInput">Monthly sales target</label>
+        <span class="dashboard-currency" aria-hidden="true">$</span>
+        <input id="dashboardGoalInput" type="number" min="0" step="100" inputmode="decimal" placeholder="80000" />
+        <button type="submit" class="ghost-btn">Save target</button>
+      </form>
+      <p id="dashboardGoalMessage" class="dashboard-target-message" aria-live="polite"></p>
     </section>
   </main>
 
@@ -517,6 +524,6 @@
   <script src="assets/app.js?v=side-nav-1"></script>
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
   <script src="assets/intake.js?v=business-dashboard-1"></script>
-  <script src="assets/dashboard.js?v=dashboard-target-1"></script>
+  <script src="assets/dashboard.js?v=targets-tab-1"></script>
 </body>
 </html>
