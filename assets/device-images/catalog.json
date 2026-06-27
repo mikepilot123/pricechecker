@@ -1,74 +1,555 @@
 {
   "iphone 7": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/IPhone_7_-_A1778_Rose_Gold_-_Back_%28retouch%29_%28white_BG_no_shadow%29.jpg/500px-IPhone_7_-_A1778_Rose_Gold_-_Back_%28retouch%29_%28white_BG_no_shadow%29.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:IPhone_7_-_A1778_Rose_Gold_-_Back_(retouch)_(white_BG_no_shadow).jpg",
-    "title": "File:IPhone 7 - A1778 Rose Gold - Back (retouch) (white BG no shadow).jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Disde&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Disde (page does not exist)\"><b>MacRepairDundee.co.uk</b></a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-7r4.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_7-8064.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-7.webp"
   },
   "iphone 7 plus": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/IPhone_7_Plus_Black_dual_camera_back.jpg/500px-IPhone_7_Plus_Black_dual_camera_back.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:IPhone_7_Plus_Black_dual_camera_back.jpg",
-    "title": "File:IPhone 7 Plus Black dual camera back.jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:Amin\" title=\"User:Amin\">Amin</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-7-plus-r2.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_7_plus-8065.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-7-plus.webp"
   },
   "iphone 8/se": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/IPhones_6%2C_7%2C_8%2C_SE2_black_-_back_camera_view.jpg/500px-IPhones_6%2C_7%2C_8%2C_SE2_black_-_back_camera_view.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:IPhones_6,_7,_8,_SE2_black_-_back_camera_view.jpg",
-    "title": "File:IPhones 6, 7, 8, SE2 black - back camera view.jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:Thsdb\" title=\"User:Thsdb\">Thsdb</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-8-new.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_8-8573.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-8-se.webp"
   },
+  "iphone 8 plus": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-8-plus-new.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_8_plus-8131.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-8-plus.webp"
+  },
+  "iphone x": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-x.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_x-8858.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-x.webp"
+  },
   "iphone xr": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Back_view_of_iPhone_XR_white.jpg/500px-Back_view_of_iPhone_XR_white.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Back_view_of_iPhone_XR_white.jpg",
-    "title": "File:Back view of iPhone XR white.jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:%E3%83%A1%E3%82%A4%E3%83%89%E7%90%86%E4%B8%96\" class=\"mw-redirect\" title=\"User:\u30e1\u30a4\u30c9\u7406\u4e16\">\u30e1\u30a4\u30c9\u7406\u4e16</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-xr-new.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_xr-9320.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-xr.webp"
   },
   "iphone xs": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Apple_iPhone_XS%2C_rear_%28gold%29.jpg/500px-Apple_iPhone_XS%2C_rear_%28gold%29.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Apple_iPhone_XS,_rear_(gold).jpg",
-    "title": "File:Apple iPhone XS, rear (gold).jpg",
-    "license": "CC BY 2.0 de",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:Mattes\" title=\"User:Mattes\">User:Mattes</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-xs-new.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_xs-9318.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-xs.webp"
   },
+  "iphone xs max": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-xs-max-new1.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_xs_max-9319.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-xs-max.webp"
+  },
   "iphone 11": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Back_view_of_iPhone_11_white.jpg/500px-Back_view_of_iPhone_11_white.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Back_view_of_iPhone_11_white.jpg",
-    "title": "File:Back view of iPhone 11 white.jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:%E3%83%A1%E3%82%A4%E3%83%89%E7%90%86%E4%B8%96\" class=\"mw-redirect\" title=\"User:\u30e1\u30a4\u30c9\u7406\u4e16\">\u30e1\u30a4\u30c9\u7406\u4e16</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-11.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_11-9848.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-11.webp"
   },
+  "iphone 11 pro": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-11-pro-max-.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_11_pro-9847.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-11-pro.webp"
+  },
   "iphone 11 pro max": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Scan_of_back_of_iPhone_11_Pro_Max_Space_Grey.jpg/500px-Scan_of_back_of_iPhone_11_Pro_Max_Space_Grey.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Scan_of_back_of_iPhone_11_Pro_Max_Space_Grey.jpg",
-    "title": "File:Scan of back of iPhone 11 Pro Max Space Grey.jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:Dllu\" title=\"User:Dllu\">Dllu</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-11-pro.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_11_pro_max-9846.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-11-pro-max.webp"
   },
+  "iphone 12": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-12.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_12-10509.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-12.webp"
+  },
+  "iphone 12 mini": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-12-mini.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_12_mini-10510.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-12-mini.webp"
+  },
+  "iphone 12 pro": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-12-pro--.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_12_pro-10508.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-12-pro.webp"
+  },
+  "iphone 12 pro max": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-12-pro-max-.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_12_pro_max-10237.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-12-pro-max.webp"
+  },
+  "iphone 13": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-13.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_13-11103.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-13.webp"
+  },
+  "iphone 13 mini": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-13-mini.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_13_mini-11104.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-13-mini.webp"
+  },
   "iphone 13 pro": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Back_of_the_iPhone_13_Pro.jpg/500px-Back_of_the_iPhone_13_Pro.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Back_of_the_iPhone_13_Pro.jpg",
-    "title": "File:Back of the iPhone 13 Pro.jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:Hajoon0102\" title=\"User:Hajoon0102\">Hajoon0102</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-13-pro.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_13_pro-11102.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-13-pro.webp"
   },
   "iphone 13 pro max": {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Back_view_of_iPhone_13_Pro_Max_Gold.jpg/500px-Back_view_of_iPhone_13_Pro_Max_Gold.jpg",
-    "source": "https://commons.wikimedia.org/wiki/File:Back_view_of_iPhone_13_Pro_Max_Gold.jpg",
-    "title": "File:Back view of iPhone 13 Pro Max Gold.jpg",
-    "license": "CC BY-SA 4.0",
-    "credit": "<a href=\"//commons.wikimedia.org/wiki/User:%E3%83%A1%E3%82%A4%E3%83%89%E7%90%86%E4%B8%96\" class=\"mw-redirect\" title=\"User:\u30e1\u30a4\u30c9\u7406\u4e16\">\u30e1\u30a4\u30c9\u7406\u4e16</a>",
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-13-pro-max.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_13_pro_max-11089.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
     "file": "iphone-13-pro-max.webp"
+  },
+  "iphone 14": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-14.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_14-11861.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-14.webp"
+  },
+  "iphone 14 plus": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-14-plus.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_14_plus-11862.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-14-plus.webp"
+  },
+  "iphone 14 pro": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-14-pro.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_14_pro-11860.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-14-pro.webp"
+  },
+  "iphone 14 pro max": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-14-pro-max-.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_14_pro_max-11773.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-14-pro-max.webp"
+  },
+  "iphone 15": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_15-12559.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-15.webp"
+  },
+  "iphone 15 plus": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15-plus-.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_15_plus-12558.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-15-plus.webp"
+  },
+  "iphone 15 pro": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15-pro.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_15_pro-12557.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-15-pro.webp"
+  },
+  "iphone 15 pro max": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15-pro-max.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_15_pro_max-12548.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-15-pro-max.webp"
+  },
+  "iphone 16": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-16.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_16-13317.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-16.webp"
+  },
+  "iphone 16 plus": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-16-plus.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_16_plus-13316.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-16-plus.webp"
+  },
+  "iphone 16 pro": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-16-pro.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_16_pro-13315.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-16-pro.webp"
+  },
+  "iphone 16 pro max": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-16-pro-max.jpg",
+    "source": "https://www.gsmarena.com/apple_iphone_16_pro_max-13123.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "iphone-16-pro-max.webp"
+  },
+  "ipad 9": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-ipad-102-2021-.jpg",
+    "source": "https://www.gsmarena.com/apple_ipad_10_2_(2021)-11106.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "ipad-9.webp"
+  },
+  "ipad 11 pro gen 1": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/apple-ipad-pro-11-2018.jpg",
+    "source": "https://www.gsmarena.com/apple_ipad_pro_11_(2018)-9386.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "ipad-11-pro-gen-1.webp"
+  },
+  "techno spark 20 kjs": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/tecno-spark-20.jpg",
+    "source": "https://www.gsmarena.com/tecno_spark_20-12722.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "techno-spark-20-kjs.webp"
+  },
+  "samsung galaxy s9+": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s9-plus.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s9+-8967.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s9-plus.webp"
+  },
+  "samsung galaxy s10": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s10.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s10-9536.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s10.webp"
+  },
+  "samsung galaxy s10e": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s10e.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s10e-9537.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s10e.webp"
+  },
+  "samsung galaxy s10+": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s10-plus.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s10+-9535.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s10-plus.webp"
+  },
+  "samsung galaxy s20": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s20.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s20-10081.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s20.webp"
+  },
+  "samsung galaxy s20 fe": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s20-fe.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s20_fe-10428.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s20-fe.webp"
+  },
+  "samsung galaxy s20+": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s20-plus.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s20+-10080.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s20-plus.webp"
+  },
+  "samsung galaxy s20 ultra": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s20-ultra.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s20_ultra-10084.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s20-ultra.webp"
+  },
+  "samsung galaxy s21 ultra": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s21-ultra-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s21_ultra_5g-10596.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s21-ultra.webp"
+  },
+  "samsung galaxy s21": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s21-5g-r.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s21_5g-10626.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s21.webp"
+  },
+  "samsung galaxy s21fe": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s21-fe-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s21_fe_5g-10954.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s21fe.webp"
+  },
+  "samsung galaxy s21+": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s21-plus-5g-.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s21+_5g-10625.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s21-plus.webp"
+  },
+  "samsung galaxy s22": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s22-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s22_5g-11253.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s22.webp"
+  },
+  "samsung galaxy s22+": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s22-plus-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s22+_5g-11252.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s22-plus.webp"
+  },
+  "samsung galaxy s22 ultra": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s22-ultra-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s22_ultra_5g-11251.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s22-ultra.webp"
+  },
+  "samsung galaxy s23": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s23-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s23-12082.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s23.webp"
+  },
+  "samsung galaxy s23+": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s23-plus-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s23+-12083.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s23-plus.webp"
+  },
+  "samsung galaxy s23 ultra": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s23-ultra-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s23_ultra-12024.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s23-ultra.webp"
+  },
+  "samsung galaxy s24": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s24-5g-sm-s921.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s24-12773.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s24.webp"
+  },
+  "samsung galaxy s24+": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s24-plus-5g-sm-s926.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s24+-12772.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s24-plus.webp"
+  },
+  "samsung galaxy s24 ultra": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s24-ultra-5g-sm-s928-stylus.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s24_ultra-12771.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s24-ultra.webp"
+  },
+  "samsung galaxy s25": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s25-sm-s931.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s25-13610.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s25.webp"
+  },
+  "samsung galaxy s25 fe": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s25-fe.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s25_fe_5g-14042.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s25-fe.webp"
+  },
+  "samsung galaxy s25 plus": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s25-plus-sm-s936.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s25+-13609.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s25-plus.webp"
+  },
+  "samsung galaxy s25 ultra": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s25-ultra-sm-s938.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_s25_ultra-13322.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-galaxy-s25-ultra.webp"
+  },
+  "note 20 ultra": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-note20-ultra-.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_note20_ultra_5g-10261.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "note-20-ultra.webp"
+  },
+  "samsung z flip 3": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-z-flip3-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_z_flip3_5g-11044.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-z-flip-3.webp"
+  },
+  "samsung z flip 4": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-z-flip4-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_z_flip4-11538.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-z-flip-4.webp"
+  },
+  "samsung a02s": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a02s-sm-a025-new.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a02s-10603.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a02s.webp"
+  },
+  "samsung a03": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a03.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a03-11244.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a03.webp"
+  },
+  "samsung a03s": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a03s.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a03s-10937.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a03s.webp"
+  },
+  "samsung a04": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a04.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a04-11817.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a04.webp"
+  },
+  "samsung a05": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a05.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a05-12583.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a05.webp"
+  },
+  "samsung a05s": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a05s.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a05s-12584.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a05s.webp"
+  },
+  "samsung a06": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a06-1.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a06-13265.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a06.webp"
+  },
+  "samsung a07": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a07.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a07-14066.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a07.webp"
+  },
+  "samsung a12": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a12-sm-a125.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a12-10604.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a12.webp"
+  },
+  "samsung a14": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a14-4g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a14-12151.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a14.webp"
+  },
+  "samsung a15": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a15-lte-.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a15-12637.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a15.webp"
+  },
+  "samsung a16": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a16-lte.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a16-13383.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a16.webp"
+  },
+  "samsung a17": {
+    "url": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a17-5g.jpg",
+    "source": "https://www.gsmarena.com/samsung_galaxy_a17_5g-14041.php",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a17.webp"
+  },
+  "samsung a21": {
+    "url": "",
+    "source": "https://www.gsmarena.com/",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a21.webp"
+  },
+  "samsung a21s": {
+    "url": "",
+    "source": "https://www.gsmarena.com/",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a21s.webp"
+  },
+  "samsung a22": {
+    "url": "",
+    "source": "https://www.gsmarena.com/",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a22.webp"
+  },
+  "samsung a23": {
+    "url": "",
+    "source": "https://www.gsmarena.com/",
+    "license": "GSMArena official product photo — used locally for internal device identification only",
+    "credit": "GSMArena",
+    "file": "samsung-a23.webp"
   }
 }
