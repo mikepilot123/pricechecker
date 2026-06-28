@@ -57,6 +57,12 @@
   const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
 
   const $ = (id) => document.getElementById(id);
+  // Skip autofocus on touch devices so opening a form doesn't immediately
+  // pop the on-screen keyboard and shove the layout around.
+  const isTouchDevice = () => window.matchMedia("(pointer: coarse)").matches;
+  const focusUnlessTouch = (el) => {
+    if (el && !isTouchDevice()) el.focus();
+  };
 
   // State
   let TICKETS = [];
@@ -1004,7 +1010,7 @@
     $("formSuccessMessage").textContent = "";
     setFormStep(1);
     $("intakeFormModal").hidden = false;
-    $("fName").focus();
+    focusUnlessTouch($("fName"));
   }
   function closeForm() {
     $("intakeFormModal").hidden = true;
@@ -1136,7 +1142,7 @@
     loadInventoryForForm().then(() => updateInventoryOptions("")).catch(() => {});
     setQuickLogMode(true);
     $("quotedPriceSummary").textContent = `Quoted ${price || (priceValue != null ? "$" + priceValue : "—")} — ${repairType || device || ""}`;
-    $("fName").focus();
+    focusUnlessTouch($("fName"));
   }
 
   window.addEventListener("rpc-log-device", (e) => {
