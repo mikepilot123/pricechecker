@@ -537,6 +537,7 @@
         <div class="ticket-sub">${esc(item.device || "—")}</div>
         ${phoneLine}
       </div>
+      <div class="ticket-phone-row">${phoneLine}</div>
       <div class="ticket-repair">
         <span class="ticket-repair-label">Repair</span>
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(item.issue)}</div>
@@ -549,8 +550,9 @@
           <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
         </div>
       </div>`;
-    const phoneEl = head.querySelector("a.ticket-phone");
-    if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
+    head.querySelectorAll("a.ticket-phone").forEach((phoneEl) => {
+      phoneEl.onclick = (e) => e.stopPropagation();
+    });
     const thumb = head.querySelector(".ticket-device-thumb");
     const thumbImg = head.querySelector(".ticket-device-thumb img");
     if (thumbImg) {

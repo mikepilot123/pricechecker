@@ -67,13 +67,42 @@ body {
 }
 
 .header-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
   align-items: center;
-  justify-content: center;
   gap: 12px;
   width: min(100%, var(--workspace-max));
   margin: 0 auto;
 }
+.brand { grid-column: 2; justify-content: center; }
+
+.nav-menu-toggle {
+  grid-column: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  flex: none;
+}
+.nav-menu-toggle .icon { width: 20px; height: 20px; }
+.nav-menu-toggle:active { transform: scale(0.96); }
+
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 190;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.nav-backdrop[hidden] { display: none; }
+body.nav-open .nav-backdrop { opacity: 1; }
 
 .brand {
   font-family: var(--font-display);
@@ -821,6 +850,9 @@ body {
   .inventory-table tr,
   .inventory-table td { display: block; width: 100%; min-width: 0; }
   .inventory-table thead { display: none; }
+  .inventory-table tr.inventory-row {
+    width: auto;
+  }
   .inventory-row {
     margin: 10px;
     border: 1px solid var(--border);
@@ -907,32 +939,44 @@ body {
 }
 
 /* ---------- View nav ---------- */
+/* Mobile default: a slide-out drawer triggered by .nav-menu-toggle, opened via
+   body.nav-open. Replaced by an always-visible sidebar at the 900px+ breakpoint. */
 .view-nav {
   display: flex;
-  gap: 6px;
-  margin: 12px auto 0;
-  width: min(100%, var(--workspace-max));
-  background: var(--bg-soft);
-  padding: 4px;
-  border-radius: var(--radius-md);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100dvh;
+  width: min(78vw, 280px);
+  margin: 0;
+  background: var(--card);
+  padding: max(env(safe-area-inset-top), 16px) 12px 16px;
+  border-radius: 0;
+  box-shadow: 8px 0 28px rgba(15, 23, 42, 0.18);
+  z-index: 200;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
 }
-.view-nav::-webkit-scrollbar { display: none; }
+body.nav-open .view-nav { transform: translateX(0); }
 .nav-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 7px;
   flex: none;
+  width: 100%;
+  min-height: 44px;
   white-space: nowrap;
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-dim);
   border-radius: var(--radius-sm);
   padding: 9px 12px;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
@@ -968,15 +1012,25 @@ body {
     box-shadow: 8px 0 24px rgba(18, 24, 38, 0.04);
   }
   .header-row {
+    display: flex;
     justify-content: flex-start;
     width: 100%;
     margin: 0;
     padding: 2px 8px 14px;
   }
+  .nav-menu-toggle { display: none; }
+  .nav-backdrop { display: none; }
   .brand-logo {
     width: 158px;
   }
   .view-nav {
+    position: static;
+    height: auto;
+    transform: none;
+    transition: none;
+    box-shadow: none;
+    z-index: auto;
+    overflow-y: visible;
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
@@ -2241,6 +2295,7 @@ body {
     grid-template-columns: 64px minmax(0, 1fr) auto;
     grid-template-areas:
       "thumb identity activity"
+      "phone phone phone"
       "repair repair status";
     align-items: start;
     gap: 12px;
@@ -2249,6 +2304,8 @@ body {
   .ticket-status { min-width: 0; align-self: center; }
   .ticket-activity { align-self: start; }
   .ticket-repair { padding-top: 2px; }
+  .ticket-identity .ticket-phone { display: none; }
+  .ticket-head .ticket-phone-row { display: block; grid-area: phone; }
 }
 @media (max-width: 390px) {
   .ticket-head {
@@ -2259,9 +2316,14 @@ body {
   .ticket-device-thumb { width: 56px; height: 56px; border-radius: var(--radius-md); }
   .ticket-device-thumb img { padding: 8px; }
 }
+/* Full-width duplicate of the phone link, shown only on the narrow mobile
+   ticket-head layout where the identity column is too cramped for it. */
+.ticket-phone-row { display: none; }
 /* Tap-to-call number shown right on the card */
 .ticket-phone {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
   align-items: center;
   gap: 6px;
   min-height: 44px;

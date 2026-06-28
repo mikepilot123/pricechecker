@@ -116,7 +116,29 @@
   navBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       navigateTo(btn.dataset.target);
+      closeNavDrawer();
     });
+  });
+
+  // ---- Mobile nav drawer ----------------------------------------------------
+  const navMenuToggle = $("navMenuToggle");
+  const navBackdrop = $("navBackdrop");
+  function openNavDrawer() {
+    document.body.classList.add("nav-open");
+    if (navBackdrop) navBackdrop.hidden = false;
+    navMenuToggle?.setAttribute("aria-expanded", "true");
+  }
+  function closeNavDrawer() {
+    document.body.classList.remove("nav-open");
+    navMenuToggle?.setAttribute("aria-expanded", "false");
+    if (navBackdrop) setTimeout(() => navBackdrop.hidden = true, 250);
+  }
+  navMenuToggle?.addEventListener("click", () => {
+    document.body.classList.contains("nav-open") ? closeNavDrawer() : openNavDrawer();
+  });
+  navBackdrop?.addEventListener("click", closeNavDrawer);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeNavDrawer();
   });
 
   // ---- Config --------------------------------------------------------------
@@ -239,6 +261,7 @@
     setActiveNav("settings");
     showView("intake");
     showSetup(true);
+    closeNavDrawer();
   });
   $("closeIntakeSettings").addEventListener("click", () => {
     setActiveNav("intake");
@@ -1650,6 +1673,7 @@
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
       </div>
+      <div class="ticket-phone-row">${phoneLine}</div>
       <div class="ticket-repair">
         <span class="ticket-repair-label">Repair</span>
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
@@ -1661,9 +1685,10 @@
       <div class="ticket-activity">
         ${activityLogBtnHtml(t, "")}
       </div>`;
-    const phoneEl = head.querySelector("a.ticket-phone");
-    if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
-    if (phoneEl) phoneEl.onkeydown = (e) => e.stopPropagation();
+    head.querySelectorAll("a.ticket-phone").forEach((phoneEl) => {
+      phoneEl.onclick = (e) => e.stopPropagation();
+      phoneEl.onkeydown = (e) => e.stopPropagation();
+    });
     const techBtn = head.querySelector(".ticket-tech-btn");
     if (techBtn) {
       techBtn.onclick = (e) => {
