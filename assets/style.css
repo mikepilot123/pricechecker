@@ -2475,7 +2475,7 @@ body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 5000;
   background: rgba(18, 24, 38, 0.45);
   display: flex;
   align-items: flex-end;
@@ -2499,6 +2499,8 @@ body {
   .modal-backdrop { align-items: center; padding: 20px; }
 }
 .modal-panel {
+  position: relative;
+  z-index: 1;
   background: var(--card);
   width: 100%;
   max-width: 480px;

@@ -6,20 +6,25 @@
 
    Google Sheet requests are never touched here — prices/intake always go
    straight to the network (with their own localStorage fallback in app.js). */
-const CACHE = "rpc-shell-v32";
+const CACHE = "rpc-shell-v34";
 const SHELL = [
   "./",
   "./index.html",
   "./assets/style.css",
   "./assets/app.js",
   "./assets/dashboard.js",
+  "./assets/appointments.js",
   "./assets/inventory.js",
   "./assets/intake.js",
   "./manifest.webmanifest",
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(SHELL.map((url) => new Request(url, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (e) => {
@@ -41,7 +46,7 @@ self.addEventListener("fetch", (e) => {
   // Network-first: try the live file, cache a fresh copy, and only fall
   // back to the cached copy if the network is unreachable.
   e.respondWith(
-    fetch(req)
+    fetch(new Request(req, { cache: "no-store" }))
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});

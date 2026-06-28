@@ -304,7 +304,11 @@
     updateIssueSummary();
   }
 
-  function openApptIssueModal() { $("apptIssueModal").hidden = false; }
+  function openApptIssueModal() {
+    closeAppointmentDeviceDropdown?.();
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    $("apptIssueModal").hidden = false;
+  }
   function closeApptIssueModal() { $("apptIssueModal").hidden = true; updateIssueSummary(); }
 
   // ---------- technicians (Fresha-style chip picker, shared with Check-In) ----------
@@ -428,7 +432,6 @@
     function choose(name) {
       input.value = name;
       close();
-      input.focus();
       if (onChoose) onChoose(name);
     }
 
@@ -580,10 +583,7 @@
       onChoose: (value) => updateDeviceThumb(value),
     });
 
-    $("openApptIssueModal")?.addEventListener("click", () => {
-      closeAppointmentDeviceDropdown?.();
-      openApptIssueModal();
-    });
+    $("openApptIssueModal")?.addEventListener("click", openApptIssueModal);
     $("closeApptIssueModal")?.addEventListener("click", closeApptIssueModal);
     $("apptIssueModalDone")?.addEventListener("click", closeApptIssueModal);
     $("apptIssueModal")?.addEventListener("click", (e) => {
