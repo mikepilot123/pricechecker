@@ -2213,6 +2213,7 @@ body {
 .ticket-head.no-click { cursor: default; }
 .ticket-head.no-click:hover { background: none; }
 .ticket-tech-label { font-size: 0.72rem; color: var(--text-dim); }
+.ticket-row-actions { display: flex; gap: 6px; }
 .ticket-status button[data-complete],
 .ticket-status button[data-delete] {
   min-height: 30px;

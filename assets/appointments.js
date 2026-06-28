@@ -544,8 +544,10 @@
       <div class="ticket-status">
         <span class="status-badge st-pickedup">Completed</span>
         <span class="ticket-tech-label">${esc(technicianLabel)}</span>
-        <button type="button" data-complete="${esc(item.id)}">Reopen</button>
-        <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
+        <div class="ticket-row-actions">
+          <button type="button" data-complete="${esc(item.id)}">Reopen</button>
+          <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
+        </div>
       </div>`;
     const phoneEl = head.querySelector("a.ticket-phone");
     if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
