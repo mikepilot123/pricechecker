@@ -187,12 +187,17 @@
       line.classList.toggle("complete", idx + 1 < n);
     });
 
+    const isComplete = n === 4;
     const prevBtn = $("apptPrevStep");
     const nextBtn = $("apptNextStep");
     const confirmBtn = $("apptConfirmBtn");
-    if (prevBtn) prevBtn.hidden = n === 1;
+    const createAnotherBtn = $("apptCreateAnother");
+    const goToViewBtn = $("apptGoToView");
+    if (prevBtn) prevBtn.hidden = n === 1 || isComplete;
     if (nextBtn) nextBtn.hidden = n !== 2;
     if (confirmBtn) confirmBtn.hidden = n !== 3;
+    if (createAnotherBtn) createAnotherBtn.hidden = !isComplete;
+    if (goToViewBtn) goToViewBtn.hidden = !isComplete;
 
     if (n === 3) renderSummary();
   }
@@ -639,10 +644,22 @@
         };
         writeAppointments([appointment].concat(readAppointments()));
         if (msg) msg.hidden = true;
-        resetSelection();
         renderList();
+        const [y, m, d] = appointment.date.split("-").map(Number);
+        const dateLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+        const successMsg = $("apptSuccessMessage");
+        if (successMsg) {
+          successMsg.textContent = `${client}'s appointment is booked for ${dateLabel} at ${minutesToLabel(timeToMinutes(appointment.time))}.`;
+        }
+        setStep(4);
       });
     }
+
+    $("apptCreateAnother")?.addEventListener("click", () => resetSelection());
+    $("apptGoToView")?.addEventListener("click", () => {
+      resetSelection();
+      setPanel("view");
+    });
   }
 
   function init() {

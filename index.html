@@ -249,11 +249,22 @@
         </form>
       </section>
 
+      <section class="form-step form-success" data-appt-step="4" hidden aria-live="polite">
+        <div class="success-check" aria-hidden="true">✓</div>
+        <div class="form-step-heading">
+          <p class="form-section-label">Booking complete</p>
+          <h4>Appointment confirmed</h4>
+          <p id="apptSuccessMessage"></p>
+        </div>
+      </section>
+
       <div class="modal-footer appt-wizard-footer">
         <div class="form-actions">
           <button type="button" id="apptPrevStep" class="ghost-btn" hidden>Back</button>
           <button type="button" id="apptNextStep" class="primary-btn" hidden>Continue</button>
           <button type="submit" id="apptConfirmBtn" class="primary-btn" form="appointmentForm" hidden>Confirm appointment</button>
+          <button type="button" id="apptCreateAnother" class="ghost-btn" hidden>Create another appointment</button>
+          <button type="button" id="apptGoToView" class="primary-btn" hidden>View appointments</button>
         </div>
       </div>
     </section>
