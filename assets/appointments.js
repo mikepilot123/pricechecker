@@ -486,11 +486,12 @@
 
   // ---------- appointment lists ----------
 
-  function appointmentRowHtml(item) {
+  function appointmentRowHtml(item, showSourceTag) {
     return `
       <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}">
         <div class="booking-row-main">
           <strong>${esc(item.client)}</strong>
+          ${showSourceTag ? `<span class="source-tag source-tag-appointment">Appointment</span>` : ""}
           <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
           <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
         </div>
@@ -536,9 +537,7 @@
       bindRowActions(upcomingList);
     }
     if (completedList) {
-      completedList.innerHTML = completed.length
-        ? completed.map(appointmentRowHtml).join("")
-        : `<p class="booking-empty">No completed appointments yet.</p>`;
+      completedList.innerHTML = completed.map((item) => appointmentRowHtml(item, true)).join("");
       bindRowActions(completedList);
     }
   }

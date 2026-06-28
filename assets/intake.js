@@ -1577,10 +1577,8 @@
     list.innerHTML = "";
     const countEl = $("completedTicketsCount");
     if (countEl) countEl.textContent = completed.length ? `${completed.length} completed check-in${completed.length === 1 ? "" : "s"}` : "";
-    const emptyEl = $("completedTicketsEmpty");
-    if (emptyEl) emptyEl.hidden = completed.length > 0;
     const frag = document.createDocumentFragment();
-    for (const t of completed) frag.appendChild(ticketCard(t));
+    for (const t of completed) frag.appendChild(ticketCard(t, true));
     list.appendChild(frag);
   }
 
@@ -1620,7 +1618,7 @@
     return (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean).join(", ");
   }
 
-  function ticketCard(t) {
+  function ticketCard(t, showSourceTag) {
     const el = document.createElement("div");
     const statusClass = STATUS_CLASS[t.status] || "st-received";
     el.className = `ticket ${statusClass}`;
@@ -1643,6 +1641,7 @@
       </div>
       <div class="ticket-identity">
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
+        ${showSourceTag ? `<span class="source-tag source-tag-checkin">Check-In</span>` : ""}
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}

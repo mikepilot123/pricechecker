@@ -1023,12 +1023,23 @@ body {
 }
 .view[hidden] { display: none; }
 /* Animation is on the element itself (not a toggled class), so it replays
-   automatically each time `hidden` is removed and the view re-enters layout. */
-.view:not([hidden]) { animation: view-in 0.22s ease; }
-@keyframes view-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+   automatically each time `hidden` is removed and the view re-enters layout.
+   Also reused for sub-tab/step panels (.appt-panel, .form-step) so switching
+   between any "page" in the app — top nav or in-flow steps — feels dynamic
+   rather than an abrupt cut. */
+.view:not([hidden]),
+.appt-panel:not([hidden]),
+.form-step:not([hidden]),
+.completed-repairs-section {
+  animation: view-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.nav-btn { position: relative; }
+.nav-btn.active { transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; }
 
 /* ---------- Business dashboard ---------- */
 .dashboard-kpi-grid {
@@ -2761,6 +2772,20 @@ body {
 
 .completed-repairs-section { margin-bottom: 24px; }
 .completed-repairs-section .booking-list-title { margin-bottom: 12px; }
+
+.source-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.source-tag-checkin { background: var(--accent-soft); color: var(--accent); }
+.source-tag-appointment { background: #fdf2e9; color: #b9650a; }
 
 .booking-wizard-card {
   max-width: min(1200px, 100%);
