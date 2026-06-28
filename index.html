@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=appointments-sidebar-fit" />
+  <link rel="stylesheet" href="assets/style.css?v=appointments-device-issue-picker" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -202,7 +202,11 @@
           <div class="form-field form-field-full appt-device-field">
             <label class="field-label" for="appointmentDevice">Device / model *</label>
             <div class="appt-device-row">
-              <input id="appointmentDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
+              <div class="device-combobox" id="appointmentDeviceCombobox">
+                <input id="appointmentDevice" class="text-input" autocomplete="off" required placeholder="Select or search for your device" aria-autocomplete="list" aria-expanded="false" aria-controls="appointmentDeviceDropdown" />
+                <button type="button" id="openApptDeviceDropdown" class="device-dropdown-btn" aria-label="Show devices"><svg class="icon"><use href="#i-chevron-down"></use></svg></button>
+                <div id="appointmentDeviceDropdown" class="device-dropdown" role="listbox" hidden></div>
+              </div>
               <div id="apptDeviceThumb" class="ticket-device-thumb appt-device-thumb" title="">
                 <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#i-device"></use></svg>
                 <img alt="" />
@@ -210,14 +214,19 @@
             </div>
           </div>
           <div class="form-field form-field-full">
-            <label class="field-label" for="appointmentIssue">Repair needed</label>
-            <input id="appointmentIssue" class="text-input" placeholder="e.g. Screen replacement" />
+            <label class="field-label">Issues *</label>
+            <button type="button" id="openApptIssueModal" class="issue-select-btn">
+              <span id="apptIssueSelectLabel">Select issues…</span>
+              <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
+            </button>
+            <div id="apptIssueSummary" class="issue-tags issue-tags-readonly"></div>
           </div>
           <div class="form-field form-field-full">
             <label class="field-label">Technician</label>
             <div id="technicianPicker" class="technician-picker"></div>
           </div>
         </div>
+        <p id="apptStep2Message" class="field-error" hidden></p>
       </section>
 
       <section class="form-step" data-appt-step="3" hidden>
@@ -243,6 +252,7 @@
       <div class="modal-footer appt-wizard-footer">
         <div class="form-actions">
           <button type="button" id="apptPrevStep" class="ghost-btn" hidden>Back</button>
+          <button type="button" id="apptNextStep" class="primary-btn" hidden>Continue</button>
           <button type="submit" id="apptConfirmBtn" class="primary-btn" form="appointmentForm" hidden>Confirm appointment</button>
         </div>
       </div>
@@ -510,8 +520,11 @@
             <div class="form-grid">
               <div class="form-field form-field-full">
                 <label class="field-label" for="fDevice">Device *</label>
-                <input id="fDevice" class="text-input" list="modelList" required placeholder="e.g. iPhone 13 Pro" />
-                <datalist id="modelList"></datalist>
+                <div class="device-combobox" id="fDeviceCombobox">
+                  <input id="fDevice" class="text-input" autocomplete="off" required placeholder="Select or search for your device" aria-autocomplete="list" aria-expanded="false" aria-controls="fDeviceDropdown" />
+                  <button type="button" id="openFDeviceDropdown" class="device-dropdown-btn" aria-label="Show devices"><svg class="icon"><use href="#i-chevron-down"></use></svg></button>
+                  <div id="fDeviceDropdown" class="device-dropdown" role="listbox" hidden></div>
+                </div>
               </div>
               <div class="form-field form-field-full">
                 <label class="field-label">Issues *</label>
@@ -652,6 +665,23 @@
       </div>
       <div class="modal-footer">
         <button type="button" id="issueModalDone" class="primary-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Appointment issue picker modal -->
+  <div id="apptIssueModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="apptIssueModalTitle">
+      <div class="modal-header">
+        <h3 id="apptIssueModalTitle">Select issues</h3>
+        <button type="button" id="closeApptIssueModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <div id="apptIssueTags" class="issue-tags"></div>
+        <input id="apptIssueOther" class="text-input issue-other-input" hidden placeholder="Describe the other issue" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="apptIssueModalDone" class="primary-btn">Done</button>
       </div>
     </div>
   </div>

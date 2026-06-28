@@ -20,6 +20,19 @@
   const LS_PIN = "rpc_intake_pin";
   const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
   const DEVICE_IMAGE_CATALOG_URL = "assets/device-images/catalog.json";
+  const ISSUES = [
+    "Screen Cracked / Broken",
+    "Battery Issue",
+    "Charging Port",
+    "Won't Power On",
+    "Water Damage",
+    "Camera Issue",
+    "Speaker / Mic Issue",
+    "Back Glass Cracked",
+    "Software Issue",
+    "Diagnostic Needed",
+    "Other",
+  ];
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -29,10 +42,12 @@
   let selectedDate = null; // "YYYY-MM-DD"
   let selectedTime = null; // "HH:MM"
   let selectedTechnician = ""; // "" = Any professional
+  let selectedIssues = new Set();
   let technicians = [];
   let deviceImageCatalogPromise = null;
   let currentStep = 1;
   let bound = false;
+  let closeAppointmentDeviceDropdown = null;
 
   function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
   function todayISO() { return toISODate(new Date()); }
@@ -173,8 +188,10 @@
     });
 
     const prevBtn = $("apptPrevStep");
+    const nextBtn = $("apptNextStep");
     const confirmBtn = $("apptConfirmBtn");
     if (prevBtn) prevBtn.hidden = n === 1;
+    if (nextBtn) nextBtn.hidden = n !== 2;
     if (confirmBtn) confirmBtn.hidden = n !== 3;
 
     if (n === 3) renderSummary();
@@ -198,14 +215,97 @@
     if (form) form.reset();
     const deviceInput = $("appointmentDevice");
     if (deviceInput) deviceInput.value = "";
-    const issueInput = $("appointmentIssue");
-    if (issueInput) issueInput.value = "";
     updateDeviceThumb("");
+    setIssueTags("");
+    const step2Msg = $("apptStep2Message");
+    if (step2Msg) step2Msg.hidden = true;
     renderTechnicianPicker();
     renderCalendar();
     renderSlots();
     setStep(1);
   }
+
+  // ---------- issues (multi-select picker, mirrors Check-In's issue modal) ----------
+
+  function populateIssueTags() {
+    const box = $("apptIssueTags");
+    if (!box) return;
+    box.innerHTML = ISSUES.map(
+      (s) => `<button type="button" class="issue-toggle" data-issue="${esc(s)}">${esc(s)}</button>`
+    ).join("");
+    box.querySelectorAll(".issue-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => toggleIssue(btn.dataset.issue, btn));
+    });
+  }
+
+  function toggleIssue(issue, btn) {
+    if (selectedIssues.has(issue)) {
+      selectedIssues.delete(issue);
+      btn.classList.remove("active");
+    } else {
+      selectedIssues.add(issue);
+      btn.classList.add("active");
+    }
+    const otherOn = selectedIssues.has("Other");
+    const otherInput = $("apptIssueOther");
+    if (otherInput) {
+      otherInput.hidden = !otherOn;
+      if (otherOn) otherInput.focus();
+    }
+    updateIssueSummary();
+  }
+
+  function buildIssuesString() {
+    const parts = [];
+    selectedIssues.forEach((s) => {
+      if (s !== "Other") parts.push(s);
+    });
+    if (selectedIssues.has("Other")) {
+      const text = ($("apptIssueOther")?.value || "").trim();
+      if (text) parts.push("Other: " + text);
+    }
+    return parts.join(", ");
+  }
+
+  function issueTagsHtml(issuesStr) {
+    const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return `<span class="issue-chip muted">No issues recorded</span>`;
+    return parts.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
+  }
+
+  function updateIssueSummary() {
+    const str = buildIssuesString();
+    const btn = $("openApptIssueModal");
+    const count = selectedIssues.size;
+    const label = $("apptIssueSelectLabel");
+    if (label) label.textContent = count ? `${count} issue${count === 1 ? "" : "s"} selected` : "Select issues…";
+    btn?.classList.toggle("has-selection", count > 0);
+    const summary = $("apptIssueSummary");
+    if (summary) summary.innerHTML = count ? issueTagsHtml(str) : "";
+  }
+
+  function setIssueTags(issuesStr) {
+    selectedIssues = new Set();
+    $("apptIssueTags")?.querySelectorAll(".issue-toggle").forEach((b) => b.classList.remove("active"));
+    const otherInput = $("apptIssueOther");
+    if (otherInput) { otherInput.hidden = true; otherInput.value = ""; }
+    const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+    parts.forEach((part) => {
+      const match = ISSUES.find((preset) => preset !== "Other" && preset === part);
+      if (match) {
+        selectedIssues.add(match);
+        $("apptIssueTags")?.querySelector(`[data-issue="${CSS.escape(match)}"]`)?.classList.add("active");
+      } else if (part.startsWith("Other:")) {
+        selectedIssues.add("Other");
+        $("apptIssueTags")?.querySelector(`[data-issue="Other"]`)?.classList.add("active");
+        if (otherInput) { otherInput.hidden = false; otherInput.value = part.slice(6).trim(); }
+      }
+    });
+    updateIssueSummary();
+  }
+
+  function openApptIssueModal() { $("apptIssueModal").hidden = false; }
+  function closeApptIssueModal() { $("apptIssueModal").hidden = true; updateIssueSummary(); }
 
   // ---------- technicians (Fresha-style chip picker, shared with Check-In) ----------
 
@@ -249,7 +349,6 @@
       btn.addEventListener("click", () => {
         selectedTechnician = btn.dataset.technician || "";
         renderTechnicianPicker();
-        maybeAdvanceFromDevice();
       });
     });
   }
@@ -273,13 +372,6 @@
     return item && item.file ? "assets/device-images/" + item.file : null;
   }
 
-  function maybeAdvanceFromDevice() {
-    if (currentStep !== 2) return;
-    const device = ($("appointmentDevice")?.value || "").trim();
-    if (!device) return;
-    setTimeout(() => setStep(3), 250);
-  }
-
   function updateDeviceThumb(device) {
     const thumb = $("apptDeviceThumb");
     const img = thumb?.querySelector("img");
@@ -292,6 +384,95 @@
       img.onload = () => thumb.classList.add("has-image");
       img.onerror = () => thumb.classList.remove("has-image");
       img.src = url;
+    });
+  }
+
+  function setupDeviceCombobox({ comboboxId, inputId, dropdownId, toggleId, onType, onChoose }) {
+    const combobox = $(comboboxId);
+    const input = $(inputId);
+    const dropdown = $(dropdownId);
+    const toggle = $(toggleId);
+    if (!combobox || !input || !dropdown) return;
+
+    function deviceOptions(showAll) {
+      const names = window.RPC_MODEL_NAMES || [];
+      const query = showAll ? "" : input.value.trim().toLowerCase();
+      return query ? names.filter((name) => name.toLowerCase().includes(query)) : names;
+    }
+
+    function render(showAll) {
+      const options = deviceOptions(showAll);
+      dropdown.innerHTML = options.length
+        ? options.map((name) => `<button type="button" class="device-option ${name === input.value ? "active" : ""}" role="option" data-device="${esc(name)}">${esc(name)}</button>`).join("")
+        : `<p class="device-dropdown-empty">No matching devices.</p>`;
+      dropdown.querySelectorAll("[data-device]").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => e.preventDefault());
+        btn.addEventListener("click", () => choose(btn.dataset.device));
+      });
+    }
+
+    function open(showAll) {
+      render(showAll);
+      dropdown.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      combobox.classList.add("open");
+    }
+
+    function close() {
+      dropdown.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      combobox.classList.remove("open");
+    }
+    closeAppointmentDeviceDropdown = close;
+
+    function choose(name) {
+      input.value = name;
+      close();
+      input.focus();
+      if (onChoose) onChoose(name);
+    }
+
+    input.addEventListener("focus", () => open(true));
+    input.addEventListener("click", () => open(true));
+    input.addEventListener("input", () => {
+      open(false);
+      if (onType) onType(input.value.trim());
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        open(true);
+        dropdown.querySelector(".device-option")?.focus();
+      } else if (e.key === "Escape") {
+        close();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        close();
+        if (onChoose) onChoose(input.value.trim());
+      }
+    });
+    dropdown.addEventListener("keydown", (e) => {
+      const options = [...dropdown.querySelectorAll(".device-option")];
+      const i = options.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        (options[i + 1] || options[0])?.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        (options[i - 1] || options[options.length - 1])?.focus();
+      } else if (e.key === "Escape") {
+        close();
+        input.focus();
+      }
+    });
+    toggle?.addEventListener("click", () => {
+      if (dropdown.hidden) open(true);
+      else close();
+      input.focus();
+    });
+    document.addEventListener("click", (e) => {
+      if (combobox.contains(e.target)) return;
+      close();
     });
   }
 
@@ -390,19 +571,46 @@
       viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1);
       renderCalendar();
     });
-    $("appointmentDevice")?.addEventListener("input", (event) => {
-      updateDeviceThumb(event.target.value.trim());
+    setupDeviceCombobox({
+      comboboxId: "appointmentDeviceCombobox",
+      inputId: "appointmentDevice",
+      dropdownId: "appointmentDeviceDropdown",
+      toggleId: "openApptDeviceDropdown",
+      onType: (value) => updateDeviceThumb(value),
+      onChoose: (value) => updateDeviceThumb(value),
     });
-    $("appointmentDevice")?.addEventListener("blur", () => maybeAdvanceFromDevice());
-    $("appointmentDevice")?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        maybeAdvanceFromDevice();
-      }
+
+    $("openApptIssueModal")?.addEventListener("click", () => {
+      closeAppointmentDeviceDropdown?.();
+      openApptIssueModal();
+    });
+    $("closeApptIssueModal")?.addEventListener("click", closeApptIssueModal);
+    $("apptIssueModalDone")?.addEventListener("click", closeApptIssueModal);
+    $("apptIssueModal")?.addEventListener("click", (e) => {
+      if (e.target.id === "apptIssueModal") closeApptIssueModal();
+    });
+    $("apptIssueOther")?.addEventListener("input", updateIssueSummary);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !$("apptIssueModal")?.hidden) closeApptIssueModal();
     });
 
     $("apptPrevStep")?.addEventListener("click", () => {
       if (currentStep > 1) setStep(currentStep - 1);
+    });
+    $("apptNextStep")?.addEventListener("click", () => {
+      closeAppointmentDeviceDropdown?.();
+      const msg = $("apptStep2Message");
+      const device = ($("appointmentDevice")?.value || "").trim();
+      if (!device) {
+        if (msg) { msg.textContent = "Add the device or model."; msg.hidden = false; }
+        return;
+      }
+      if (!selectedIssues.size) {
+        if (msg) { msg.textContent = "Select at least one issue."; msg.hidden = false; }
+        return;
+      }
+      if (msg) msg.hidden = true;
+      setStep(3);
     });
 
     const form = $("appointmentForm");
@@ -421,7 +629,7 @@
           client,
           phone: ($("appointmentPhone")?.value || "").trim(),
           device,
-          issue: ($("appointmentIssue")?.value || "").trim(),
+          issue: buildIssuesString(),
           technician: selectedTechnician || "",
           date: selectedDate,
           time: selectedTime,
@@ -444,6 +652,7 @@
     renderSlots();
     renderList();
     renderTechnicianPicker();
+    populateIssueTags();
     fetchTechnicians();
     setStep(1);
     setPanel("create");

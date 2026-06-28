@@ -1703,12 +1703,92 @@
   }
 
   // ---- Device autosuggest (from price list) --------------------------------
-  function fillModelList() {
-    const names = window.RPC_MODEL_NAMES || [];
-    $("modelList").innerHTML = names.map((n) => `<option value="${esc(n)}"></option>`).join("");
+  function setupDeviceCombobox({ comboboxId, inputId, dropdownId, toggleId, onSelect }) {
+    const combobox = $(comboboxId);
+    const input = $(inputId);
+    const dropdown = $(dropdownId);
+    const toggle = $(toggleId);
+    if (!combobox || !input || !dropdown) return;
+
+    function deviceOptions(showAll) {
+      const names = window.RPC_MODEL_NAMES || [];
+      const query = showAll ? "" : input.value.trim().toLowerCase();
+      return query ? names.filter((name) => name.toLowerCase().includes(query)) : names;
+    }
+
+    function render(showAll) {
+      const options = deviceOptions(showAll);
+      dropdown.innerHTML = options.length
+        ? options.map((name) => `<button type="button" class="device-option ${name === input.value ? "active" : ""}" role="option" data-device="${esc(name)}">${esc(name)}</button>`).join("")
+        : `<p class="device-dropdown-empty">No matching devices.</p>`;
+      dropdown.querySelectorAll("[data-device]").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => e.preventDefault());
+        btn.addEventListener("click", () => choose(btn.dataset.device));
+      });
+    }
+
+    function open(showAll) {
+      render(showAll);
+      dropdown.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      combobox.classList.add("open");
+    }
+
+    function close() {
+      dropdown.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      combobox.classList.remove("open");
+    }
+
+    function choose(name) {
+      input.value = name;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      close();
+      input.focus();
+      if (onSelect) onSelect(name);
+    }
+
+    input.addEventListener("focus", () => open(true));
+    input.addEventListener("click", () => open(true));
+    input.addEventListener("input", () => { open(false); if (onSelect) onSelect(input.value.trim()); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        open(true);
+        dropdown.querySelector(".device-option")?.focus();
+      } else if (e.key === "Escape") {
+        close();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        close();
+      }
+    });
+    dropdown.addEventListener("keydown", (e) => {
+      const options = [...dropdown.querySelectorAll(".device-option")];
+      const i = options.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        (options[i + 1] || options[0])?.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        (options[i - 1] || options[options.length - 1])?.focus();
+      } else if (e.key === "Escape") {
+        close();
+        input.focus();
+      }
+    });
+    toggle?.addEventListener("click", () => {
+      if (dropdown.hidden) open(true);
+      else close();
+      input.focus();
+    });
+    document.addEventListener("click", (e) => {
+      if (combobox.contains(e.target)) return;
+      close();
+    });
   }
-  window.addEventListener("rpc-models", fillModelList);
-  fillModelList();
+
+  setupDeviceCombobox({ comboboxId: "fDeviceCombobox", inputId: "fDevice", dropdownId: "fDeviceDropdown", toggleId: "openFDeviceDropdown" });
 
   // ---- Helpers -------------------------------------------------------------
   // The original Apps Script API returned `client` and `issue`. The current
