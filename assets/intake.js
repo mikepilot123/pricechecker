@@ -129,6 +129,7 @@
   // ---- Mobile nav drawer ----------------------------------------------------
   const navMenuToggle = $("navMenuToggle");
   const navBackdrop = $("navBackdrop");
+  const navDrawerClose = $("navDrawerClose");
   function openNavDrawer() {
     document.body.classList.add("nav-open");
     if (navBackdrop) navBackdrop.hidden = false;
@@ -143,6 +144,7 @@
     document.body.classList.contains("nav-open") ? closeNavDrawer() : openNavDrawer();
   });
   navBackdrop?.addEventListener("click", closeNavDrawer);
+  navDrawerClose?.addEventListener("click", closeNavDrawer);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeNavDrawer();
   });
