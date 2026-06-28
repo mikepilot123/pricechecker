@@ -1574,11 +1574,16 @@
     const list = $("completedTicketsList");
     if (!list) return;
     const completed = TICKETS.filter((t) => t.status === "Picked Up");
-    list.innerHTML = "";
     const countEl = $("completedTicketsCount");
     if (countEl) countEl.textContent = completed.length ? `${completed.length} completed check-in${completed.length === 1 ? "" : "s"}` : "";
+    list.innerHTML = "";
     const frag = document.createDocumentFragment();
-    for (const t of completed) frag.appendChild(ticketCard(t, true));
+    for (const t of completed) {
+      const card = ticketCard(t);
+      const customerEl = card.querySelector(".ticket-customer");
+      if (customerEl) customerEl.insertAdjacentHTML("beforeend", `<span class="source-tag source-tag-checkin">Check-In</span>`);
+      frag.appendChild(card);
+    }
     list.appendChild(frag);
   }
 
@@ -1618,7 +1623,7 @@
     return (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean).join(", ");
   }
 
-  function ticketCard(t, showSourceTag) {
+  function ticketCard(t) {
     const el = document.createElement("div");
     const statusClass = STATUS_CLASS[t.status] || "st-received";
     el.className = `ticket ${statusClass}`;
@@ -1641,7 +1646,6 @@
       </div>
       <div class="ticket-identity">
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
-        ${showSourceTag ? `<span class="source-tag source-tag-checkin">Check-In</span>` : ""}
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}

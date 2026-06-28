@@ -2210,6 +2210,24 @@ body {
   grid-area: activity;
   justify-self: end;
 }
+.ticket-head.no-click { cursor: default; }
+.ticket-head.no-click:hover { background: none; }
+.ticket-tech-label { font-size: 0.72rem; color: var(--text-dim); }
+.ticket-status button[data-complete],
+.ticket-status button[data-delete] {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ticket-status button[data-complete]:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.ticket-status button[data-delete] { color: #c0392b; border-color: #f3c9c2; }
+.ticket-status button[data-delete]:hover { background: #fdf0ee; }
 .ticket-activity .activity-log-btn { width: 44px; height: 44px; }
 @media (max-width: 760px) {
   .ticket-head {
@@ -2772,6 +2790,14 @@ body {
 
 .completed-repairs-section { margin-bottom: 24px; }
 .completed-repairs-section .booking-list-title { margin-bottom: 12px; }
+.completed-repairs-list,
+.completed-repairs-list #completedTicketsList,
+.completed-repairs-list #completedAppointmentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+[data-completed-ticket] .booking-row-main { cursor: pointer; }
 
 .source-tag {
   display: inline-block;

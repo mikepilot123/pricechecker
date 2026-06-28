@@ -281,15 +281,13 @@
   <main class="container view" id="view-completed-repairs" hidden>
     <p class="info-banner">Picked-up check-ins and completed appointments, all in one place.</p>
 
-    <section class="completed-repairs-section">
-      <h2 class="booking-list-title">Completed check-ins</h2>
-      <p id="completedTicketsCount" class="result-count"></p>
-      <div id="completedTicketsList" class="results" aria-live="polite"></div>
-    </section>
-
     <section class="completed-repairs-section booking-list-card">
-      <h2 class="booking-list-title">Completed appointments</h2>
-      <div id="completedAppointmentsList" class="booking-list" aria-live="polite"></div>
+      <h2 class="booking-list-title">Completed repairs</h2>
+      <p id="completedTicketsCount" class="result-count"></p>
+      <div class="completed-repairs-list" aria-live="polite">
+        <div id="completedTicketsList"></div>
+        <div id="completedAppointmentsList"></div>
+      </div>
     </section>
   </main>
 

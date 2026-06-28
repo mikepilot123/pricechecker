@@ -364,6 +364,17 @@
 
   // ---------- device sync (shared datalist + catalog thumbnail) ----------
 
+  function deviceTypeIcon(device) {
+    const text = String(device || "").toLowerCase();
+    if (/\b(ipad|tablet|tab)\b/.test(text)) return "i-tablet";
+    if (/\b(watch|iwatch|galaxy watch|apple watch)\b/.test(text)) return "i-watch";
+    if (/\b(macbook|laptop|notebook|chromebook|surface|thinkpad)\b/.test(text)) return "i-laptop";
+    if (/\b(playstation|xbox|nintendo|switch|console|controller|gamepad)\b/.test(text)) return "i-gamepad";
+    if (/\b(airpods|earbuds|earphones|headphones|beats|buds)\b/.test(text)) return "i-earbuds";
+    if (/\b(iphone|phone|galaxy|pixel|tecno|techno|redmi|xiaomi|huawei|honor|oppo|vivo|oneplus|motorola|moto|samsung)\b/.test(text)) return "i-smartphone";
+    return "i-device";
+  }
+
   function deviceImageKey(device) {
     return String(device || "").trim().toLowerCase().replace(/\s+/g, " ");
   }
@@ -486,12 +497,11 @@
 
   // ---------- appointment lists ----------
 
-  function appointmentRowHtml(item, showSourceTag) {
+  function appointmentRowHtml(item) {
     return `
       <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}">
         <div class="booking-row-main">
           <strong>${esc(item.client)}</strong>
-          ${showSourceTag ? `<span class="source-tag source-tag-appointment">Appointment</span>` : ""}
           <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
           <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
         </div>
@@ -501,6 +511,56 @@
         </div>
       </article>
     `;
+  }
+
+  function completedAppointmentCard(item) {
+    const el = document.createElement("div");
+    el.className = "ticket st-pickedup";
+
+    const head = document.createElement("div");
+    head.className = "ticket-head";
+    const hasPhone = !!item.phone;
+    const phoneLine = hasPhone
+      ? `<a class="ticket-phone" href="tel:${esc(item.phone)}" aria-label="Call ${esc(item.client || "client")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(item.phone)}</a>`
+      : `<span class="ticket-phone no-phone">No number on file</span>`;
+    const deviceIcon = deviceTypeIcon(item.device);
+    const technicianLabel = item.technician ? `Assigned to ${item.technician}` : "Any professional";
+    head.classList.add("no-click");
+    head.innerHTML = `
+      <div class="ticket-device-thumb" title="${esc(item.device || "Device")}">
+        <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
+        <img alt="" />
+      </div>
+      <div class="ticket-identity">
+        <span class="ticket-num mono">${esc(formatDateTime(item.date, item.time))}</span>
+        <div class="ticket-customer">${esc(item.client)}<span class="source-tag source-tag-appointment">Appointment</span></div>
+        <div class="ticket-sub">${esc(item.device || "—")}</div>
+        ${phoneLine}
+      </div>
+      <div class="ticket-repair">
+        <span class="ticket-repair-label">Repair</span>
+        <div class="issue-tags issue-tags-readonly">${issueTagsHtml(item.issue)}</div>
+      </div>
+      <div class="ticket-status">
+        <span class="status-badge st-pickedup">Completed</span>
+        <span class="ticket-tech-label">${esc(technicianLabel)}</span>
+        <button type="button" data-complete="${esc(item.id)}">Reopen</button>
+        <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
+      </div>`;
+    const phoneEl = head.querySelector("a.ticket-phone");
+    if (phoneEl) phoneEl.onclick = (e) => e.stopPropagation();
+    const thumb = head.querySelector(".ticket-device-thumb");
+    const thumbImg = head.querySelector(".ticket-device-thumb img");
+    if (thumbImg) {
+      fetchDeviceImage(item.device).then((url) => {
+        if (!url) return;
+        thumbImg.onload = () => thumb.classList.add("has-image");
+        thumbImg.onerror = () => thumb.classList.remove("has-image");
+        thumbImg.src = url;
+      });
+    }
+    el.appendChild(head);
+    return el;
   }
 
   function bindRowActions(list) {
@@ -537,7 +597,10 @@
       bindRowActions(upcomingList);
     }
     if (completedList) {
-      completedList.innerHTML = completed.map((item) => appointmentRowHtml(item, true)).join("");
+      completedList.innerHTML = "";
+      const frag = document.createDocumentFragment();
+      for (const item of completed) frag.appendChild(completedAppointmentCard(item));
+      completedList.appendChild(frag);
       bindRowActions(completedList);
     }
   }
