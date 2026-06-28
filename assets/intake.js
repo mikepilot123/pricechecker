@@ -84,6 +84,7 @@
     dashboard: $("view-dashboard"),
     targets: $("view-targets"),
     appointments: $("view-appointments"),
+    "completed-repairs": $("view-completed-repairs"),
     prices: $("view-prices"),
     intake: $("view-intake"),
     inventory: $("view-inventory"),
@@ -106,6 +107,7 @@
     if (target === "dashboard") window.dispatchEvent(new Event("rpc-enter-dashboard"));
     if (target === "targets") window.dispatchEvent(new Event("rpc-enter-targets"));
     if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
+    if (target === "completed-repairs") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
     if (target === "intake") enterIntake();
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
     if (target === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
@@ -1534,13 +1536,19 @@
     }
   });
 
+  window.addEventListener("rpc-enter-completed-repairs", () => {
+    if (!loadedOnce && isConfigured()) loadTickets();
+    else renderCompletedTickets();
+  });
+
   function renderStatusChips() {
-    const counts = { all: TICKETS.length };
-    STATUSES.forEach((s) => (counts[s] = TICKETS.filter((t) => t.status === s).length));
+    const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up");
+    const counts = { all: TICKETS.filter((t) => t.status !== "Picked Up").length };
+    filterableStatuses.forEach((s) => (counts[s] = TICKETS.filter((t) => t.status === s).length));
     const select = $("statusFilterSelect");
     if (!select) return;
     const options = [{ key: "all", label: `All (${counts.all})` }]
-      .concat(STATUSES.map((status) => ({ key: status, label: `${status} (${counts[status]})` })));
+      .concat(filterableStatuses.map((status) => ({ key: status, label: `${status} (${counts[status]})` })));
     const current = statusFilter === "__active" ? "all" : statusFilter;
     select.innerHTML = options.map((option) =>
       `<option value="${esc(option.key)}">${esc(option.label)}</option>`
@@ -1551,6 +1559,7 @@
   function currentList() {
     const q = $("intakeSearch").value.trim().toLowerCase();
     return TICKETS.filter((t) => {
+      if (t.status === "Picked Up") return false; // moved to the Completed Repairs tab
       if (statusFilter === "__active") {
         if (!ACTIVE_REPAIR_STATUSES.has(t.status)) return false;
       } else if (statusFilter !== "all" && t.status !== statusFilter) return false;
@@ -1559,6 +1568,20 @@
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
+  }
+
+  function renderCompletedTickets() {
+    const list = $("completedTicketsList");
+    if (!list) return;
+    const completed = TICKETS.filter((t) => t.status === "Picked Up");
+    list.innerHTML = "";
+    const countEl = $("completedTicketsCount");
+    if (countEl) countEl.textContent = completed.length ? `${completed.length} completed check-in${completed.length === 1 ? "" : "s"}` : "";
+    const emptyEl = $("completedTicketsEmpty");
+    if (emptyEl) emptyEl.hidden = completed.length > 0;
+    const frag = document.createDocumentFragment();
+    for (const t of completed) frag.appendChild(ticketCard(t));
+    list.appendChild(frag);
   }
 
   function render() {
@@ -1584,6 +1607,7 @@
       frag.appendChild(more);
     }
     $("intakeList").appendChild(frag);
+    renderCompletedTickets();
   }
 
   function issueTagsHtml(issuesStr) {

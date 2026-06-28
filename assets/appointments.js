@@ -524,7 +524,7 @@
 
   function renderList() {
     const upcomingList = $("appointmentList");
-    const completedList = $("appointmentCompletedList");
+    const completedList = $("completedAppointmentsList");
     const appointments = readAppointments().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
     const upcoming = appointments.filter((a) => a.status !== "completed");
     const completed = appointments.filter((a) => a.status === "completed");
@@ -676,4 +676,5 @@
   }
 
   window.addEventListener("rpc-enter-appointments", init);
+  window.addEventListener("rpc-enter-completed-repairs", renderList);
 })();

@@ -65,8 +65,8 @@
       <div class="appt-sidebar-subnav" role="group" aria-label="Appointment sections">
         <button type="button" class="appt-subnav-btn active" data-appt-panel="create" aria-selected="true">Create</button>
         <button type="button" class="appt-subnav-btn" data-appt-panel="view" aria-selected="false">View</button>
-        <button type="button" class="appt-subnav-btn" data-appt-panel="completed" aria-selected="false">Completed</button>
       </div>
+      <button class="nav-btn" data-target="completed-repairs" role="tab" aria-selected="false"><svg class="icon"><use href="#i-check"></use></svg>Completed Repairs</button>
       <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
       <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
       <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
@@ -151,7 +151,6 @@
     <div class="appt-subnav appt-content-subnav" role="tablist" aria-label="Appointments sections">
       <button type="button" class="appt-subnav-btn active" data-appt-panel="create" role="tab" aria-selected="true">Create an appointment</button>
       <button type="button" class="appt-subnav-btn" data-appt-panel="view" role="tab" aria-selected="false">View appointments</button>
-      <button type="button" class="appt-subnav-btn" data-appt-panel="completed" role="tab" aria-selected="false">Completed appointments</button>
     </div>
 
     <section class="appt-panel" data-appt-panel-section="create">
@@ -276,12 +275,22 @@
         <div id="appointmentList" class="booking-list" aria-live="polite"></div>
       </section>
     </section>
+  </main>
 
-    <section class="appt-panel" data-appt-panel-section="completed" hidden>
-      <section class="booking-list-card">
-        <h2 class="booking-list-title">Completed appointments</h2>
-        <div id="appointmentCompletedList" class="booking-list" aria-live="polite"></div>
-      </section>
+  <!-- ============ COMPLETED REPAIRS VIEW ============ -->
+  <main class="container view" id="view-completed-repairs" hidden>
+    <p class="info-banner">Picked-up check-ins and completed appointments, all in one place.</p>
+
+    <section class="completed-repairs-section">
+      <h2 class="booking-list-title">Completed check-ins</h2>
+      <p id="completedTicketsCount" class="result-count"></p>
+      <div id="completedTicketsList" class="results" aria-live="polite"></div>
+      <p id="completedTicketsEmpty" class="booking-empty" hidden>No completed check-ins yet.</p>
+    </section>
+
+    <section class="completed-repairs-section booking-list-card">
+      <h2 class="booking-list-title">Completed appointments</h2>
+      <div id="completedAppointmentsList" class="booking-list" aria-live="polite"></div>
     </section>
   </main>
 
