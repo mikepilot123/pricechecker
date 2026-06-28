@@ -41,6 +41,7 @@ body {
   line-height: 1.45;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 :focus-visible {
@@ -908,19 +909,24 @@ body {
 /* ---------- View nav ---------- */
 .view-nav {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin: 12px auto 0;
   width: min(100%, var(--workspace-max));
   background: var(--bg-soft);
   padding: 4px;
   border-radius: var(--radius-md);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.view-nav::-webkit-scrollbar { display: none; }
 .nav-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  flex: 1;
+  flex: none;
+  white-space: nowrap;
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-dim);
