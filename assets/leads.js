@@ -346,9 +346,7 @@
     if (bound) return;
     bound = true;
 
-    const form = $("leadForm");
-    if (form) form.addEventListener("submit", saveLead);
-
+    $("leadSubmit")?.addEventListener("click", saveLead);
     $("leadNewBtn")?.addEventListener("click", openNewLeadForm);
     $("closeLeadFormModal")?.addEventListener("click", closeAndReset);
     $("leadCancelBtn")?.addEventListener("click", closeAndReset);
