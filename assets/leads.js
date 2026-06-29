@@ -79,6 +79,7 @@
     bound = true;
     const form = $("leadForm");
     if (form) form.addEventListener("submit", saveLead);
+    $("leadNewBtn")?.addEventListener("click", openNewLeadForm);
     $("leadCancelEdit")?.addEventListener("click", resetForm);
     $("leadRefresh")?.addEventListener("click", () => loadLeads({ force: true }));
     $("leadStatusFilter")?.addEventListener("change", render);
@@ -189,10 +190,25 @@
     if ($("leadId")) $("leadId").value = "";
     if ($("leadSubmit")) $("leadSubmit").textContent = "Save lead";
     if ($("leadCancelEdit")) $("leadCancelEdit").hidden = true;
+    if ($("leadForm")) $("leadForm").hidden = true;
+    if ($("leadNewBtn")) $("leadNewBtn").hidden = false;
+  }
+
+  function openNewLeadForm() {
+    $("leadForm")?.reset();
+    if ($("leadStatus")) $("leadStatus").value = "New";
+    if ($("leadId")) $("leadId").value = "";
+    if ($("leadSubmit")) $("leadSubmit").textContent = "Save lead";
+    if ($("leadCancelEdit")) $("leadCancelEdit").hidden = false;
+    if ($("leadForm")) $("leadForm").hidden = false;
+    if ($("leadNewBtn")) $("leadNewBtn").hidden = true;
+    $("leadName")?.focus();
   }
 
   function editLead(lead) {
     if (!lead) return;
+    if ($("leadForm")) $("leadForm").hidden = false;
+    if ($("leadNewBtn")) $("leadNewBtn").hidden = true;
     $("leadId").value = lead.id || "";
     $("leadName").value = lead.customerName || "";
     $("leadPhone").value = lead.phone || "";

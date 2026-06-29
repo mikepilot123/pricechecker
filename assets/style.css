@@ -1373,24 +1373,76 @@ body.nav-open .view-nav { transform: translateX(0); }
   margin: 4px 0 0;
   color: var(--text-dim);
 }
+.leads-workspace { margin-top: 14px; }
+.leads-topbar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 18;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(150px, 0.32fr) minmax(170px, 0.36fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 0;
+  background: var(--bg);
+}
+.leads-searchbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 10px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  color: var(--text-dim);
+}
+.leads-searchbar .icon { width: 20px; height: 20px; flex: none; }
+.leads-searchbar input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: 500 1rem var(--font-display);
+}
+.leads-heading-row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+.leads-heading-row h2 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+.leads-form {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
 .leads-form-actions {
   grid-column: 1 / -1;
   justify-content: flex-start;
   margin-top: 0;
 }
-.leads-toolbar {
-  display: grid;
-  grid-template-columns: minmax(160px, 0.7fr) minmax(170px, 0.7fr) minmax(220px, 1.6fr);
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-.leads-search {
-  min-height: 44px;
+.leads-list {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 .lead-row {
   align-items: stretch;
+  background: var(--card);
+  box-shadow: var(--shadow);
 }
 .lead-main {
   min-width: 0;
@@ -1634,7 +1686,8 @@ body.nav-open .view-nav { transform: translateX(0); }
   .target-card-create,
   .target-board,
   .ops-form,
-  .leads-toolbar { grid-template-columns: 1fr; }
+  .leads-topbar { grid-template-columns: 1fr; position: static; }
+  .leads-heading-row { align-items: start; flex-direction: column; }
   .lead-row,
   .lead-actions { flex-direction: column; align-items: stretch; }
   .lead-card-status { width: 100%; }
