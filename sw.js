@@ -6,7 +6,7 @@
 
    Google Sheet requests are never touched here — prices/intake always go
    straight to the network (with their own localStorage fallback in app.js). */
-const CACHE = "rpc-shell-v34";
+const CACHE = "rpc-shell-v35";
 const SHELL = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const SHELL = [
   "./assets/app.js",
   "./assets/dashboard.js",
   "./assets/appointments.js",
+  "./assets/leads.js",
   "./assets/inventory.js",
   "./assets/intake.js",
   "./manifest.webmanifest",

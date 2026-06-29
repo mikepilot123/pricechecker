@@ -1373,6 +1373,71 @@ body.nav-open .view-nav { transform: translateX(0); }
   margin: 4px 0 0;
   color: var(--text-dim);
 }
+.leads-form-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  margin-top: 0;
+}
+.leads-toolbar {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.7fr) minmax(170px, 0.7fr) minmax(220px, 1.6fr);
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.leads-search {
+  min-height: 44px;
+}
+.lead-row {
+  align-items: stretch;
+}
+.lead-main {
+  min-width: 0;
+  flex: 1;
+}
+.lead-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lead-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+.lead-status-won .lead-status-pill { background: #dff5ec; color: var(--price); }
+.lead-status-lost .lead-status-pill { background: #fff5f5; color: var(--danger); }
+.lead-status-follow-up .lead-status-pill,
+.lead-status-quoted .lead-status-pill { background: #fffbeb; color: var(--warn); }
+.lead-meta {
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.lead-meta.is-due {
+  color: var(--danger);
+  font-weight: 500;
+}
+.lead-actions {
+  align-content: flex-start;
+  justify-content: flex-end;
+  min-width: min(100%, 260px);
+  margin-top: 0;
+}
+.lead-card-status {
+  width: 132px;
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 0.78rem;
+}
 .ops-empty {
   margin: 0;
   color: var(--text-dim);
@@ -1568,7 +1633,11 @@ body.nav-open .view-nav { transform: translateX(0); }
   }
   .target-card-create,
   .target-board,
-  .ops-form { grid-template-columns: 1fr; }
+  .ops-form,
+  .leads-toolbar { grid-template-columns: 1fr; }
+  .lead-row,
+  .lead-actions { flex-direction: column; align-items: stretch; }
+  .lead-card-status { width: 100%; }
   .dashboard-target-message { grid-column: 1; }
   .dashboard-kpi-card { min-height: 134px; }
   .today-focus-header { flex-direction: column; }

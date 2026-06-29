@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=appointments-modal-layer-fix" />
+  <link rel="stylesheet" href="assets/style.css?v=leads-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -71,6 +71,7 @@
       <button class="nav-btn active" data-target="dashboard" role="tab" aria-selected="true"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
       <button class="nav-btn" data-target="prices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
+      <button class="nav-btn" data-target="leads" role="tab" aria-selected="false"><svg class="icon"><use href="#i-user"></use></svg>Leads</button>
       <button class="nav-btn" data-target="appointments" role="tab" aria-selected="false"><svg class="icon"><use href="#i-calendar"></use></svg>Appointments</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Appointment sections">
         <button type="button" class="appt-subnav-btn active" data-appt-panel="create" aria-selected="true">Create</button>
@@ -152,6 +153,70 @@
         <p id="targetPlanMessage" class="dashboard-target-message" aria-live="polite"></p>
       </form>
       <div id="targetActionBoard" class="target-board" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- ============ LEADS VIEW ============ -->
+  <main class="container view" id="view-leads" hidden>
+    <p class="info-banner">Track repair prospects, quotes, and follow-ups across the team.</p>
+    <p class="status-line">
+      <span id="leadsStatusDot" class="status-dot stale"></span>
+      <span id="leadsUpdated">Loading leads…</span>
+    </p>
+
+    <section class="ops-card leads-card" aria-labelledby="leadsTitle">
+      <div class="today-focus-header">
+        <div>
+          <p class="dashboard-eyebrow">Pipeline</p>
+          <h2 id="leadsTitle">Lead tracker</h2>
+        </div>
+        <button type="button" id="leadRefresh" class="ghost-btn"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
+      </div>
+
+      <form id="leadForm" class="ops-form leads-form">
+        <input id="leadId" type="hidden" />
+        <input id="leadName" class="text-input" placeholder="Customer name" autocomplete="name" />
+        <input id="leadPhone" class="text-input" type="tel" placeholder="Phone" autocomplete="tel" />
+        <input id="leadEmail" class="text-input" type="email" placeholder="Email" autocomplete="email" />
+        <input id="leadDevice" class="text-input" placeholder="Device / interest" />
+        <input id="leadIssue" class="text-input" placeholder="Issue / need" />
+        <input id="leadQuotedAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Quoted amount" />
+        <select id="leadSource" class="text-input select-input" aria-label="Lead source">
+          <option value="">Source</option>
+          <option value="Walk-in">Walk-in</option>
+          <option value="Phone">Phone</option>
+          <option value="WhatsApp">WhatsApp</option>
+          <option value="Instagram">Instagram</option>
+          <option value="Referral">Referral</option>
+          <option value="Other">Other</option>
+        </select>
+        <select id="leadStatus" class="text-input select-input" aria-label="Lead status"></select>
+        <input id="leadFollowUpDate" class="text-input" type="date" aria-label="Follow-up date" />
+        <textarea id="leadNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
+        <div class="form-actions leads-form-actions">
+          <button type="button" id="leadCancelEdit" class="ghost-btn" hidden>Cancel edit</button>
+          <button type="submit" id="leadSubmit" class="primary-btn">Save lead</button>
+        </div>
+      </form>
+      <p id="leadMessage" class="dashboard-target-message" aria-live="polite"></p>
+
+      <div class="leads-toolbar">
+        <select id="leadStatusFilter" class="text-input select-input" aria-label="Filter leads by status"></select>
+        <select id="leadFollowUpFilter" class="text-input select-input" aria-label="Filter leads by follow-up">
+          <option value="all">All follow-ups</option>
+          <option value="due">Due or overdue</option>
+          <option value="today">Due today</option>
+          <option value="upcoming">Upcoming</option>
+          <option value="none">No follow-up date</option>
+        </select>
+        <div class="inventory-search leads-search">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input id="leadSearch" type="search" inputmode="search" autocomplete="off" placeholder="Search leads" aria-label="Search leads" />
+          <button id="clearLeadSearch" class="inventory-clear-search" aria-label="Clear lead search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+        </div>
+      </div>
+      <p id="leadCount" class="result-count"></p>
+      <div id="leadList" class="ops-list leads-list" aria-live="polite"></div>
     </section>
   </main>
 
@@ -769,10 +834,11 @@
     </section>
   </div>
 
-  <script src="assets/app.js?v=sw-refresh-1"></script>
+  <script src="assets/app.js?v=leads-1"></script>
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
-  <script src="assets/intake.js?v=checkin-filter-toolbar-1"></script>
+  <script src="assets/intake.js?v=leads-1"></script>
   <script src="assets/dashboard.js?v=ops-tools-1"></script>
   <script src="assets/appointments.js?v=modal-layer-fix-1"></script>
+  <script src="assets/leads.js?v=leads-1"></script>
 </body>
 </html>
