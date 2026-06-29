@@ -191,33 +191,6 @@
         <p id="leadCount" class="result-count"></p>
       </div>
 
-      <form id="leadForm" class="ops-form leads-form" hidden>
-        <input id="leadId" type="hidden" />
-        <input id="leadName" class="text-input" placeholder="Customer name" autocomplete="name" />
-        <input id="leadPhone" class="text-input" type="tel" placeholder="Phone" autocomplete="tel" />
-        <input id="leadEmail" class="text-input" type="email" placeholder="Email" autocomplete="email" />
-        <input id="leadDevice" class="text-input" placeholder="Device / interest" />
-        <input id="leadIssue" class="text-input" placeholder="Issue / need" />
-        <input id="leadQuotedAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Quoted amount" />
-        <select id="leadSource" class="text-input select-input" aria-label="Lead source">
-          <option value="">Source</option>
-          <option value="Walk-in">Walk-in</option>
-          <option value="Phone">Phone</option>
-          <option value="WhatsApp">WhatsApp</option>
-          <option value="Instagram">Instagram</option>
-          <option value="Referral">Referral</option>
-          <option value="Other">Other</option>
-        </select>
-        <select id="leadStatus" class="text-input select-input" aria-label="Lead status"></select>
-        <input id="leadFollowUpDate" class="text-input" type="date" aria-label="Follow-up date" />
-        <textarea id="leadNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
-        <div class="form-actions leads-form-actions">
-          <button type="button" id="leadCancelEdit" class="ghost-btn" hidden>Cancel edit</button>
-          <button type="submit" id="leadSubmit" class="primary-btn">Save lead</button>
-        </div>
-      </form>
-      <p id="leadMessage" class="dashboard-target-message" aria-live="polite"></p>
-
       <div id="leadList" class="ops-list leads-list" aria-live="polite"></div>
     </section>
   </main>
@@ -834,6 +807,114 @@
       </div>
       <div id="activityLogBody" class="modal-body"></div>
     </section>
+  </div>
+
+  <!-- Lead form modal -->
+  <div id="leadFormModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="leadFormTitle">
+      <div class="modal-header">
+        <h3 id="leadFormTitle">New lead</h3>
+        <button type="button" id="closeLeadFormModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="leadForm" autocomplete="off">
+          <input id="leadId" type="hidden" />
+          <div class="form-progress" aria-label="Lead entry progress">
+            <span class="form-progress-step active" data-lead-progress-step="1">1<span>Customer</span></span>
+            <span class="form-progress-line"></span>
+            <span class="form-progress-step" data-lead-progress-step="2">2<span>Device</span></span>
+            <span class="form-progress-line"></span>
+            <span class="form-progress-step" data-lead-progress-step="3">3<span>Follow-up</span></span>
+          </div>
+
+          <section class="form-step" data-lead-step="1">
+            <div class="form-step-heading"><p class="form-section-label">Step 1</p><h4>Customer details</h4><p>Who is this lead and how did they reach you?</p></div>
+            <div class="form-grid">
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadName">Name</label>
+                <input id="leadName" class="text-input" placeholder="e.g. Anita Singh" autocomplete="name" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadPhone">Phone</label>
+                <input id="leadPhone" class="text-input" type="tel" placeholder="e.g. 868 712 3456" autocomplete="tel" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadEmail">Email</label>
+                <input id="leadEmail" class="text-input" type="email" placeholder="e.g. anita@example.com" autocomplete="email" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadSource">Source</label>
+                <select id="leadSource" class="text-input select-input" aria-label="Lead source">
+                  <option value="">How did they find you?</option>
+                  <option value="Walk-in">Walk-in</option>
+                  <option value="Phone">Phone</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="Referral">Referral</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <p id="leadStep1Error" class="field-error" hidden></p>
+          </section>
+
+          <section class="form-step" data-lead-step="2" hidden>
+            <div class="form-step-heading"><p class="form-section-label">Step 2</p><h4>Device and need</h4><p>What is the customer bringing in, and what needs attention?</p></div>
+            <div class="form-grid">
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadDevice">Device / interest</label>
+                <input id="leadDevice" class="text-input" placeholder="e.g. iPhone 14, Samsung S22" list="modelList" autocomplete="off" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadIssue">Issue / need</label>
+                <input id="leadIssue" class="text-input" placeholder="e.g. cracked screen, battery replacement" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadQuotedAmount">Quoted amount (TTD)</label>
+                <input id="leadQuotedAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 450.00" />
+              </div>
+            </div>
+          </section>
+
+          <section class="form-step" data-lead-step="3" hidden>
+            <div class="form-step-heading"><p class="form-section-label">Step 3</p><h4>Status and follow-up</h4><p>Where is this lead in the pipeline, and when should you follow up?</p></div>
+            <div class="form-grid">
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadStatus">Status</label>
+                <select id="leadStatus" class="text-input select-input" aria-label="Lead status"></select>
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadFollowUpDate">Follow-up date</label>
+                <input id="leadFollowUpDate" class="text-input" type="date" aria-label="Follow-up date" />
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label" for="leadNotes">Notes</label>
+                <textarea id="leadNotes" class="text-input" rows="3" placeholder="Extra context, conversation history, next action…"></textarea>
+              </div>
+            </div>
+            <p id="leadMessage" class="field-error" aria-live="polite" hidden></p>
+          </section>
+
+          <section class="form-step form-success" data-lead-step="4" hidden aria-live="polite">
+            <div class="success-check" aria-hidden="true">✓</div>
+            <div class="form-step-heading">
+              <p class="form-section-label">Lead saved</p>
+              <h4 id="leadSuccessTitle">Lead added to pipeline</h4>
+              <p id="leadSuccessMessage"></p>
+            </div>
+          </section>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="leadCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="leadPrevStep" class="ghost-btn" hidden>Back</button>
+          <button type="button" id="leadNextStep" class="primary-btn">Continue</button>
+          <button type="submit" id="leadSubmit" class="primary-btn" form="leadForm" hidden>Save lead</button>
+          <button type="button" id="leadDoneBtn" class="primary-btn" hidden>Done</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="assets/app.js?v=leads-flow-1"></script>

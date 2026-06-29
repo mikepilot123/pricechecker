@@ -15,6 +15,7 @@
   let leads = [];
   let bound = false;
   let loadedOnce = false;
+  let currentStep = 1;
 
   function getPin() {
     try { return localStorage.getItem(LS_PIN) || ""; }
@@ -74,13 +75,115 @@
     )).join("");
   }
 
+  // --- Modal / step management ---
+
+  function openModal() {
+    const modal = $("leadFormModal");
+    if (modal) modal.hidden = false;
+    document.body.classList.add("modal-open");
+  }
+
+  function closeModal() {
+    const modal = $("leadFormModal");
+    if (modal) modal.hidden = true;
+    document.body.classList.remove("modal-open");
+  }
+
+  function setLeadStep(n) {
+    currentStep = n;
+    document.querySelectorAll("[data-lead-step]").forEach((section) => {
+      section.hidden = String(section.dataset.leadStep) !== String(n);
+    });
+    document.querySelectorAll("[data-lead-progress-step]").forEach((el) => {
+      const stepNum = parseInt(el.dataset.leadProgressStep, 10);
+      el.classList.toggle("active", stepNum === n);
+      el.classList.toggle("done", stepNum < n);
+    });
+    const isSuccess = n === 4;
+    const prev = $("leadPrevStep");
+    const next = $("leadNextStep");
+    const save = $("leadSubmit");
+    const done = $("leadDoneBtn");
+    const cancel = $("leadCancelBtn");
+    if (prev) prev.hidden = n <= 1 || isSuccess;
+    if (next) next.hidden = n >= 3 || isSuccess;
+    if (save) save.hidden = n !== 3;
+    if (done) done.hidden = !isSuccess;
+    if (cancel) cancel.hidden = isSuccess;
+  }
+
+  function validateStep1() {
+    const name = ($("leadName")?.value || "").trim();
+    const phone = ($("leadPhone")?.value || "").trim();
+    const err = $("leadStep1Error");
+    if (!name && !phone) {
+      if (err) { err.textContent = "Add a name or phone number to continue."; err.hidden = false; }
+      return false;
+    }
+    if (err) err.hidden = true;
+    return true;
+  }
+
+  function closeAndReset() {
+    closeModal();
+    $("leadForm")?.reset();
+    if ($("leadStatus")) $("leadStatus").value = "New";
+    if ($("leadId")) $("leadId").value = "";
+    const msg = $("leadMessage");
+    if (msg) { msg.textContent = ""; msg.hidden = true; }
+    const err = $("leadStep1Error");
+    if (err) err.hidden = true;
+    if ($("leadFormTitle")) $("leadFormTitle").textContent = "New lead";
+    setLeadStep(1);
+  }
+
+  function openNewLeadForm() {
+    closeAndReset();
+    openModal();
+    $("leadName")?.focus();
+  }
+
+  function editLead(lead) {
+    if (!lead) return;
+    closeAndReset();
+    if ($("leadFormTitle")) $("leadFormTitle").textContent = "Edit lead";
+    $("leadId").value = lead.id || "";
+    $("leadName").value = lead.customerName || "";
+    $("leadPhone").value = lead.phone || "";
+    $("leadEmail").value = lead.email || "";
+    $("leadSource").value = lead.source || "";
+    $("leadDevice").value = lead.device || "";
+    $("leadIssue").value = lead.issue || "";
+    $("leadQuotedAmount").value = lead.quotedAmount || "";
+    $("leadStatus").value = STATUSES.includes(lead.status) ? lead.status : "New";
+    $("leadFollowUpDate").value = lead.followUpDate || "";
+    $("leadNotes").value = lead.notes || "";
+    openModal();
+    $("leadName")?.focus();
+  }
+
   function bindOnce() {
     if (bound) return;
     bound = true;
+
     const form = $("leadForm");
     if (form) form.addEventListener("submit", saveLead);
+
     $("leadNewBtn")?.addEventListener("click", openNewLeadForm);
-    $("leadCancelEdit")?.addEventListener("click", resetForm);
+    $("closeLeadFormModal")?.addEventListener("click", closeAndReset);
+    $("leadCancelBtn")?.addEventListener("click", closeAndReset);
+    $("leadDoneBtn")?.addEventListener("click", closeAndReset);
+
+    $("leadPrevStep")?.addEventListener("click", () => setLeadStep(currentStep - 1));
+    $("leadNextStep")?.addEventListener("click", () => {
+      if (currentStep === 1 && !validateStep1()) return;
+      setLeadStep(currentStep + 1);
+    });
+
+    $("leadFormModal")?.addEventListener("click", (e) => {
+      if (e.target === $("leadFormModal")) closeAndReset();
+    });
+
     $("leadRefresh")?.addEventListener("click", () => loadLeads({ force: true }));
     $("leadStatusFilter")?.addEventListener("change", render);
     $("leadFollowUpFilter")?.addEventListener("change", render);
@@ -153,24 +256,29 @@
     const submit = $("leadSubmit");
     const payload = formPayload();
     if (!payload.customerName && !payload.phone) {
-      if (msg) msg.textContent = "Add a name or phone number.";
+      if (msg) { msg.textContent = "Add a name or phone number."; msg.hidden = false; }
       return;
     }
     if (!getPin()) {
-      if (msg) msg.textContent = "Save the Check In PIN in Settings before adding leads.";
+      if (msg) { msg.textContent = "Save the Check In PIN in Settings before adding leads."; msg.hidden = false; }
       return;
     }
     if (submit) submit.disabled = true;
+    if (msg) msg.hidden = true;
     try {
       const action = payload.id ? "update" : "add";
+      const isNew = !payload.id;
       const data = await api(Object.assign({ action }, payload));
       mergeLead(data.lead);
-      resetForm();
-      if (msg) msg.textContent = action === "add" ? "Lead added." : "Lead updated.";
       setStatus("live", `Leads synced ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
       render();
+      const title = $("leadSuccessTitle");
+      const successMsg = $("leadSuccessMessage");
+      if (title) title.textContent = isNew ? "Lead added to pipeline" : "Lead updated";
+      if (successMsg) successMsg.textContent = `${data.lead?.customerName || "Lead"} has been ${isNew ? "added" : "updated"} successfully.`;
+      setLeadStep(4);
     } catch (err) {
-      if (msg) msg.textContent = err.message;
+      if (msg) { msg.textContent = err.message; msg.hidden = false; }
       setStatus("error", "Lead sync failed");
     } finally {
       if (submit) submit.disabled = false;
@@ -182,48 +290,6 @@
     const index = leads.findIndex((item) => item.id === lead.id);
     if (index === -1) leads.unshift(lead);
     else leads[index] = lead;
-  }
-
-  function resetForm() {
-    $("leadForm")?.reset();
-    if ($("leadStatus")) $("leadStatus").value = "New";
-    if ($("leadId")) $("leadId").value = "";
-    if ($("leadSubmit")) $("leadSubmit").textContent = "Save lead";
-    if ($("leadCancelEdit")) $("leadCancelEdit").hidden = true;
-    if ($("leadForm")) $("leadForm").hidden = true;
-    if ($("leadNewBtn")) $("leadNewBtn").hidden = false;
-  }
-
-  function openNewLeadForm() {
-    $("leadForm")?.reset();
-    if ($("leadStatus")) $("leadStatus").value = "New";
-    if ($("leadId")) $("leadId").value = "";
-    if ($("leadSubmit")) $("leadSubmit").textContent = "Save lead";
-    if ($("leadCancelEdit")) $("leadCancelEdit").hidden = false;
-    if ($("leadForm")) $("leadForm").hidden = false;
-    if ($("leadNewBtn")) $("leadNewBtn").hidden = true;
-    $("leadName")?.focus();
-  }
-
-  function editLead(lead) {
-    if (!lead) return;
-    if ($("leadForm")) $("leadForm").hidden = false;
-    if ($("leadNewBtn")) $("leadNewBtn").hidden = true;
-    $("leadId").value = lead.id || "";
-    $("leadName").value = lead.customerName || "";
-    $("leadPhone").value = lead.phone || "";
-    $("leadEmail").value = lead.email || "";
-    $("leadDevice").value = lead.device || "";
-    $("leadIssue").value = lead.issue || "";
-    $("leadQuotedAmount").value = lead.quotedAmount || "";
-    $("leadSource").value = lead.source || "";
-    $("leadStatus").value = STATUSES.includes(lead.status) ? lead.status : "New";
-    $("leadFollowUpDate").value = lead.followUpDate || "";
-    $("leadNotes").value = lead.notes || "";
-    $("leadSubmit").textContent = "Update lead";
-    $("leadCancelEdit").hidden = false;
-    $("leadName").focus();
-    $("view-leads")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function filteredLeads() {
