@@ -8,6 +8,19 @@
   const LEADS_URL = "https://pricechecker-cyan.vercel.app/api/leads";
   const LS_PIN = "rpc_intake_pin";
   const STATUSES = ["New", "Contacted", "Quoted", "Follow-up", "Won", "Lost"];
+  const ISSUES = [
+    "Screen Cracked / Broken",
+    "Battery Issue",
+    "Charging Port",
+    "Won't Power On",
+    "Water Damage",
+    "Camera Issue",
+    "Speaker / Mic Issue",
+    "Back Glass Cracked",
+    "Software Issue",
+    "Diagnostic Needed",
+    "Other",
+  ];
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -16,6 +29,8 @@
   let bound = false;
   let loadedOnce = false;
   let currentStep = 1;
+  let selectedLeadIssues = new Set();
+  let closeLeadDeviceDropdown = null;
 
   function getPin() {
     try { return localStorage.getItem(LS_PIN) || ""; }
@@ -75,7 +90,170 @@
     )).join("");
   }
 
-  // --- Modal / step management ---
+  // ---------- device combobox ----------
+
+  function setupDeviceCombobox() {
+    const combobox = $("leadDeviceCombobox");
+    const input = $("leadDevice");
+    const dropdown = $("leadDeviceDropdown");
+    const toggle = $("openLeadDeviceDropdown");
+    if (!combobox || !input || !dropdown) return;
+
+    function deviceOptions(showAll) {
+      const names = window.RPC_MODEL_NAMES || [];
+      const query = showAll ? "" : input.value.trim().toLowerCase();
+      return query ? names.filter((n) => n.toLowerCase().includes(query)) : names;
+    }
+
+    function renderDropdown(showAll) {
+      const options = deviceOptions(showAll);
+      dropdown.innerHTML = options.length
+        ? options.map((name) => `<button type="button" class="device-option ${name === input.value ? "active" : ""}" role="option" data-device="${esc(name)}">${esc(name)}</button>`).join("")
+        : `<p class="device-dropdown-empty">No matching devices.</p>`;
+      dropdown.querySelectorAll("[data-device]").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => e.preventDefault());
+        btn.addEventListener("click", () => choose(btn.dataset.device));
+      });
+    }
+
+    function open(showAll) {
+      renderDropdown(showAll);
+      dropdown.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      combobox.classList.add("open");
+    }
+
+    function close() {
+      dropdown.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      combobox.classList.remove("open");
+    }
+    closeLeadDeviceDropdown = close;
+
+    function choose(name) {
+      input.value = name;
+      close();
+    }
+
+    input.addEventListener("focus", () => open(true));
+    input.addEventListener("click", () => open(true));
+    input.addEventListener("input", () => open(false));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        open(true);
+        dropdown.querySelector(".device-option")?.focus();
+      } else if (e.key === "Escape") {
+        close();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        close();
+      }
+    });
+    dropdown.addEventListener("keydown", (e) => {
+      const options = [...dropdown.querySelectorAll(".device-option")];
+      const i = options.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") { e.preventDefault(); (options[i + 1] || options[0])?.focus(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); (options[i - 1] || options[options.length - 1])?.focus(); }
+      else if (e.key === "Escape") { close(); input.focus(); }
+    });
+    toggle?.addEventListener("click", () => {
+      if (dropdown.hidden) open(true); else close();
+      input.focus();
+    });
+    document.addEventListener("click", (e) => {
+      if (combobox && !combobox.contains(e.target)) close();
+    });
+  }
+
+  // ---------- issue picker ----------
+
+  function populateLeadIssueTags() {
+    const box = $("leadIssueTags");
+    if (!box || box.childElementCount) return;
+    box.innerHTML = ISSUES.map(
+      (s) => `<button type="button" class="issue-toggle" data-issue="${esc(s)}">${esc(s)}</button>`
+    ).join("");
+    box.querySelectorAll(".issue-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => toggleLeadIssue(btn.dataset.issue, btn));
+    });
+  }
+
+  function toggleLeadIssue(issue, btn) {
+    if (selectedLeadIssues.has(issue)) {
+      selectedLeadIssues.delete(issue);
+      btn.classList.remove("active");
+    } else {
+      selectedLeadIssues.add(issue);
+      btn.classList.add("active");
+    }
+    const otherOn = selectedLeadIssues.has("Other");
+    const otherInput = $("leadIssueOther");
+    if (otherInput) {
+      otherInput.hidden = !otherOn;
+      if (otherOn) otherInput.focus();
+    }
+    updateLeadIssueSummary();
+  }
+
+  function buildLeadIssuesString() {
+    const parts = [];
+    selectedLeadIssues.forEach((s) => { if (s !== "Other") parts.push(s); });
+    if (selectedLeadIssues.has("Other")) {
+      const text = ($("leadIssueOther")?.value || "").trim();
+      if (text) parts.push("Other: " + text);
+    }
+    return parts.join(", ");
+  }
+
+  function issueTagsHtml(issuesStr) {
+    const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return `<span class="issue-chip muted">No issues recorded</span>`;
+    return parts.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
+  }
+
+  function updateLeadIssueSummary() {
+    const str = buildLeadIssuesString();
+    const count = selectedLeadIssues.size;
+    const label = $("leadIssueSelectLabel");
+    const btn = $("openLeadIssueModal");
+    if (label) label.textContent = count ? `${count} issue${count === 1 ? "" : "s"} selected` : "Select issues…";
+    btn?.classList.toggle("has-selection", count > 0);
+    const summary = $("leadIssueSummary");
+    if (summary) summary.innerHTML = count ? issueTagsHtml(str) : "";
+  }
+
+  function setLeadIssueTags(issuesStr) {
+    selectedLeadIssues = new Set();
+    $("leadIssueTags")?.querySelectorAll(".issue-toggle").forEach((b) => b.classList.remove("active"));
+    const otherInput = $("leadIssueOther");
+    if (otherInput) { otherInput.hidden = true; otherInput.value = ""; }
+    const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+    parts.forEach((part) => {
+      const match = ISSUES.find((preset) => preset !== "Other" && preset === part);
+      if (match) {
+        selectedLeadIssues.add(match);
+        $("leadIssueTags")?.querySelector(`[data-issue="${CSS.escape(match)}"]`)?.classList.add("active");
+      } else if (part.startsWith("Other:")) {
+        selectedLeadIssues.add("Other");
+        $("leadIssueTags")?.querySelector('[data-issue="Other"]')?.classList.add("active");
+        if (otherInput) { otherInput.hidden = false; otherInput.value = part.slice(6).trim(); }
+      }
+    });
+    updateLeadIssueSummary();
+  }
+
+  function openLeadIssueModal() {
+    closeLeadDeviceDropdown?.();
+    $("leadIssueModal").hidden = false;
+  }
+
+  function closeLeadIssueModal() {
+    $("leadIssueModal").hidden = true;
+    updateLeadIssueSummary();
+  }
+
+  // ---------- modal / step management ----------
 
   function openModal() {
     const modal = $("leadFormModal");
@@ -134,6 +312,8 @@
     const err = $("leadStep1Error");
     if (err) err.hidden = true;
     if ($("leadFormTitle")) $("leadFormTitle").textContent = "New lead";
+    setLeadIssueTags("");
+    closeLeadDeviceDropdown?.();
     setLeadStep(1);
   }
 
@@ -153,7 +333,7 @@
     $("leadEmail").value = lead.email || "";
     $("leadSource").value = lead.source || "";
     $("leadDevice").value = lead.device || "";
-    $("leadIssue").value = lead.issue || "";
+    setLeadIssueTags(lead.issue || "");
     $("leadQuotedAmount").value = lead.quotedAmount || "";
     $("leadStatus").value = STATUSES.includes(lead.status) ? lead.status : "New";
     $("leadFollowUpDate").value = lead.followUpDate || "";
@@ -174,14 +354,29 @@
     $("leadCancelBtn")?.addEventListener("click", closeAndReset);
     $("leadDoneBtn")?.addEventListener("click", closeAndReset);
 
-    $("leadPrevStep")?.addEventListener("click", () => setLeadStep(currentStep - 1));
+    $("leadPrevStep")?.addEventListener("click", () => {
+      closeLeadDeviceDropdown?.();
+      setLeadStep(currentStep - 1);
+    });
     $("leadNextStep")?.addEventListener("click", () => {
       if (currentStep === 1 && !validateStep1()) return;
+      closeLeadDeviceDropdown?.();
       setLeadStep(currentStep + 1);
     });
 
     $("leadFormModal")?.addEventListener("click", (e) => {
       if (e.target === $("leadFormModal")) closeAndReset();
+    });
+
+    $("openLeadIssueModal")?.addEventListener("click", openLeadIssueModal);
+    $("closeLeadIssueModal")?.addEventListener("click", closeLeadIssueModal);
+    $("leadIssueModalDone")?.addEventListener("click", closeLeadIssueModal);
+    $("leadIssueModal")?.addEventListener("click", (e) => {
+      if (e.target === $("leadIssueModal")) closeLeadIssueModal();
+    });
+    $("leadIssueOther")?.addEventListener("input", updateLeadIssueSummary);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !$("leadIssueModal")?.hidden) closeLeadIssueModal();
     });
 
     $("leadRefresh")?.addEventListener("click", () => loadLeads({ force: true }));
@@ -199,6 +394,9 @@
     });
     $("leadList")?.addEventListener("click", handleListClick);
     $("leadList")?.addEventListener("change", handleListChange);
+
+    setupDeviceCombobox();
+    populateLeadIssueTags();
   }
 
   function populateControls() {
@@ -241,7 +439,7 @@
       phone: ($("leadPhone")?.value || "").trim(),
       email: ($("leadEmail")?.value || "").trim(),
       device: ($("leadDevice")?.value || "").trim(),
-      issue: ($("leadIssue")?.value || "").trim(),
+      issue: buildLeadIssuesString(),
       quotedAmount: ($("leadQuotedAmount")?.value || "").trim(),
       source: ($("leadSource")?.value || "").trim(),
       status: $("leadStatus")?.value || "New",

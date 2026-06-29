@@ -863,11 +863,19 @@
             <div class="form-grid">
               <div class="form-field form-field-full">
                 <label class="field-label" for="leadDevice">Device / interest</label>
-                <input id="leadDevice" class="text-input" placeholder="e.g. iPhone 14, Samsung S22" list="modelList" autocomplete="off" />
+                <div class="device-combobox" id="leadDeviceCombobox">
+                  <input id="leadDevice" class="text-input" autocomplete="off" placeholder="Select or search for a device" aria-autocomplete="list" aria-expanded="false" aria-controls="leadDeviceDropdown" />
+                  <button type="button" id="openLeadDeviceDropdown" class="device-dropdown-btn" aria-label="Show devices"><svg class="icon"><use href="#i-chevron-down"></use></svg></button>
+                  <div id="leadDeviceDropdown" class="device-dropdown" role="listbox" hidden></div>
+                </div>
               </div>
               <div class="form-field form-field-full">
-                <label class="field-label" for="leadIssue">Issue / need</label>
-                <input id="leadIssue" class="text-input" placeholder="e.g. cracked screen, battery replacement" />
+                <label class="field-label">Issues</label>
+                <button type="button" id="openLeadIssueModal" class="issue-select-btn">
+                  <span id="leadIssueSelectLabel">Select issues…</span>
+                  <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
+                </button>
+                <div id="leadIssueSummary" class="issue-tags issue-tags-readonly"></div>
               </div>
               <div class="form-field form-field-full">
                 <label class="field-label" for="leadQuotedAmount">Quoted amount (TTD)</label>
@@ -913,6 +921,23 @@
           <button type="submit" id="leadSubmit" class="primary-btn" form="leadForm" hidden>Save lead</button>
           <button type="button" id="leadDoneBtn" class="primary-btn" hidden>Done</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lead issue picker modal (must be after leadFormModal to paint on top) -->
+  <div id="leadIssueModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="leadIssueModalTitle">
+      <div class="modal-header">
+        <h3 id="leadIssueModalTitle">Select issues</h3>
+        <button type="button" id="closeLeadIssueModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <div id="leadIssueTags" class="issue-tags"></div>
+        <input id="leadIssueOther" class="text-input issue-other-input" hidden placeholder="Describe the other issue" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="leadIssueModalDone" class="primary-btn">Done</button>
       </div>
     </div>
   </div>
