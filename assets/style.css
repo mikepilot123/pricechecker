@@ -2745,25 +2745,6 @@ body.nav-open .view-nav { transform: translateX(0); }
   box-shadow: var(--shadow);
   overflow: hidden;
 }
-.booking-info-panel {
-  padding: 20px;
-  border-bottom: 1px solid var(--border);
-}
-.booking-title { margin: 4px 0 10px; font-family: var(--font-display); font-size: 1.3rem; }
-.booking-badge {
-  display: inline-block;
-  margin-bottom: 14px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.74rem;
-  font-weight: 600;
-}
-.booking-meta { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.booking-meta li { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 0.86rem; }
-.booking-meta .icon { width: 16px; height: 16px; flex: none; }
-
 .booking-calendar-panel { padding: 24px; border-bottom: 1px solid var(--border); }
 .booking-calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .booking-calendar-header strong { font-family: var(--font-display); font-size: 1.15rem; }
@@ -2822,8 +2803,7 @@ body.nav-open .view-nav { transform: translateX(0); }
 .booking-slots-empty { color: var(--text-dim); font-size: 0.86rem; }
 
 @media (min-width: 720px) {
-  .booking-card { grid-template-columns: 240px 1fr 240px; }
-  .booking-info-panel { border-bottom: none; border-right: 1px solid var(--border); }
+  .booking-card { grid-template-columns: 1fr 240px; }
   .booking-calendar-panel { border-bottom: none; border-right: 1px solid var(--border); }
 }
 
@@ -3057,23 +3037,12 @@ body.nav-open .view-nav { transform: translateX(0); }
   #view-appointments .booking-card {
     flex: 1;
     min-height: 0;
-    grid-template-columns: minmax(180px, 0.75fr) minmax(360px, 1.75fr) minmax(190px, 0.8fr);
+    grid-template-columns: minmax(360px, 1.75fr) minmax(190px, 0.8fr);
   }
-  #view-appointments .booking-info-panel,
   #view-appointments .booking-calendar-panel,
   #view-appointments .booking-slots-panel {
     min-height: 0;
     padding: clamp(14px, 1.8vh, 20px);
-  }
-  #view-appointments .booking-title {
-    margin-top: 0;
-    font-size: 1.15rem;
-  }
-  #view-appointments .booking-badge {
-    margin-bottom: 10px;
-  }
-  #view-appointments .booking-meta {
-    gap: 8px;
   }
   #view-appointments .booking-calendar-panel,
   #view-appointments .booking-slots-panel {
@@ -3131,7 +3100,6 @@ body.nav-open .view-nav { transform: translateX(0); }
     grid-template-columns: 1fr;
     overflow-y: auto;
   }
-  #view-appointments .booking-info-panel,
   #view-appointments .booking-calendar-panel {
     border-right: 0;
     border-bottom: 1px solid var(--border);
