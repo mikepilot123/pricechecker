@@ -77,6 +77,7 @@ function handle(p) {
     if (action === "clear") return json(Object.assign({ ok: true }, clearTickets(sheet)));
     if (action === "listBackups") return json({ ok: true, backups: listBackups(sheet.getParent()) });
     if (action === "restoreBackup") return json(Object.assign({ ok: true }, restoreBackup(sheet, p)));
+    if (action === "updatePrice") return json(Object.assign({ ok: true }, updatePrice(p)));
     return json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -361,6 +362,63 @@ function hasIssues(p) {
 
 function issuesFrom(p) {
   return p.issues != null ? p.issues : (p.issue || "");
+}
+
+// ---- Price editing ---------------------------------------------------------
+// Scans all non-intake tabs for a "Model" header row, locates the cell at
+// (model × repairType), updates it, and flushes. Works on sheets with
+// multiple price tables per tab (each starting with a "Model" header row).
+function updatePrice(p) {
+  var model = String(p.model || "").trim();
+  var repairType = String(p.repairType || "").trim();
+  var value = String(p.value != null ? p.value : "").trim();
+  if (!model) throw new Error("model is required");
+  if (!repairType) throw new Error("repairType is required");
+
+  var ss = SpreadsheetApp.getActive();
+  var sheets = ss.getSheets();
+  var skipNames = [SHEET_NAME, BACKUP_INDEX_SHEET];
+
+  for (var s = 0; s < sheets.length; s++) {
+    var sheet = sheets[s];
+    var sheetName = sheet.getName();
+    if (skipNames.indexOf(sheetName) >= 0) continue;
+    if (sheetName.indexOf(BACKUP_SHEET_PREFIX) === 0) continue;
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 2 || lastCol < 2) continue;
+
+    var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+
+    for (var r = 0; r < data.length; r++) {
+      if (String(data[r][0] || "").trim().toLowerCase() !== "model") continue;
+
+      // Find the repairType column in this header row.
+      var repairCol = -1;
+      for (var c = 1; c < data[r].length; c++) {
+        if (String(data[r][c] || "").trim() === repairType) { repairCol = c; break; }
+      }
+      if (repairCol === -1) continue;
+
+      // Determine the end of this table (next "Model" header or end of data).
+      var tableEnd = data.length;
+      for (var er = r + 1; er < data.length; er++) {
+        if (String(data[er][0] || "").trim().toLowerCase() === "model") { tableEnd = er; break; }
+      }
+
+      // Find the model row and update the cell (getRange is 1-indexed).
+      for (var mr = r + 1; mr < tableEnd; mr++) {
+        if (String(data[mr][0] || "").trim() === model) {
+          sheet.getRange(mr + 1, repairCol + 1).setValue(value);
+          SpreadsheetApp.flush();
+          return { model: model, repairType: repairType, value: value };
+        }
+      }
+    }
+  }
+
+  throw new Error("Cell not found: " + model + " — " + repairType);
 }
 
 function json(obj) {

@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=leads-flow-1" />
+  <link rel="stylesheet" href="assets/style.css?v=leads-cards-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -366,10 +366,16 @@
   <!-- ============ PRICES VIEW ============ -->
   <main class="container view" id="view-prices" hidden>
     <p id="infoBanner" class="info-banner">Loading standing info…</p>
-    <p class="status-line">
+    <div class="status-line">
       <span id="statusDot" class="status-dot"></span>
       <span id="lastUpdated">Loading prices…</span>
-    </p>
+      <button type="button" id="editPricesBtn" class="edit-prices-btn" title="Edit prices"><svg class="icon"><use href="#i-pencil"></use></svg></button>
+    </div>
+    <div id="pricesEditBanner" class="prices-edit-banner" hidden>
+      <svg class="icon"><use href="#i-pencil"></use></svg>
+      Edit mode — tap any price to update it
+      <button type="button" id="exitPricesEdit" class="prices-edit-exit">Exit</button>
+    </div>
 
     <div class="search-wrap">
       <input
@@ -533,6 +539,51 @@
   <footer class="app-footer">
     <p>Prices in TTD · Live from the shop sheet · Internal team use</p>
   </footer>
+
+  <!-- Prices Script setup modal (first-time edit mode config) -->
+  <div id="pricesSetupModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="pricesSetupTitle">
+      <div class="modal-header">
+        <h3 id="pricesSetupTitle">Enable price editing</h3>
+        <button type="button" id="closePricesSetupModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p class="settings-help">Paste the Apps Script web app URL and your team PIN. Changes save directly to the Google Sheet.</p>
+        <label class="field-label" for="pricesScriptUrlInput">Apps Script URL</label>
+        <input id="pricesScriptUrlInput" class="text-input" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" />
+        <label class="field-label" for="pricesPinInput" style="margin-top:12px">Team PIN</label>
+        <input id="pricesPinInput" class="text-input" type="password" inputmode="numeric" placeholder="••••" />
+        <p id="pricesSetupError" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="pricesSetupSave" class="primary-btn">Enable editing</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Price edit modal -->
+  <div id="priceEditModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="priceEditTitle">
+      <div class="modal-header">
+        <h3 id="priceEditTitle">Edit price</h3>
+        <button type="button" id="closePriceEditModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="priceEditModelLabel" class="price-edit-model-label"></p>
+        <label class="field-label" for="priceEditValue">New price (TTD)</label>
+        <input id="priceEditValue" class="text-input" type="text" inputmode="decimal" />
+        <p id="priceEditError" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="priceEditCancel" class="ghost-btn">Cancel</button>
+          <button type="button" id="priceEditSave" class="primary-btn">Save to sheet</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Log / edit device modal -->
   <div id="intakeFormModal" class="modal-backdrop" hidden>
@@ -947,6 +998,6 @@
   <script src="assets/intake.js?v=leads-flow-1"></script>
   <script src="assets/dashboard.js?v=ops-tools-1"></script>
   <script src="assets/appointments.js?v=modal-layer-fix-1"></script>
-  <script src="assets/leads.js?v=leads-flow-1"></script>
+  <script src="assets/leads.js?v=leads-cards-1"></script>
 </body>
 </html>

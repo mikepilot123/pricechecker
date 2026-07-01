@@ -40,6 +40,22 @@ const els = {
   info: document.getElementById("infoBanner"),
   lastUpdated: document.getElementById("lastUpdated"),
   statusDot: document.getElementById("statusDot"),
+  editPricesBtn: document.getElementById("editPricesBtn"),
+  pricesEditBanner: document.getElementById("pricesEditBanner"),
+  exitPricesEdit: document.getElementById("exitPricesEdit"),
+  pricesSetupModal: document.getElementById("pricesSetupModal"),
+  closePricesSetupModal: document.getElementById("closePricesSetupModal"),
+  pricesScriptUrlInput: document.getElementById("pricesScriptUrlInput"),
+  pricesPinInput: document.getElementById("pricesPinInput"),
+  pricesSetupSave: document.getElementById("pricesSetupSave"),
+  pricesSetupError: document.getElementById("pricesSetupError"),
+  priceEditModal: document.getElementById("priceEditModal"),
+  closePriceEditModal: document.getElementById("closePriceEditModal"),
+  priceEditModelLabel: document.getElementById("priceEditModelLabel"),
+  priceEditValue: document.getElementById("priceEditValue"),
+  priceEditError: document.getElementById("priceEditError"),
+  priceEditCancel: document.getElementById("priceEditCancel"),
+  priceEditSave: document.getElementById("priceEditSave"),
 };
 
 // --- State ------------------------------------------------------------------
@@ -57,6 +73,19 @@ let syncTimer = null;
 let loadInFlight = null;
 let INVENTORY_ITEMS = [];
 let inventoryLoadInFlight = null;
+
+// --- Price editing state ----------------------------------------------------
+const PRICES_SCRIPT_URL_KEY = "rpc_prices_script_url";
+const INTAKE_PIN_KEY = "rpc_intake_pin";
+let pricesEditMode = false;
+let priceEditTarget = null;
+
+function pricesScriptUrl() {
+  try { return localStorage.getItem(PRICES_SCRIPT_URL_KEY) || ""; } catch(_) { return ""; }
+}
+function storedPin() {
+  try { return localStorage.getItem(INTAKE_PIN_KEY) || ""; } catch(_) { return ""; }
+}
 
 // --- CSV parsing ------------------------------------------------------------
 // Robust CSV -> array of rows (handles quoted fields, commas, newlines).
@@ -489,7 +518,7 @@ function card(m, expand = false) {
   body.className = "card-body";
   if (m.prices.length) {
     const grid = document.createElement("div");
-    grid.className = "price-grid";
+    grid.className = "price-grid" + (pricesEditMode ? " edit-mode" : "");
     grid.innerHTML = m.prices
       .map(
         (p, i) => {
@@ -506,7 +535,11 @@ function card(m, expand = false) {
       const p = m.prices[Number(rowEl.dataset.idx)];
       const go = (e) => {
         e.stopPropagation();
-        logDeviceFromPrice(m, p);
+        if (pricesEditMode) {
+          openPriceEditModal(m, p);
+        } else {
+          logDeviceFromPrice(m, p);
+        }
       };
       rowEl.addEventListener("click", go);
       rowEl.addEventListener("keydown", (e) => {
@@ -525,6 +558,103 @@ function card(m, expand = false) {
   el.appendChild(head);
   el.appendChild(body);
   return el;
+}
+
+// --- Price edit mode ---------------------------------------------------------
+function togglePricesEditMode() {
+  if (pricesEditMode) { exitPricesEditMode(); return; }
+  if (!pricesScriptUrl()) { openPricesSetupModal(); return; }
+  enterPricesEditMode();
+}
+
+function enterPricesEditMode() {
+  pricesEditMode = true;
+  if (els.pricesEditBanner) els.pricesEditBanner.hidden = false;
+  if (els.editPricesBtn) els.editPricesBtn.classList.add("active");
+  render();
+}
+
+function exitPricesEditMode() {
+  pricesEditMode = false;
+  if (els.pricesEditBanner) els.pricesEditBanner.hidden = true;
+  if (els.editPricesBtn) els.editPricesBtn.classList.remove("active");
+  render();
+}
+
+function openPricesSetupModal() {
+  els.pricesScriptUrlInput.value = pricesScriptUrl();
+  els.pricesPinInput.value = storedPin();
+  els.pricesSetupError.hidden = true;
+  els.pricesSetupModal.hidden = false;
+}
+
+function savePricesSetup() {
+  const url = (els.pricesScriptUrlInput.value || "").trim();
+  const pin = (els.pricesPinInput.value || "").trim();
+  if (!url) {
+    els.pricesSetupError.textContent = "Enter the Apps Script URL";
+    els.pricesSetupError.hidden = false;
+    return;
+  }
+  if (!pin) {
+    els.pricesSetupError.textContent = "Enter the team PIN";
+    els.pricesSetupError.hidden = false;
+    return;
+  }
+  try {
+    localStorage.setItem(PRICES_SCRIPT_URL_KEY, url);
+    localStorage.setItem(INTAKE_PIN_KEY, pin);
+  } catch(_) {}
+  els.pricesSetupModal.hidden = true;
+  enterPricesEditMode();
+}
+
+function openPriceEditModal(model, priceEntry) {
+  priceEditTarget = { model, priceEntry };
+  els.priceEditModelLabel.textContent = model.name + " — " + priceEntry.type;
+  els.priceEditValue.value = String(priceEntry.value).replace(/[^0-9.]/g, "");
+  els.priceEditError.hidden = true;
+  els.priceEditModal.hidden = false;
+  requestAnimationFrame(() => { els.priceEditValue.select(); els.priceEditValue.focus(); });
+}
+
+async function savePriceEdit() {
+  if (!priceEditTarget) return;
+  const url = pricesScriptUrl();
+  const pin = storedPin();
+  const value = (els.priceEditValue.value || "").trim();
+  if (!value) {
+    els.priceEditError.textContent = "Enter a price";
+    els.priceEditError.hidden = false;
+    return;
+  }
+  els.priceEditSave.disabled = true;
+  els.priceEditSave.textContent = "Saving…";
+  els.priceEditError.hidden = true;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "updatePrice",
+        pin,
+        model: priceEditTarget.model.name,
+        repairType: priceEditTarget.priceEntry.type,
+        value,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Update failed");
+    els.priceEditModal.hidden = true;
+    priceEditTarget = null;
+    await loadData({ reason: "price-edit" });
+  } catch (err) {
+    els.priceEditError.textContent = err.message;
+    els.priceEditError.hidden = false;
+  } finally {
+    els.priceEditSave.disabled = false;
+    els.priceEditSave.textContent = "Save to sheet";
+  }
 }
 
 // --- Log device from a price row --------------------------------------------
@@ -604,6 +734,15 @@ function showSkeleton() {
 }
 
 // --- Wire up events ---------------------------------------------------------
+if (els.editPricesBtn) els.editPricesBtn.addEventListener("click", togglePricesEditMode);
+if (els.exitPricesEdit) els.exitPricesEdit.addEventListener("click", exitPricesEditMode);
+if (els.closePricesSetupModal) els.closePricesSetupModal.addEventListener("click", () => { els.pricesSetupModal.hidden = true; });
+if (els.pricesSetupSave) els.pricesSetupSave.addEventListener("click", savePricesSetup);
+if (els.closePriceEditModal) els.closePriceEditModal.addEventListener("click", () => { els.priceEditModal.hidden = true; });
+if (els.priceEditCancel) els.priceEditCancel.addEventListener("click", () => { els.priceEditModal.hidden = true; });
+if (els.priceEditSave) els.priceEditSave.addEventListener("click", savePriceEdit);
+if (els.priceEditValue) els.priceEditValue.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); savePriceEdit(); } });
+
 els.search.addEventListener("input", render);
 els.search.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
