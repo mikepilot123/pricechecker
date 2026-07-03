@@ -3922,17 +3922,17 @@ video.media-viewer-media {
     justify-content: space-between;
   }
   .ticket-detail-row {
-    grid-template-columns: 24px minmax(76px, 0.8fr) minmax(0, 1.2fr);
+    grid-template-columns: 24px minmax(76px, 0.8fr) minmax(0, 1.2fr) 30px;
   }
   .ticket-detail-row .ticket-detail-edit-btn {
-    grid-column: 3;
+    grid-column: auto;
     justify-self: end;
   }
   .ticket-detail-value {
-    text-align: left;
+    text-align: right;
   }
   .ticket-detail-value.ticket-detail-editing {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
   }
   .ticket-media-gallery {
     grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
@@ -4077,12 +4077,18 @@ video.media-viewer-media {
     grid-template-columns: 1fr;
   }
   .ticket-detail-row {
-    grid-template-columns: 22px minmax(0, 1fr);
+    grid-template-columns: 20px minmax(58px, 0.78fr) minmax(0, 1fr) 30px;
   }
   .ticket-detail-label,
   .ticket-detail-value,
   .ticket-detail-row .ticket-detail-edit-btn {
-    grid-column: 2;
+    grid-column: auto;
+  }
+  .ticket-detail-label {
+    overflow-wrap: anywhere;
+  }
+  .ticket-detail-value.ticket-detail-editing {
+    grid-column: 2 / -1;
   }
   .booking-calendar-panel,
   .booking-slots-panel {
