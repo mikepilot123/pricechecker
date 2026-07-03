@@ -153,55 +153,6 @@ body.nav-open .nav-backdrop { opacity: 1; }
   gap: 7px;
   font-family: var(--font-mono);
 }
-.edit-prices-btn {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.edit-prices-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.edit-prices-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.prices-edit-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0 0;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.82rem;
-  font-weight: 500;
-}
-.prices-edit-exit {
-  margin-left: auto;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--accent);
-  background: transparent;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  padding: 2px 10px;
-  cursor: pointer;
-}
-.price-grid.edit-mode .price-row { cursor: text; }
-.price-grid.edit-mode .price-row:hover > span,
-.price-grid.edit-mode .price-row:focus-visible > span { background: #fff3cd; }
-.price-grid.edit-mode .price-val { color: var(--accent); text-decoration: underline dotted; }
-.price-edit-model-label {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 14px;
-}
 .status-dot {
   width: 8px;
   height: 8px;
@@ -450,7 +401,7 @@ body.nav-open .nav-backdrop { opacity: 1; }
 .card.open .card-body { display: block; }
 .price-grid {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 0;
   margin-top: 10px;
 }
@@ -510,6 +461,40 @@ body.nav-open .nav-backdrop { opacity: 1; }
 .price-row:focus-visible .price-add-btn {
   transform: scale(1.15);
 }
+.price-edit-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.price-edit-btn .icon { width: 14px; height: 14px; }
+.price-row:hover .price-edit-btn,
+.price-row:focus-within .price-edit-btn {
+  opacity: 1;
+}
+.price-val-editing {
+  grid-column: 2 / span 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+}
+.price-val-editing .price-inline-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}
+.price-val-editing .icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex: none;
+}
+.price-val-editing .icon-btn .icon { width: 14px; height: 14px; }
+.price-inline-input.field-error-input { border-color: var(--danger); }
 .no-prices {
   margin-top: 10px;
   font-size: 0.9rem;
@@ -1383,17 +1368,6 @@ body.nav-open .view-nav { transform: translateX(0); }
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
 }
-.ops-form {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding-top: 14px;
-}
-.ops-form-wide { grid-column: 1 / -1; }
-.ops-form .ghost-btn {
-  justify-self: start;
-  min-width: 160px;
-}
 .ops-list {
   display: grid;
   gap: 10px;
@@ -1673,6 +1647,28 @@ body.nav-open .view-nav { transform: translateX(0); }
   font-size: 1.25rem;
   font-weight: 500;
 }
+.expenses-workspace { margin-top: 14px; }
+.expenses-topbar { grid-template-columns: minmax(240px, 1fr) auto; }
+.expense-category-chips { margin-top: 4px; }
+.expenses-heading-row { align-items: center; }
+.expense-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.expense-breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.expense-breakdown-item span { color: var(--text-dim); }
+.expense-breakdown-item strong { color: var(--text); }
 .dashboard-kpi-card {
   min-height: 152px;
   padding: 18px;
@@ -1846,7 +1842,6 @@ body.nav-open .view-nav { transform: translateX(0); }
   }
   .target-card-create,
   .target-board,
-  .ops-form,
   .leads-topbar { grid-template-columns: 1fr; position: static; }
   .leads-heading-row { align-items: start; flex-direction: column; }
   .lead-card {
@@ -3028,6 +3023,59 @@ body.nav-open .view-nav { transform: translateX(0); }
 .ticket-detail-value.ticket-detail-editing .icon-btn { width: 28px; height: 28px; padding: 0; flex: none; }
 .ticket-detail-value.ticket-detail-editing .icon-btn .icon { width: 14px; height: 14px; }
 .ticket-inline-input.field-error-input { border-color: var(--danger); }
+.ticket-media-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ticket-media-gallery .ops-empty { grid-column: 1 / -1; }
+.ticket-media-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--card-hover);
+  border: 1px solid var(--border);
+}
+.ticket-media-link { display: block; width: 100%; height: 100%; }
+.ticket-media-item img,
+.ticket-media-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ticket-media-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  pointer-events: none;
+}
+.ticket-media-play .icon { width: 22px; height: 22px; }
+.ticket-media-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ticket-media-delete .icon { width: 12px; height: 12px; }
+.ticket-media-add-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ticket-media-add-btn.is-uploading { opacity: 0.6; pointer-events: none; }
 .ticket-detail-notes { margin: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 12px; color: var(--text-dim); font-size: 0.88rem; white-space: pre-wrap; }
 .ticket-modal-footer { display: flex; gap: 8px; }
 .ticket-modal-footer .primary-btn { flex: 1; width: auto; }

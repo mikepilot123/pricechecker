@@ -15,6 +15,12 @@
   // push to main) — update if the project or domain ever changes.
   const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
   const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
+  const MEDIA_UPLOAD_URL = "https://pricechecker-cyan.vercel.app/api/media-upload";
+  // Vercel Blob's browser upload helper, loaded on demand from a pinned CDN
+  // build — this repo has no bundler, and the two-phase token/PUT protocol
+  // upload() implements is a private wire format best not hand-rolled.
+  const BLOB_CLIENT_CDN_URL = "https://esm.sh/@vercel/blob@0.27.1/client";
+  const MEDIA_MAX_BYTES = 50 * 1024 * 1024; // mirror api/media-upload.js's authoritative cap
 
   // Status pipeline — keep in sync with apps-script/Code.gs STATUSES.
   const STATUSES = [
@@ -821,6 +827,14 @@
           <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
         </div>
       </div>
+      <section class="ticket-detail-section"><p class="field-label">Photos & videos</p>
+        <div class="ticket-media-gallery" id="ticketMediaGallery"><p class="ops-empty ticket-media-loading">Loading…</p></div>
+        <label class="ghost-btn ticket-media-add-btn" id="ticketMediaAddBtn">
+          <svg class="icon"><use href="#i-camera"></use></svg><span>Add photo/video</span>
+          <input type="file" accept="image/*,video/*" capture="environment" hidden id="ticketMediaInput" />
+        </label>
+        <p class="field-error" id="ticketMediaError" hidden></p>
+      </section>
       <section class="ticket-detail-section"><p class="field-label">Customer & device</p><div class="ticket-detail-grid">
         ${detailRow("i-user", "Customer", fieldDisplayHtml("customerName", ticket), "", "customerName")}
         ${detailRow("i-phone", "Phone", fieldDisplayHtml("phone", ticket), "", "phone")}
@@ -845,6 +859,8 @@
     $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
+    bindTicketMediaControls(ticket);
+    loadTicketMedia(ticket);
     $("ticketModal").hidden = false;
     $("closeTicketModal").focus();
   }
@@ -917,6 +933,117 @@
 
   function detailRow(iconName, label, value, valueClass = "", field = "") {
     return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span>${detailValueHtml(value, valueClass, field)}</div>`;
+  }
+
+  // ---- Ticket media (photos & videos of the physical device) ----------------
+  // Files upload from the browser straight to Vercel Blob (two-phase token
+  // handshake via api/media-upload.js), then the resulting URL is recorded in
+  // the ticket_media table via the normal intake API. This keeps big videos
+  // off the JSON API, which has a ~4.5MB request-size ceiling.
+  let blobClientPromise = null;
+  function loadBlobClient() {
+    if (!blobClientPromise) blobClientPromise = import(BLOB_CLIENT_CDN_URL);
+    return blobClientPromise;
+  }
+
+  function ticketMediaItemHtml(item) {
+    const inner = item.type === "video"
+      ? `<video src="${esc(item.url)}" muted playsinline preload="metadata"></video><span class="ticket-media-play"><svg class="icon"><use href="#i-play"></use></svg></span>`
+      : `<img src="${esc(item.url)}" alt="Device photo" loading="lazy" />`;
+    return `<div class="ticket-media-item" data-media-id="${esc(item.id)}">
+      <a href="${esc(item.url)}" target="_blank" rel="noopener" class="ticket-media-link" aria-label="Open ${item.type}">${inner}</a>
+      <button type="button" class="ticket-media-delete" data-delete-media="${esc(item.id)}" aria-label="Delete"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+    </div>`;
+  }
+
+  function renderTicketMedia(items) {
+    const gallery = $("ticketMediaGallery");
+    if (!gallery) return;
+    gallery.innerHTML = items.length
+      ? items.map(ticketMediaItemHtml).join("")
+      : `<p class="ops-empty">No photos or videos yet.</p>`;
+  }
+
+  async function loadTicketMedia(ticket) {
+    const gallery = $("ticketMediaGallery");
+    if (!gallery) return;
+    try {
+      const res = await api({ action: "listMedia", ticketId: ticket.id });
+      if (!res.ok) throw new Error(res.error || "Couldn't load media");
+      // The modal may have moved on to another ticket while this was in flight.
+      if (!currentModalTicket || currentModalTicket.id !== ticket.id) return;
+      renderTicketMedia(res.media || []);
+    } catch (err) {
+      gallery.innerHTML = `<p class="ops-empty">Couldn't load photos — ${esc(err.message)}</p>`;
+    }
+  }
+
+  function setTicketMediaError(message) {
+    const el = $("ticketMediaError");
+    if (!el) return;
+    el.textContent = message || "";
+    el.hidden = !message;
+  }
+
+  async function uploadTicketMedia(ticket, file) {
+    const type = file.type.startsWith("video/") ? "video" : "photo";
+    if (file.size > MEDIA_MAX_BYTES) {
+      throw new Error("That file is over 50MB — trim the video or pick a smaller one.");
+    }
+    const { upload } = await loadBlobClient();
+    const safeName = String(file.name || "capture").replace(/[^\w.\-]+/g, "_");
+    const blob = await upload(`tickets/${ticket.id}/${Date.now()}-${safeName}`, file, {
+      access: "public",
+      handleUploadUrl: MEDIA_UPLOAD_URL,
+      clientPayload: JSON.stringify({ ticketId: ticket.id, pin: getCfg().pin }),
+    });
+    const res = await api({ action: "addMedia", ticketId: ticket.id, url: blob.url, type });
+    if (!res.ok) throw new Error(res.error || "Upload saved to storage but not recorded — try again");
+    return res.media;
+  }
+
+  function bindTicketMediaControls(ticket) {
+    const input = $("ticketMediaInput");
+    const addBtn = $("ticketMediaAddBtn");
+    const gallery = $("ticketMediaGallery");
+    if (!input || !gallery) return;
+
+    input.addEventListener("change", async () => {
+      const file = input.files && input.files[0];
+      input.value = "";
+      if (!file) return;
+      setTicketMediaError("");
+      addBtn.classList.add("is-uploading");
+      const label = addBtn.querySelector("span");
+      const originalText = label.textContent;
+      label.textContent = "Uploading…";
+      try {
+        await uploadTicketMedia(ticket, file);
+        await loadTicketMedia(ticket);
+      } catch (err) {
+        setTicketMediaError(err.message);
+      } finally {
+        addBtn.classList.remove("is-uploading");
+        label.textContent = originalText;
+      }
+    });
+
+    gallery.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-delete-media]");
+      if (!btn) return;
+      e.preventDefault();
+      if (!window.confirm("Delete this photo/video?")) return;
+      btn.disabled = true;
+      try {
+        const res = await api({ action: "deleteMedia", id: btn.dataset.deleteMedia });
+        if (!res.ok) throw new Error(res.error || "Delete failed");
+        btn.closest(".ticket-media-item")?.remove();
+        if (!gallery.querySelector(".ticket-media-item")) renderTicketMedia([]);
+      } catch (err) {
+        btn.disabled = false;
+        setTicketMediaError(err.message);
+      }
+    });
   }
 
   function formatMoney(value) {

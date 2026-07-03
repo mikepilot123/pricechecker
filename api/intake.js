@@ -10,6 +10,7 @@ import {
   addTechnician,
   deleteTechnician,
 } from "../lib/tickets.js";
+import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { ensureSchema } from "../lib/db.js";
 
 // Mirrors apps-script/Code.gs's handle(p) dispatch-by-action shape exactly,
@@ -65,6 +66,15 @@ export default async function handler(req, res) {
     }
     if (action === "deleteTechnician") {
       return res.status(200).json({ ok: true, technicians: await deleteTechnician(body) });
+    }
+    if (action === "listMedia") {
+      return res.status(200).json({ ok: true, media: await listMedia(body.ticketId) });
+    }
+    if (action === "addMedia") {
+      return res.status(200).json({ ok: true, media: await addMedia(body) });
+    }
+    if (action === "deleteMedia") {
+      return res.status(200).json({ ok: true, deletedId: await deleteMedia(body) });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {

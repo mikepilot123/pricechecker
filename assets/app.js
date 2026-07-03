@@ -40,22 +40,12 @@ const els = {
   info: document.getElementById("infoBanner"),
   lastUpdated: document.getElementById("lastUpdated"),
   statusDot: document.getElementById("statusDot"),
-  editPricesBtn: document.getElementById("editPricesBtn"),
-  pricesEditBanner: document.getElementById("pricesEditBanner"),
-  exitPricesEdit: document.getElementById("exitPricesEdit"),
   pricesSetupModal: document.getElementById("pricesSetupModal"),
   closePricesSetupModal: document.getElementById("closePricesSetupModal"),
   pricesScriptUrlInput: document.getElementById("pricesScriptUrlInput"),
   pricesPinInput: document.getElementById("pricesPinInput"),
   pricesSetupSave: document.getElementById("pricesSetupSave"),
   pricesSetupError: document.getElementById("pricesSetupError"),
-  priceEditModal: document.getElementById("priceEditModal"),
-  closePriceEditModal: document.getElementById("closePriceEditModal"),
-  priceEditModelLabel: document.getElementById("priceEditModelLabel"),
-  priceEditValue: document.getElementById("priceEditValue"),
-  priceEditError: document.getElementById("priceEditError"),
-  priceEditCancel: document.getElementById("priceEditCancel"),
-  priceEditSave: document.getElementById("priceEditSave"),
 };
 
 // --- State ------------------------------------------------------------------
@@ -77,8 +67,6 @@ let inventoryLoadInFlight = null;
 // --- Price editing state ----------------------------------------------------
 const PRICES_SCRIPT_URL_KEY = "rpc_prices_script_url";
 const INTAKE_PIN_KEY = "rpc_intake_pin";
-let pricesEditMode = false;
-let priceEditTarget = null;
 
 function pricesScriptUrl() {
   try { return localStorage.getItem(PRICES_SCRIPT_URL_KEY) || ""; } catch(_) { return ""; }
@@ -518,28 +506,13 @@ function card(m, expand = false) {
   body.className = "card-body";
   if (m.prices.length) {
     const grid = document.createElement("div");
-    grid.className = "price-grid" + (pricesEditMode ? " edit-mode" : "");
-    grid.innerHTML = m.prices
-      .map(
-        (p, i) => {
-          const inStock = isPricePartInStock(m.name, p.type);
-          return `<div class="price-row" role="button" tabindex="0" data-idx="${i}"
-            aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
-          <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${inStock ? `<span class="price-stock-tick" title="In stock" aria-label="In stock">✓</span>` : ""}</span>
-          <span class="price-val">${formatPrice(p.value)}</span>
-        </div>`;
-        }
-      )
-      .join("");
+    grid.className = "price-grid";
+    grid.innerHTML = m.prices.map((p, i) => priceRowHtml(m, p, i)).join("");
     grid.querySelectorAll(".price-row").forEach((rowEl) => {
       const p = m.prices[Number(rowEl.dataset.idx)];
       const go = (e) => {
         e.stopPropagation();
-        if (pricesEditMode) {
-          openPriceEditModal(m, p);
-        } else {
-          logDeviceFromPrice(m, p);
-        }
+        logDeviceFromPrice(m, p);
       };
       rowEl.addEventListener("click", go);
       rowEl.addEventListener("keydown", (e) => {
@@ -548,6 +521,7 @@ function card(m, expand = false) {
           go(e);
         }
       });
+      bindPriceEditBtn(rowEl, m, p);
     });
     body.appendChild(grid);
   } else {
@@ -560,25 +534,105 @@ function card(m, expand = false) {
   return el;
 }
 
-// --- Price edit mode ---------------------------------------------------------
-function togglePricesEditMode() {
-  if (pricesEditMode) { exitPricesEditMode(); return; }
+// --- Price rows + inline pencil edit ------------------------------------------
+// Matches assets/intake.js's per-field pencil pattern (startInlineEdit /
+// saveInlineEdit / renderDetailRowStatic): clicking the pencil turns just
+// that row's value into an input + save/cancel, no page-wide edit mode.
+function priceRowHtml(m, p, idx) {
+  const inStock = isPricePartInStock(m.name, p.type);
+  return `<div class="price-row" role="button" tabindex="0" data-idx="${idx}"
+      aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
+    <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${inStock ? `<span class="price-stock-tick" title="In stock" aria-label="In stock">✓</span>` : ""}</span>
+    ${priceValueHtml(p.value)}
+    <button type="button" class="icon-btn ghost-btn price-edit-btn" data-edit-price aria-label="Edit price"><svg class="icon"><use href="#i-pencil"></use></svg></button>
+  </div>`;
+}
+
+function priceValueHtml(value) {
+  return `<span class="price-val">${formatPrice(value)}</span>`;
+}
+
+function bindPriceEditBtn(rowEl, model, priceEntry) {
+  const btn = rowEl.querySelector("[data-edit-price]");
+  if (!btn) return;
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startPriceInlineEdit(rowEl, model, priceEntry);
+  });
+}
+
+function startPriceInlineEdit(rowEl, model, priceEntry) {
   if (!pricesScriptUrl()) { openPricesSetupModal(); return; }
-  enterPricesEditMode();
+  const raw = String(priceEntry.value).replace(/[^0-9.]/g, "");
+  rowEl.querySelector(".price-val").outerHTML = `
+    <span class="price-val price-val-editing">
+      <input type="text" inputmode="decimal" class="text-input price-inline-input" value="${escapeHtml(raw)}" />
+      <button type="button" class="icon-btn ghost-btn" data-save-price aria-label="Save"><svg class="icon"><use href="#i-check"></use></svg></button>
+      <button type="button" class="icon-btn ghost-btn" data-cancel-price aria-label="Cancel"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+    </span>`;
+  rowEl.querySelector("[data-edit-price]")?.remove();
+  const input = rowEl.querySelector(".price-inline-input");
+  input.focus();
+  input.select();
+  rowEl.querySelector("[data-save-price]").addEventListener("click", (e) => {
+    e.stopPropagation();
+    savePriceInlineEdit(rowEl, model, priceEntry);
+  });
+  rowEl.querySelector("[data-cancel-price]").addEventListener("click", (e) => {
+    e.stopPropagation();
+    renderPriceRowStatic(rowEl, model, priceEntry);
+  });
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); savePriceInlineEdit(rowEl, model, priceEntry); }
+    if (e.key === "Escape") { e.preventDefault(); renderPriceRowStatic(rowEl, model, priceEntry); }
+  });
 }
 
-function enterPricesEditMode() {
-  pricesEditMode = true;
-  if (els.pricesEditBanner) els.pricesEditBanner.hidden = false;
-  if (els.editPricesBtn) els.editPricesBtn.classList.add("active");
-  render();
+function renderPriceRowStatic(rowEl, model, priceEntry) {
+  rowEl.querySelector(".price-val-editing")?.remove();
+  rowEl.insertAdjacentHTML(
+    "beforeend",
+    priceValueHtml(priceEntry.value) +
+      `<button type="button" class="icon-btn ghost-btn price-edit-btn" data-edit-price aria-label="Edit price"><svg class="icon"><use href="#i-pencil"></use></svg></button>`
+  );
+  bindPriceEditBtn(rowEl, model, priceEntry);
 }
 
-function exitPricesEditMode() {
-  pricesEditMode = false;
-  if (els.pricesEditBanner) els.pricesEditBanner.hidden = true;
-  if (els.editPricesBtn) els.editPricesBtn.classList.remove("active");
-  render();
+async function savePriceInlineEdit(rowEl, model, priceEntry) {
+  const url = pricesScriptUrl();
+  const pin = storedPin();
+  const input = rowEl.querySelector(".price-inline-input");
+  const saveBtn = rowEl.querySelector("[data-save-price]");
+  const value = (input.value || "").trim();
+  if (!value) {
+    input.classList.add("field-error-input");
+    return;
+  }
+  saveBtn.disabled = true;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "updatePrice",
+        pin,
+        model: model.name,
+        repairType: priceEntry.type,
+        value,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Update failed");
+    // Optimistic local update so the row reflects the new value immediately;
+    // still reload from the sheet in the background to reconcile formatting.
+    priceEntry.value = value;
+    renderPriceRowStatic(rowEl, model, priceEntry);
+    loadData({ reason: "price-edit" });
+  } catch (err) {
+    input.classList.add("field-error-input");
+    saveBtn.disabled = false;
+  }
 }
 
 function openPricesSetupModal() {
@@ -606,55 +660,6 @@ function savePricesSetup() {
     localStorage.setItem(INTAKE_PIN_KEY, pin);
   } catch(_) {}
   els.pricesSetupModal.hidden = true;
-  enterPricesEditMode();
-}
-
-function openPriceEditModal(model, priceEntry) {
-  priceEditTarget = { model, priceEntry };
-  els.priceEditModelLabel.textContent = model.name + " — " + priceEntry.type;
-  els.priceEditValue.value = String(priceEntry.value).replace(/[^0-9.]/g, "");
-  els.priceEditError.hidden = true;
-  els.priceEditModal.hidden = false;
-  requestAnimationFrame(() => { els.priceEditValue.select(); els.priceEditValue.focus(); });
-}
-
-async function savePriceEdit() {
-  if (!priceEditTarget) return;
-  const url = pricesScriptUrl();
-  const pin = storedPin();
-  const value = (els.priceEditValue.value || "").trim();
-  if (!value) {
-    els.priceEditError.textContent = "Enter a price";
-    els.priceEditError.hidden = false;
-    return;
-  }
-  els.priceEditSave.disabled = true;
-  els.priceEditSave.textContent = "Saving…";
-  els.priceEditError.hidden = true;
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        action: "updatePrice",
-        pin,
-        model: priceEditTarget.model.name,
-        repairType: priceEditTarget.priceEntry.type,
-        value,
-      }),
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "Update failed");
-    els.priceEditModal.hidden = true;
-    priceEditTarget = null;
-    await loadData({ reason: "price-edit" });
-  } catch (err) {
-    els.priceEditError.textContent = err.message;
-    els.priceEditError.hidden = false;
-  } finally {
-    els.priceEditSave.disabled = false;
-    els.priceEditSave.textContent = "Save to sheet";
-  }
 }
 
 // --- Log device from a price row --------------------------------------------
@@ -734,14 +739,8 @@ function showSkeleton() {
 }
 
 // --- Wire up events ---------------------------------------------------------
-if (els.editPricesBtn) els.editPricesBtn.addEventListener("click", togglePricesEditMode);
-if (els.exitPricesEdit) els.exitPricesEdit.addEventListener("click", exitPricesEditMode);
 if (els.closePricesSetupModal) els.closePricesSetupModal.addEventListener("click", () => { els.pricesSetupModal.hidden = true; });
 if (els.pricesSetupSave) els.pricesSetupSave.addEventListener("click", savePricesSetup);
-if (els.closePriceEditModal) els.closePriceEditModal.addEventListener("click", () => { els.priceEditModal.hidden = true; });
-if (els.priceEditCancel) els.priceEditCancel.addEventListener("click", () => { els.priceEditModal.hidden = true; });
-if (els.priceEditSave) els.priceEditSave.addEventListener("click", savePriceEdit);
-if (els.priceEditValue) els.priceEditValue.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); savePriceEdit(); } });
 
 els.search.addEventListener("input", render);
 els.search.addEventListener("keydown", (e) => {

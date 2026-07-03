@@ -284,35 +284,127 @@
     catch (_) { return ""; }
   }
 
+  const EXPENSE_CATEGORIES = ["Parts", "Tools", "Rent", "Utilities", "Marketing", "Other"];
+  let expenseSearchQuery = "";
+  let expenseCategoryFilter = "all";
+  let editingExpenseId = null;
+
   function initExpenses() {
+    bindExpenseFormOnce();
+    renderExpenses();
+  }
+
+  function bindExpenseFormOnce() {
     const form = $("expenseForm");
-    if (form && !form.dataset.bound) {
-      form.dataset.bound = "true";
-      const dateInput = $("expenseDate");
-      if (dateInput && !dateInput.value) dateInput.valueAsDate = new Date();
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const expense = {
-          id: uid(),
-          date: $("expenseDate")?.value || "",
-          category: $("expenseCategory")?.value || "Other",
-          vendor: ($("expenseVendor")?.value || "").trim(),
-          amount: Number($("expenseAmount")?.value || 0),
-          notes: ($("expenseNotes")?.value || "").trim(),
-          created: new Date().toISOString(),
-        };
-        const msg = $("expenseMessage");
-        if (!expense.date || !expense.amount || expense.amount < 0) {
-          if (msg) msg.textContent = "Add a valid date and amount.";
-          return;
-        }
-        writeJson(EXPENSES_KEY, [expense].concat(readExpenses()));
-        form.reset();
-        if (dateInput) dateInput.valueAsDate = new Date();
-        if (msg) msg.textContent = "Expense added.";
-        renderExpenses();
-      });
+    if (!form || form.dataset.bound) return;
+    form.dataset.bound = "true";
+
+    $("expenseNewBtn")?.addEventListener("click", openNewExpenseForm);
+    $("closeExpenseFormModal")?.addEventListener("click", closeExpenseForm);
+    $("expenseCancelBtn")?.addEventListener("click", closeExpenseForm);
+    $("expenseSubmit")?.addEventListener("click", saveExpenseForm);
+    $("expenseFormModal")?.addEventListener("click", (event) => {
+      if (event.target.id === "expenseFormModal") closeExpenseForm();
+    });
+
+    $("expenseSearch")?.addEventListener("input", () => {
+      expenseSearchQuery = ($("expenseSearch").value || "").trim().toLowerCase();
+      const clearBtn = $("clearExpenseSearch");
+      if (clearBtn) clearBtn.hidden = !expenseSearchQuery;
+      renderExpenses();
+    });
+    $("clearExpenseSearch")?.addEventListener("click", () => {
+      $("expenseSearch").value = "";
+      expenseSearchQuery = "";
+      $("clearExpenseSearch").hidden = true;
+      renderExpenses();
+    });
+
+    $("expenseList")?.addEventListener("click", handleExpenseListClick);
+    $("expenseCategoryChips")?.addEventListener("click", handleExpenseChipClick);
+  }
+
+  function openNewExpenseForm() {
+    editingExpenseId = null;
+    $("expenseFormTitle").textContent = "Add expense";
+    $("expenseId").value = "";
+    $("expenseDate").valueAsDate = new Date();
+    $("expenseCategory").value = "Parts";
+    $("expenseVendor").value = "";
+    $("expenseAmount").value = "";
+    $("expenseNotes").value = "";
+    const msg = $("expenseMessage");
+    if (msg) { msg.hidden = true; msg.textContent = ""; }
+    $("expenseFormModal").hidden = false;
+    $("expenseVendor")?.focus();
+  }
+
+  function editExpense(expense) {
+    if (!expense) return;
+    editingExpenseId = expense.id;
+    $("expenseFormTitle").textContent = "Edit expense";
+    $("expenseId").value = expense.id;
+    $("expenseDate").value = expense.date || "";
+    $("expenseCategory").value = expense.category || "Other";
+    $("expenseVendor").value = expense.vendor || "";
+    $("expenseAmount").value = expense.amount || "";
+    $("expenseNotes").value = expense.notes || "";
+    const msg = $("expenseMessage");
+    if (msg) { msg.hidden = true; msg.textContent = ""; }
+    $("expenseFormModal").hidden = false;
+    $("expenseVendor")?.focus();
+  }
+
+  function closeExpenseForm() {
+    $("expenseFormModal").hidden = true;
+    editingExpenseId = null;
+  }
+
+  function saveExpenseForm() {
+    const date = $("expenseDate")?.value || "";
+    const amount = Number($("expenseAmount")?.value || 0);
+    const msg = $("expenseMessage");
+    if (!date || !amount || amount < 0) {
+      if (msg) { msg.textContent = "Add a valid date and amount."; msg.hidden = false; }
+      return;
     }
+    const record = {
+      id: editingExpenseId || uid(),
+      date,
+      category: $("expenseCategory")?.value || "Other",
+      vendor: ($("expenseVendor")?.value || "").trim(),
+      amount,
+      notes: ($("expenseNotes")?.value || "").trim(),
+      created: editingExpenseId
+        ? (readExpenses().find((item) => item.id === editingExpenseId)?.created || new Date().toISOString())
+        : new Date().toISOString(),
+    };
+    const existing = readExpenses();
+    const next = editingExpenseId
+      ? existing.map((item) => (item.id === editingExpenseId ? record : item))
+      : [record].concat(existing);
+    writeJson(EXPENSES_KEY, next);
+    closeExpenseForm();
+    renderExpenses();
+  }
+
+  function handleExpenseListClick(event) {
+    const editBtn = event.target.closest("[data-expense-edit]");
+    const deleteBtn = event.target.closest("[data-expense-delete]");
+    if (editBtn) {
+      editExpense(readExpenses().find((item) => item.id === editBtn.dataset.expenseEdit));
+      return;
+    }
+    if (!deleteBtn) return;
+    if (!window.confirm("Delete this expense?")) return;
+    writeJson(EXPENSES_KEY, readExpenses().filter((item) => item.id !== deleteBtn.dataset.expenseDelete));
+    renderExpenses();
+  }
+
+  function handleExpenseChipClick(event) {
+    const chip = event.target.closest("[data-expense-category]");
+    if (!chip) return;
+    expenseCategoryFilter = chip.dataset.expenseCategory;
     renderExpenses();
   }
 
@@ -320,35 +412,80 @@
     return readJson(EXPENSES_KEY, []);
   }
 
+  function filteredExpenses(expenses) {
+    return expenses.filter((item) => {
+      if (expenseCategoryFilter !== "all" && item.category !== expenseCategoryFilter) return false;
+      if (!expenseSearchQuery) return true;
+      return [item.vendor, item.notes, item.category].some((v) =>
+        String(v || "").toLowerCase().includes(expenseSearchQuery)
+      );
+    });
+  }
+
+  function categoryTotals(expenses) {
+    const totals = {};
+    expenses.forEach((item) => {
+      totals[item.category] = (totals[item.category] || 0) + Number(item.amount || 0);
+    });
+    return totals;
+  }
+
+  function renderExpenseChips(totals) {
+    const box = $("expenseCategoryChips");
+    if (!box) return;
+    const used = EXPENSE_CATEGORIES.filter((c) => totals[c]);
+    const chips = [{ key: "all", label: "All" }].concat(used.map((c) => ({ key: c, label: c })));
+    box.innerHTML = chips.map((c) =>
+      `<button type="button" class="chip${expenseCategoryFilter === c.key ? " active" : ""}" data-expense-category="${esc(c.key)}">${esc(c.label)}</button>`
+    ).join("");
+  }
+
+  function renderExpenseBreakdown(totals) {
+    const box = $("expenseBreakdown");
+    if (!box) return;
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    box.innerHTML = entries.length
+      ? entries.map(([cat, total]) =>
+          `<div class="expense-breakdown-item"><span>${esc(cat)}</span><strong>${money(total)}</strong></div>`
+        ).join("")
+      : "";
+  }
+
   function renderExpenses() {
     const list = $("expenseList");
     const total = $("expenseMonthTotal");
+    const count = $("expenseCount");
     if (!list && !total) return;
     const expenses = readExpenses().sort((a, b) => String(b.date).localeCompare(String(a.date)));
     const currentMonth = monthKey(new Date());
-    const monthTotal = expenses
-      .filter((item) => monthKey(new Date(item.date || Date.now())) === currentMonth)
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const monthExpenses = expenses.filter((item) => monthKey(new Date(item.date || Date.now())) === currentMonth);
+    const monthTotal = monthExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     if (total) total.textContent = money(monthTotal);
+
+    const totals = categoryTotals(monthExpenses);
+    renderExpenseChips(totals);
+    renderExpenseBreakdown(totals);
+
+    const visible = filteredExpenses(expenses);
+    if (count) {
+      count.textContent = expenses.length
+        ? `${visible.length} of ${expenses.length} expense${expenses.length === 1 ? "" : "s"}`
+        : "No expenses yet";
+    }
     if (list) {
-      list.innerHTML = expenses.length ? expenses.map((item) => `
-        <article class="ops-row">
+      list.innerHTML = visible.length ? visible.map((item) => `
+        <article class="ops-row expense-row">
           <div>
             <strong>${esc(item.category)} · ${money(item.amount)}</strong>
             <p>${esc(item.vendor || "No vendor")}</p>
             <small>${esc(formatDate(item.date))}${item.notes ? " · " + esc(item.notes) : ""}</small>
           </div>
           <div class="ops-row-actions">
+            <button type="button" data-expense-edit="${esc(item.id)}">Edit</button>
             <button type="button" class="danger-text" data-expense-delete="${esc(item.id)}">Delete</button>
           </div>
         </article>
-      `).join("") : `<p class="ops-empty">No expenses recorded yet.</p>`;
-      list.querySelectorAll("[data-expense-delete]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          writeJson(EXPENSES_KEY, readExpenses().filter((item) => item.id !== btn.dataset.expenseDelete));
-          renderExpenses();
-        });
-      });
+      `).join("") : `<p class="ops-empty">${expenses.length ? "No expenses match the current filters." : "No expenses recorded yet."}</p>`;
     }
   }
 

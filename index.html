@@ -53,6 +53,8 @@
     <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3.5h12v17l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2v-17Z"/><path d="M9 8h6M9 11.5h6M9 15h3"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><path d="M8 3.5h8a2 2 0 0 1 2 2v14.5l-3-2.5-3 2.5-3-2.5-3 2.5V5.5a2 2 0 0 1 2-2Z"/><path d="M9 8h6M9 11.5h4"/></symbol>
     <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4.5 9.5V4.8m0 0h4.7M4.6 4.9A8.4 8.4 0 1 1 3.5 14"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4.5 7.5h3l1.5-2.5h6l1.5 2.5h3a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V9a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5L8 5.5Z"/></symbol>
   </svg>
   <header class="app-header">
     <div class="header-row">
@@ -335,33 +337,84 @@
   <!-- ============ EXPENSES VIEW ============ -->
   <main class="container view" id="view-expenses" hidden>
     <p class="info-banner">Track shop expenses locally for quick monthly visibility.</p>
-    <section class="ops-card" aria-labelledby="expenseTitle">
-      <div class="today-focus-header">
+
+    <section class="expenses-workspace" aria-labelledby="expensesTitle">
+      <div class="leads-topbar expenses-topbar">
+        <div class="leads-searchbar">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input id="expenseSearch" type="search" inputmode="search" autocomplete="off" placeholder="Search vendor, notes, category…" aria-label="Search expenses" />
+          <button id="clearExpenseSearch" class="inventory-clear-search" aria-label="Clear expense search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+        </div>
+        <button type="button" id="expenseNewBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add expense</button>
+      </div>
+
+      <div id="expenseCategoryChips" class="filter-chips expense-category-chips" role="tablist" aria-label="Filter by category"></div>
+
+      <div class="leads-heading-row expenses-heading-row">
         <div>
           <p class="dashboard-eyebrow">Expenses</p>
-          <h2 id="expenseTitle">Record expense</h2>
+          <h2 id="expensesTitle">This month</h2>
         </div>
-        <div class="expense-total"><span>This month</span><strong id="expenseMonthTotal">$0</strong></div>
+        <div class="expense-total"><span>Total</span><strong id="expenseMonthTotal">$0</strong></div>
       </div>
-      <form id="expenseForm" class="ops-form">
-        <input id="expenseDate" class="text-input" type="date" required />
-        <select id="expenseCategory" class="text-input select-input" required>
-          <option value="Parts">Parts</option>
-          <option value="Tools">Tools</option>
-          <option value="Rent">Rent</option>
-          <option value="Utilities">Utilities</option>
-          <option value="Marketing">Marketing</option>
-          <option value="Other">Other</option>
-        </select>
-        <input id="expenseVendor" class="text-input" placeholder="Vendor / payee" />
-        <input id="expenseAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" required />
-        <textarea id="expenseNotes" class="text-input ops-form-wide" rows="2" placeholder="Notes"></textarea>
-        <button type="submit" class="ghost-btn">Add expense</button>
-      </form>
-      <p id="expenseMessage" class="dashboard-target-message" aria-live="polite"></p>
-      <div id="expenseList" class="ops-list" aria-live="polite"></div>
+
+      <div id="expenseBreakdown" class="expense-breakdown" aria-live="polite"></div>
+
+      <p id="expenseCount" class="result-count"></p>
+      <div id="expenseList" class="ops-list expense-list" aria-live="polite"></div>
     </section>
   </main>
+
+  <!-- Expense form modal -->
+  <div id="expenseFormModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="expenseFormTitle">
+      <div class="modal-header">
+        <h3 id="expenseFormTitle">Add expense</h3>
+        <button type="button" id="closeExpenseFormModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="expenseForm" autocomplete="off">
+          <input id="expenseId" type="hidden" />
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="expenseDate">Date</label>
+              <input id="expenseDate" class="text-input" type="date" required />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="expenseCategory">Category</label>
+              <select id="expenseCategory" class="text-input select-input" required>
+                <option value="Parts">Parts</option>
+                <option value="Tools">Tools</option>
+                <option value="Rent">Rent</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="expenseVendor">Vendor / payee</label>
+              <input id="expenseVendor" class="text-input" placeholder="e.g. iFixit Supply Co." />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="expenseAmount">Amount</label>
+              <input id="expenseAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" required />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="expenseNotes">Notes</label>
+              <textarea id="expenseNotes" class="text-input" rows="2" placeholder="Optional notes"></textarea>
+            </div>
+          </div>
+          <p id="expenseMessage" class="field-error" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="expenseCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="expenseSubmit" class="primary-btn">Save expense</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ============ PRICES VIEW ============ -->
   <main class="container view" id="view-prices" hidden>
@@ -369,12 +422,6 @@
     <div class="status-line">
       <span id="statusDot" class="status-dot"></span>
       <span id="lastUpdated">Loading prices…</span>
-      <button type="button" id="editPricesBtn" class="edit-prices-btn" title="Edit prices"><svg class="icon"><use href="#i-pencil"></use></svg></button>
-    </div>
-    <div id="pricesEditBanner" class="prices-edit-banner" hidden>
-      <svg class="icon"><use href="#i-pencil"></use></svg>
-      Edit mode — tap any price to update it
-      <button type="button" id="exitPricesEdit" class="prices-edit-exit">Exit</button>
     </div>
 
     <div class="search-wrap">
@@ -540,7 +587,7 @@
     <p>Prices in TTD · Live from the shop sheet · Internal team use</p>
   </footer>
 
-  <!-- Prices Script setup modal (first-time edit mode config) -->
+  <!-- Prices Script setup modal (first-time price editing config) -->
   <div id="pricesSetupModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="pricesSetupTitle">
       <div class="modal-header">
@@ -558,28 +605,6 @@
       <div class="modal-footer">
         <div class="form-actions">
           <button type="button" id="pricesSetupSave" class="primary-btn">Enable editing</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Price edit modal -->
-  <div id="priceEditModal" class="modal-backdrop" hidden>
-    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="priceEditTitle">
-      <div class="modal-header">
-        <h3 id="priceEditTitle">Edit price</h3>
-        <button type="button" id="closePriceEditModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
-      </div>
-      <div class="modal-body">
-        <p id="priceEditModelLabel" class="price-edit-model-label"></p>
-        <label class="field-label" for="priceEditValue">New price (TTD)</label>
-        <input id="priceEditValue" class="text-input" type="text" inputmode="decimal" />
-        <p id="priceEditError" class="field-error" hidden></p>
-      </div>
-      <div class="modal-footer">
-        <div class="form-actions">
-          <button type="button" id="priceEditCancel" class="ghost-btn">Cancel</button>
-          <button type="button" id="priceEditSave" class="primary-btn">Save to sheet</button>
         </div>
       </div>
     </div>
