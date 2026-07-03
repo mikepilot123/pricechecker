@@ -525,20 +525,35 @@
       : `<span class="ticket-phone no-phone">No phone</span>`;
     const quote = money(lead.quotedAmount);
     const dueClass = isDue(lead.followUpDate) && !["Won", "Lost"].includes(lead.status) ? " is-due" : "";
-    return `<article class="ops-row lead-row ${statusClass(lead.status)}" data-lead-id="${esc(lead.id)}">
-      <div class="lead-main">
-        <div class="lead-title-row">
-          <strong>${esc(lead.customerName || "Unnamed lead")}</strong>
+    const repairText = [lead.device, lead.issue].filter(Boolean).join(" · ") || "No device or issue yet";
+    return `<article class="lead-card ${statusClass(lead.status)}" data-lead-id="${esc(lead.id)}">
+      <div class="lead-avatar" aria-hidden="true">
+        <svg class="icon"><use href="#i-user"></use></svg>
+      </div>
+      <div class="lead-card-main">
+        <div class="lead-card-top">
+          <div class="lead-card-title">${esc(lead.customerName || "Unnamed lead")}</div>
           <span class="lead-status-pill">${esc(lead.status || "New")}</span>
         </div>
-        <p>${esc([lead.device, lead.issue].filter(Boolean).join(" · ") || "No device or issue yet")}</p>
-        <small>${phone}${lead.email ? ` · ${esc(lead.email)}` : ""}${quote ? ` · Quote ${esc(quote)}` : ""}${lead.source ? ` · ${esc(lead.source)}` : ""}</small>
-        <div class="lead-meta${dueClass}">${lead.followUpDate ? `Follow up ${esc(formatDate(lead.followUpDate))}` : "No follow-up date"}${lead.notes ? ` · ${esc(lead.notes)}` : ""}</div>
+        <div class="lead-card-sub">${esc(repairText)}</div>
+        <div class="lead-phone-wrap">${phone}</div>
+        <div class="lead-detail-grid">
+          <div class="lead-detail${dueClass}">
+            <svg class="icon"><use href="#i-calendar"></use></svg>
+            <span>${lead.followUpDate ? `Follow up ${esc(formatDate(lead.followUpDate))}` : "No follow-up date"}</span>
+          </div>
+          ${quote ? `<div class="lead-detail"><svg class="icon"><use href="#i-cash"></use></svg><span>Quote ${esc(quote)}</span></div>` : ""}
+          ${lead.email ? `<div class="lead-detail"><svg class="icon"><use href="#i-mail"></use></svg><span>${esc(lead.email)}</span></div>` : ""}
+          ${lead.source ? `<div class="lead-detail"><svg class="icon"><use href="#i-tag"></use></svg><span>${esc(lead.source)}</span></div>` : ""}
+        </div>
+        ${lead.notes ? `<div class="lead-notes"><svg class="icon"><use href="#i-note"></use></svg><span>${esc(lead.notes)}</span></div>` : ""}
       </div>
-      <div class="ops-row-actions lead-actions">
+      <div class="lead-card-side">
+        <div class="lead-card-actions">
+          <button type="button" data-lead-edit="${esc(lead.id)}">Edit</button>
+          <button type="button" class="danger-text" data-lead-delete="${esc(lead.id)}">Delete</button>
+        </div>
         <select class="text-input select-input lead-card-status" data-lead-status="${esc(lead.id)}" aria-label="Lead status">${statusOptions(lead.status, false)}</select>
-        <button type="button" data-lead-edit="${esc(lead.id)}">Edit</button>
-        <button type="button" class="danger-text" data-lead-delete="${esc(lead.id)}">Delete</button>
       </div>
     </article>`;
   }
