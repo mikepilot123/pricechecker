@@ -236,27 +236,6 @@
   }
 
   function renderActionPlan() {
-    const form = $("targetPlanForm");
-    if (form && !form.dataset.bound) {
-      form.dataset.bound = "true";
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const title = ($("targetPlanTitle")?.value || "").trim();
-        const notes = ($("targetPlanNotes")?.value || "").trim();
-        const status = $("targetPlanColumn")?.value || "todo";
-        const msg = $("targetPlanMessage");
-        if (!title) {
-          if (msg) msg.textContent = "Add a card title first.";
-          return;
-        }
-        const cards = readActionCards();
-        cards.unshift({ id: uid(), title, notes, status, created: new Date().toISOString() });
-        writeJson(ACTION_CARDS_KEY, cards);
-        form.reset();
-        if (msg) msg.textContent = "Action card saved.";
-        renderActionPlan();
-      });
-    }
     renderActionBoard();
   }
 
@@ -274,13 +253,28 @@
       const clearBtn = column.key === "done" && items.length
         ? `<button type="button" class="target-clear-done" data-action-clear-done>Clear</button>`
         : "";
+      const composer = column.key === "todo" ? targetTodoComposerHtml() : "";
       return `<section class="target-board-column">
         <div class="target-board-heading"><span>${esc(column.label)}</span><b>${items.length}</b>${clearBtn}</div>
         <div class="target-board-cards">
+          ${composer}
           ${items.length ? items.map(actionCardHtml).join("") : `<p class="ops-empty">No cards yet.</p>`}
         </div>
       </section>`;
     }).join("");
+    board.querySelector("[data-action-add-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const title = (form.querySelector("[data-action-add-title]")?.value || "").trim();
+      const notes = (form.querySelector("[data-action-add-notes]")?.value || "").trim();
+      const message = form.querySelector("[data-action-add-message]");
+      if (!title) {
+        if (message) message.textContent = "Add a title first.";
+        form.querySelector("[data-action-add-title]")?.focus();
+        return;
+      }
+      addActionCard({ title, notes, status: "todo" });
+    });
     board.querySelectorAll("[data-action-move]").forEach((btn) => {
       btn.addEventListener("click", () => updateActionCard(btn.dataset.actionId, { status: btn.dataset.actionMove }));
     });
@@ -291,6 +285,17 @@
       writeJson(ACTION_CARDS_KEY, readActionCards().filter((card) => card.status !== "done"));
       renderActionPlan();
     });
+  }
+
+  function targetTodoComposerHtml() {
+    return `<form class="target-inline-composer" data-action-add-form>
+      <input class="target-inline-title" data-action-add-title type="text" autocomplete="off" placeholder="Add a to-do..." aria-label="New to-do title" />
+      <textarea class="target-inline-notes" data-action-add-notes rows="2" placeholder="Add a note" aria-label="New to-do note"></textarea>
+      <div class="target-inline-actions">
+        <p class="dashboard-target-message" data-action-add-message aria-live="polite"></p>
+        <button type="submit" class="ghost-btn target-inline-add"><svg class="icon"><use href="#i-plus"></use></svg>Add</button>
+      </div>
+    </form>`;
   }
 
   function actionCardHtml(card) {
@@ -318,6 +323,21 @@
     const seeded = DEFAULT_ACTIONS.map((card) => Object.assign({ id: uid(), created: new Date().toISOString() }, card));
     writeJson(ACTION_CARDS_KEY, seeded);
     return seeded;
+  }
+
+  function addActionCard(card) {
+    const title = String(card.title || "").trim();
+    if (!title) return;
+    const cards = readActionCards();
+    cards.unshift({
+      id: uid(),
+      title,
+      notes: String(card.notes || "").trim(),
+      status: card.status || "todo",
+      created: new Date().toISOString(),
+    });
+    writeJson(ACTION_CARDS_KEY, cards);
+    renderActionPlan();
   }
 
   function updateActionCard(id, patch) {

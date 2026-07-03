@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=leads-cards-1" />
+  <link rel="stylesheet" href="assets/style.css?v=target-board-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -156,20 +156,6 @@
           <h2 id="targetsActionTitle">Daily sales actions</h2>
         </div>
       </div>
-      <form id="targetPlanForm" class="target-plan-form target-card-form">
-        <label class="field-label" for="targetPlanTitle">Add action card</label>
-        <div class="target-card-create">
-          <input id="targetPlanTitle" class="text-input" placeholder="Example: Call Jack Johnson" />
-          <select id="targetPlanColumn" class="text-input select-input" aria-label="Action status">
-            <option value="todo">To do</option>
-            <option value="doing">Doing</option>
-            <option value="done">Done</option>
-          </select>
-          <button type="submit" class="ghost-btn">Add card</button>
-        </div>
-        <textarea id="targetPlanNotes" class="text-input" rows="2" placeholder="Optional details or next step"></textarea>
-        <p id="targetPlanMessage" class="dashboard-target-message" aria-live="polite"></p>
-      </form>
       <div id="targetActionBoard" class="target-board" aria-live="polite"></div>
     </section>
   </main>
@@ -900,6 +886,27 @@
     </section>
   </div>
 
+  <div id="mediaViewerModal" class="modal-backdrop media-viewer-backdrop" hidden>
+    <section class="media-viewer-panel" role="dialog" aria-modal="true" aria-labelledby="mediaViewerTitle">
+      <div class="media-viewer-topbar">
+        <div>
+          <p id="mediaViewerMeta" class="modal-eyebrow">Media</p>
+          <h3 id="mediaViewerTitle">Device media</h3>
+        </div>
+        <button type="button" id="closeMediaViewer" class="media-viewer-close" aria-label="Close media viewer"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="media-viewer-stage-wrap">
+        <button type="button" id="mediaViewerPrev" class="media-viewer-nav media-viewer-prev" aria-label="Previous media"><svg class="icon"><use href="#i-chevron-left"></use></svg></button>
+        <div id="mediaViewerStage" class="media-viewer-stage" aria-live="polite"></div>
+        <button type="button" id="mediaViewerNext" class="media-viewer-nav media-viewer-next" aria-label="Next media"><svg class="icon"><use href="#i-chevron-right"></use></svg></button>
+      </div>
+      <div class="media-viewer-footer">
+        <span id="mediaViewerCounter" class="media-viewer-counter"></span>
+        <a id="mediaViewerOpenOriginal" class="ghost-btn" href="#" target="_blank" rel="noopener">Open original</a>
+      </div>
+    </section>
+  </div>
+
   <!-- Activity log (updates & notes) -->
   <div id="activityLogModal" class="modal-backdrop activity-log-backdrop" hidden>
     <section class="modal-panel activity-log-panel" role="dialog" aria-modal="true" aria-labelledby="activityLogTitle">
@@ -1047,7 +1054,7 @@
   <script src="assets/app.js?v=leads-flow-1"></script>
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
   <script src="assets/intake.js?v=leads-flow-1"></script>
-  <script src="assets/dashboard.js?v=ops-tools-1"></script>
+  <script src="assets/dashboard.js?v=todo-composer-1"></script>
   <script src="assets/appointments.js?v=modal-layer-fix-1"></script>
   <script src="assets/leads.js?v=leads-cards-1"></script>
 </body>

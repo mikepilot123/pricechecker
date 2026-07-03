@@ -865,10 +865,18 @@
     $("closeTicketModal").focus();
   }
 
-  function closeTicketModal() { $("ticketModal").hidden = true; currentModalTicket = null; }
+  function closeTicketModal() {
+    closeMediaViewer();
+    $("ticketModal").hidden = true;
+    currentModalTicket = null;
+    activeTicketMedia = [];
+  }
   $("closeTicketModal").addEventListener("click", closeTicketModal);
   $("ticketModal").addEventListener("click", (e) => { if (e.target.id === "ticketModal") closeTicketModal(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && isMediaViewerOpen()) return;
+    if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal();
+  });
 
   $("ticketModalBody").addEventListener("click", (e) => {
     const pencilBtn = e.target.closest("[data-edit-field]");
@@ -935,6 +943,93 @@
     return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span>${detailValueHtml(value, valueClass, field)}</div>`;
   }
 
+  // ---- In-app media viewer -------------------------------------------------
+  let activeTicketMedia = [];
+  let mediaViewerItems = [];
+  let mediaViewerIndex = 0;
+
+  function isMediaViewerOpen() {
+    const modal = $("mediaViewerModal");
+    return !!modal && !modal.hidden;
+  }
+
+  function mediaViewerCurrentItem() {
+    return mediaViewerItems[mediaViewerIndex] || null;
+  }
+
+  function mediaViewerLabel(item, index, total) {
+    const kind = item?.type === "video" ? "Video" : "Photo";
+    return `${kind} ${index + 1} of ${total}`;
+  }
+
+  function renderMediaViewer() {
+    const item = mediaViewerCurrentItem();
+    const stage = $("mediaViewerStage");
+    if (!item || !stage) return;
+    const total = mediaViewerItems.length;
+    const label = mediaViewerLabel(item, mediaViewerIndex, total);
+    $("mediaViewerTitle").textContent = item.type === "video" ? "Device video" : "Device photo";
+    $("mediaViewerMeta").textContent = currentModalTicket?.device || "Device media";
+    $("mediaViewerCounter").textContent = label;
+    $("mediaViewerOpenOriginal").href = item.url;
+    $("mediaViewerOpenOriginal").hidden = String(item.url || "").startsWith("blob:");
+    $("mediaViewerPrev").disabled = total < 2;
+    $("mediaViewerNext").disabled = total < 2;
+    stage.innerHTML = item.type === "video"
+      ? `<video class="media-viewer-media" src="${esc(item.url)}" controls autoplay playsinline preload="metadata"></video>`
+      : `<img class="media-viewer-media" src="${esc(item.url)}" alt="${esc(label)}" />`;
+  }
+
+  function openMediaViewer(items, index = 0) {
+    const cleanItems = (items || []).filter((item) => item && item.url);
+    if (!cleanItems.length) return;
+    mediaViewerItems = cleanItems;
+    mediaViewerIndex = Math.min(Math.max(Number(index) || 0, 0), mediaViewerItems.length - 1);
+    renderMediaViewer();
+    $("mediaViewerModal").hidden = false;
+    $("closeMediaViewer")?.focus();
+  }
+
+  function closeMediaViewer() {
+    const modal = $("mediaViewerModal");
+    if (!modal || modal.hidden) return;
+    const media = $("mediaViewerStage")?.querySelector("video");
+    if (media) media.pause();
+    modal.hidden = true;
+    $("mediaViewerStage").innerHTML = "";
+    mediaViewerItems = [];
+    mediaViewerIndex = 0;
+  }
+
+  function stepMediaViewer(delta) {
+    if (!mediaViewerItems.length) return;
+    mediaViewerIndex = (mediaViewerIndex + delta + mediaViewerItems.length) % mediaViewerItems.length;
+    renderMediaViewer();
+  }
+
+  $("closeMediaViewer")?.addEventListener("click", closeMediaViewer);
+  $("mediaViewerModal")?.addEventListener("click", (e) => {
+    if (e.target.id === "mediaViewerModal") closeMediaViewer();
+  });
+  $("mediaViewerPrev")?.addEventListener("click", () => stepMediaViewer(-1));
+  $("mediaViewerNext")?.addEventListener("click", () => stepMediaViewer(1));
+  document.addEventListener("keydown", (e) => {
+    if (!isMediaViewerOpen()) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeMediaViewer();
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      stepMediaViewer(-1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      stepMediaViewer(1);
+    }
+  });
+
   // ---- Ticket media (photos & videos of the physical device) ----------------
   // Files upload from the browser straight to Vercel Blob (two-phase token
   // handshake via api/media-upload.js), then the resulting URL is recorded in
@@ -946,12 +1041,12 @@
     return blobClientPromise;
   }
 
-  function ticketMediaItemHtml(item) {
+  function ticketMediaItemHtml(item, index) {
     const inner = item.type === "video"
       ? `<video src="${esc(item.url)}" muted playsinline preload="metadata"></video><span class="ticket-media-play"><svg class="icon"><use href="#i-play"></use></svg></span>`
       : `<img src="${esc(item.url)}" alt="Device photo" loading="lazy" />`;
     return `<div class="ticket-media-item" data-media-id="${esc(item.id)}">
-      <a href="${esc(item.url)}" target="_blank" rel="noopener" class="ticket-media-link" aria-label="Open ${item.type}">${inner}</a>
+      <button type="button" class="ticket-media-link" data-open-media="${index}" aria-label="View ${item.type}">${inner}</button>
       <button type="button" class="ticket-media-delete" data-delete-media="${esc(item.id)}" aria-label="Delete"><svg class="icon"><use href="#i-xmark"></use></svg></button>
     </div>`;
   }
@@ -959,6 +1054,7 @@
   function renderTicketMedia(items) {
     const gallery = $("ticketMediaGallery");
     if (!gallery) return;
+    activeTicketMedia = Array.isArray(items) ? items : [];
     gallery.innerHTML = items.length
       ? items.map(ticketMediaItemHtml).join("")
       : `<p class="ops-empty">No photos or videos yet.</p>`;
@@ -1029,6 +1125,11 @@
     });
 
     gallery.addEventListener("click", async (e) => {
+      const openBtn = e.target.closest("[data-open-media]");
+      if (openBtn) {
+        openMediaViewer(activeTicketMedia, Number(openBtn.dataset.openMedia));
+        return;
+      }
       const btn = e.target.closest("[data-delete-media]");
       if (!btn) return;
       e.preventDefault();
@@ -1037,8 +1138,7 @@
       try {
         const res = await api({ action: "deleteMedia", id: btn.dataset.deleteMedia });
         if (!res.ok) throw new Error(res.error || "Delete failed");
-        btn.closest(".ticket-media-item")?.remove();
-        if (!gallery.querySelector(".ticket-media-item")) renderTicketMedia([]);
+        await loadTicketMedia(ticket);
       } catch (err) {
         btn.disabled = false;
         setTicketMediaError(err.message);
@@ -1065,9 +1165,11 @@
     strip.hidden = !pendingFormMedia.length;
     strip.innerHTML = pendingFormMedia.map((item, i) => `
       <div class="ticket-media-item">
+        <button type="button" class="ticket-media-link" data-pending-open="${i}" aria-label="Preview ${item.type}">
         ${item.type === "video"
           ? `<video src="${item.url}" muted playsinline preload="metadata"></video><span class="ticket-media-play"><svg class="icon"><use href="#i-play"></use></svg></span>`
           : `<img src="${item.url}" alt="Pending photo" />`}
+        </button>
         <button type="button" class="ticket-media-delete" data-pending-remove="${i}" aria-label="Remove"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>`).join("");
   }
@@ -1092,6 +1194,11 @@
   });
 
   $("fMediaPending")?.addEventListener("click", (e) => {
+    const openBtn = e.target.closest("[data-pending-open]");
+    if (openBtn) {
+      openMediaViewer(pendingFormMedia, Number(openBtn.dataset.pendingOpen));
+      return;
+    }
     const btn = e.target.closest("[data-pending-remove]");
     if (!btn) return;
     const removed = pendingFormMedia.splice(Number(btn.dataset.pendingRemove), 1)[0];
