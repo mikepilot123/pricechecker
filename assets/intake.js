@@ -827,14 +827,6 @@
           <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
         </div>
       </div>
-      <section class="ticket-detail-section"><p class="field-label">Photos & videos</p>
-        <div class="ticket-media-gallery" id="ticketMediaGallery"><p class="ops-empty ticket-media-loading">Loading…</p></div>
-        <label class="ghost-btn ticket-media-add-btn" id="ticketMediaAddBtn">
-          <svg class="icon"><use href="#i-camera"></use></svg><span>Add photo/video</span>
-          <input type="file" accept="image/*,video/*" capture="environment" hidden id="ticketMediaInput" />
-        </label>
-        <p class="field-error" id="ticketMediaError" hidden></p>
-      </section>
       <section class="ticket-detail-section"><p class="field-label">Customer & device</p><div class="ticket-detail-grid">
         ${detailRow("i-user", "Customer", fieldDisplayHtml("customerName", ticket), "", "customerName")}
         ${detailRow("i-phone", "Phone", fieldDisplayHtml("phone", ticket), "", "phone")}
@@ -848,7 +840,15 @@
         ${detailRow("i-cash", "Amount paid", fieldDisplayHtml("amountPaid", ticket), "money-positive", "amountPaid")}
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
       </div></section>
-      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>`;
+      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
+      <section class="ticket-detail-section"><p class="field-label">Photos & videos</p>
+        <div class="ticket-media-gallery" id="ticketMediaGallery"><p class="ops-empty ticket-media-loading">Loading…</p></div>
+        <label class="ghost-btn ticket-media-add-btn" id="ticketMediaAddBtn">
+          <svg class="icon"><use href="#i-camera"></use></svg><span>Add photo/video</span>
+          <input type="file" accept="image/*,video/*" capture="environment" hidden id="ticketMediaInput" />
+        </label>
+        <p class="field-error" id="ticketMediaError" hidden></p>
+      </section>`;
 
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
