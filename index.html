@@ -113,6 +113,22 @@
   <!-- ============ TARGETS VIEW ============ -->
   <main class="container view" id="view-targets" hidden>
     <p class="info-banner">Set business targets used across the dashboard.</p>
+
+    <section class="targets-progress" id="targetsProgress" aria-label="Live progress against targets">
+      <article class="targets-progress-card">
+        <p class="dashboard-eyebrow">This month</p>
+        <p class="targets-progress-value"><strong id="targetMonthSales">$0</strong><span id="targetMonthGoalLabel">of $0</span></p>
+        <div class="dashboard-progress" aria-label="Monthly target progress"><span id="targetMonthBar" style="width:0%"></span></div>
+        <p class="targets-progress-sub" id="targetMonthPace">Loading…</p>
+      </article>
+      <article class="targets-progress-card">
+        <p class="dashboard-eyebrow">Today</p>
+        <p class="targets-progress-value"><strong id="targetTodaySales">$0</strong><span id="targetTodayGoalLabel">of $0</span></p>
+        <div class="dashboard-progress" aria-label="Daily target progress"><span id="targetTodayBar" style="width:0%"></span></div>
+        <p class="targets-progress-sub" id="targetTodayPace">Loading…</p>
+      </article>
+    </section>
+
     <section class="dashboard-target-card targets-page-card" aria-labelledby="dashboardTargetTitle">
       <div>
         <p class="dashboard-eyebrow" id="dashboardTargetTitle">Sales targets</p>
@@ -686,6 +702,16 @@
               <div class="form-field form-field-full">
                 <label class="field-label" for="fNotes">Notes</label>
                 <textarea id="fNotes" class="text-input" rows="3" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
+              </div>
+              <div class="form-field form-field-full">
+                <label class="field-label">Photos &amp; videos <span class="field-optional">(optional)</span></label>
+                <div id="fMediaPending" class="ticket-media-gallery form-media-pending" hidden></div>
+                <label class="ghost-btn ticket-media-add-btn" id="fMediaAddBtn">
+                  <svg class="icon"><use href="#i-camera"></use></svg><span>Add photo/video</span>
+                  <input type="file" accept="image/*,video/*" capture="environment" hidden id="fMediaInput" />
+                </label>
+                <p class="field-hint">Snap the device's condition now — uploads happen after the check-in saves.</p>
+                <p id="fMediaError" class="field-error" hidden></p>
               </div>
             </div>
           </section>

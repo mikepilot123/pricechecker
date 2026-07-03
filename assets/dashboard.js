@@ -160,7 +160,50 @@
     if (input && document.activeElement !== input) input.value = goal;
     if (dailyInput && document.activeElement !== dailyInput) dailyInput.value = Math.round(dailyGoal());
     bindGoalForm();
+    renderTargetProgress();
     renderActionPlan();
+  }
+
+  // Live progress against the saved targets, shown at the top of the Targets
+  // page so the numbers being chased are visible where they're set.
+  function renderTargetProgress() {
+    const monthSalesEl = $("targetMonthSales");
+    if (!monthSalesEl) return;
+    const now = new Date();
+    const currentMonth = monthKey(now);
+    const today = dayKey(now);
+    const goal = monthlyGoal();
+    const daily = dailyGoal();
+    const salesThisMonth = tickets
+      .filter((ticket) => monthKey(ticketDate(ticket)) === currentMonth)
+      .reduce((sum, ticket) => sum + ticket.repairCost, 0);
+    const salesToday = tickets
+      .filter((ticket) => dayKey(ticketDate(ticket)) === today)
+      .reduce((sum, ticket) => sum + ticket.repairCost, 0);
+
+    monthSalesEl.textContent = money(salesThisMonth);
+    $("targetMonthGoalLabel").textContent = "of " + money(goal);
+    $("targetMonthBar").style.width = Math.min(100, goal > 0 ? Math.round((salesThisMonth / goal) * 100) : 0) + "%";
+
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysLeft = Math.max(1, daysInMonth - now.getDate() + 1); // includes today
+    const remaining = goal - salesThisMonth;
+    $("targetMonthPace").textContent = remaining <= 0
+      ? "Monthly target hit — everything from here is extra."
+      : `${money(remaining)} to go · ${money(Math.ceil(remaining / daysLeft))}/day over the next ${daysLeft} day${daysLeft === 1 ? "" : "s"} hits it.`;
+
+    $("targetTodaySales").textContent = money(salesToday);
+    $("targetTodayGoalLabel").textContent = "of " + money(daily);
+    $("targetTodayBar").style.width = Math.min(100, daily > 0 ? Math.round((salesToday / daily) * 100) : 0) + "%";
+    const todayRemaining = daily - salesToday;
+    $("targetTodayPace").textContent = todayRemaining <= 0
+      ? "Daily target hit — great pace."
+      : money(todayRemaining) + " more today to stay on pace.";
+  }
+
+  function dayKey(date) {
+    if (!date || isNaN(date)) return "";
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
   function bindGoalForm() {
@@ -228,8 +271,11 @@
     ];
     board.innerHTML = columns.map((column) => {
       const items = cards.filter((card) => card.status === column.key);
+      const clearBtn = column.key === "done" && items.length
+        ? `<button type="button" class="target-clear-done" data-action-clear-done>Clear</button>`
+        : "";
       return `<section class="target-board-column">
-        <div class="target-board-heading"><span>${esc(column.label)}</span><b>${items.length}</b></div>
+        <div class="target-board-heading"><span>${esc(column.label)}</span><b>${items.length}</b>${clearBtn}</div>
         <div class="target-board-cards">
           ${items.length ? items.map(actionCardHtml).join("") : `<p class="ops-empty">No cards yet.</p>`}
         </div>
@@ -241,6 +287,10 @@
     board.querySelectorAll("[data-action-delete]").forEach((btn) => {
       btn.addEventListener("click", () => deleteActionCard(btn.dataset.actionDelete));
     });
+    board.querySelector("[data-action-clear-done]")?.addEventListener("click", () => {
+      writeJson(ACTION_CARDS_KEY, readActionCards().filter((card) => card.status !== "done"));
+      renderActionPlan();
+    });
   }
 
   function actionCardHtml(card) {
@@ -249,9 +299,12 @@
       ["doing", "Doing"],
       ["done", "Done"],
     ].filter(([status]) => status !== card.status);
+    const age = card.created ? ageInDays(new Date(card.created)) : 0;
+    const ageLabel = age >= 1 ? `<small class="target-card-age">${age >= 2 ? Math.floor(age) + " days" : "1 day"} old</small>` : "";
     return `<article class="target-action-card">
       <strong>${esc(card.title)}</strong>
       ${card.notes ? `<p>${esc(card.notes)}</p>` : ""}
+      ${ageLabel}
       <div class="target-card-actions">
         ${moveButtons.map(([status, label]) => `<button type="button" data-action-id="${esc(card.id)}" data-action-move="${esc(status)}">${esc(label)}</button>`).join("")}
         <button type="button" class="danger-text" data-action-delete="${esc(card.id)}">Delete</button>
@@ -720,7 +773,12 @@
   }
 
   window.addEventListener("rpc-enter-dashboard", () => loadDashboard({ force: true }));
-  window.addEventListener("rpc-enter-targets", () => renderGoalEditor({ goal: monthlyGoal() }));
+  window.addEventListener("rpc-enter-targets", () => {
+    renderGoalEditor({ goal: monthlyGoal() });
+    // Refresh ticket data so the progress strip reflects today's sales,
+    // then re-render the strip once the fresh numbers land.
+    loadDashboard().then(() => renderTargetProgress());
+  });
   window.addEventListener("rpc-enter-expenses", initExpenses);
   window.addEventListener("rpc-tickets", (event) => {
     tickets = (event.detail?.tickets || []).map(normalizeTicket);

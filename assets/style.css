@@ -1191,6 +1191,62 @@ body.nav-open .view-nav { transform: translateX(0); }
   margin-top: 18px;
   padding: 20px;
 }
+.targets-progress {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.targets-progress-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.targets-progress-value {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.targets-progress-value strong {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.targets-progress-value span {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.targets-progress-sub {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+.target-clear-done {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.target-clear-done:hover { border-color: var(--danger); color: var(--danger); }
+.target-card-age {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+@media (max-width: 680px) {
+  .targets-progress { grid-template-columns: 1fr; }
+}
 .targets-title {
   margin: 3px 0 0;
   font-family: var(--font-display);
@@ -1295,7 +1351,7 @@ body.nav-open .view-nav { transform: translateX(0); }
 .target-board-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   min-height: 42px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
@@ -1304,6 +1360,9 @@ body.nav-open .view-nav { transform: translateX(0); }
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+/* Label absorbs the free space so the count (and Done's Clear button)
+   group on the right regardless of how many controls a column has. */
+.target-board-heading span:first-child { margin-right: auto; }
 .target-board-heading b {
   display: inline-grid;
   place-items: center;
@@ -3076,6 +3135,8 @@ body.nav-open .view-nav { transform: translateX(0); }
 .ticket-media-delete .icon { width: 12px; height: 12px; }
 .ticket-media-add-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .ticket-media-add-btn.is-uploading { opacity: 0.6; pointer-events: none; }
+.form-media-pending { margin-bottom: 8px; }
+.field-optional { color: var(--text-dim); font-weight: 400; text-transform: none; }
 .ticket-detail-notes { margin: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 12px; color: var(--text-dim); font-size: 0.88rem; white-space: pre-wrap; }
 .ticket-modal-footer { display: flex; gap: 8px; }
 .ticket-modal-footer .primary-btn { flex: 1; width: auto; }

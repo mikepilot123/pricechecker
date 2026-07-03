@@ -1046,6 +1046,81 @@
     });
   }
 
+  // ---- Pending media in the Log Device wizard --------------------------------
+  // Photos/videos picked during the form are queued locally (the ticket
+  // doesn't exist yet) and uploaded right after the save succeeds.
+  let pendingFormMedia = []; // [{ file, url, type }]
+
+  function resetPendingFormMedia() {
+    pendingFormMedia.forEach((item) => URL.revokeObjectURL(item.url));
+    pendingFormMedia = [];
+    renderPendingFormMedia();
+    const err = $("fMediaError");
+    if (err) { err.hidden = true; err.textContent = ""; }
+  }
+
+  function renderPendingFormMedia() {
+    const strip = $("fMediaPending");
+    if (!strip) return;
+    strip.hidden = !pendingFormMedia.length;
+    strip.innerHTML = pendingFormMedia.map((item, i) => `
+      <div class="ticket-media-item">
+        ${item.type === "video"
+          ? `<video src="${item.url}" muted playsinline preload="metadata"></video><span class="ticket-media-play"><svg class="icon"><use href="#i-play"></use></svg></span>`
+          : `<img src="${item.url}" alt="Pending photo" />`}
+        <button type="button" class="ticket-media-delete" data-pending-remove="${i}" aria-label="Remove"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>`).join("");
+  }
+
+  $("fMediaInput")?.addEventListener("change", () => {
+    const input = $("fMediaInput");
+    const err = $("fMediaError");
+    const file = input.files && input.files[0];
+    input.value = "";
+    if (!file) return;
+    if (err) { err.hidden = true; err.textContent = ""; }
+    if (file.size > MEDIA_MAX_BYTES) {
+      if (err) { err.textContent = "That file is over 50MB — trim the video or pick a smaller one."; err.hidden = false; }
+      return;
+    }
+    pendingFormMedia.push({
+      file,
+      url: URL.createObjectURL(file),
+      type: file.type.startsWith("video/") ? "video" : "photo",
+    });
+    renderPendingFormMedia();
+  });
+
+  $("fMediaPending")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-pending-remove]");
+    if (!btn) return;
+    const removed = pendingFormMedia.splice(Number(btn.dataset.pendingRemove), 1)[0];
+    if (removed) URL.revokeObjectURL(removed.url);
+    renderPendingFormMedia();
+  });
+
+  // Uploads the queued files once the ticket exists, narrating progress on
+  // the success screen. Failures never undo the saved check-in.
+  async function uploadPendingFormMedia(ticket) {
+    const queue = pendingFormMedia.slice();
+    if (!queue.length || !ticket?.id) return;
+    const msg = $("formSuccessMessage");
+    const baseText = msg.textContent;
+    let failed = 0;
+    for (let i = 0; i < queue.length; i++) {
+      msg.textContent = `${baseText} Uploading ${queue[i].type} ${i + 1} of ${queue.length}…`;
+      try {
+        await uploadTicketMedia(ticket, queue[i].file);
+      } catch (_) {
+        failed++;
+      }
+    }
+    msg.textContent = failed
+      ? `${baseText} ${queue.length - failed} of ${queue.length} files uploaded — ${failed} failed. You can retry from the ticket's Photos & videos section.`
+      : `${baseText} ${queue.length} ${queue.length === 1 ? "file" : "files"} uploaded.`;
+    resetPendingFormMedia();
+  }
+
   function formatMoney(value) {
     if (value == null || value === "") return "—";
     const amount = Number(value);
@@ -1139,6 +1214,7 @@
     $("saveForm").textContent = ticket ? "Update device" : "Save device";
     $("formError").hidden = true;
     $("formSuccessMessage").textContent = "";
+    resetPendingFormMedia();
     setFormStep(1);
     $("intakeFormModal").hidden = false;
     focusUnlessTouch($("fName"));
@@ -1602,6 +1678,9 @@
         : "The device check-in has been saved.";
       setFormStep(4);
       $("doneForm").focus();
+      // Fire-and-forget: queued photos/videos upload while the success
+      // screen is showing, narrated via formSuccessMessage.
+      uploadPendingFormMedia(res.ticket);
     } catch (ex) {
       err.textContent = "Couldn't save: " + ex.message;
       err.hidden = false;
