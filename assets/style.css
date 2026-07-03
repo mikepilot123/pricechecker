@@ -3697,3 +3697,402 @@ video.media-viewer-media {
     border-bottom: 1px solid var(--border);
   }
 }
+
+/* ---------- Mobile comfort pass ---------- */
+@media (max-width: 899px) {
+  :root {
+    --workspace-pad: clamp(12px, 4vw, 22px);
+    --header-h: 78px;
+  }
+  body.nav-open { overflow: hidden; }
+  .app-header {
+    padding-bottom: 10px;
+  }
+  .container {
+    padding-top: 14px;
+    padding-bottom: calc(34px + env(safe-area-inset-bottom));
+  }
+  .info-banner {
+    margin-top: 10px;
+  }
+  .status-line {
+    align-items: flex-start;
+    line-height: 1.35;
+  }
+  .primary-btn,
+  .ghost-btn,
+  .text-input,
+  .search-input,
+  .issue-select-btn,
+  .chip,
+  .nav-btn,
+  .appt-subnav-btn {
+    min-height: 44px;
+  }
+  .search-wrap {
+    padding: 12px 0 10px;
+  }
+  .filter-chips {
+    margin-inline: calc(var(--workspace-pad) * -1);
+    padding-inline: var(--workspace-pad);
+    scroll-padding-inline: var(--workspace-pad);
+  }
+  .card-head,
+  #results .card-head {
+    align-items: flex-start;
+  }
+  #results .card-model {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .price-row > span {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+  .price-edit-btn {
+    opacity: 1;
+  }
+  .target-board {
+    grid-template-columns: 1fr;
+  }
+  .leads-topbar,
+  .expenses-topbar {
+    position: static;
+    grid-template-columns: 1fr;
+  }
+  .lead-card {
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-areas:
+      "avatar main"
+      "side side";
+  }
+  .lead-card-side {
+    width: 100%;
+    justify-self: stretch;
+  }
+  .lead-card-actions {
+    justify-content: stretch;
+  }
+  .lead-card-actions button {
+    flex: 1;
+  }
+  .booking-wizard-card,
+  .booking-details-card,
+  .booking-list-card {
+    padding: 16px;
+  }
+  .booking-row {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .targets-action-card,
+  .targets-page-card,
+  .today-focus-card,
+  .ops-card,
+  .booking-wizard-card,
+  .booking-details-card,
+  .booking-list-card,
+  .leads-form {
+    padding: 14px;
+  }
+  .targets-progress-value {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .dashboard-target-form {
+    width: 100%;
+  }
+  .dashboard-target-form .ghost-btn,
+  .target-inline-add {
+    width: 100%;
+  }
+  .target-inline-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .inventory-summary {
+    grid-template-columns: 1fr;
+  }
+  .inventory-summary-tile {
+    padding: 12px;
+  }
+  .inventory-table-shell {
+    border-radius: var(--radius-md);
+  }
+  .inventory-table-toolbar {
+    min-height: 0;
+  }
+  .inventory-stock-filters {
+    margin-inline: -2px;
+    padding-bottom: 4px;
+  }
+  .inventory-table td {
+    align-items: flex-start;
+  }
+  .inventory-table td:not(:first-child) {
+    overflow-wrap: anywhere;
+  }
+  .inventory-category,
+  .inventory-stock-status {
+    justify-content: flex-end;
+    text-align: right;
+  }
+  .appt-subnav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: calc(var(--workspace-pad) * -1);
+    padding-inline: var(--workspace-pad);
+    scroll-padding-inline: var(--workspace-pad);
+    scrollbar-width: none;
+  }
+  .appt-subnav::-webkit-scrollbar {
+    display: none;
+  }
+  .booking-calendar-panel,
+  .booking-slots-panel {
+    padding: 16px;
+  }
+  .booking-calendar-header {
+    gap: 10px;
+  }
+  .booking-day {
+    width: 100%;
+    min-height: 38px;
+    max-width: none;
+    max-height: none;
+    aspect-ratio: 1;
+    font-size: 0.98rem;
+  }
+  .booking-slots-list {
+    max-height: none;
+  }
+  .booking-slot-btn {
+    min-height: 44px;
+  }
+  .booking-row {
+    flex-direction: column;
+  }
+  .booking-row-actions {
+    width: 100%;
+  }
+  .booking-row-actions button {
+    flex: 1;
+    min-height: 40px;
+  }
+  .appt-device-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .appt-device-thumb {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 559px) {
+  .modal-backdrop {
+    align-items: stretch;
+  }
+  .modal-panel {
+    width: 100%;
+  }
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-inline: 14px;
+  }
+  .modal-footer .form-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .modal-footer .form-actions .primary-btn,
+  .modal-footer .form-actions .ghost-btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .ticket-detail-hero {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .ticket-detail-hero-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .ticket-detail-row {
+    grid-template-columns: 24px minmax(76px, 0.8fr) minmax(0, 1.2fr);
+  }
+  .ticket-detail-row .ticket-detail-edit-btn {
+    grid-column: 3;
+    justify-self: end;
+  }
+  .ticket-detail-value {
+    text-align: left;
+  }
+  .ticket-detail-value.ticket-detail-editing {
+    grid-column: 1 / -1;
+  }
+  .ticket-media-gallery {
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  }
+  .ticket-modal-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .ticket-modal-footer .primary-btn,
+  .ticket-modal-footer .ghost-btn {
+    width: 100%;
+  }
+  .ticket-modal-footer .danger-btn {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .header-row {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+  }
+  .brand-logo {
+    width: clamp(112px, 42vw, 142px);
+  }
+  .view-nav {
+    width: min(86vw, 300px);
+  }
+  .container {
+    padding-left: var(--workspace-pad);
+    padding-right: var(--workspace-pad);
+  }
+  .dashboard-kpi-card {
+    min-height: 118px;
+    padding: 15px;
+  }
+  .dashboard-card-value {
+    font-size: 1.55rem;
+  }
+  .today-focus-header h2,
+  .targets-title {
+    font-size: 1.18rem;
+  }
+  .dashboard-target-card {
+    padding: 14px;
+  }
+  .lead-card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "main"
+      "side";
+  }
+  .lead-avatar {
+    display: none;
+  }
+  .lead-detail,
+  .lead-notes {
+    width: 100%;
+  }
+  .expense-total {
+    text-align: left;
+  }
+  .settings-actions {
+    grid-template-columns: 1fr;
+  }
+  .form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .form-progress {
+    gap: 4px;
+  }
+  .form-progress-step > span {
+    font-size: 0.62rem;
+  }
+  .ticket-head {
+    grid-template-columns: 52px minmax(0, 1fr) 42px;
+    padding: 12px;
+  }
+  .ticket-device-thumb {
+    width: 52px;
+    height: 52px;
+  }
+  .ticket-status {
+    align-items: stretch;
+    justify-self: stretch;
+    width: 100%;
+  }
+  .ticket-row-actions,
+  .status-buttons {
+    width: 100%;
+  }
+  .ticket-row-actions button,
+  .status-buttons button,
+  .ticket-tech-btn {
+    flex: 1;
+    min-height: 38px;
+  }
+}
+
+@media (max-width: 420px) {
+  :root {
+    --workspace-pad: 10px;
+  }
+  .search-input,
+  .text-input,
+  .issue-select-btn {
+    font-size: 0.95rem;
+  }
+  .card-body {
+    padding-inline: 12px;
+  }
+  .price-val-editing {
+    grid-column: 1 / -1;
+  }
+  .target-board {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  .target-board-cards {
+    padding: 8px;
+  }
+  .inventory-table td {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .inventory-table td.num,
+  .inventory-category,
+  .inventory-stock-status {
+    text-align: left;
+    justify-content: flex-start;
+  }
+  .inventory-adjust {
+    flex-wrap: wrap;
+  }
+  .inventory-delta {
+    flex: 1;
+  }
+  .modal-header h3 {
+    font-size: 0.98rem;
+  }
+  .modal-footer .form-actions {
+    grid-template-columns: 1fr;
+  }
+  .ticket-detail-row {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+  .ticket-detail-label,
+  .ticket-detail-value,
+  .ticket-detail-row .ticket-detail-edit-btn {
+    grid-column: 2;
+  }
+  .booking-calendar-panel,
+  .booking-slots-panel {
+    padding: 12px;
+  }
+  .booking-calendar-grid {
+    gap: 4px;
+  }
+  .booking-day {
+    min-height: 34px;
+    font-size: 0.9rem;
+  }
+}
