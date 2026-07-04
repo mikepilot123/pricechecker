@@ -48,6 +48,7 @@
   let currentStep = 1;
   let bound = false;
   let closeAppointmentDeviceDropdown = null;
+  let editingAppointmentId = null; // set while editing an existing appointment
 
   function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
   function todayISO() { return toISODate(new Date()); }
@@ -82,7 +83,7 @@
   function bookedTimesFor(dateStr) {
     return new Set(
       readAppointments()
-        .filter((a) => a.date === dateStr && a.status !== "cancelled")
+        .filter((a) => a.date === dateStr && a.status !== "cancelled" && a.id !== editingAppointmentId)
         .map((a) => a.time)
     );
   }
@@ -146,7 +147,7 @@
   // even when there's nothing left to book, without leaving the wizard.
   function bookedAppointmentsFor(dateStr) {
     return readAppointments()
-      .filter((a) => a.date === dateStr && a.status !== "cancelled")
+      .filter((a) => a.date === dateStr && a.status !== "cancelled" && a.id !== editingAppointmentId)
       .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
   }
 
@@ -223,7 +224,10 @@
     const goToViewBtn = $("apptGoToView");
     if (prevBtn) prevBtn.hidden = n === 1 || isComplete;
     if (nextBtn) nextBtn.hidden = n !== 2;
-    if (confirmBtn) confirmBtn.hidden = n !== 3;
+    if (confirmBtn) {
+      confirmBtn.hidden = n !== 3;
+      confirmBtn.textContent = editingAppointmentId ? "Save changes" : "Confirm appointment";
+    }
     if (createAnotherBtn) createAnotherBtn.hidden = !isComplete;
     if (goToViewBtn) goToViewBtn.hidden = !isComplete;
 
@@ -244,6 +248,7 @@
     selectedDate = null;
     selectedTime = null;
     selectedTechnician = "";
+    editingAppointmentId = null;
     const form = $("appointmentForm");
     if (form) form.reset();
     const deviceInput = $("appointmentDevice");
@@ -534,6 +539,7 @@
           <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
         </div>
         <div class="booking-row-actions">
+          <button type="button" data-edit="${esc(item.id)}">Edit</button>
           <button type="button" data-complete="${esc(item.id)}">${item.status === "completed" ? "Reopen" : "Done"}</button>
           <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
         </div>
@@ -574,6 +580,7 @@
         <span class="status-badge st-pickedup">Completed</span>
         <span class="ticket-tech-label">${esc(technicianLabel)}</span>
         <div class="ticket-row-actions">
+          <button type="button" data-edit="${esc(item.id)}">Edit</button>
           <button type="button" data-complete="${esc(item.id)}">Reopen</button>
           <button type="button" class="danger-text" data-delete="${esc(item.id)}">Delete</button>
         </div>
@@ -596,6 +603,12 @@
   }
 
   function bindRowActions(list) {
+    list.querySelectorAll("[data-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const appointment = readAppointments().find((item) => item.id === btn.dataset.edit);
+        if (appointment) editAppointment(appointment);
+      });
+    });
     list.querySelectorAll("[data-complete]").forEach((btn) => {
       btn.addEventListener("click", () => {
         writeAppointments(readAppointments().map((item) =>
@@ -613,6 +626,36 @@
         renderSlots();
       });
     });
+  }
+
+  // Loads an existing appointment into the wizard for editing. Date/time
+  // stay changeable (its own slot is excluded from "booked" while editing —
+  // see bookedTimesFor/bookedAppointmentsFor), then jumps straight to the
+  // Details step since everything is already filled in.
+  function editAppointment(appointment) {
+    editingAppointmentId = appointment.id;
+    setPanel("create");
+    const [y, m, d] = appointment.date.split("-").map(Number);
+    viewMonth = startOfMonth(new Date(y, m - 1, d));
+    selectedDate = appointment.date;
+    selectedTime = appointment.time;
+    selectedTechnician = appointment.technician || "";
+    renderCalendar();
+    renderSlots();
+    renderTechnicianPicker();
+    const deviceInput = $("appointmentDevice");
+    if (deviceInput) deviceInput.value = appointment.device || "";
+    updateDeviceThumb(appointment.device || "");
+    setIssueTags(appointment.issue || "");
+    const clientInput = $("appointmentClient");
+    if (clientInput) clientInput.value = appointment.client || "";
+    const phoneInput = $("appointmentPhone");
+    if (phoneInput) phoneInput.value = appointment.phone || "";
+    const notesInput = $("appointmentNotes");
+    if (notesInput) notesInput.value = appointment.notes || "";
+    const msg = $("appointmentMessage");
+    if (msg) msg.hidden = true;
+    setStep(3);
   }
 
   function renderList() {
@@ -723,8 +766,10 @@
           if (msg) { msg.textContent = "Add the client name and device."; msg.hidden = false; }
           return;
         }
+        const isEdit = !!editingAppointmentId;
+        const existing = isEdit ? readAppointments().find((a) => a.id === editingAppointmentId) : null;
         const appointment = {
-          id: uid(),
+          id: isEdit ? editingAppointmentId : uid(),
           client,
           phone: ($("appointmentPhone")?.value || "").trim(),
           device,
@@ -733,17 +778,28 @@
           date: selectedDate,
           time: selectedTime,
           notes: ($("appointmentNotes")?.value || "").trim(),
-          status: "scheduled",
-          created: new Date().toISOString(),
+          status: existing?.status || "scheduled",
+          created: existing?.created || new Date().toISOString(),
         };
-        writeAppointments([appointment].concat(readAppointments()));
+        writeAppointments(
+          isEdit
+            ? readAppointments().map((a) => (a.id === editingAppointmentId ? appointment : a))
+            : [appointment].concat(readAppointments())
+        );
+        editingAppointmentId = null;
         if (msg) msg.hidden = true;
         renderList();
         const [y, m, d] = appointment.date.split("-").map(Number);
         const dateLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+        const successLabel = $("apptSuccessLabel");
+        const successTitle = $("apptSuccessTitle");
         const successMsg = $("apptSuccessMessage");
+        if (successLabel) successLabel.textContent = isEdit ? "Changes saved" : "Booking complete";
+        if (successTitle) successTitle.textContent = isEdit ? "Appointment updated" : "Appointment confirmed";
         if (successMsg) {
-          successMsg.textContent = `${client}'s appointment is booked for ${dateLabel} at ${minutesToLabel(timeToMinutes(appointment.time))}.`;
+          successMsg.textContent = isEdit
+            ? `${client}'s appointment is now ${dateLabel} at ${minutesToLabel(timeToMinutes(appointment.time))}.`
+            : `${client}'s appointment is booked for ${dateLabel} at ${minutesToLabel(timeToMinutes(appointment.time))}.`;
         }
         setStep(4);
       });
@@ -763,6 +819,10 @@
     // panel (and that day's scheduled appointments) only appear then.
     selectedDate = null;
     selectedTime = null;
+    // Re-entering the Appointments tab always starts a fresh flow — an
+    // in-progress edit left behind by navigating away is abandoned, not
+    // silently resumed against whatever gets picked next.
+    editingAppointmentId = null;
     renderCalendar();
     renderSlots();
     renderList();
