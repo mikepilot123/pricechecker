@@ -24,6 +24,7 @@
 
   let tickets = [];
   let inventoryItems = [];
+  let monthlySales = []; // [{monthKey, totalSales, ticketCount}, ...] desc by month
   let lastUpdated = null;
   let loadInFlight = null;
   let goalFormBound = false;
@@ -58,10 +59,12 @@
       const hasPin = !!pin();
       const ticketPromise = hasPin ? loadTickets() : Promise.resolve({ tickets: [], noPin: true });
       const inventoryPromise = loadInventory();
-      const [ticketData, inventoryData] = await Promise.allSettled([ticketPromise, inventoryPromise]);
+      const monthlySalesPromise = hasPin ? loadMonthlySales() : Promise.resolve({ months: [] });
+      const [ticketData, inventoryData, monthlySalesData] = await Promise.allSettled([ticketPromise, inventoryPromise, monthlySalesPromise]);
 
       if (ticketData.status === "fulfilled") tickets = ticketData.value.tickets || [];
       if (inventoryData.status === "fulfilled") inventoryItems = inventoryData.value.items || [];
+      if (monthlySalesData.status === "fulfilled") monthlySales = monthlySalesData.value.months || [];
 
       render(ticketData.status === "fulfilled" ? ticketData.value : { error: true });
       lastUpdated = Date.now();
@@ -78,6 +81,15 @@
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "Couldn't load check-ins");
     return { tickets: (data.tickets || []).map(normalizeTicket) };
+  }
+
+  async function loadMonthlySales() {
+    const q = new URLSearchParams({ action: "listMonthlySales", pin: pin(), _: Date.now() });
+    const res = await fetch(INTAKE_URL + "?" + q.toString(), { method: "GET", cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Couldn't load sales history");
+    return { months: data.months || [] };
   }
 
   async function loadInventory() {
@@ -127,9 +139,16 @@
     const salesThisMonth = tickets
       .filter((ticket) => monthKey(ticketDate(ticket)) === currentMonth)
       .reduce((sum, ticket) => sum + ticket.repairCost, 0);
-    const salesLastMonth = tickets
-      .filter((ticket) => monthKey(ticketDate(ticket)) === lastMonth)
-      .reduce((sum, ticket) => sum + ticket.repairCost, 0);
+    // Sourced from the durable monthly_sales ledger so this comparison
+    // survives a "Clear all" — falls back to filtering live tickets only
+    // if the ledger hasn't recorded that month yet (e.g. right after
+    // upgrading, before the one-time backfill has run).
+    const lastMonthLedgerRow = monthlySales.find((m) => m.monthKey === lastMonth);
+    const salesLastMonth = lastMonthLedgerRow
+      ? lastMonthLedgerRow.totalSales
+      : tickets
+          .filter((ticket) => monthKey(ticketDate(ticket)) === lastMonth)
+          .reduce((sum, ticket) => sum + ticket.repairCost, 0);
     const activeRepairs = tickets.filter((ticket) => ACTIVE_STATUSES.has(ticket.status));
     const readyForPickup = tickets.filter((ticket) => ticket.status === "Repaired");
     const lowStockItems = inventoryItems.filter((item) => item.section !== "TOOLS" && item.quantity > 0 && item.quantity <= 1);
@@ -199,6 +218,40 @@
     $("targetTodayPace").textContent = todayRemaining <= 0
       ? "Daily target hit — great pace."
       : money(todayRemaining) + " more today to stay on pace.";
+
+    renderMonthlySalesHistory(currentMonth);
+  }
+
+  // Past months from the durable monthly_sales ledger (assets/dashboard.js's
+  // own "This month" card above already covers the current month live), each
+  // shown against the month before it so trends are visible at a glance.
+  function renderMonthlySalesHistory(currentMonth) {
+    const list = $("targetMonthlyHistory");
+    if (!list) return;
+    const pastMonths = monthlySales.filter((m) => m.monthKey !== currentMonth);
+    if (!pastMonths.length) {
+      list.innerHTML = `<p class="ops-empty">No past months recorded yet.</p>`;
+      return;
+    }
+    list.innerHTML = pastMonths.map((m, i) => {
+      const prior = pastMonths[i + 1];
+      const comparison = prior && prior.totalSales > 0
+        ? `${signedPercent(m.totalSales, prior.totalSales)} vs ${monthLabel(prior.monthKey)}`
+        : "No prior month to compare";
+      return `<article class="ops-row target-history-row">
+        <div>
+          <strong>${esc(monthLabel(m.monthKey))} · ${money(m.totalSales)}</strong>
+          <p>${esc(comparison)}</p>
+        </div>
+        <small>${m.ticketCount} ticket${m.ticketCount === 1 ? "" : "s"}</small>
+      </article>`;
+    }).join("");
+  }
+
+  function monthLabel(monthKeyStr) {
+    const [y, m] = String(monthKeyStr).split("-").map(Number);
+    if (!y || !m) return monthKeyStr;
+    return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   }
 
   function dayKey(date) {
