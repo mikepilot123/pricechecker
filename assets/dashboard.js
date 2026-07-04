@@ -792,8 +792,30 @@
       .replace(/"/g, "&quot;");
   }
 
+  // Targets subnav — mirrors Appointments' .appt-subnav/.appt-panel pattern
+  // for consistency (data-targets-panel / data-targets-panel-section).
+  let targetsSubnavBound = false;
+  function setTargetsPanel(panel) {
+    document.querySelectorAll("#view-targets .appt-panel[data-targets-panel-section]").forEach((section) => {
+      section.hidden = section.dataset.targetsPanelSection !== panel;
+    });
+    document.querySelectorAll("#view-targets .appt-subnav-btn[data-targets-panel]").forEach((btn) => {
+      const active = btn.dataset.targetsPanel === panel;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+  }
+  function bindTargetsSubnavOnce() {
+    if (targetsSubnavBound) return;
+    targetsSubnavBound = true;
+    document.querySelectorAll("#view-targets .appt-subnav-btn[data-targets-panel]").forEach((btn) => {
+      btn.addEventListener("click", () => setTargetsPanel(btn.dataset.targetsPanel));
+    });
+  }
+
   window.addEventListener("rpc-enter-dashboard", () => loadDashboard({ force: true }));
   window.addEventListener("rpc-enter-targets", () => {
+    bindTargetsSubnavOnce();
     renderGoalEditor({ goal: monthlyGoal() });
     // Refresh ticket data so the progress strip reflects today's sales,
     // then re-render the strip once the fresh numbers land.

@@ -114,49 +114,58 @@
   <main class="container view" id="view-targets" hidden>
     <p class="info-banner">Set business targets used across the dashboard.</p>
 
-    <section class="targets-progress" id="targetsProgress" aria-label="Live progress against targets">
-      <article class="targets-progress-card">
-        <p class="dashboard-eyebrow">This month</p>
-        <p class="targets-progress-value"><strong id="targetMonthSales">$0</strong><span id="targetMonthGoalLabel">of $0</span></p>
-        <div class="dashboard-progress" aria-label="Monthly target progress"><span id="targetMonthBar" style="width:0%"></span></div>
-        <p class="targets-progress-sub" id="targetMonthPace">Loading…</p>
-      </article>
-      <article class="targets-progress-card">
-        <p class="dashboard-eyebrow">Today</p>
-        <p class="targets-progress-value"><strong id="targetTodaySales">$0</strong><span id="targetTodayGoalLabel">of $0</span></p>
-        <div class="dashboard-progress" aria-label="Daily target progress"><span id="targetTodayBar" style="width:0%"></span></div>
-        <p class="targets-progress-sub" id="targetTodayPace">Loading…</p>
-      </article>
+    <div class="appt-subnav targets-subnav" role="tablist" aria-label="Targets sections">
+      <button type="button" class="appt-subnav-btn active" data-targets-panel="progress" role="tab" aria-selected="true">Progress</button>
+      <button type="button" class="appt-subnav-btn" data-targets-panel="goals" role="tab" aria-selected="false">Goals &amp; actions</button>
+    </div>
+
+    <section class="appt-panel" data-targets-panel-section="progress">
+      <section class="targets-progress" id="targetsProgress" aria-label="Live progress against targets">
+        <article class="targets-progress-card">
+          <p class="dashboard-eyebrow">This month</p>
+          <p class="targets-progress-value"><strong id="targetMonthSales">$0</strong><span id="targetMonthGoalLabel">of $0</span></p>
+          <div class="dashboard-progress" aria-label="Monthly target progress"><span id="targetMonthBar" style="width:0%"></span></div>
+          <p class="targets-progress-sub" id="targetMonthPace">Loading…</p>
+        </article>
+        <article class="targets-progress-card">
+          <p class="dashboard-eyebrow">Today</p>
+          <p class="targets-progress-value"><strong id="targetTodaySales">$0</strong><span id="targetTodayGoalLabel">of $0</span></p>
+          <div class="dashboard-progress" aria-label="Daily target progress"><span id="targetTodayBar" style="width:0%"></span></div>
+          <p class="targets-progress-sub" id="targetTodayPace">Loading…</p>
+        </article>
+      </section>
     </section>
 
-    <section class="dashboard-target-card targets-page-card" aria-labelledby="dashboardTargetTitle">
-      <div>
-        <p class="dashboard-eyebrow" id="dashboardTargetTitle">Sales targets</p>
-        <h2 class="targets-title">Monthly and daily goals</h2>
-        <p class="dashboard-target-help">Monthly target powers the Dashboard progress card. Daily target helps the team pace each day.</p>
-      </div>
-      <form id="dashboardGoalForm" class="dashboard-target-form">
-        <label class="target-input-group" for="dashboardGoalInput">
-          <span>Monthly target</span>
-          <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardGoalInput" type="number" min="0" step="100" inputmode="decimal" placeholder="80000" /></span>
-        </label>
-        <label class="target-input-group" for="dashboardDailyGoalInput">
-          <span>Daily target</span>
-          <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardDailyGoalInput" type="number" min="0" step="50" inputmode="decimal" placeholder="2500" /></span>
-        </label>
-        <button type="submit" class="ghost-btn">Save targets</button>
-      </form>
-      <p id="dashboardGoalMessage" class="dashboard-target-message" aria-live="polite"></p>
-    </section>
-
-    <section class="targets-action-card" aria-labelledby="targetsActionTitle">
-      <div class="today-focus-header">
+    <section class="appt-panel" data-targets-panel-section="goals" hidden>
+      <section class="dashboard-target-card targets-page-card" aria-labelledby="dashboardTargetTitle">
         <div>
-          <p class="dashboard-eyebrow">Action plans</p>
-          <h2 id="targetsActionTitle">Daily sales actions</h2>
+          <p class="dashboard-eyebrow" id="dashboardTargetTitle">Sales targets</p>
+          <h2 class="targets-title">Monthly and daily goals</h2>
+          <p class="dashboard-target-help">Monthly target powers the Dashboard progress card. Daily target helps the team pace each day.</p>
         </div>
-      </div>
-      <div id="targetActionBoard" class="target-board" aria-live="polite"></div>
+        <form id="dashboardGoalForm" class="dashboard-target-form">
+          <label class="target-input-group" for="dashboardGoalInput">
+            <span>Monthly target</span>
+            <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardGoalInput" type="number" min="0" step="100" inputmode="decimal" placeholder="80000" /></span>
+          </label>
+          <label class="target-input-group" for="dashboardDailyGoalInput">
+            <span>Daily target</span>
+            <span class="target-money-input"><span class="dashboard-currency" aria-hidden="true">$</span><input id="dashboardDailyGoalInput" type="number" min="0" step="50" inputmode="decimal" placeholder="2500" /></span>
+          </label>
+          <button type="submit" class="ghost-btn">Save targets</button>
+        </form>
+        <p id="dashboardGoalMessage" class="dashboard-target-message" aria-live="polite"></p>
+      </section>
+
+      <section class="targets-action-card" aria-labelledby="targetsActionTitle">
+        <div class="today-focus-header">
+          <div>
+            <p class="dashboard-eyebrow">Action plans</p>
+            <h2 id="targetsActionTitle">Daily sales actions</h2>
+          </div>
+        </div>
+        <div id="targetActionBoard" class="target-board" aria-live="polite"></div>
+      </section>
     </section>
   </main>
 
@@ -646,8 +655,17 @@
               </div>
               <label class="invoice-request form-field-full">
                 <input id="fSendInvoice" type="checkbox" checked />
-                <span><strong>Send invoice to client</strong><small>Mark this check-in for an invoice after it is saved.</small></span>
+                <span><strong>Send invoice to client</strong><small>Create a JQ Electronics invoice after the device is logged.</small></span>
               </label>
+              <div class="form-field form-field-full invoice-delivery-field">
+                <label class="field-label" for="fInvoiceDelivery">Invoice delivery</label>
+                <div class="select-wrap">
+                  <select id="fInvoiceDelivery" class="text-input select-input">
+                    <option value="email">Email client automatically</option>
+                    <option value="whatsapp">Open WhatsApp message</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1053,7 +1071,7 @@
 
   <script src="assets/app.js?v=leads-flow-1"></script>
   <script src="assets/inventory.js?v=business-dashboard-1"></script>
-  <script src="assets/intake.js?v=ticket-footer-grid-1"></script>
+  <script src="assets/intake.js?v=custom-invoices-1"></script>
   <script src="assets/dashboard.js?v=todo-composer-1"></script>
   <script src="assets/appointments.js?v=modal-layer-fix-1"></script>
   <script src="assets/leads.js?v=leads-cards-1"></script>
