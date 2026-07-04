@@ -757,6 +757,11 @@
   function init() {
     bindOnce();
     viewMonth = startOfMonth(new Date());
+    // Default to today so the slots panel (and any appointments already
+    // booked today) show immediately — today's blue ring in the calendar
+    // otherwise reads as "selected" when it's really just today's marker.
+    selectedDate = todayISO();
+    selectedTime = null;
     renderCalendar();
     renderSlots();
     renderList();
