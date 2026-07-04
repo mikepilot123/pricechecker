@@ -10,6 +10,7 @@ import {
   addTechnician,
   deleteTechnician,
   listMonthlySales,
+  rebuildMonthlySales,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { ensureSchema } from "../lib/db.js";
@@ -79,6 +80,9 @@ export default async function handler(req, res) {
     }
     if (action === "listMonthlySales") {
       return res.status(200).json({ ok: true, months: await listMonthlySales(body) });
+    }
+    if (action === "rebuildMonthlySales") {
+      return res.status(200).json({ ok: true, months: await rebuildMonthlySales() });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
