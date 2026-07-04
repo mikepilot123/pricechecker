@@ -169,19 +169,21 @@
     const [y, m, d] = selectedDate.split("-").map(Number);
     const dateLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
     label.textContent = dateLabel;
+
+    // Who's coming in that day — shown for every selected date, not just
+    // fully-booked ones, so staff can see the day's schedule at a glance.
+    const existing = bookedAppointmentsFor(selectedDate);
+    let html = existing.length
+      ? `<div class="booking-existing-list">
+          <p class="booking-existing-heading">Scheduled that day</p>
+          ${existing.map(bookedAppointmentRowHtml).join("")}
+        </div>`
+      : "";
+
     const slots = slotsFor(selectedDate);
-    let html = slots.length
+    html += slots.length
       ? slots.map((value) => `<button type="button" class="booking-slot-btn ${value === selectedTime ? "is-selected" : ""}" data-time="${value}">${minutesToLabel(timeToMinutes(value))}</button>`).join("")
       : `<p class="booking-slots-empty">No open times this day.</p>`;
-    if (!slots.length) {
-      const existing = bookedAppointmentsFor(selectedDate);
-      if (existing.length) {
-        html += `<div class="booking-existing-list">
-          <p class="booking-existing-heading">Already booked that day</p>
-          ${existing.map(bookedAppointmentRowHtml).join("")}
-        </div>`;
-      }
-    }
     list.innerHTML = html;
     list.querySelectorAll(".booking-slot-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -757,10 +759,9 @@
   function init() {
     bindOnce();
     viewMonth = startOfMonth(new Date());
-    // Default to today so the slots panel (and any appointments already
-    // booked today) show immediately — today's blue ring in the calendar
-    // otherwise reads as "selected" when it's really just today's marker.
-    selectedDate = todayISO();
+    // Nothing is selected until staff actually click a day — the slots
+    // panel (and that day's scheduled appointments) only appear then.
+    selectedDate = null;
     selectedTime = null;
     renderCalendar();
     renderSlots();
