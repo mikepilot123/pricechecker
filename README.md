@@ -177,6 +177,30 @@ ticket saves with a selected stock item will fail with a setup message.
 
 ---
 
+## Invoicing
+
+The **Send invoice to client** checkbox on device check-in creates a custom JQ
+Electronics invoice after the ticket is saved. The invoice uses the logged
+ticket data (customer, phone, email, device, issues, status, notes, repair cost,
+amount paid, and balance) and intentionally excludes photos/videos and assigned
+technician details.
+
+Email delivery sends the invoice link through Resend. WhatsApp delivery creates
+the invoice and opens a WhatsApp message handoff with the invoice link for staff
+to send.
+
+Configure these Vercel environment variables:
+
+```txt
+RESEND_API_KEY
+INVOICE_FROM_EMAIL=JQ Electronics <invoices@example.com>
+PUBLIC_APP_URL=https://pricechecker-cyan.vercel.app
+INVOICE_BUSINESS_NAME=JQ Electronics
+INVOICE_CURRENCY=TTD
+```
+
+---
+
 ## Tech
 
 Plain HTML/CSS/JS — **no build step, no dependencies**. Just static files
