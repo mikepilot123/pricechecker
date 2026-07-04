@@ -16,6 +16,7 @@
   const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
   const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
   const MEDIA_UPLOAD_URL = "https://pricechecker-cyan.vercel.app/api/media-upload";
+  const INVOICE_URL = "https://pricechecker-cyan.vercel.app/api/invoice";
   // Vercel Blob's browser upload helper, loaded on demand from a pinned CDN
   // build — this repo has no bundler, and the two-phase token/PUT protocol
   // upload() implements is a private wire format best not hand-rolled.
@@ -907,6 +908,24 @@
     rowEl.querySelector(".ticket-detail-value")?.remove();
     const valueClass = field === "repairCost" || field === "amountPaid" ? "money-positive" : "";
     rowEl.insertAdjacentHTML("beforeend", detailValueHtml(fieldDisplayHtml(field, currentModalTicket), valueClass, field));
+    // Balance due has no pencil of its own — it's derived from these two
+    // fields, so it must be recomputed whenever either one saves, or it's
+    // left showing stale math that looks like the edit didn't take.
+    if (field === "repairCost" || field === "amountPaid") refreshBalanceDueRow();
+  }
+
+  function refreshBalanceDueRow() {
+    if (!currentModalTicket) return;
+    const labels = document.querySelectorAll("#ticketModalBody .ticket-detail-label");
+    for (const label of labels) {
+      if (label.textContent.trim() !== "Balance due") continue;
+      const row = label.closest(".ticket-detail-row");
+      const valueEl = row?.querySelector(".ticket-detail-value");
+      if (!valueEl) break;
+      valueEl.textContent = formatMoney(balanceDue(currentModalTicket.repairCost, currentModalTicket.amountPaid));
+      valueEl.className = "ticket-detail-value " + balanceTone(currentModalTicket.repairCost, currentModalTicket.amountPaid);
+      break;
+    }
   }
 
   async function saveInlineEdit(rowEl, field) {
@@ -1228,6 +1247,49 @@
     resetPendingFormMedia();
   }
 
+  async function sendInvoiceForTicket(ticket, delivery) {
+    if (!ticket?.id) return "";
+    try {
+      const res = await fetch(INVOICE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          pin: getCfg().pin,
+          delivery,
+          ticketId: ticket.id,
+          customerName: ticket.customerName,
+          phone: ticket.phone,
+          email: ticket.email,
+          device: ticket.device,
+          issues: ticket.issues,
+          status: ticket.status,
+          notes: ticket.notes,
+          repairCost: ticket.repairCost,
+          amountPaid: ticket.amountPaid,
+        }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Invoice failed");
+      if (delivery === "whatsapp") {
+        if (data.whatsappUrl) window.open(data.whatsappUrl, "_blank", "noopener");
+        return data.invoiceNumber
+          ? `Invoice ${data.invoiceNumber} was created; WhatsApp is ready to send.`
+          : "Invoice was created; WhatsApp is ready to send.";
+      }
+      if (data.emailSent) {
+        return data.invoiceNumber
+          ? `Invoice ${data.invoiceNumber} was emailed to the client.`
+          : "The invoice was emailed to the client.";
+      }
+      return data.invoiceNumber
+        ? `Invoice ${data.invoiceNumber} was created, but the email did not send. Open the invoice link and send it manually.`
+        : "The invoice was created, but the email did not send. Open the invoice link and send it manually.";
+    } catch (err) {
+      return "The invoice could not be sent: " + err.message;
+    }
+  }
+
   function formatMoney(value) {
     if (value == null || value === "") return "—";
     const amount = Number(value);
@@ -1309,6 +1371,8 @@
     $("fRepairCost").value = ticket ? ticket.repairCost ?? "" : "";
     $("fAmountPaid").value = ticket ? ticket.amountPaid ?? "" : "";
     $("fSendInvoice").checked = !ticket;
+    $("fInvoiceDelivery").value = "email";
+    $("fInvoiceDelivery").closest(".invoice-delivery-field").hidden = Boolean(ticket);
     setIssueTags(ticket ? ticket.issues || "" : "");
     $("fInventoryItem").innerHTML = `<option value="">Loading inventory…</option>`;
     loadInventoryForForm()
@@ -1393,6 +1457,10 @@
   $("previousFormStep").addEventListener("click", () => setFormStep(quickLogMode && formStep === 3 ? 1 : formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
   $("doneForm").addEventListener("click", closeForm);
+  $("fSendInvoice").addEventListener("change", () => {
+    const field = $("fInvoiceDelivery").closest(".invoice-delivery-field");
+    if (field) field.hidden = !$("fSendInvoice").checked;
+  });
   $("closeIntakeFormModal").addEventListener("click", closeForm);
   $("intakeFormModal").addEventListener("click", (e) => {
     if (e.target.id === "intakeFormModal") closeForm();
@@ -1748,7 +1816,11 @@
       return;
     }
     const notes = $("fNotes").value.trim();
-    const invoiceNote = $("fSendInvoice").checked && !editingId ? "Invoice to send to client." : "";
+    const shouldSendInvoice = $("fSendInvoice").checked && !editingId;
+    const invoiceDelivery = $("fInvoiceDelivery").value === "whatsapp" ? "whatsapp" : "email";
+    const invoiceNote = shouldSendInvoice
+      ? `Invoice requested by ${invoiceDelivery === "whatsapp" ? "WhatsApp" : "email"}.`
+      : "";
     const payload = {
       action: editingId ? "update" : "add",
       id: editingId || undefined,
@@ -1778,10 +1850,15 @@
       refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
+      let invoiceMessage = "";
+      if (shouldSendInvoice) {
+        $("saveForm").textContent = invoiceDelivery === "whatsapp" ? "Creating invoice…" : "Sending invoice…";
+        invoiceMessage = await sendInvoiceForTicket(res.ticket, invoiceDelivery);
+      }
       $("intakeFormTitle").textContent = wasEditing ? "Device updated" : "Device logged";
       $("formSuccessTitle").textContent = wasEditing ? "Device successfully updated" : "Device successfully logged";
-      $("formSuccessMessage").textContent = $("fSendInvoice").checked && !wasEditing
-        ? "The device was logged and marked to send an invoice to the client."
+      $("formSuccessMessage").textContent = invoiceMessage
+        ? `The device was logged. ${invoiceMessage}`
         : "The device check-in has been saved.";
       setFormStep(4);
       $("doneForm").focus();
