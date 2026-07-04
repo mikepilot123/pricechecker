@@ -3575,7 +3575,11 @@ video.media-viewer-media {
 .technician-chip.is-selected .technician-chip-name { color: var(--text); font-weight: 600; }
 
 @media (min-width: 900px) {
-  .nav-btn[data-target="appointments"]:not(.active) + .appt-sidebar-subnav {
+  .nav-btn[data-target="appointments"]:not(.active) + .appt-sidebar-subnav,
+  .nav-btn[data-target="targets"]:not(.active) + .appt-sidebar-subnav {
+    display: none;
+  }
+  #view-targets > .targets-content-subnav {
     display: none;
   }
   .appt-sidebar-subnav {

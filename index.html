@@ -82,6 +82,10 @@
       <button class="nav-btn" data-target="completed-repairs" role="tab" aria-selected="false"><svg class="icon"><use href="#i-check"></use></svg>Completed Repairs</button>
       <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
       <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
+      <div class="appt-sidebar-subnav" role="group" aria-label="Targets sections">
+        <button type="button" class="appt-subnav-btn active" data-targets-panel="progress" aria-selected="true">Progress</button>
+        <button type="button" class="appt-subnav-btn" data-targets-panel="goals" aria-selected="false">Goals &amp; actions</button>
+      </div>
       <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
     </nav>
@@ -114,7 +118,7 @@
   <main class="container view" id="view-targets" hidden>
     <p class="info-banner">Set business targets used across the dashboard.</p>
 
-    <div class="appt-subnav targets-subnav" role="tablist" aria-label="Targets sections">
+    <div class="appt-subnav targets-content-subnav" role="tablist" aria-label="Targets sections">
       <button type="button" class="appt-subnav-btn active" data-targets-panel="progress" role="tab" aria-selected="true">Progress</button>
       <button type="button" class="appt-subnav-btn" data-targets-panel="goals" role="tab" aria-selected="false">Goals &amp; actions</button>
     </div>

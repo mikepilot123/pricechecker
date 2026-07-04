@@ -847,12 +847,15 @@
 
   // Targets subnav — mirrors Appointments' .appt-subnav/.appt-panel pattern
   // for consistency (data-targets-panel / data-targets-panel-section).
+  // Unscoped (not "#view-targets ...") on purpose, same as appointments.js's
+  // setPanel()/bindOnce(): the sidebar flyout copy of these buttons lives in
+  // the left <nav>, outside #view-targets, and must stay in sync too.
   let targetsSubnavBound = false;
   function setTargetsPanel(panel) {
     document.querySelectorAll("#view-targets .appt-panel[data-targets-panel-section]").forEach((section) => {
       section.hidden = section.dataset.targetsPanelSection !== panel;
     });
-    document.querySelectorAll("#view-targets .appt-subnav-btn[data-targets-panel]").forEach((btn) => {
+    document.querySelectorAll(".appt-subnav-btn[data-targets-panel]").forEach((btn) => {
       const active = btn.dataset.targetsPanel === panel;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
@@ -861,7 +864,7 @@
   function bindTargetsSubnavOnce() {
     if (targetsSubnavBound) return;
     targetsSubnavBound = true;
-    document.querySelectorAll("#view-targets .appt-subnav-btn[data-targets-panel]").forEach((btn) => {
+    document.querySelectorAll(".appt-subnav-btn[data-targets-panel]").forEach((btn) => {
       btn.addEventListener("click", () => setTargetsPanel(btn.dataset.targetsPanel));
     });
   }
