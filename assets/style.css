@@ -3436,6 +3436,26 @@ video.media-viewer-media {
 .booking-slot-btn:hover { background: var(--accent-soft); }
 .booking-slot-btn.is-selected { background: var(--accent); color: #fff; }
 .booking-slots-empty { color: var(--text-dim); font-size: 0.86rem; }
+.booking-existing-list { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.booking-existing-heading {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.booking-existing-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.86rem;
+}
+.booking-existing-row:last-child { border-bottom: none; }
+.booking-existing-time { flex: none; font-family: var(--font-mono); color: var(--text-dim); font-size: 0.82rem; }
+.booking-existing-details { color: var(--text); }
 
 @media (min-width: 720px) {
   .booking-card { grid-template-columns: 1fr 240px; }

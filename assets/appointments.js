@@ -141,6 +141,22 @@
     if (prevBtn) prevBtn.disabled = viewMonth <= startOfMonth(new Date());
   }
 
+  // What's already on the books for a day, oldest first — shown read-only
+  // alongside (or instead of) open slots so staff can see the day's load
+  // even when there's nothing left to book, without leaving the wizard.
+  function bookedAppointmentsFor(dateStr) {
+    return readAppointments()
+      .filter((a) => a.date === dateStr && a.status !== "cancelled")
+      .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }
+
+  function bookedAppointmentRowHtml(item) {
+    return `<div class="booking-existing-row">
+      <span class="booking-existing-time">${esc(minutesToLabel(timeToMinutes(item.time)))}</span>
+      <span class="booking-existing-details">${esc(item.client)}${item.device ? " · " + esc(item.device) : ""}${item.technician ? " · " + esc(item.technician) : ""}</span>
+    </div>`;
+  }
+
   function renderSlots() {
     const label = $("bookingSlotsLabel");
     const list = $("bookingSlotsList");
@@ -154,9 +170,19 @@
     const dateLabel = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
     label.textContent = dateLabel;
     const slots = slotsFor(selectedDate);
-    list.innerHTML = slots.length
+    let html = slots.length
       ? slots.map((value) => `<button type="button" class="booking-slot-btn ${value === selectedTime ? "is-selected" : ""}" data-time="${value}">${minutesToLabel(timeToMinutes(value))}</button>`).join("")
       : `<p class="booking-slots-empty">No open times this day.</p>`;
+    if (!slots.length) {
+      const existing = bookedAppointmentsFor(selectedDate);
+      if (existing.length) {
+        html += `<div class="booking-existing-list">
+          <p class="booking-existing-heading">Already booked that day</p>
+          ${existing.map(bookedAppointmentRowHtml).join("")}
+        </div>`;
+      }
+    }
+    list.innerHTML = html;
     list.querySelectorAll(".booking-slot-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         selectedTime = btn.dataset.time;
