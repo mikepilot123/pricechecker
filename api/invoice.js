@@ -9,8 +9,11 @@ export default async function handler(req, res) {
 
   try {
     await ensureSchema();
-    if (req.method === "GET") return viewInvoice(req, res);
-    if (req.method === "POST") return createAndDeliverInvoice(req, res);
+    // Awaited so a rejection inside either handler is caught here instead of
+    // escaping as an unhandled rejection (which Vercel turns into a raw
+    // FUNCTION_INVOCATION_FAILED 500 with no useful error message).
+    if (req.method === "GET") return await viewInvoice(req, res);
+    if (req.method === "POST") return await createAndDeliverInvoice(req, res);
     return res.status(405).json({ ok: false, error: "GET or POST only" });
   } catch (err) {
     return res.status(200).json({ ok: false, error: String((err && err.message) || err) });
@@ -18,9 +21,20 @@ export default async function handler(req, res) {
 }
 
 async function viewInvoice(req, res) {
-  const invoice = await getInvoiceByToken(req.query?.token);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  return res.status(200).send(invoiceHtml(invoice));
+  try {
+    const invoice = await getInvoiceByToken(req.query?.token);
+    return res.status(200).send(invoiceHtml(invoice));
+  } catch (err) {
+    // A customer's browser hits this GET directly, so show a plain page
+    // instead of a JSON error blob.
+    return res.status(404).send(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:60px 20px;color:#334">
+      <h1>Invoice not found</h1><p>${escapeHtml(String((err && err.message) || err))}</p></body></html>`);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 async function createAndDeliverInvoice(req, res) {
