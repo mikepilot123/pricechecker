@@ -392,6 +392,13 @@
     });
     $("leadList")?.addEventListener("click", handleListClick);
     $("leadList")?.addEventListener("change", handleListChange);
+    $("leadList")?.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const card = e.target.closest(".lead-card");
+      if (!card || e.target.closest("button, select, a")) return;
+      e.preventDefault();
+      openLeadDetailModal(leads.find((lead) => lead.id === card.dataset.leadId));
+    });
 
     setupDeviceCombobox();
     populateLeadIssueTags();
@@ -526,7 +533,7 @@
     const quote = money(lead.quotedAmount);
     const dueClass = isDue(lead.followUpDate) && !["Won", "Lost"].includes(lead.status) ? " is-due" : "";
     const repairText = [lead.device, lead.issue].filter(Boolean).join(" · ") || "No device or issue yet";
-    return `<article class="lead-card ${statusClass(lead.status)}" data-lead-id="${esc(lead.id)}">
+    return `<article class="lead-card ${statusClass(lead.status)}" data-lead-id="${esc(lead.id)}" role="button" tabindex="0">
       <div class="lead-avatar" aria-hidden="true">
         <svg class="icon"><use href="#i-user"></use></svg>
       </div>
@@ -558,15 +565,50 @@
     </article>`;
   }
 
-  async function handleListClick(event) {
-    const editBtn = event.target.closest("[data-lead-edit]");
-    const deleteBtn = event.target.closest("[data-lead-delete]");
-    if (editBtn) {
-      editLead(leads.find((lead) => lead.id === editBtn.dataset.leadEdit));
-      return;
-    }
-    if (!deleteBtn) return;
-    const id = deleteBtn.dataset.leadDelete;
+  // ---------- lead detail modal ----------
+
+  function leadDetailRow(iconName, label, value) {
+    if (!value) return "";
+    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${esc(value)}</span></div>`;
+  }
+
+  function openLeadDetailModal(lead) {
+    if (!lead) return;
+    const repairText = [lead.device, lead.issue].filter(Boolean).join(" · ");
+    $("leadDetailModalBody").innerHTML = `
+      <section class="ticket-detail-section"><p class="field-label">Lead</p><div class="ticket-detail-grid">
+        ${leadDetailRow("i-user", "Customer", lead.customerName)}
+        ${leadDetailRow("i-phone", "Phone", lead.phone)}
+        ${leadDetailRow("i-mail", "Email", lead.email)}
+        ${leadDetailRow("i-device", "Device", repairText)}
+        ${leadDetailRow("i-cash", "Quote", money(lead.quotedAmount))}
+        ${leadDetailRow("i-calendar", "Follow-up", lead.followUpDate ? formatDate(lead.followUpDate) : "")}
+        ${leadDetailRow("i-tag", "Source", lead.source)}
+        <div class="ticket-detail-row"><svg class="icon"><use href="#i-tag"></use></svg><span class="ticket-detail-label">Status</span><span class="lead-status-pill">${esc(lead.status || "New")}</span></div>
+      </div></section>
+      ${lead.issue ? `<section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(lead.issue)}</div></section>` : ""}
+      ${lead.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(lead.notes)}</p></section>` : ""}
+    `;
+    $("leadDetailModalFooter").innerHTML = `
+      ${lead.phone ? `<a class="primary-btn" href="tel:${esc(lead.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      <button type="button" class="ghost-btn" id="leadDetailEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
+      <button type="button" class="ghost-btn danger-btn" id="leadDetailDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
+    $("leadDetailEdit").onclick = () => { closeLeadDetailModal(); editLead(lead); };
+    $("leadDetailDelete").onclick = () => { deleteLeadById(lead.id); closeLeadDetailModal(); };
+    $("leadDetailModal").hidden = false;
+    $("closeLeadDetailModal").focus();
+  }
+
+  function closeLeadDetailModal() {
+    $("leadDetailModal").hidden = true;
+  }
+  $("closeLeadDetailModal")?.addEventListener("click", closeLeadDetailModal);
+  $("leadDetailModal")?.addEventListener("click", (e) => { if (e.target.id === "leadDetailModal") closeLeadDetailModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("leadDetailModal")?.hidden) closeLeadDetailModal();
+  });
+
+  async function deleteLeadById(id) {
     const lead = leads.find((item) => item.id === id);
     if (!lead || !window.confirm(`Delete lead for ${lead.customerName || lead.phone || "this customer"}?`)) return;
     try {
@@ -577,6 +619,22 @@
     } catch (err) {
       setStatus("error", "Couldn't delete lead: " + err.message);
     }
+  }
+
+  async function handleListClick(event) {
+    const editBtn = event.target.closest("[data-lead-edit]");
+    const deleteBtn = event.target.closest("[data-lead-delete]");
+    if (editBtn) {
+      editLead(leads.find((lead) => lead.id === editBtn.dataset.leadEdit));
+      return;
+    }
+    if (deleteBtn) {
+      deleteLeadById(deleteBtn.dataset.leadDelete);
+      return;
+    }
+    if (event.target.closest("select[data-lead-status]") || event.target.closest("a.ticket-phone")) return;
+    const card = event.target.closest(".lead-card");
+    if (card) openLeadDetailModal(leads.find((lead) => lead.id === card.dataset.leadId));
   }
 
   async function handleListChange(event) {
