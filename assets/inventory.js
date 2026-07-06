@@ -360,7 +360,15 @@
   });
   window.addEventListener("rpc-enter-inventory", () => loadInventory({ force: !loadedOnce }));
   setInterval(() => {
+    // No background refreshes while the tab is hidden — the visibilitychange
+    // handler below catches up when the tab comes back.
+    if (document.hidden) return;
     if (!$("view-inventory")?.hidden) loadInventory({ force: true });
     if (lastUpdated) setStatus("live");
   }, AUTO_REFRESH_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && !$("view-inventory")?.hidden && loadedOnce) {
+      loadInventory({ force: true });
+    }
+  });
 })();

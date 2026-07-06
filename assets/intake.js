@@ -91,6 +91,31 @@
   let INVENTORY_ITEMS = [];
   let inventoryLoadPromise = null;
 
+  // ---- Toasts ---------------------------------------------------------------
+  // In-app notification strip replacing raw browser alert() popups. Exposed
+  // as window.RPC_TOAST so the other per-view modules (appointments,
+  // dashboard, …) can reuse it — this file loads before them.
+  function toast(message, { tone = "error", duration = 6000 } = {}) {
+    let box = document.getElementById("appToasts");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "appToasts";
+      box.className = "app-toasts";
+      box.setAttribute("role", "status");
+      box.setAttribute("aria-live", "polite");
+      document.body.appendChild(box);
+    }
+    const el = document.createElement("div");
+    el.className = `app-toast${tone === "error" ? " is-error" : ""}`;
+    el.textContent = message;
+    box.appendChild(el);
+    setTimeout(() => {
+      el.classList.add("is-leaving");
+      setTimeout(() => el.remove(), 350);
+    }, duration);
+  }
+  window.RPC_TOAST = toast;
+
   // ---- View navigation -----------------------------------------------------
   const navBtns = document.querySelectorAll(".nav-btn[data-target]");
   const settingsNavBtn = $("intakeSettings");
@@ -564,7 +589,7 @@
       renderStatusChips();
       render();
       publishTickets();
-      if (res.backup) alert(`Deleted ${res.deletedCount} record${res.deletedCount === 1 ? "" : "s"}. Backup ${res.backup.id} is ready to restore if needed.`);
+      if (res.backup) toast(`Deleted ${res.deletedCount} record${res.deletedCount === 1 ? "" : "s"}. Backup ${res.backup.id} is ready to restore if needed.`, { tone: "info" });
     } catch (e) {
       err.textContent = "Couldn't clear devices: " + e.message;
       err.hidden = false;
@@ -630,7 +655,7 @@
       render();
       publishTickets();
       closeRestoreBackupModal();
-      alert(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous check-in list is backed up as ${res.backup.id}.`);
+      toast(`Restored ${res.restoredCount} record${res.restoredCount === 1 ? "" : "s"}. Your previous check-in list is backed up as ${res.backup.id}.`, { tone: "info" });
     } catch (e) {
       err.textContent = "Couldn't restore backup: " + e.message;
       err.hidden = false;
@@ -1533,7 +1558,7 @@
     const detail = e.detail || {};
     if (!isConfigured()) {
       pendingLogDevice = detail;
-      window.alert("Set up the Check In PIN from the Check In tab before logging a device.");
+      toast("Set up the Check In PIN from the Check In tab before logging a device.");
       return;
     }
     applyLogDevicePrefill(detail);
@@ -1909,7 +1934,7 @@
       render();
       return normalizeTicket(res.ticket);
     } catch (e) {
-      alert("Couldn't update status: " + e.message);
+      toast("Couldn't update status: " + e.message);
       return null;
     }
   }
@@ -1976,7 +2001,7 @@
       publishTickets();
       return true;
     } catch (e) {
-      alert("Couldn't delete record: " + e.message);
+      toast("Couldn't delete record: " + e.message);
       return false;
     }
   }

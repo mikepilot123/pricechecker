@@ -772,7 +772,12 @@ document.addEventListener("visibilitychange", () => {
 // if the socket is unavailable.
 function startAutoSync() {
   if (syncTimer) clearInterval(syncTimer);
-  syncTimer = setInterval(() => loadData({ reason: "interval" }), AUTO_REFRESH_MS);
+  syncTimer = setInterval(() => {
+    // Skip background refreshes while the tab is hidden — the
+    // visibilitychange handler above catches the app up on return.
+    if (document.hidden) return;
+    loadData({ reason: "interval" });
+  }, AUTO_REFRESH_MS);
 }
 
 function priceUpdateSocketUrl() {
