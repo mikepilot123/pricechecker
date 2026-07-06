@@ -86,6 +86,7 @@
   // user has manually connected the Check In tab.
   let pendingLogDevice = null;
   let technicianModalTicket = null;
+  let statusModalTicket = null;
   let suppressTechnicianFocusOpen = false;
   let INVENTORY_ITEMS = [];
   let inventoryLoadPromise = null;
@@ -825,7 +826,7 @@
         </div>
         <div class="ticket-detail-hero-actions">
           ${activityLogBtnHtml(ticket, "ticketModalActivity")}
-          <span class="status-badge ${STATUS_CLASS[ticket.status] || "st-received"}">${esc(ticket.status || "—")}</span>
+          <button type="button" class="status-badge status-badge-btn ${STATUS_CLASS[ticket.status] || "st-received"}" id="ticketModalStatus" aria-label="Change status (currently ${esc(ticket.status || "—")})">${esc(ticket.status || "—")}</button>
         </div>
       </div>
       <section class="ticket-detail-section"><p class="field-label">Customer & device</p><div class="ticket-detail-grid">
@@ -857,6 +858,7 @@
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     bindActivityLogBtn($("ticketModalActivity"), ticket);
+    $("ticketModalStatus").onclick = () => { closeTicketModal(); openStatusModalForTicket(ticket); };
     $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
@@ -1912,6 +1914,55 @@
     }
   }
 
+  // Lets staff jump a ticket straight to a new status (e.g. Collected ->
+  // Repaired) from the card or detail sheet, without opening the full
+  // edit form.
+  function openStatusModalForTicket(ticket) {
+    statusModalTicket = ticket;
+    $("statusModalSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
+    renderStatusModalOptions();
+    $("statusModalError").hidden = true;
+    $("statusModal").hidden = false;
+  }
+
+  function closeStatusModal() {
+    $("statusModal").hidden = true;
+    statusModalTicket = null;
+  }
+
+  function renderStatusModalOptions() {
+    const ticket = statusModalTicket;
+    if (!ticket) return;
+    const box = $("statusModalOptions");
+    box.innerHTML = STATUSES.map((s) =>
+      `<button type="button" class="status-set ${STATUS_CLASS[s]} ${s === ticket.status ? "current" : ""}" data-status="${esc(s)}">${esc(s)}</button>`
+    ).join("");
+    box.querySelectorAll("[data-status]").forEach((btn) => {
+      btn.addEventListener("click", () => chooseStatusOption(btn.dataset.status));
+    });
+  }
+
+  async function chooseStatusOption(status) {
+    const ticket = statusModalTicket;
+    if (!ticket || status === ticket.status) {
+      closeStatusModal();
+      return;
+    }
+    const box = $("statusModalOptions");
+    box.querySelectorAll("[data-status]").forEach((btn) => { btn.disabled = true; });
+    const updated = await setStatus(ticket, status);
+    if (updated) closeStatusModal();
+    else box.querySelectorAll("[data-status]").forEach((btn) => { btn.disabled = false; });
+  }
+
+  $("closeStatusModal")?.addEventListener("click", closeStatusModal);
+  $("statusModal")?.addEventListener("click", (e) => {
+    if (e.target.id === "statusModal") closeStatusModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("statusModal")?.hidden) closeStatusModal();
+  });
+
   async function deleteTicket(ticket) {
     const label = ticket.customerName || ticket.device || "this record";
     if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
@@ -2079,7 +2130,7 @@
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
       </div>
       <div class="ticket-status">
-        <span class="status-badge ${statusClass}">${esc(t.status || "—")}</span>
+        <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
         <button type="button" class="ticket-tech-btn" aria-label="${esc(technicianLabel)}">${esc(technicianLabel)}</button>
       </div>
       <div class="ticket-activity">
@@ -2089,6 +2140,14 @@
       phoneEl.onclick = (e) => e.stopPropagation();
       phoneEl.onkeydown = (e) => e.stopPropagation();
     });
+    const statusBtn = head.querySelector(".status-badge-btn");
+    if (statusBtn) {
+      statusBtn.onclick = (e) => {
+        e.stopPropagation();
+        openStatusModalForTicket(t);
+      };
+      statusBtn.onkeydown = (e) => e.stopPropagation();
+    }
     const techBtn = head.querySelector(".ticket-tech-btn");
     if (techBtn) {
       techBtn.onclick = (e) => {

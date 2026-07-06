@@ -2813,6 +2813,13 @@ body.nav-open .view-nav { transform: translateX(0); }
   border-radius: 50%;
   background: var(--status-dot, currentColor);
 }
+.status-badge-btn {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.status-badge-btn:hover, .status-badge-btn:focus-visible { filter: brightness(0.94); }
+.status-badge-btn:focus-visible { outline: 2px solid var(--status-ink, var(--accent)); outline-offset: 1px; }
 .ticket-body {
   display: none;
   padding: 4px 15px 15px;
