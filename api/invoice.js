@@ -1,10 +1,11 @@
 import { ensureSchema } from "../lib/db.js";
 import { createInvoice, getInvoiceByToken, invoiceHtml, invoiceWhatsAppUrl, sendInvoiceEmail } from "../lib/invoices.js";
+import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // GET serves the customer-facing invoice page as a top-level navigation,
+  // where CORS doesn't apply — the allowlist only affects staff-app POSTs.
+  applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
 
   try {
@@ -39,8 +40,9 @@ function escapeHtml(value) {
 
 async function createAndDeliverInvoice(req, res) {
   const body = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
-  if (String(body.pin) !== String(process.env.INTAKE_PIN)) {
-    return res.status(200).json({ ok: false, error: "Invalid PIN" });
+  const denied = checkPin(req, body.pin);
+  if (denied) {
+    return res.status(denied.status).json({ ok: false, error: denied.error });
   }
   const invoice = await createInvoice(body);
   const invoiceUrl = publicInvoiceUrl(req, invoice.token);

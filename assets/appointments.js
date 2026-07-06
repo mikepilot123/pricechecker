@@ -1,16 +1,21 @@
 /* ============================================================
-   Appointments — Cal.com-style booking, now a 3-step wizard:
+   Appointments — Cal.com-style booking, a 3-step wizard:
    1) pick a day + time on a month calendar, 2) pick the device
    (synced with the same model datalist/catalog images as Check-In)
    and a technician (Fresha-style chip picker, shared technician
-   list), 3) add the client's details to confirm. Stored locally
-   (no backend yet for the booking itself); booked slots are
-   excluded from the picker so two clients can't be double-booked
-   into the same time.
+   list), 3) add the client's details to confirm. Bookings sync
+   through the shared Vercel/Postgres API (same PIN as Check-In)
+   so every device sees the same schedule; a localStorage copy of
+   the last server list keeps the page usable offline. Legacy
+   device-local bookings are uploaded once on first sync.
    ============================================================ */
 
 (function () {
-  const APPOINTMENTS_KEY = "rpc_repair_appointments";
+  // Pre-sync store (appointments used to live only on this device) — read
+  // once for migration, then kept as a _backup key, never written again.
+  const LEGACY_APPOINTMENTS_KEY = "rpc_repair_appointments";
+  // Offline fallback: the last list the server returned.
+  const CACHE_KEY = "rpc_appointments_cache";
   const OPEN_HOUR = 8.5; // 8:30 AM
   const CLOSE_HOUR = 16; // 4:00 PM
   const SLOT_MINUTES = 30;
@@ -36,7 +41,6 @@
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
   let viewMonth = startOfMonth(new Date());
   let selectedDate = null; // "YYYY-MM-DD"
@@ -65,12 +69,82 @@
   }
   function minutesToValue(mins) { return `${pad2(Math.floor(mins / 60))}:${pad2(mins % 60)}`; }
 
+  // In-memory list, refreshed from the server. Kept synchronous for the many
+  // existing read call sites (calendar counts, day lists, renders).
+  let APPOINTMENTS = readCache();
+
   function readAppointments() {
-    try { return JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || "[]"); }
+    return APPOINTMENTS;
+  }
+  function setAppointments(list) {
+    APPOINTMENTS = Array.isArray(list) ? list : [];
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(APPOINTMENTS)); } catch (_) { /* storage unavailable */ }
+  }
+  function readCache() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "[]"); }
     catch (_) { return []; }
   }
-  function writeAppointments(list) {
-    try { localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(list)); } catch (_) { /* storage unavailable */ }
+
+  async function api(payload) {
+    const pin = localStorage.getItem(LS_PIN) || "";
+    // text/plain avoids a CORS preflight, matching how Check-In calls the API.
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ pin }, payload)),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Rejected");
+    return data;
+  }
+
+  function notifyError(message) {
+    if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message);
+    else console.warn(message);
+  }
+
+  let loadInFlight = null;
+  function loadAppointments() {
+    if (loadInFlight) return loadInFlight;
+    loadInFlight = (async () => {
+      try {
+        const data = await api({ action: "listAppointments" });
+        setAppointments(data.appointments || []);
+        await migrateLegacyAppointments();
+        renderList();
+        renderCalendar();
+        renderSlots();
+      } catch (err) {
+        console.warn("Couldn't sync appointments:", err);
+        notifyError("Couldn't sync appointments — showing this device's last saved copy.");
+      } finally {
+        loadInFlight = null;
+      }
+    })();
+    return loadInFlight;
+  }
+
+  // One-time upload of bookings made before appointments synced through the
+  // server. addAppointment keeps the original ids (ON CONFLICT DO NOTHING on
+  // the server), so re-running after a partial failure can't duplicate.
+  async function migrateLegacyAppointments() {
+    let raw = "";
+    try { raw = localStorage.getItem(LEGACY_APPOINTMENTS_KEY) || ""; } catch (_) { return; }
+    if (!raw) return;
+    let legacy = [];
+    try { legacy = JSON.parse(raw) || []; } catch (_) { legacy = []; }
+    const known = new Set(APPOINTMENTS.map((a) => a.id));
+    for (const item of legacy) {
+      if (!item || !item.id || known.has(item.id) || !item.date || !item.time) continue;
+      await api({ action: "addAppointment", ...item });
+    }
+    const data = await api({ action: "listAppointments" });
+    setAppointments(data.appointments || []);
+    try {
+      localStorage.setItem(LEGACY_APPOINTMENTS_KEY + "_backup", raw);
+      localStorage.removeItem(LEGACY_APPOINTMENTS_KEY);
+    } catch (_) { /* storage unavailable */ }
   }
 
   function isClosedDay(date) { return date.getDay() === 0; } // Sunday
@@ -623,19 +697,31 @@
     return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${esc(value)}</span></div>`;
   }
 
-  function toggleAppointmentComplete(id) {
-    writeAppointments(readAppointments().map((item) =>
-      item.id === id
-        ? Object.assign({}, item, { status: item.status === "completed" ? "scheduled" : "completed" })
-        : item
-    ));
-    renderList();
+  async function toggleAppointmentComplete(id) {
+    const current = APPOINTMENTS.find((item) => item.id === id);
+    if (!current) return;
+    const status = current.status === "completed" ? "scheduled" : "completed";
+    try {
+      const data = await api({ action: "updateAppointment", id, status });
+      setAppointments(APPOINTMENTS.map((item) => (item.id === id ? data.appointment : item)));
+      renderList();
+    } catch (err) {
+      notifyError("Couldn't update appointment: " + err.message);
+    }
   }
 
-  function deleteAppointment(id) {
-    writeAppointments(readAppointments().filter((item) => item.id !== id));
-    renderList();
-    renderSlots();
+  async function deleteAppointment(id) {
+    const current = APPOINTMENTS.find((item) => item.id === id);
+    const label = current?.client || "this appointment";
+    if (!window.confirm(`Delete ${label}'s appointment? This cannot be undone.`)) return;
+    try {
+      await api({ action: "deleteAppointment", id });
+      setAppointments(APPOINTMENTS.filter((item) => item.id !== id));
+      renderList();
+      renderSlots();
+    } catch (err) {
+      notifyError("Couldn't delete appointment: " + err.message);
+    }
   }
 
   function openApptDetailModal(appointment) {
@@ -840,7 +926,7 @@
 
     const form = $("appointmentForm");
     if (form) {
-      form.addEventListener("submit", (event) => {
+      form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const msg = $("appointmentMessage");
         const client = ($("appointmentClient")?.value || "").trim();
@@ -850,9 +936,7 @@
           return;
         }
         const isEdit = !!editingAppointmentId;
-        const existing = isEdit ? readAppointments().find((a) => a.id === editingAppointmentId) : null;
-        const appointment = {
-          id: isEdit ? editingAppointmentId : uid(),
+        const payload = {
           client,
           phone: ($("appointmentPhone")?.value || "").trim(),
           device,
@@ -862,13 +946,26 @@
           time: selectedTime,
           source: ($("appointmentSource")?.value || "").trim(),
           notes: ($("appointmentNotes")?.value || "").trim(),
-          status: existing?.status || "scheduled",
-          created: existing?.created || new Date().toISOString(),
         };
-        writeAppointments(
+        const confirmBtn = $("apptConfirmBtn");
+        const originalLabel = confirmBtn?.textContent;
+        if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = "Saving…"; }
+        let appointment;
+        try {
+          const data = isEdit
+            ? await api({ action: "updateAppointment", id: editingAppointmentId, ...payload })
+            : await api({ action: "addAppointment", ...payload });
+          appointment = data.appointment;
+        } catch (err) {
+          if (msg) { msg.textContent = "Couldn't save the appointment: " + err.message; msg.hidden = false; }
+          return;
+        } finally {
+          if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = originalLabel; }
+        }
+        setAppointments(
           isEdit
-            ? readAppointments().map((a) => (a.id === editingAppointmentId ? appointment : a))
-            : [appointment].concat(readAppointments())
+            ? APPOINTMENTS.map((a) => (a.id === appointment.id ? appointment : a))
+            : [appointment].concat(APPOINTMENTS)
         );
         editingAppointmentId = null;
         if (msg) msg.hidden = true;
@@ -913,10 +1010,14 @@
     renderTechnicianPicker();
     populateIssueTags();
     fetchTechnicians();
+    loadAppointments();
     setStep(1);
     setPanel("create");
   }
 
   window.addEventListener("rpc-enter-appointments", init);
-  window.addEventListener("rpc-enter-completed-repairs", renderList);
+  window.addEventListener("rpc-enter-completed-repairs", () => {
+    renderList();
+    loadAppointments();
+  });
 })();

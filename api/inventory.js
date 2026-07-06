@@ -1,9 +1,8 @@
 import { adjustInventoryItem, listInventory } from "../lib/inventory.js";
+import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -12,8 +11,9 @@ export default async function handler(req, res) {
   try {
     if (req.method === "POST") {
       const body = readBody(req);
-      if (!process.env.INTAKE_PIN || String(body.pin) !== String(process.env.INTAKE_PIN)) {
-        return res.status(200).json({ ok: false, error: "Invalid PIN" });
+      const denied = checkPin(req, body.pin);
+      if (denied) {
+        return res.status(denied.status).json({ ok: false, error: denied.error });
       }
       if (body.action !== "adjust") {
         return res.status(200).json({ ok: false, error: "Unknown action: " + (body.action || "") });

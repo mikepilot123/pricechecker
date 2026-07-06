@@ -9,7 +9,10 @@
   const GOAL_KEY = "rpc_monthly_sales_goal";
   const DAILY_GOAL_KEY = "rpc_daily_sales_goal";
   const ACTION_CARDS_KEY = "rpc_target_action_cards";
-  const EXPENSES_KEY = "rpc_expenses";
+  // Pre-sync expenses store (device-local) — read once for migration only.
+  const LEGACY_EXPENSES_KEY = "rpc_expenses";
+  // Offline fallback: the last expense list the server returned.
+  const EXPENSES_CACHE_KEY = "rpc_expenses_cache";
   const DEFAULT_MONTHLY_GOAL = 80000;
   const DEFAULT_DAILY_GOAL = 2500;
   const DEFAULT_ACTIONS = [
@@ -415,9 +418,78 @@
   let expenseCategoryFilter = "all";
   let editingExpenseId = null;
 
+  // In-memory expense list, refreshed from the server (shared across
+  // devices, like tickets/leads). readExpenses() stays synchronous for the
+  // existing render/filter call sites.
+  let EXPENSES = readJson(EXPENSES_CACHE_KEY, []);
+
+  function setExpenses(list) {
+    EXPENSES = Array.isArray(list) ? list : [];
+    writeJson(EXPENSES_CACHE_KEY, EXPENSES);
+  }
+
+  async function expensesApi(payload) {
+    const res = await fetch(INTAKE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ pin: pin() }, payload)),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Rejected");
+    return data;
+  }
+
+  function notifyExpenseError(message) {
+    if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message);
+    else console.warn(message);
+  }
+
+  let expensesLoadInFlight = null;
+  function loadExpenses() {
+    if (expensesLoadInFlight) return expensesLoadInFlight;
+    expensesLoadInFlight = (async () => {
+      try {
+        const data = await expensesApi({ action: "listExpenses" });
+        setExpenses(data.expenses || []);
+        await migrateLegacyExpenses();
+        renderExpenses();
+      } catch (err) {
+        console.warn("Couldn't sync expenses:", err);
+        notifyExpenseError("Couldn't sync expenses — showing this device's last saved copy.");
+      } finally {
+        expensesLoadInFlight = null;
+      }
+    })();
+    return expensesLoadInFlight;
+  }
+
+  // One-time upload of expenses recorded before they synced through the
+  // server. Original ids are kept (ON CONFLICT DO NOTHING server-side), so a
+  // retry after partial failure can't duplicate records.
+  async function migrateLegacyExpenses() {
+    let raw = "";
+    try { raw = localStorage.getItem(LEGACY_EXPENSES_KEY) || ""; } catch (_) { return; }
+    if (!raw) return;
+    let legacy = [];
+    try { legacy = JSON.parse(raw) || []; } catch (_) { legacy = []; }
+    const known = new Set(EXPENSES.map((item) => item.id));
+    for (const item of legacy) {
+      if (!item || !item.id || known.has(item.id) || !item.date) continue;
+      await expensesApi({ action: "addExpense", ...item });
+    }
+    const data = await expensesApi({ action: "listExpenses" });
+    setExpenses(data.expenses || []);
+    try {
+      localStorage.setItem(LEGACY_EXPENSES_KEY + "_backup", raw);
+      localStorage.removeItem(LEGACY_EXPENSES_KEY);
+    } catch (_) { /* storage unavailable */ }
+  }
+
   function initExpenses() {
     bindExpenseFormOnce();
     renderExpenses();
+    loadExpenses();
   }
 
   function bindExpenseFormOnce() {
@@ -486,7 +558,7 @@
     editingExpenseId = null;
   }
 
-  function saveExpenseForm() {
+  async function saveExpenseForm() {
     const date = $("expenseDate")?.value || "";
     const amount = Number($("expenseAmount")?.value || 0);
     const msg = $("expenseMessage");
@@ -494,27 +566,36 @@
       if (msg) { msg.textContent = "Add a valid date and amount."; msg.hidden = false; }
       return;
     }
-    const record = {
-      id: editingExpenseId || uid(),
+    const payload = {
       date,
       category: $("expenseCategory")?.value || "Other",
       vendor: ($("expenseVendor")?.value || "").trim(),
       amount,
       notes: ($("expenseNotes")?.value || "").trim(),
-      created: editingExpenseId
-        ? (readExpenses().find((item) => item.id === editingExpenseId)?.created || new Date().toISOString())
-        : new Date().toISOString(),
     };
-    const existing = readExpenses();
-    const next = editingExpenseId
-      ? existing.map((item) => (item.id === editingExpenseId ? record : item))
-      : [record].concat(existing);
-    writeJson(EXPENSES_KEY, next);
+    const submitBtn = $("expenseSubmit");
+    const originalLabel = submitBtn?.textContent;
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Saving…"; }
+    try {
+      const data = editingExpenseId
+        ? await expensesApi({ action: "updateExpense", id: editingExpenseId, ...payload })
+        : await expensesApi({ action: "addExpense", ...payload });
+      setExpenses(
+        editingExpenseId
+          ? EXPENSES.map((item) => (item.id === data.expense.id ? data.expense : item))
+          : [data.expense].concat(EXPENSES)
+      );
+    } catch (err) {
+      if (msg) { msg.textContent = "Couldn't save the expense: " + err.message; msg.hidden = false; }
+      return;
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalLabel; }
+    }
     closeExpenseForm();
     renderExpenses();
   }
 
-  function handleExpenseListClick(event) {
+  async function handleExpenseListClick(event) {
     const editBtn = event.target.closest("[data-expense-edit]");
     const deleteBtn = event.target.closest("[data-expense-delete]");
     if (editBtn) {
@@ -523,8 +604,14 @@
     }
     if (!deleteBtn) return;
     if (!window.confirm("Delete this expense?")) return;
-    writeJson(EXPENSES_KEY, readExpenses().filter((item) => item.id !== deleteBtn.dataset.expenseDelete));
-    renderExpenses();
+    const id = deleteBtn.dataset.expenseDelete;
+    try {
+      await expensesApi({ action: "deleteExpense", id });
+      setExpenses(EXPENSES.filter((item) => item.id !== id));
+      renderExpenses();
+    } catch (err) {
+      notifyExpenseError("Couldn't delete expense: " + err.message);
+    }
   }
 
   function handleExpenseChipClick(event) {
@@ -535,7 +622,7 @@
   }
 
   function readExpenses() {
-    return readJson(EXPENSES_KEY, []);
+    return EXPENSES;
   }
 
   function filteredExpenses(expenses) {
@@ -889,6 +976,5 @@
 
   loadDashboard();
   renderGoalEditor({ goal: monthlyGoal() });
-  initAppointments();
   initExpenses();
 })();

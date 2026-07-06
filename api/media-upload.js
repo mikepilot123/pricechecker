@@ -1,4 +1,5 @@
 import { handleUpload } from "@vercel/blob/client";
+import { applyCors } from "../lib/security.js";
 
 // Separate from api/intake.js because @vercel/blob/client's upload() helper
 // POSTs its own fixed request shape ({type: "blob.generate-client-token", ...})
@@ -12,9 +13,7 @@ import { handleUpload } from "@vercel/blob/client";
 // Vercel Blob, bypassing Vercel serverless functions' ~4.5MB body limit
 // entirely — necessary since videos can easily exceed that.
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
 
   const body = req.body;

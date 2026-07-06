@@ -1,15 +1,15 @@
 import { ensureSchema } from "../lib/db.js";
 import { addLead, deleteLead, listLeads, updateLead } from "../lib/leads.js";
+import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
 
   const body = req.method === "GET" ? (req.query || {}) : readBody(req);
-  if (String(body.pin) !== String(process.env.INTAKE_PIN)) {
-    return res.status(200).json({ ok: false, error: "Invalid PIN" });
+  const denied = checkPin(req, body.pin);
+  if (denied) {
+    return res.status(denied.status).json({ ok: false, error: denied.error });
   }
 
   const action = body.action || "list";

@@ -13,7 +13,10 @@ import {
   rebuildMonthlySales,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
+import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../lib/appointments.js";
+import { listExpenses, addExpense, updateExpense, deleteExpense } from "../lib/expenses.js";
 import { ensureSchema } from "../lib/db.js";
+import { applyCors, checkPin } from "../lib/security.js";
 
 // Mirrors apps-script/Code.gs's handle(p) dispatch-by-action shape exactly,
 // so assets/intake.js needs no changes beyond pointing SCRIPT_URL at this
@@ -23,15 +26,14 @@ import { ensureSchema } from "../lib/db.js";
 // version-history UI.
 export default async function handler(req, res) {
   // The frontend (GitHub Pages) is cross-origin from this Vercel deployment.
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
 
   const body = req.method === "GET" ? (req.query || {}) : readBody(req);
 
-  if (String(body.pin) !== String(process.env.INTAKE_PIN)) {
-    return res.status(200).json({ ok: false, error: "Invalid PIN" });
+  const denied = checkPin(req, body.pin);
+  if (denied) {
+    return res.status(denied.status).json({ ok: false, error: denied.error });
   }
 
   const action = body.action || "list";
@@ -83,6 +85,30 @@ export default async function handler(req, res) {
     }
     if (action === "rebuildMonthlySales") {
       return res.status(200).json({ ok: true, months: await rebuildMonthlySales() });
+    }
+    if (action === "listAppointments") {
+      return res.status(200).json({ ok: true, appointments: await listAppointments() });
+    }
+    if (action === "addAppointment") {
+      return res.status(200).json({ ok: true, appointment: await addAppointment(body) });
+    }
+    if (action === "updateAppointment") {
+      return res.status(200).json({ ok: true, appointment: await updateAppointment(body) });
+    }
+    if (action === "deleteAppointment") {
+      return res.status(200).json({ ok: true, deletedId: await deleteAppointment(body) });
+    }
+    if (action === "listExpenses") {
+      return res.status(200).json({ ok: true, expenses: await listExpenses() });
+    }
+    if (action === "addExpense") {
+      return res.status(200).json({ ok: true, expense: await addExpense(body) });
+    }
+    if (action === "updateExpense") {
+      return res.status(200).json({ ok: true, expense: await updateExpense(body) });
+    }
+    if (action === "deleteExpense") {
+      return res.status(200).json({ ok: true, deletedId: await deleteExpense(body) });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
