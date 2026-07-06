@@ -3491,7 +3491,10 @@ video.media-viewer-media {
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  cursor: pointer;
 }
+.booking-row:hover { background: var(--card-hover); }
+.booking-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .booking-row.is-completed { opacity: 0.6; }
 .booking-row-main p { margin: 2px 0; color: var(--text-dim); font-size: 0.86rem; }
 .booking-row-main small { color: var(--text-dim); font-size: 0.8rem; }

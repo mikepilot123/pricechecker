@@ -532,7 +532,7 @@
 
   function appointmentRowHtml(item) {
     return `
-      <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}">
+      <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}" data-open-detail="${esc(item.id)}" role="button" tabindex="0">
         <div class="booking-row-main">
           <strong>${esc(item.client)}</strong>
           <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
@@ -559,7 +559,9 @@
       : `<span class="ticket-phone no-phone">No number on file</span>`;
     const deviceIcon = deviceTypeIcon(item.device);
     const technicianLabel = item.technician ? `Assigned to ${item.technician}` : "Any professional";
-    head.classList.add("no-click");
+    head.dataset.openDetail = item.id;
+    head.setAttribute("role", "button");
+    head.setAttribute("tabindex", "0");
     head.innerHTML = `
       <div class="ticket-device-thumb" title="${esc(item.device || "Device")}">
         <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
@@ -602,28 +604,95 @@
     return el;
   }
 
+  // ---------- appointment detail modal ----------
+
+  function apptDetailRow(iconName, label, value) {
+    if (!value) return "";
+    return `<div class="ticket-detail-row"><svg class="icon"><use href="#${iconName}"></use></svg><span class="ticket-detail-label">${esc(label)}</span><span class="ticket-detail-value">${esc(value)}</span></div>`;
+  }
+
+  function toggleAppointmentComplete(id) {
+    writeAppointments(readAppointments().map((item) =>
+      item.id === id
+        ? Object.assign({}, item, { status: item.status === "completed" ? "scheduled" : "completed" })
+        : item
+    ));
+    renderList();
+  }
+
+  function deleteAppointment(id) {
+    writeAppointments(readAppointments().filter((item) => item.id !== id));
+    renderList();
+    renderSlots();
+  }
+
+  function openApptDetailModal(appointment) {
+    const technicianLabel = appointment.technician || "Any professional";
+    $("apptDetailModalBody").innerHTML = `
+      <section class="ticket-detail-section"><p class="field-label">Appointment</p><div class="ticket-detail-grid">
+        ${apptDetailRow("i-user", "Client", appointment.client)}
+        ${apptDetailRow("i-phone", "Phone", appointment.phone)}
+        ${apptDetailRow("i-calendar", "When", formatDateTime(appointment.date, appointment.time))}
+        ${apptDetailRow("i-device", "Device", appointment.device)}
+        ${apptDetailRow("i-user", "Technician", technicianLabel)}
+        ${apptDetailRow("i-tag", "Source", appointment.source)}
+        <div class="ticket-detail-row"><svg class="icon"><use href="#i-tag"></use></svg><span class="ticket-detail-label">Status</span><span class="status-badge ${appointment.status === "completed" ? "st-pickedup" : "st-received"}">${esc(appointment.status === "completed" ? "Completed" : "Scheduled")}</span></div>
+      </div></section>
+      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(appointment.issue)}</div></section>
+      ${appointment.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(appointment.notes)}</p></section>` : ""}
+    `;
+    $("apptDetailModalFooter").innerHTML = `
+      ${appointment.phone ? `<a class="primary-btn" href="tel:${esc(appointment.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      <button type="button" class="ghost-btn" id="apptDetailEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
+      <button type="button" class="ghost-btn" id="apptDetailComplete">${appointment.status === "completed" ? "Reopen" : "Mark done"}</button>
+      <button type="button" class="ghost-btn danger-btn" id="apptDetailDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
+    $("apptDetailEdit").onclick = () => { closeApptDetailModal(); editAppointment(appointment); };
+    $("apptDetailComplete").onclick = () => { toggleAppointmentComplete(appointment.id); closeApptDetailModal(); };
+    $("apptDetailDelete").onclick = () => { deleteAppointment(appointment.id); closeApptDetailModal(); };
+    $("apptDetailModal").hidden = false;
+    $("closeApptDetailModal").focus();
+  }
+
+  function closeApptDetailModal() {
+    $("apptDetailModal").hidden = true;
+  }
+  $("closeApptDetailModal")?.addEventListener("click", closeApptDetailModal);
+  $("apptDetailModal")?.addEventListener("click", (e) => { if (e.target.id === "apptDetailModal") closeApptDetailModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("apptDetailModal")?.hidden) closeApptDetailModal();
+  });
+
   function bindRowActions(list) {
     list.querySelectorAll("[data-edit]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const appointment = readAppointments().find((item) => item.id === btn.dataset.edit);
         if (appointment) editAppointment(appointment);
       });
     });
     list.querySelectorAll("[data-complete]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        writeAppointments(readAppointments().map((item) =>
-          item.id === btn.dataset.complete
-            ? Object.assign({}, item, { status: item.status === "completed" ? "scheduled" : "completed" })
-            : item
-        ));
-        renderList();
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleAppointmentComplete(btn.dataset.complete);
       });
     });
     list.querySelectorAll("[data-delete]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        writeAppointments(readAppointments().filter((item) => item.id !== btn.dataset.delete));
-        renderList();
-        renderSlots();
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteAppointment(btn.dataset.delete);
+      });
+    });
+    list.querySelectorAll("[data-open-detail]").forEach((el) => {
+      const open = () => {
+        const appointment = readAppointments().find((item) => item.id === el.dataset.openDetail);
+        if (appointment) openApptDetailModal(appointment);
+      };
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
       });
     });
   }
@@ -651,6 +720,8 @@
     if (clientInput) clientInput.value = appointment.client || "";
     const phoneInput = $("appointmentPhone");
     if (phoneInput) phoneInput.value = appointment.phone || "";
+    const sourceInput = $("appointmentSource");
+    if (sourceInput) sourceInput.value = appointment.source || "";
     const notesInput = $("appointmentNotes");
     if (notesInput) notesInput.value = appointment.notes || "";
     const msg = $("appointmentMessage");
@@ -777,6 +848,7 @@
           technician: selectedTechnician || "",
           date: selectedDate,
           time: selectedTime,
+          source: ($("appointmentSource")?.value || "").trim(),
           notes: ($("appointmentNotes")?.value || "").trim(),
           status: existing?.status || "scheduled",
           created: existing?.created || new Date().toISOString(),
