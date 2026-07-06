@@ -80,26 +80,30 @@
     return date < t;
   }
 
-  function bookedTimesFor(dateStr) {
-    return new Set(
-      readAppointments()
-        .filter((a) => a.date === dateStr && a.status !== "cancelled" && a.id !== editingAppointmentId)
-        .map((a) => a.time)
-    );
+  // How many appointments are already on the books for each time on a
+  // given day (excluding the one currently being edited) — no longer used
+  // to hide slots, just to show staff a heads-up when a time is shared by
+  // more than one client.
+  function bookedCountsFor(dateStr) {
+    const counts = new Map();
+    readAppointments()
+      .filter((a) => a.date === dateStr && a.status !== "cancelled" && a.id !== editingAppointmentId)
+      .forEach((a) => counts.set(a.time, (counts.get(a.time) || 0) + 1));
+    return counts;
   }
 
   function slotsFor(dateStr) {
     const [y, m, d] = dateStr.split("-").map(Number);
     const date = new Date(y, m - 1, d);
     if (isClosedDay(date) || isPastDay(date)) return [];
-    const booked = bookedTimesFor(dateStr);
     const isToday = dateStr === todayISO();
     const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
     const slots = [];
     for (let mins = OPEN_HOUR * 60; mins + SLOT_MINUTES <= CLOSE_HOUR * 60; mins += SLOT_MINUTES) {
       const value = minutesToValue(mins);
-      if (booked.has(value)) continue;
+      // Multiple clients can share the same time slot — a slot never gets
+      // removed just because someone is already booked into it.
       if (isToday && mins <= nowMins) continue;
       slots.push(value);
     }
@@ -182,8 +186,16 @@
       : "";
 
     const slots = slotsFor(selectedDate);
+    const counts = bookedCountsFor(selectedDate);
     html += slots.length
-      ? slots.map((value) => `<button type="button" class="booking-slot-btn ${value === selectedTime ? "is-selected" : ""}" data-time="${value}">${minutesToLabel(timeToMinutes(value))}</button>`).join("")
+      ? slots.map((value) => {
+          const count = counts.get(value) || 0;
+          const classes = ["booking-slot-btn"];
+          if (value === selectedTime) classes.push("is-selected");
+          if (count > 0) classes.push("has-bookings");
+          const badge = count > 0 ? `<span class="booking-slot-count">${count} booked</span>` : "";
+          return `<button type="button" class="${classes.join(" ")}" data-time="${value}">${minutesToLabel(timeToMinutes(value))}${badge}</button>`;
+        }).join("")
       : `<p class="booking-slots-empty">No open times this day.</p>`;
     list.innerHTML = html;
     list.querySelectorAll(".booking-slot-btn").forEach((btn) => {
@@ -698,9 +710,9 @@
   }
 
   // Loads an existing appointment into the wizard for editing. Date/time
-  // stay changeable (its own slot is excluded from "booked" while editing —
-  // see bookedTimesFor/bookedAppointmentsFor), then jumps straight to the
-  // Details step since everything is already filled in.
+  // stay changeable (its own booking is excluded from the counts/list shown
+  // while editing — see bookedCountsFor/bookedAppointmentsFor), then jumps
+  // straight to the Details step since everything is already filled in.
   function editAppointment(appointment) {
     editingAppointmentId = appointment.id;
     setPanel("create");
