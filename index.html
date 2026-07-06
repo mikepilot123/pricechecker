@@ -70,8 +70,8 @@
           <svg class="icon"><use href="#i-xmark"></use></svg>
         </button>
       </div>
-      <button class="nav-btn active" data-target="dashboard" role="tab" aria-selected="true"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
-      <button class="nav-btn" data-target="prices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
+      <button class="nav-btn" data-target="dashboard" role="tab" aria-selected="false"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
+      <button class="nav-btn active" data-target="prices" role="tab" aria-selected="true"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
       <button class="nav-btn" data-target="leads" role="tab" aria-selected="false"><svg class="icon"><use href="#i-user"></use></svg>Leads</button>
       <button class="nav-btn" data-target="appointments" role="tab" aria-selected="false"><svg class="icon"><use href="#i-calendar"></use></svg>Appointments</button>
@@ -93,7 +93,7 @@
   </header>
 
   <!-- ============ DASHBOARD VIEW ============ -->
-  <main class="container view" id="view-dashboard">
+  <main class="container view" id="view-dashboard" hidden>
     <p class="info-banner">Repair business overview from check-ins and live inventory.</p>
     <p class="status-line">
       <span id="dashboardStatusDot" class="status-dot stale"></span>
@@ -438,7 +438,7 @@
   </div>
 
   <!-- ============ PRICES VIEW ============ -->
-  <main class="container view" id="view-prices" hidden>
+  <main class="container view" id="view-prices">
     <p id="infoBanner" class="info-banner">Loading standing info…</p>
     <div class="status-line">
       <span id="statusDot" class="status-dot"></span>
