@@ -544,6 +544,7 @@
         <div class="lead-card-sub">${esc(repairText)}</div>
         <div class="lead-phone-wrap">${phone}</div>
         <div class="lead-detail-grid">
+          ${lead.created ? `<div class="lead-detail"><svg class="icon"><use href="#i-clock"></use></svg><span>Logged ${esc(formatLoggedDate(lead.created))}</span></div>` : ""}
           <div class="lead-detail${dueClass}">
             <svg class="icon"><use href="#i-calendar"></use></svg>
             <span>${lead.followUpDate ? `Follow up ${esc(formatDate(lead.followUpDate))}` : "No follow-up date"}</span>
@@ -580,6 +581,7 @@
     const repairText = [lead.device, lead.issue].filter(Boolean).join(" · ");
     $("leadDetailModalBody").innerHTML = `
       <section class="ticket-detail-section"><p class="field-label">Lead</p><div class="ticket-detail-grid">
+        ${leadDetailRow("i-clock", "Logged", formatLoggedDate(lead.created))}
         ${leadDetailRow("i-user", "Customer", lead.customerName)}
         ${leadDetailRow("i-phone", "Phone", lead.phone)}
         ${leadDetailRow("i-mail", "Email", lead.email)}
@@ -631,6 +633,12 @@
     if (!iso) return "";
     const d = new Date(iso);
     return isNaN(d) ? "" : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  function formatLoggedDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
   }
 
   async function openLeadNotesModal(lead) {
