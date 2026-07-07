@@ -54,6 +54,7 @@
   let closeAppointmentDeviceDropdown = null;
   let editingAppointmentId = null; // set while editing an existing appointment
   let pendingPrefill = null; // contact/device info handed off from a converted lead
+  let rescheduleAppointment = null; // set while the quick-reschedule modal is open
 
   function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
   function todayISO() { return toISODate(new Date()); }
@@ -623,7 +624,11 @@
         <div class="booking-row-main">
           <strong>${esc(item.client)}</strong>
           <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
-          <small>${esc(formatDateTime(item.date, item.time))}${item.phone ? " · " + esc(item.phone) : ""}</small>
+          <small class="booking-row-datetime">
+            <span>${esc(formatDateTime(item.date, item.time))}</span>
+            <button type="button" class="appt-reschedule-btn" data-reschedule="${esc(item.id)}" aria-label="Reschedule"><svg class="icon"><use href="#i-pencil"></use></svg></button>
+            ${item.phone ? `<span>· ${esc(item.phone)}</span>` : ""}
+          </small>
         </div>
         <div class="booking-row-actions">
           <button type="button" data-edit="${esc(item.id)}">Edit</button>
@@ -731,7 +736,7 @@
       <section class="ticket-detail-section"><p class="field-label">Appointment</p><div class="ticket-detail-grid">
         ${apptDetailRow("i-user", "Client", appointment.client)}
         ${apptDetailRow("i-phone", "Phone", appointment.phone)}
-        ${apptDetailRow("i-calendar", "When", formatDateTime(appointment.date, appointment.time))}
+        <div class="ticket-detail-row"><svg class="icon"><use href="#i-calendar"></use></svg><span class="ticket-detail-label">When</span><span class="ticket-detail-value">${esc(formatDateTime(appointment.date, appointment.time))}</span><button type="button" class="appt-reschedule-btn" id="apptDetailReschedule" aria-label="Reschedule"><svg class="icon"><use href="#i-pencil"></use></svg></button></div>
         ${apptDetailRow("i-device", "Device", appointment.device)}
         ${apptDetailRow("i-user", "Technician", technicianLabel)}
         ${apptDetailRow("i-tag", "Source", appointment.source)}
@@ -748,6 +753,7 @@
     $("apptDetailEdit").onclick = () => { closeApptDetailModal(); editAppointment(appointment); };
     $("apptDetailComplete").onclick = () => { toggleAppointmentComplete(appointment.id); closeApptDetailModal(); };
     $("apptDetailDelete").onclick = () => { deleteAppointment(appointment.id); closeApptDetailModal(); };
+    $("apptDetailReschedule").onclick = () => { closeApptDetailModal(); openRescheduleModal(appointment); };
     $("apptDetailModal").hidden = false;
     $("closeApptDetailModal").focus();
   }
@@ -759,6 +765,82 @@
   $("apptDetailModal")?.addEventListener("click", (e) => { if (e.target.id === "apptDetailModal") closeApptDetailModal(); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("apptDetailModal")?.hidden) closeApptDetailModal();
+  });
+
+  // ---------- quick reschedule (date/time only, no need to re-touch device/technician) ----------
+
+  function openRescheduleModal(appointment) {
+    rescheduleAppointment = appointment;
+    $("apptRescheduleModalSub").textContent = `${appointment.client}${appointment.device ? " · " + appointment.device : ""}`;
+    const dateInput = $("apptRescheduleDate");
+    if (dateInput) {
+      dateInput.value = appointment.date;
+      dateInput.min = todayISO();
+    }
+    $("apptRescheduleError").hidden = true;
+    renderRescheduleSlots(appointment.date);
+    $("apptRescheduleModal").hidden = false;
+  }
+
+  function closeRescheduleModal() {
+    $("apptRescheduleModal").hidden = true;
+    rescheduleAppointment = null;
+  }
+
+  function rescheduleBookedCounts(dateStr) {
+    const counts = new Map();
+    readAppointments()
+      .filter((a) => a.date === dateStr && a.status !== "cancelled" && a.id !== rescheduleAppointment?.id)
+      .forEach((a) => counts.set(a.time, (counts.get(a.time) || 0) + 1));
+    return counts;
+  }
+
+  function renderRescheduleSlots(dateStr) {
+    const list = $("apptRescheduleSlots");
+    if (!list) return;
+    const slots = slotsFor(dateStr);
+    const counts = rescheduleBookedCounts(dateStr);
+    const currentTime = rescheduleAppointment?.date === dateStr ? rescheduleAppointment.time : null;
+    list.innerHTML = slots.length
+      ? slots.map((value) => {
+          const count = counts.get(value) || 0;
+          const classes = ["booking-slot-btn"];
+          if (value === currentTime) classes.push("is-selected");
+          if (count > 0) classes.push("has-bookings");
+          const badge = count > 0 ? `<span class="booking-slot-count">${count} booked</span>` : "";
+          return `<button type="button" class="${classes.join(" ")}" data-time="${value}">${minutesToLabel(timeToMinutes(value))}${badge}</button>`;
+        }).join("")
+      : `<p class="booking-slots-empty">No open times this day.</p>`;
+    list.querySelectorAll(".booking-slot-btn").forEach((btn) => {
+      btn.addEventListener("click", () => saveReschedule(dateStr, btn.dataset.time));
+    });
+  }
+
+  async function saveReschedule(date, time) {
+    if (!rescheduleAppointment) return;
+    const err = $("apptRescheduleError");
+    err.hidden = true;
+    try {
+      const data = await api({ action: "updateAppointment", id: rescheduleAppointment.id, date, time });
+      setAppointments(APPOINTMENTS.map((item) => (item.id === data.appointment.id ? data.appointment : item)));
+      renderList();
+      renderSlots();
+      closeRescheduleModal();
+    } catch (e) {
+      err.textContent = "Couldn't reschedule: " + e.message;
+      err.hidden = false;
+    }
+  }
+
+  $("apptRescheduleDate")?.addEventListener("change", () => {
+    if (!rescheduleAppointment) return;
+    const value = $("apptRescheduleDate").value;
+    if (value) renderRescheduleSlots(value);
+  });
+  $("closeApptRescheduleModal")?.addEventListener("click", closeRescheduleModal);
+  $("apptRescheduleModal")?.addEventListener("click", (e) => { if (e.target.id === "apptRescheduleModal") closeRescheduleModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("apptRescheduleModal")?.hidden) closeRescheduleModal();
   });
 
   function bindRowActions(list) {
@@ -779,6 +861,13 @@
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         deleteAppointment(btn.dataset.delete);
+      });
+    });
+    list.querySelectorAll("[data-reschedule]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const appointment = readAppointments().find((item) => item.id === btn.dataset.reschedule);
+        if (appointment) openRescheduleModal(appointment);
       });
     });
     list.querySelectorAll("[data-open-detail]").forEach((el) => {

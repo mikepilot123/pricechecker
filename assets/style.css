@@ -3588,6 +3588,27 @@ video.media-viewer-media {
 .booking-row.is-completed { opacity: 0.6; }
 .booking-row-main p { margin: 2px 0; color: var(--text-dim); font-size: 0.86rem; }
 .booking-row-main small { color: var(--text-dim); font-size: 0.8rem; }
+.booking-row-datetime { display: inline-flex; align-items: center; gap: 4px; }
+.appt-reschedule-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.appt-reschedule-btn .icon { width: 13px; height: 13px; stroke-width: 2; }
+.appt-reschedule-btn:hover, .appt-reschedule-btn:focus-visible {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.ticket-detail-row .appt-reschedule-btn { margin-left: auto; }
+.reschedule-slots { max-height: 280px; }
 .booking-row-actions { display: flex; gap: 8px; flex: none; }
 .booking-row-actions button {
   border: 1px solid var(--border);

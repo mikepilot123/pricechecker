@@ -942,6 +942,27 @@
     </section>
   </div>
 
+  <!-- Reschedule appointment -->
+  <div id="apptRescheduleModal" class="modal-backdrop" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="apptRescheduleModalTitle">
+      <div class="modal-header">
+        <div><p class="modal-eyebrow" id="apptRescheduleModalSub"></p><h3 id="apptRescheduleModalTitle">Reschedule</h3></div>
+        <button type="button" id="closeApptRescheduleModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-field">
+          <label class="field-label" for="apptRescheduleDate">Date</label>
+          <input type="date" id="apptRescheduleDate" class="text-input" />
+        </div>
+        <div class="form-field">
+          <label class="field-label">Time</label>
+          <div id="apptRescheduleSlots" class="booking-slots-list reschedule-slots"></div>
+        </div>
+        <p id="apptRescheduleError" class="field-error" hidden></p>
+      </div>
+    </section>
+  </div>
+
   <!-- Lead detail sheet -->
   <div id="leadDetailModal" class="modal-backdrop" hidden>
     <section class="modal-panel ticket-modal-panel" role="dialog" aria-modal="true" aria-labelledby="leadDetailModalTitle">
@@ -1151,7 +1172,7 @@
   <script src="assets/inventory.js?v=synced-data-1"></script>
   <script src="assets/intake.js?v=synced-data-1"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
-  <script src="assets/appointments.js?v=lead-convert-1"></script>
+  <script src="assets/appointments.js?v=reschedule-1"></script>
   <script src="assets/leads.js?v=lead-convert-1"></script>
 </body>
 </html>
