@@ -337,7 +337,6 @@
     $("leadQuotedAmount").value = lead.quotedAmount || "";
     $("leadStatus").value = STATUSES.includes(lead.status) ? lead.status : "New";
     $("leadFollowUpDate").value = lead.followUpDate || "";
-    $("leadNotes").value = lead.notes || "";
     openModal();
     $("leadName")?.focus();
   }
@@ -449,7 +448,6 @@
       source: ($("leadSource")?.value || "").trim(),
       status: $("leadStatus")?.value || "New",
       followUpDate: $("leadFollowUpDate")?.value || "",
-      notes: ($("leadNotes")?.value || "").trim(),
     };
   }
 
@@ -506,7 +504,7 @@
       if (follow === "upcoming" && (!lead.followUpDate || lead.followUpDate <= todayISO())) return false;
       if (follow === "none" && lead.followUpDate) return false;
       if (!query) return true;
-      return [lead.customerName, lead.phone, lead.email, lead.device, lead.issue, lead.source, lead.notes]
+      return [lead.customerName, lead.phone, lead.email, lead.device, lead.issue, lead.source]
         .some((value) => String(value || "").toLowerCase().includes(query));
     });
   }
@@ -552,7 +550,6 @@
           ${quote ? `<div class="lead-detail"><svg class="icon"><use href="#i-cash"></use></svg><span>Quote ${esc(quote)}</span></div>` : ""}
           ${lead.email ? `<div class="lead-detail"><svg class="icon"><use href="#i-mail"></use></svg><span>${esc(lead.email)}</span></div>` : ""}
           ${lead.source ? `<div class="lead-detail"><svg class="icon"><use href="#i-tag"></use></svg><span>${esc(lead.source)}</span></div>` : ""}
-          ${lead.notes ? `<button type="button" class="lead-detail lead-notes-btn" data-lead-notes="${esc(lead.id)}" aria-label="View notes"><svg class="icon"><use href="#i-note"></use></svg><span>Notes</span></button>` : ""}
         </div>
       </div>
       <div class="lead-card-side">
@@ -561,6 +558,11 @@
           <button type="button" class="danger-text" data-lead-delete="${esc(lead.id)}">Delete</button>
         </div>
         <select class="text-input select-input lead-card-status" data-lead-status="${esc(lead.id)}" aria-label="Lead status">${statusOptions(lead.status, false)}</select>
+        <button type="button" class="lead-notes-btn" data-lead-notes="${esc(lead.id)}" aria-label="View notes">
+          <svg class="icon"><use href="#i-note"></use></svg>
+          <span>Notes</span>
+          <span class="lead-notes-count">${lead.notesCount || 0}</span>
+        </button>
       </div>
     </article>`;
   }
@@ -587,7 +589,13 @@
         <div class="ticket-detail-row"><svg class="icon"><use href="#i-tag"></use></svg><span class="ticket-detail-label">Status</span><span class="lead-status-pill">${esc(lead.status || "New")}</span></div>
       </div></section>
       ${lead.issue ? `<section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(lead.issue)}</div></section>` : ""}
-      ${lead.notes ? `<section class="ticket-detail-section"><p class="field-label">Notes</p><p class="ticket-detail-notes">${esc(lead.notes)}</p></section>` : ""}
+      <section class="ticket-detail-section"><p class="field-label">Notes</p>
+        <button type="button" class="lead-notes-btn" id="leadDetailNotesBtn" aria-label="View notes">
+          <svg class="icon"><use href="#i-note"></use></svg>
+          <span>Notes</span>
+          <span class="lead-notes-count">${lead.notesCount || 0}</span>
+        </button>
+      </section>
     `;
     $("leadDetailModalFooter").innerHTML = `
       ${lead.phone ? `<a class="primary-btn" href="tel:${esc(lead.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
@@ -595,6 +603,7 @@
       <button type="button" class="ghost-btn danger-btn" id="leadDetailDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     $("leadDetailEdit").onclick = () => { closeLeadDetailModal(); editLead(lead); };
     $("leadDetailDelete").onclick = () => { deleteLeadById(lead.id); closeLeadDetailModal(); };
+    $("leadDetailNotesBtn").onclick = () => { closeLeadDetailModal(); openLeadNotesModal(lead); };
     $("leadDetailModal").hidden = false;
     $("closeLeadDetailModal").focus();
   }
@@ -608,20 +617,86 @@
     if (e.key === "Escape" && !$("leadDetailModal")?.hidden) closeLeadDetailModal();
   });
 
-  function openLeadNotesModal(lead) {
-    if (!lead || !lead.notes) return;
-    $("leadNotesModalSub").textContent = lead.customerName || lead.phone || "";
-    $("leadNotesModalBody").textContent = lead.notes;
-    $("leadNotesModal").hidden = false;
-    $("closeLeadNotesModal").focus();
+  let notesModalLead = null;
+
+  function leadNoteRowHtml(note) {
+    return `<article class="lead-note-row">
+      <p>${esc(note.note)}</p>
+      <small>${esc(formatDateTime(note.created))}</small>
+    </article>`;
   }
+
+  function formatDateTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  async function openLeadNotesModal(lead) {
+    if (!lead) return;
+    notesModalLead = lead;
+    $("leadNotesModalSub").textContent = lead.customerName || lead.phone || "";
+    $("leadNotesInput").value = "";
+    $("leadNotesError").hidden = true;
+    $("leadNotesList").innerHTML = `<p class="ops-empty">Loading notes…</p>`;
+    $("leadNotesModal").hidden = false;
+    $("leadNotesInput")?.focus();
+    try {
+      const data = await api({ action: "listLeadNotes", leadId: lead.id });
+      renderLeadNotesList(data.notes || []);
+    } catch (err) {
+      $("leadNotesList").innerHTML = `<p class="ops-empty">Couldn't load notes: ${esc(err.message)}</p>`;
+    }
+  }
+
+  function renderLeadNotesList(notes) {
+    $("leadNotesModalTitle").textContent = `Notes (${notes.length})`;
+    $("leadNotesList").innerHTML = notes.length
+      ? notes.map(leadNoteRowHtml).join("")
+      : `<p class="ops-empty">No notes yet — add the first one below.</p>`;
+    // Keep the card grid and any open detail sheet in sync with the new count
+    // without a full reload.
+    if (notesModalLead) {
+      notesModalLead.notesCount = notes.length;
+      const lead = leads.find((item) => item.id === notesModalLead.id);
+      if (lead) lead.notesCount = notes.length;
+      render();
+    }
+  }
+
   function closeLeadNotesModal() {
     $("leadNotesModal").hidden = true;
+    notesModalLead = null;
   }
   $("closeLeadNotesModal")?.addEventListener("click", closeLeadNotesModal);
   $("leadNotesModal")?.addEventListener("click", (e) => { if (e.target.id === "leadNotesModal") closeLeadNotesModal(); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("leadNotesModal")?.hidden) closeLeadNotesModal();
+  });
+  $("leadNotesForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!notesModalLead) return;
+    const note = ($("leadNotesInput")?.value || "").trim();
+    const err = $("leadNotesError");
+    if (!note) {
+      err.textContent = "Write a note before adding it.";
+      err.hidden = false;
+      return;
+    }
+    err.hidden = true;
+    const submitBtn = event.target.querySelector("button[type=submit]");
+    const original = submitBtn?.textContent;
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Adding…"; }
+    try {
+      const data = await api({ action: "addLeadNote", leadId: notesModalLead.id, note });
+      $("leadNotesInput").value = "";
+      renderLeadNotesList(data.notes || []);
+    } catch (e) {
+      err.textContent = "Couldn't add note: " + e.message;
+      err.hidden = false;
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = original; }
+    }
   });
 
   async function deleteLeadById(id) {
