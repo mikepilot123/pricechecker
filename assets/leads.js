@@ -552,8 +552,8 @@
           ${quote ? `<div class="lead-detail"><svg class="icon"><use href="#i-cash"></use></svg><span>Quote ${esc(quote)}</span></div>` : ""}
           ${lead.email ? `<div class="lead-detail"><svg class="icon"><use href="#i-mail"></use></svg><span>${esc(lead.email)}</span></div>` : ""}
           ${lead.source ? `<div class="lead-detail"><svg class="icon"><use href="#i-tag"></use></svg><span>${esc(lead.source)}</span></div>` : ""}
+          ${lead.notes ? `<button type="button" class="lead-detail lead-notes-btn" data-lead-notes="${esc(lead.id)}" aria-label="View notes"><svg class="icon"><use href="#i-note"></use></svg><span>Notes</span></button>` : ""}
         </div>
-        ${lead.notes ? `<div class="lead-notes"><svg class="icon"><use href="#i-note"></use></svg><span>${esc(lead.notes)}</span></div>` : ""}
       </div>
       <div class="lead-card-side">
         <div class="lead-card-actions">
@@ -608,6 +608,22 @@
     if (e.key === "Escape" && !$("leadDetailModal")?.hidden) closeLeadDetailModal();
   });
 
+  function openLeadNotesModal(lead) {
+    if (!lead || !lead.notes) return;
+    $("leadNotesModalSub").textContent = lead.customerName || lead.phone || "";
+    $("leadNotesModalBody").textContent = lead.notes;
+    $("leadNotesModal").hidden = false;
+    $("closeLeadNotesModal").focus();
+  }
+  function closeLeadNotesModal() {
+    $("leadNotesModal").hidden = true;
+  }
+  $("closeLeadNotesModal")?.addEventListener("click", closeLeadNotesModal);
+  $("leadNotesModal")?.addEventListener("click", (e) => { if (e.target.id === "leadNotesModal") closeLeadNotesModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("leadNotesModal")?.hidden) closeLeadNotesModal();
+  });
+
   async function deleteLeadById(id) {
     const lead = leads.find((item) => item.id === id);
     if (!lead || !window.confirm(`Delete lead for ${lead.customerName || lead.phone || "this customer"}?`)) return;
@@ -624,12 +640,17 @@
   async function handleListClick(event) {
     const editBtn = event.target.closest("[data-lead-edit]");
     const deleteBtn = event.target.closest("[data-lead-delete]");
+    const notesBtn = event.target.closest("[data-lead-notes]");
     if (editBtn) {
       editLead(leads.find((lead) => lead.id === editBtn.dataset.leadEdit));
       return;
     }
     if (deleteBtn) {
       deleteLeadById(deleteBtn.dataset.leadDelete);
+      return;
+    }
+    if (notesBtn) {
+      openLeadNotesModal(leads.find((lead) => lead.id === notesBtn.dataset.leadNotes));
       return;
     }
     if (event.target.closest("select[data-lead-status]") || event.target.closest("a.ticket-phone")) return;

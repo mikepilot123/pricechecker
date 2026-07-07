@@ -953,6 +953,19 @@
     </section>
   </div>
 
+  <!-- Lead notes -->
+  <div id="leadNotesModal" class="modal-backdrop" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="leadNotesModalTitle">
+      <div class="modal-header">
+        <div><p class="modal-eyebrow" id="leadNotesModalSub"></p><h3 id="leadNotesModalTitle">Notes</h3></div>
+        <button type="button" id="closeLeadNotesModal" class="modal-close" aria-label="Close notes"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="leadNotesModalBody" class="ticket-detail-notes"></p>
+      </div>
+    </section>
+  </div>
+
   <!-- Device detail sheet -->
   <div id="ticketModal" class="modal-backdrop" hidden>
     <section class="modal-panel ticket-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ticketModalTitle">
@@ -1135,6 +1148,6 @@
   <script src="assets/intake.js?v=synced-data-1"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=synced-data-1"></script>
-  <script src="assets/leads.js?v=leads-cards-1"></script>
+  <script src="assets/leads.js?v=notes-icon-1"></script>
 </body>
 </html>

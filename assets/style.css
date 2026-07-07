@@ -1670,8 +1670,7 @@ body.nav-open .view-nav { transform: translateX(0); }
   gap: 7px;
   margin-top: 10px;
 }
-.lead-detail,
-.lead-notes {
+.lead-detail {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1683,8 +1682,7 @@ body.nav-open .view-nav { transform: translateX(0); }
   color: var(--text-dim);
   font-size: 0.8rem;
 }
-.lead-detail .icon,
-.lead-notes .icon {
+.lead-detail .icon {
   width: 15px;
   height: 15px;
   flex: none;
@@ -1696,16 +1694,13 @@ body.nav-open .view-nav { transform: translateX(0); }
   color: var(--danger);
   font-weight: 600;
 }
-.lead-notes {
-  display: flex;
-  align-items: flex-start;
-  max-width: 680px;
-  margin-top: 10px;
-  background: var(--card);
+.lead-notes-btn {
+  font-family: inherit;
+  cursor: pointer;
 }
-.lead-notes span {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.lead-notes-btn:hover, .lead-notes-btn:focus-visible {
+  background: var(--card-hover);
+  color: var(--text);
 }
 .lead-card-side {
   grid-area: side;
