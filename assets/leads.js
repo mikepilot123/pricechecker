@@ -529,6 +529,7 @@
       ? `<a class="ticket-phone" href="tel:${esc(lead.phone)}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(lead.phone)}</a>`
       : `<span class="ticket-phone no-phone">No phone</span>`;
     const quote = money(lead.quotedAmount);
+    const notesCount = Number(lead.notesCount || 0);
     const dueClass = isDue(lead.followUpDate) && !["Won", "Lost"].includes(lead.status) ? " is-due" : "";
     const repairText = [lead.device, lead.issue].filter(Boolean).join(" · ") || "No device or issue yet";
     return `<article class="lead-card ${statusClass(lead.status)}" data-lead-id="${esc(lead.id)}" role="button" tabindex="0">
@@ -558,10 +559,10 @@
           <button type="button" class="danger-text" data-lead-delete="${esc(lead.id)}">Delete</button>
         </div>
         <select class="text-input select-input lead-card-status" data-lead-status="${esc(lead.id)}" aria-label="Lead status">${statusOptions(lead.status, false)}</select>
-        <button type="button" class="lead-notes-btn" data-lead-notes="${esc(lead.id)}" aria-label="View notes">
+        <button type="button" class="lead-notes-btn${notesCount ? " has-notes" : ""}" data-lead-notes="${esc(lead.id)}" aria-label="View notes">
           <svg class="icon"><use href="#i-note"></use></svg>
           <span>Notes</span>
-          <span class="lead-notes-count">${lead.notesCount || 0}</span>
+          <span class="lead-notes-count">${notesCount}</span>
         </button>
       </div>
     </article>`;

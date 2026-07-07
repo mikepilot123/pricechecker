@@ -1716,6 +1716,21 @@ body.nav-open .view-nav { transform: translateX(0); }
   color: var(--accent);
   background: var(--card-hover);
 }
+.lead-notes-btn.has-notes {
+  border-color: #86cfa3;
+  background: #ecfdf3;
+  color: #14783e;
+}
+.lead-notes-btn.has-notes:hover,
+.lead-notes-btn.has-notes:focus-visible {
+  border-color: #42a96c;
+  background: #dcf8e8;
+  color: #0f6a35;
+}
+.lead-notes-btn.has-notes .lead-notes-count {
+  background: #14783e;
+  color: #fff;
+}
 .lead-notes-count {
   display: inline-flex;
   align-items: center;
@@ -1758,10 +1773,6 @@ body.nav-open .view-nav { transform: translateX(0); }
   gap: 8px;
   width: min(100%, 248px);
   justify-self: end;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-soft);
 }
 .lead-card-status {
   width: 100%;
