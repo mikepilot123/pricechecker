@@ -1718,18 +1718,18 @@ body.nav-open .view-nav { transform: translateX(0); }
 }
 .lead-notes-btn.has-notes {
   border-color: #86cfa3;
-  background: #ecfdf3;
+  background: var(--card);
   color: #14783e;
 }
 .lead-notes-btn.has-notes:hover,
 .lead-notes-btn.has-notes:focus-visible {
   border-color: #42a96c;
-  background: #dcf8e8;
+  background: var(--card);
   color: #0f6a35;
 }
 .lead-notes-btn.has-notes .lead-notes-count {
-  background: #14783e;
-  color: #fff;
+  background: #e4f8ec;
+  color: #14783e;
 }
 .lead-notes-count {
   display: inline-flex;
