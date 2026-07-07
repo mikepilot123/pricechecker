@@ -955,14 +955,33 @@
     }
   }
 
+  const FIELD_LABELS = {
+    customerName: "Customer",
+    phone: "Phone",
+    email: "Email",
+    device: "Device",
+    repairCost: "Repair cost",
+    amountPaid: "Amount paid",
+  };
+
   async function saveInlineEdit(rowEl, field) {
     if (!rowEl || !currentModalTicket) return;
     const cfg = INLINE_EDIT_FIELDS[field];
     const input = rowEl.querySelector(".ticket-inline-input");
     if (!cfg || !input) return;
     const raw = input.value.trim();
+    input.classList.remove("field-error-input");
     if (cfg.required && !raw) {
       input.classList.add("field-error-input");
+      toast(`${FIELD_LABELS[field] || "This field"} can't be empty.`);
+      return;
+    }
+    // Numbers must be a valid non-negative amount — the server rejects
+    // anything else, so catch it here with a clear message rather than
+    // letting the request bounce back as a generic failure.
+    if (cfg.type === "number" && raw !== "" && !/^\d+(?:\.\d{1,2})?$/.test(raw)) {
+      input.classList.add("field-error-input");
+      toast(`${FIELD_LABELS[field] || "Amount"} must be a valid amount (e.g. 950 or 950.00).`);
       return;
     }
     const value = cfg.type === "number" ? (raw === "" ? null : Number(raw)) : raw;
@@ -974,9 +993,15 @@
       mergeTicket(res.ticket);
       currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
       renderDetailRowStatic(rowEl, field);
+      render();
+      toast(`${FIELD_LABELS[field] || "Change"} saved.`, { tone: "info", duration: 2500 });
     } catch (err) {
       if (saveBtn) saveBtn.disabled = false;
       input.classList.add("field-error-input");
+      // Never fail silently — a slow cold start, a dropped connection, or a
+      // rejected value should tell staff what happened instead of looking
+      // like the button did nothing.
+      toast(`Couldn't save ${FIELD_LABELS[field] || "change"}: ${err.message}. Check your connection and try again.`);
     }
   }
 

@@ -3888,7 +3888,10 @@ video.media-viewer-media {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 300;
+  /* Above .modal-backdrop (5000) so save errors/confirmations are visible
+     while a modal like the ticket detail sheet is open — that's exactly
+     where inline edits happen. */
+  z-index: 6000;
   width: min(440px, calc(100vw - 32px));
   pointer-events: none;
 }
