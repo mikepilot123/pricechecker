@@ -1694,6 +1694,11 @@ body.nav-open .view-nav { transform: translateX(0); }
   color: var(--danger);
   font-weight: 600;
 }
+.lead-side-row {
+  display: flex;
+  gap: 8px;
+}
+.lead-side-row .lead-notes-btn { width: auto; flex: 1; }
 .lead-notes-btn {
   display: inline-flex;
   align-items: center;

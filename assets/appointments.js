@@ -53,6 +53,7 @@
   let bound = false;
   let closeAppointmentDeviceDropdown = null;
   let editingAppointmentId = null; // set while editing an existing appointment
+  let pendingPrefill = null; // contact/device info handed off from a converted lead
 
   function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
   function todayISO() { return toISODate(new Date()); }
@@ -1013,7 +1014,30 @@
     loadAppointments();
     setStep(1);
     setPanel("create");
+    applyPendingPrefill();
   }
+
+  // Fills in what a converted lead already told us (client, phone, device,
+  // source) without picking a date/time for them — staff still choose that
+  // by clicking a day, same as any other booking.
+  function applyPendingPrefill() {
+    if (!pendingPrefill) return;
+    const { client, phone, device, source } = pendingPrefill;
+    pendingPrefill = null;
+    const clientInput = $("appointmentClient");
+    if (clientInput) clientInput.value = client || "";
+    const phoneInput = $("appointmentPhone");
+    if (phoneInput) phoneInput.value = phone || "";
+    const sourceInput = $("appointmentSource");
+    if (sourceInput) sourceInput.value = source || "";
+    const deviceInput = $("appointmentDevice");
+    if (deviceInput) deviceInput.value = device || "";
+    updateDeviceThumb(device || "");
+  }
+
+  window.addEventListener("rpc-prefill-appointment", (e) => {
+    pendingPrefill = e.detail || null;
+  });
 
   window.addEventListener("rpc-enter-appointments", init);
   window.addEventListener("rpc-enter-completed-repairs", () => {

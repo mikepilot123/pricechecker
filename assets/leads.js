@@ -560,11 +560,17 @@
           <button type="button" class="danger-text" data-lead-delete="${esc(lead.id)}">Delete</button>
         </div>
         <select class="text-input select-input lead-card-status" data-lead-status="${esc(lead.id)}" aria-label="Lead status">${statusOptions(lead.status, false)}</select>
-        <button type="button" class="lead-notes-btn${notesCount ? " has-notes" : ""}" data-lead-notes="${esc(lead.id)}" aria-label="View notes">
-          <svg class="icon"><use href="#i-note"></use></svg>
-          <span>Notes</span>
-          <span class="lead-notes-count">${notesCount}</span>
-        </button>
+        <div class="lead-side-row">
+          <button type="button" class="lead-notes-btn${notesCount ? " has-notes" : ""}" data-lead-notes="${esc(lead.id)}" aria-label="View notes">
+            <svg class="icon"><use href="#i-note"></use></svg>
+            <span>Notes</span>
+            <span class="lead-notes-count">${notesCount}</span>
+          </button>
+          <button type="button" class="lead-notes-btn" data-lead-convert="${esc(lead.id)}" aria-label="Convert to appointment">
+            <svg class="icon"><use href="#i-calendar"></use></svg>
+            <span>Book</span>
+          </button>
+        </div>
       </div>
     </article>`;
   }
@@ -602,11 +608,13 @@
     `;
     $("leadDetailModalFooter").innerHTML = `
       ${lead.phone ? `<a class="primary-btn" href="tel:${esc(lead.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      <button type="button" class="ghost-btn" id="leadDetailConvert"><svg class="icon"><use href="#i-calendar"></use></svg>Book appointment</button>
       <button type="button" class="ghost-btn" id="leadDetailEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="leadDetailDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     $("leadDetailEdit").onclick = () => { closeLeadDetailModal(); editLead(lead); };
     $("leadDetailDelete").onclick = () => { deleteLeadById(lead.id); closeLeadDetailModal(); };
     $("leadDetailNotesBtn").onclick = () => { closeLeadDetailModal(); openLeadNotesModal(lead); };
+    $("leadDetailConvert").onclick = () => { closeLeadDetailModal(); convertLeadToAppointment(lead); };
     $("leadDetailModal").hidden = false;
     $("closeLeadDetailModal").focus();
   }
@@ -725,6 +733,7 @@
     const editBtn = event.target.closest("[data-lead-edit]");
     const deleteBtn = event.target.closest("[data-lead-delete]");
     const notesBtn = event.target.closest("[data-lead-notes]");
+    const convertBtn = event.target.closest("[data-lead-convert]");
     if (editBtn) {
       editLead(leads.find((lead) => lead.id === editBtn.dataset.leadEdit));
       return;
@@ -737,9 +746,31 @@
       openLeadNotesModal(leads.find((lead) => lead.id === notesBtn.dataset.leadNotes));
       return;
     }
+    if (convertBtn) {
+      convertLeadToAppointment(leads.find((lead) => lead.id === convertBtn.dataset.leadConvert));
+      return;
+    }
     if (event.target.closest("select[data-lead-status]") || event.target.closest("a.ticket-phone")) return;
     const card = event.target.closest(".lead-card");
     if (card) openLeadDetailModal(leads.find((lead) => lead.id === card.dataset.leadId));
+  }
+
+  // Hands a lead's contact/device info to Appointments via a custom event,
+  // then switches views. Date/time still has to be picked by staff — there's
+  // no "lead's preferred time" to carry over — so this only pre-fills what's
+  // already known (client, phone, device, source), leaving the wizard on
+  // Step 1 instead of jumping ahead.
+  function convertLeadToAppointment(lead) {
+    if (!lead) return;
+    window.dispatchEvent(new CustomEvent("rpc-prefill-appointment", {
+      detail: {
+        client: lead.customerName || "",
+        phone: lead.phone || "",
+        device: lead.device || "",
+        source: lead.source || "",
+      },
+    }));
+    if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("appointments");
   }
 
   async function handleListChange(event) {
