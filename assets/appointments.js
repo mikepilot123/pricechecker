@@ -1111,7 +1111,7 @@
   // by clicking a day, same as any other booking.
   function applyPendingPrefill() {
     if (!pendingPrefill) return;
-    const { client, phone, device, source } = pendingPrefill;
+    const { client, phone, device, issue, source } = pendingPrefill;
     pendingPrefill = null;
     const clientInput = $("appointmentClient");
     if (clientInput) clientInput.value = client || "";
@@ -1122,6 +1122,7 @@
     const deviceInput = $("appointmentDevice");
     if (deviceInput) deviceInput.value = device || "";
     updateDeviceThumb(device || "");
+    setIssueTags(issue || "");
   }
 
   window.addEventListener("rpc-prefill-appointment", (e) => {

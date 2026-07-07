@@ -767,6 +767,7 @@
         client: lead.customerName || "",
         phone: lead.phone || "",
         device: lead.device || "",
+        issue: lead.issue || "",
         source: lead.source || "",
       },
     }));
