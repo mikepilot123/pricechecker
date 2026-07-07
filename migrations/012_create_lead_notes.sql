@@ -25,3 +25,9 @@ WHERE a.lead_id = b.lead_id
   AND a.note = b.note
   AND a.created_at = b.created_at
   AND a.id > b.id;
+
+DELETE FROM lead_notes old
+USING lead_notes keep
+WHERE old.lead_id = keep.lead_id
+  AND btrim(old.note) = btrim(keep.note)
+  AND (old.created_at < keep.created_at OR (old.created_at = keep.created_at AND old.id < keep.id));

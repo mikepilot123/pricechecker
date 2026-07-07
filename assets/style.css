@@ -1708,6 +1708,7 @@ body.nav-open .view-nav { transform: translateX(0); }
   padding: 7px 12px;
   font: 600 0.78rem var(--font-display);
   cursor: pointer;
+  white-space: nowrap;
 }
 .lead-notes-btn .icon { width: 15px; height: 15px; flex: none; stroke-width: 1.9; }
 .lead-notes-btn:hover, .lead-notes-btn:focus-visible {
@@ -1754,24 +1755,29 @@ body.nav-open .view-nav { transform: translateX(0); }
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
-  width: min(100%, 260px);
+  gap: 8px;
+  width: min(100%, 248px);
   justify-self: end;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
 }
 .lead-card-status {
   width: 100%;
-  min-height: 42px;
+  min-height: 38px;
   padding: 8px 10px;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 600;
 }
 .lead-card-actions {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .lead-card-actions button {
-  min-height: 36px;
+  width: 100%;
+  min-height: 38px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--card);
@@ -1779,6 +1785,9 @@ body.nav-open .view-nav { transform: translateX(0); }
   padding: 7px 12px;
   font: 600 0.78rem var(--font-display);
   cursor: pointer;
+}
+.lead-card-side .lead-notes-btn {
+  min-height: 38px;
 }
 .lead-card-actions button:hover {
   border-color: var(--accent);
