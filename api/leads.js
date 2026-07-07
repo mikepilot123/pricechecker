@@ -1,5 +1,5 @@
 import { ensureSchema } from "../lib/db.js";
-import { addLead, deleteLead, listLeads, updateLead } from "../lib/leads.js";
+import { addLead, addLeadNote, deleteLead, listLeadNotes, listLeads, updateLead } from "../lib/leads.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
@@ -26,6 +26,12 @@ export default async function handler(req, res) {
     }
     if (action === "delete") {
       return res.status(200).json({ ok: true, deletedId: await deleteLead(body) });
+    }
+    if (action === "listLeadNotes") {
+      return res.status(200).json({ ok: true, notes: await listLeadNotes(body.leadId) });
+    }
+    if (action === "addLeadNote") {
+      return res.status(200).json({ ok: true, notes: await addLeadNote(body) });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
