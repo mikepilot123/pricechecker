@@ -17,11 +17,19 @@
   const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
   const MEDIA_UPLOAD_URL = "https://pricechecker-cyan.vercel.app/api/media-upload";
   const INVOICE_URL = "https://pricechecker-cyan.vercel.app/api/invoice";
-  // Vercel Blob's browser upload helper, loaded on demand from a pinned CDN
-  // build — this repo has no bundler, and the two-phase token/PUT protocol
-  // upload() implements is a private wire format best not hand-rolled.
-  const BLOB_CLIENT_CDN_URL = "https://esm.sh/@vercel/blob@0.27.1/client";
+  // Ticket media now uploads straight to Cloudflare R2 via a presigned PUT
+  // URL (api/media-upload.js issues it) instead of Vercel Blob's client
+  // helper — no CDN-loaded library needed, it's a plain fetch() PUT.
   const MEDIA_MAX_BYTES = 50 * 1024 * 1024; // mirror api/media-upload.js's authoritative cap
+  const MEDIA_ALLOWED_TYPES = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+  ]);
 
   // Status pipeline — keep in sync with apps-script/Code.gs STATUSES.
   const STATUSES = [
@@ -1102,15 +1110,12 @@
   });
 
   // ---- Ticket media (photos & videos of the physical device) ----------------
-  // Files upload from the browser straight to Vercel Blob (two-phase token
-  // handshake via api/media-upload.js), then the resulting URL is recorded in
-  // the ticket_media table via the normal intake API. This keeps big videos
-  // off the JSON API, which has a ~4.5MB request-size ceiling.
-  let blobClientPromise = null;
-  function loadBlobClient() {
-    if (!blobClientPromise) blobClientPromise = import(BLOB_CLIENT_CDN_URL);
-    return blobClientPromise;
-  }
+  // Files upload from the browser straight to Cloudflare R2: api/media-upload.js
+  // (phase 1) validates the file and returns a short-lived presigned PUT URL,
+  // the browser PUTs the file bytes straight to R2 (phase 2), then the
+  // resulting URL is recorded in the ticket_media table via the normal
+  // intake API. This keeps big videos off the JSON API, which has a
+  // ~4.5MB request-size ceiling.
 
   function ticketMediaItemHtml(item, index) {
     const inner = item.type === "video"
@@ -1154,17 +1159,43 @@
 
   async function uploadTicketMedia(ticket, file) {
     const type = file.type.startsWith("video/") ? "video" : "photo";
+    if (!MEDIA_ALLOWED_TYPES.has(file.type)) {
+      throw new Error("That file type isn't supported — use a photo (JPEG/PNG/WEBP/HEIC) or video (MP4/MOV/WEBM).");
+    }
     if (file.size > MEDIA_MAX_BYTES) {
       throw new Error("That file is over 50MB — trim the video or pick a smaller one.");
     }
-    const { upload } = await loadBlobClient();
-    const safeName = String(file.name || "capture").replace(/[^\w.\-]+/g, "_");
-    const blob = await upload(`tickets/${ticket.id}/${Date.now()}-${safeName}`, file, {
-      access: "public",
-      handleUploadUrl: MEDIA_UPLOAD_URL,
-      clientPayload: JSON.stringify({ ticketId: ticket.id, pin: getCfg().pin }),
+
+    // Phase 1: ask the API for a presigned R2 upload URL (also re-validates
+    // type/size and the PIN server-side — the client checks above are just
+    // for a fast, friendly error before spending the round trip).
+    const presignRes = await fetch(MEDIA_UPLOAD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pin: getCfg().pin,
+        ticketId: ticket.id,
+        filename: file.name,
+        contentType: file.type,
+        size: file.size,
+      }),
     });
-    const res = await api({ action: "addMedia", ticketId: ticket.id, url: blob.url, type });
+    const presign = await presignRes.json().catch(() => ({}));
+    if (!presignRes.ok || !presign.ok) {
+      throw new Error(presign.error || "Couldn't prepare upload");
+    }
+
+    // Phase 2: PUT the file bytes straight to R2 using that URL.
+    const putRes = await fetch(presign.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!putRes.ok) {
+      throw new Error("Upload to storage failed — try again");
+    }
+
+    const res = await api({ action: "addMedia", ticketId: ticket.id, url: presign.url, type, key: presign.key });
     if (!res.ok) throw new Error(res.error || "Upload saved to storage but not recorded — try again");
     return res.media;
   }
