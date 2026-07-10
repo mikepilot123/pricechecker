@@ -56,6 +56,7 @@
     <symbol id="i-restore" viewBox="0 0 24 24"><path d="M4.5 9.5V4.8m0 0h4.7M4.6 4.9A8.4 8.4 0 1 1 3.5 14"/><path d="M12 7v5l3 2"/></symbol>
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4.5 7.5h3l1.5-2.5h6l1.5 2.5h3a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V9a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5L8 5.5Z"/></symbol>
+    <symbol id="i-diagnose" viewBox="0 0 24 24"><path d="M3 12h3.5l2-5.5 4 12 2-6.5h3"/><circle cx="19.5" cy="12" r="1.6"/></symbol>
   </svg>
   <header class="app-header">
     <div class="header-row">
@@ -74,6 +75,7 @@
       <button class="nav-btn active" data-target="prices" role="tab" aria-selected="true"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="dashboard" role="tab" aria-selected="false"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Check In</button>
+      <button class="nav-btn" data-target="diagnose" role="tab" aria-selected="false"><svg class="icon"><use href="#i-diagnose"></use></svg>Diagnose</button>
       <button class="nav-btn" data-target="leads" role="tab" aria-selected="false"><svg class="icon"><use href="#i-user"></use></svg>Leads</button>
       <button class="nav-btn" data-target="appointments" role="tab" aria-selected="false"><svg class="icon"><use href="#i-calendar"></use></svg>Appointments</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Appointment sections">
@@ -216,6 +218,39 @@
       </div>
 
       <div id="leadList" class="ops-list leads-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- ============ DIAGNOSE VIEW ============ -->
+  <main class="container view" id="view-diagnose" hidden>
+    <p class="info-banner">Run through a device's hardware and functional tests, then copy the results into notes or a message.</p>
+
+    <section class="diagnose-workspace" aria-labelledby="diagnoseTitle">
+      <div class="leads-heading-row">
+        <div>
+          <p class="dashboard-eyebrow">Testing</p>
+          <h2 id="diagnoseTitle">Device diagnostics</h2>
+        </div>
+      </div>
+
+      <div class="diagnose-device-row">
+        <label class="field-label" for="diagnoseDevice">Device</label>
+        <input id="diagnoseDevice" class="text-input" type="text" autocomplete="off" placeholder="e.g. iPhone 11, Macbook A1466" aria-label="Device being tested" />
+      </div>
+
+      <div id="diagnoseSummary" class="diagnose-summary" aria-live="polite"></div>
+
+      <div id="diagnoseChecklist" class="diagnose-checklist"></div>
+
+      <div class="diagnose-notes-row">
+        <label class="field-label" for="diagnoseNotes">Notes</label>
+        <textarea id="diagnoseNotes" class="text-input" rows="3" placeholder="Anything else worth recording — faults, part numbers, customer requests…" aria-label="Diagnostic notes"></textarea>
+      </div>
+
+      <div class="diagnose-actions">
+        <button type="button" id="diagnoseCopy" class="primary-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy report</button>
+        <button type="button" id="diagnoseReset" class="ghost-btn danger-btn"><svg class="icon"><use href="#i-refresh"></use></svg>Reset</button>
+      </div>
     </section>
   </main>
 
@@ -1175,5 +1210,6 @@
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=lead-issue-prefill-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
+  <script src="assets/diagnose.js?v=diagnose-1"></script>
 </body>
 </html>

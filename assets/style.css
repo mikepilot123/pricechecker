@@ -1515,6 +1515,159 @@ body.nav-open .view-nav { transform: translateX(0); }
   margin: 4px 0 0;
   color: var(--text-dim);
 }
+/* ---------- Diagnose (device testing) ---------- */
+.diagnose-workspace { margin-top: 14px; }
+.diagnose-device-row,
+.diagnose-notes-row { margin-top: 16px; }
+.diagnose-device-row .field-label,
+.diagnose-notes-row .field-label { margin-bottom: 6px; }
+.diagnose-notes-row textarea { resize: vertical; min-height: 68px; }
+
+.diagnose-summary {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+}
+.diagnose-summary-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.diagnose-tally {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.diagnose-tally strong {
+  font-size: 0.98rem;
+  color: var(--text);
+}
+.diagnose-tally.is-pass strong { color: var(--price); }
+.diagnose-tally.is-fail strong { color: var(--danger); }
+.diagnose-tally.is-na strong { color: var(--warn); }
+.diagnose-progress {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+.diagnose-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.diagnose-progress-label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  text-align: center;
+  line-height: 22px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+  mix-blend-mode: luminosity;
+}
+
+.diagnose-checklist {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+.diagnose-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.diagnose-group-title {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.diagnose-test-list {
+  display: grid;
+  gap: 8px;
+}
+.diagnose-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+.diagnose-test.state-pass { border-color: #b7e0cd; background: #f0f9f4; }
+.diagnose-test.state-fail { border-color: #f2c6c0; background: #fff5f5; }
+.diagnose-test.state-na { border-color: #ecd4ac; background: #fdf7ec; }
+.diagnose-test-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.diagnose-test-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.diagnose-state-btn {
+  min-width: 52px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-dim);
+  font: 500 0.82rem var(--font-sans);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, transform 0.1s;
+}
+.diagnose-state-btn:hover { border-color: var(--text-dim); }
+.diagnose-state-btn:active { transform: scale(0.96); }
+.diagnose-state-btn.state-pass.active {
+  background: var(--price); border-color: var(--price); color: #fff;
+}
+.diagnose-state-btn.state-fail.active {
+  background: var(--danger); border-color: var(--danger); color: #fff;
+}
+.diagnose-state-btn.state-na.active {
+  background: var(--warn); border-color: var(--warn); color: #fff;
+}
+
+.diagnose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.diagnose-actions .primary-btn,
+.diagnose-actions .ghost-btn { width: auto; }
+@media (max-width: 520px) {
+  .diagnose-test { justify-content: flex-start; }
+  .diagnose-test-actions { width: 100%; }
+  .diagnose-state-btn { flex: 1; }
+}
+
 .leads-workspace { margin-top: 14px; }
 .leads-topbar {
   position: sticky;
