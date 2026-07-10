@@ -1378,17 +1378,13 @@
   function whatsAppNotifyUrl(ticket) {
     const number = whatsAppNumber(ticket.phone);
     if (!number) return "";
-    const name = (ticket.customerName || "").trim() || "there";
-    const device = ticket.device || "your device";
+    const firstName = (ticket.customerName || "").trim().split(/\s+/)[0] || "there";
     let text;
     if (ticket.status === "Repaired") {
-      const balance = balanceDue(ticket.repairCost, ticket.amountPaid);
-      const balanceLine = balance != null && balance > 0
-        ? ` The balance due on collection is ${formatMoney(balance)}.`
-        : balance != null && balance <= 0 ? " It's fully paid — nothing due on collection." : "";
-      text = `Hi ${name}, good news from JQ Electronics — your ${device} is repaired and ready for pickup.${balanceLine}`;
+      text = `Hi ${firstName}, great news! your device has been repaired and is ready for pick up.`;
     } else {
-      text = `Hi ${name}, an update from JQ Electronics on your ${device}: it is now marked "${ticket.status || "in progress"}". We'll keep you posted.`;
+      const device = ticket.device || "your device";
+      text = `Hi ${firstName}, an update from JQ Electronics on your ${device}: it is now marked "${ticket.status || "in progress"}". We'll keep you posted.`;
     }
     return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
   }
