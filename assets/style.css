@@ -1694,6 +1694,26 @@ body.nav-open .view-nav { transform: translateX(0); }
   color: var(--danger);
   font-weight: 600;
 }
+.lead-followup-label {
+  position: relative;
+  cursor: pointer;
+}
+.lead-followup-label:hover {
+  border-color: var(--accent);
+}
+.lead-followup-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
 .lead-side-row {
   display: flex;
   gap: 8px;
