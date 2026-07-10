@@ -122,6 +122,7 @@
   const views = {
     dashboard: $("view-dashboard"),
     targets: $("view-targets"),
+    diagnose: $("view-diagnose"),
     leads: $("view-leads"),
     appointments: $("view-appointments"),
     "completed-repairs": $("view-completed-repairs"),
@@ -146,6 +147,7 @@
     showView(target);
     if (target === "dashboard") window.dispatchEvent(new Event("rpc-enter-dashboard"));
     if (target === "targets") window.dispatchEvent(new Event("rpc-enter-targets"));
+    if (target === "diagnose") window.dispatchEvent(new Event("rpc-enter-diagnose"));
     if (target === "leads") window.dispatchEvent(new Event("rpc-enter-leads"));
     if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
     if (target === "completed-repairs") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
