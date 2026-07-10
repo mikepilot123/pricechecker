@@ -3908,3 +3908,21 @@ video.media-viewer-media {
 }
 .app-toast.is-error { background: #b42318; }
 .app-toast.is-leaving { opacity: 0; transform: translateY(6px); }
+
+/* ---- WhatsApp client notifications --------------------------------------- */
+.whatsapp-btn { color: #128c4b; border-color: #9ad9b8; }
+.whatsapp-btn:hover { background: #ecfdf3; }
+.status-notify-copy {
+  width: 100%;
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+#statusModalOptions .primary-btn,
+#statusModalOptions .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}

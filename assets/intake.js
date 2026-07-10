@@ -877,8 +877,10 @@
         <p class="field-error" id="ticketMediaError" hidden></p>
       </section>`;
 
+    const notifyUrl = whatsAppNotifyUrl(ticket);
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
+      ${notifyUrl ? `<a class="ghost-btn whatsapp-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : ""}
       <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
@@ -1354,6 +1356,41 @@
     const cost = Number(repairCost);
     const paid = amountPaid == null || amountPaid === "" ? 0 : Number(amountPaid);
     return Number.isFinite(cost) && Number.isFinite(paid) ? cost - paid : null;
+  }
+
+  // ---- WhatsApp client notifications ----------------------------------------
+  // Turns a locally-written phone number into the full international format
+  // wa.me requires. Numbers here are Trinidad & Tobago (+1 868): staff type
+  // them as 7 digits ("345-3937"), 10 digits ("8686820138"), or full 11.
+  function whatsAppNumber(phone) {
+    const digits = String(phone || "").replace(/\D+/g, "");
+    if (digits.length === 7) return "1868" + digits;
+    if (digits.length === 10 && digits.startsWith("868")) return "1" + digits;
+    if (digits.length === 11 && digits.startsWith("1868")) return digits;
+    // Anything longer probably already includes a country code.
+    if (digits.length >= 11) return digits;
+    return "";
+  }
+
+  // Prefilled status message — the everyday "your device is ready" text that
+  // staff otherwise had to phone in (it's literally the dashboard's default
+  // action card). Special-cases Repaired with the balance due.
+  function whatsAppNotifyUrl(ticket) {
+    const number = whatsAppNumber(ticket.phone);
+    if (!number) return "";
+    const name = (ticket.customerName || "").trim() || "there";
+    const device = ticket.device || "your device";
+    let text;
+    if (ticket.status === "Repaired") {
+      const balance = balanceDue(ticket.repairCost, ticket.amountPaid);
+      const balanceLine = balance != null && balance > 0
+        ? ` The balance due on collection is ${formatMoney(balance)}.`
+        : balance != null && balance <= 0 ? " It's fully paid — nothing due on collection." : "";
+      text = `Hi ${name}, good news from JQ Electronics — your ${device} is repaired and ready for pickup.${balanceLine}`;
+    } else {
+      text = `Hi ${name}, an update from JQ Electronics on your ${device}: it is now marked "${ticket.status || "in progress"}". We'll keep you posted.`;
+    }
+    return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
   }
 
   function balanceTone(repairCost, amountPaid) {
@@ -2001,8 +2038,24 @@
     const box = $("statusModalOptions");
     box.querySelectorAll("[data-status]").forEach((btn) => { btn.disabled = true; });
     const updated = await setStatus(ticket, status);
-    if (updated) closeStatusModal();
-    else box.querySelectorAll("[data-status]").forEach((btn) => { btn.disabled = false; });
+    if (!updated) {
+      box.querySelectorAll("[data-status]").forEach((btn) => { btn.disabled = false; });
+      return;
+    }
+    // Marking a device Repaired is the moment the client needs to hear from
+    // the shop — offer the prefilled WhatsApp message right here instead of
+    // making staff remember to call (see the dashboard's default action list).
+    const notifyUrl = status === "Repaired" ? whatsAppNotifyUrl(updated) : "";
+    if (notifyUrl) {
+      box.innerHTML = `
+        <p class="status-notify-copy">Marked repaired. Let ${esc(updated.customerName || "the client")} know it's ready for pickup?</p>
+        <a class="primary-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener" id="statusNotifyWhatsApp"><svg class="icon"><use href="#i-chat"></use></svg>Notify on WhatsApp</a>
+        <button type="button" class="ghost-btn" id="statusNotifySkip">Skip</button>`;
+      $("statusNotifyWhatsApp").addEventListener("click", () => closeStatusModal());
+      $("statusNotifySkip").addEventListener("click", () => closeStatusModal());
+    } else {
+      closeStatusModal();
+    }
   }
 
   $("closeStatusModal")?.addEventListener("click", closeStatusModal);
