@@ -751,7 +751,14 @@
       convertLeadToAppointment(leads.find((lead) => lead.id === convertBtn.dataset.leadConvert));
       return;
     }
-    if (event.target.closest("select[data-lead-status]") || event.target.closest("a.ticket-phone") || event.target.closest(".lead-followup-label")) return;
+    const followupInput = event.target.closest("[data-lead-followup]");
+    if (followupInput) {
+      if (typeof followupInput.showPicker === "function") {
+        try { followupInput.showPicker(); } catch { /* unsupported in this browser/context */ }
+      }
+      return;
+    }
+    if (event.target.closest("select[data-lead-status]") || event.target.closest("a.ticket-phone")) return;
     const card = event.target.closest(".lead-card");
     if (card) openLeadDetailModal(leads.find((lead) => lead.id === card.dataset.leadId));
   }
