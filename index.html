@@ -223,34 +223,11 @@
 
   <!-- ============ DIAGNOSE VIEW ============ -->
   <main class="container view" id="view-diagnose" hidden>
-    <p class="info-banner">Run through a device's hardware and functional tests, then copy the results into notes or a message.</p>
+    <p class="info-banner">Walk through a device's hardware checks one section at a time, then copy the report into notes or a message.</p>
 
-    <section class="diagnose-workspace" aria-labelledby="diagnoseTitle">
-      <div class="leads-heading-row">
-        <div>
-          <p class="dashboard-eyebrow">Testing</p>
-          <h2 id="diagnoseTitle">Device diagnostics</h2>
-        </div>
-      </div>
-
-      <div class="diagnose-device-row">
-        <label class="field-label" for="diagnoseDevice">Device</label>
-        <input id="diagnoseDevice" class="text-input" type="text" autocomplete="off" placeholder="e.g. iPhone 11, Macbook A1466" aria-label="Device being tested" />
-      </div>
-
-      <div id="diagnoseSummary" class="diagnose-summary" aria-live="polite"></div>
-
-      <div id="diagnoseChecklist" class="diagnose-checklist"></div>
-
-      <div class="diagnose-notes-row">
-        <label class="field-label" for="diagnoseNotes">Notes</label>
-        <textarea id="diagnoseNotes" class="text-input" rows="3" placeholder="Anything else worth recording — faults, part numbers, customer requests…" aria-label="Diagnostic notes"></textarea>
-      </div>
-
-      <div class="diagnose-actions">
-        <button type="button" id="diagnoseCopy" class="primary-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy report</button>
-        <button type="button" id="diagnoseReset" class="ghost-btn danger-btn"><svg class="icon"><use href="#i-refresh"></use></svg>Reset</button>
-      </div>
+    <section class="booking-wizard-card diagnose-wizard-card" aria-labelledby="diagnoseTitle">
+      <h2 id="diagnoseTitle" class="visually-hidden">Device diagnostics</h2>
+      <div id="diagnoseWizard"></div>
     </section>
   </main>
 
@@ -1210,6 +1187,6 @@
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=lead-issue-prefill-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
-  <script src="assets/diagnose.js?v=diagnose-1"></script>
+  <script src="assets/diagnose.js?v=diagnose-2"></script>
 </body>
 </html>
