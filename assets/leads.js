@@ -545,10 +545,11 @@
         <div class="lead-phone-wrap">${phone}</div>
         <div class="lead-detail-grid">
           ${lead.created ? `<div class="lead-detail"><svg class="icon"><use href="#i-clock"></use></svg><span>Logged ${esc(formatLoggedDate(lead.created))}</span></div>` : ""}
-          <div class="lead-detail${dueClass}">
+          <label class="lead-detail lead-followup-label${dueClass}">
             <svg class="icon"><use href="#i-calendar"></use></svg>
             <span>${lead.followUpDate ? `Follow up ${esc(formatDate(lead.followUpDate))}` : "No follow-up date"}</span>
-          </div>
+            <input type="date" class="lead-followup-input" data-lead-followup="${esc(lead.id)}" value="${esc(lead.followUpDate || "")}" aria-label="Follow-up date" />
+          </label>
           ${quote ? `<div class="lead-detail"><svg class="icon"><use href="#i-cash"></use></svg><span>Quote ${esc(quote)}</span></div>` : ""}
           ${lead.email ? `<div class="lead-detail"><svg class="icon"><use href="#i-mail"></use></svg><span>${esc(lead.email)}</span></div>` : ""}
           ${lead.source ? `<div class="lead-detail"><svg class="icon"><use href="#i-tag"></use></svg><span>${esc(lead.source)}</span></div>` : ""}
@@ -750,7 +751,7 @@
       convertLeadToAppointment(leads.find((lead) => lead.id === convertBtn.dataset.leadConvert));
       return;
     }
-    if (event.target.closest("select[data-lead-status]") || event.target.closest("a.ticket-phone")) return;
+    if (event.target.closest("select[data-lead-status]") || event.target.closest("a.ticket-phone") || event.target.closest(".lead-followup-label")) return;
     const card = event.target.closest(".lead-card");
     if (card) openLeadDetailModal(leads.find((lead) => lead.id === card.dataset.leadId));
   }
@@ -776,16 +777,31 @@
 
   async function handleListChange(event) {
     const select = event.target.closest("[data-lead-status]");
-    if (!select) return;
-    const id = select.dataset.leadStatus;
-    try {
-      const data = await api({ action: "update", id, status: select.value });
-      mergeLead(data.lead);
-      render();
-      setStatus("live", `Leads synced ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
-    } catch (err) {
-      setStatus("error", "Couldn't update lead: " + err.message);
-      render();
+    const followupInput = event.target.closest("[data-lead-followup]");
+    if (select) {
+      const id = select.dataset.leadStatus;
+      try {
+        const data = await api({ action: "update", id, status: select.value });
+        mergeLead(data.lead);
+        render();
+        setStatus("live", `Leads synced ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
+      } catch (err) {
+        setStatus("error", "Couldn't update lead: " + err.message);
+        render();
+      }
+      return;
+    }
+    if (followupInput) {
+      const id = followupInput.dataset.leadFollowup;
+      try {
+        const data = await api({ action: "update", id, followUpDate: followupInput.value });
+        mergeLead(data.lead);
+        render();
+        setStatus("live", `Leads synced ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
+      } catch (err) {
+        setStatus("error", "Couldn't update follow-up date: " + err.message);
+        render();
+      }
     }
   }
 
