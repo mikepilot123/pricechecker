@@ -6,7 +6,7 @@
 
    Google Sheet requests are never touched here — prices/intake always go
    straight to the network (with their own localStorage fallback in app.js). */
-const CACHE = "rpc-shell-v53";
+const CACHE = "rpc-shell-v54";
 const SHELL = [
   "./",
   "./index.html",
@@ -17,7 +17,11 @@ const SHELL = [
   "./assets/leads.js",
   "./assets/inventory.js",
   "./assets/intake.js",
+  "./assets/diagnose.js",
   "./manifest.webmanifest",
+  "./assets/branding/jq-electronics-logo.png",
+  "./assets/branding/icon-192.png",
+  "./assets/branding/icon-512.png",
 ];
 
 self.addEventListener("install", (e) => {

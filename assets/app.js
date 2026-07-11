@@ -833,6 +833,58 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// --- Install app (PWA) -------------------------------------------------------
+// Chrome/Edge/Android fire `beforeinstallprompt` when the manifest + service
+// worker criteria are met; we hold onto that event and surface our own
+// "Install app" nav button instead of relying on staff to notice the
+// browser's own (easy-to-miss) install affordance. iOS Safari has no such
+// event — Add to Home Screen there only exists in the Share sheet — so we
+// show a one-time instructional tip instead of a button that would do
+// nothing when tapped.
+(function () {
+  const btn = document.getElementById("installAppBtn");
+  const iosTip = document.getElementById("installIosTip");
+  const closeIosTip = document.getElementById("closeInstallIosTip");
+  const LS_IOS_TIP_DISMISSED = "rpc_install_ios_tip_dismissed";
+  let deferredPrompt = null;
+
+  const isStandalone = () =>
+    window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+  if (isStandalone()) return; // already installed and running as an app
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (btn) btn.hidden = false;
+  });
+
+  btn?.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    btn.hidden = true;
+    deferredPrompt.prompt();
+    try { await deferredPrompt.userChoice; } catch (_) { /* dismissed */ }
+    deferredPrompt = null;
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredPrompt = null;
+    if (btn) btn.hidden = true;
+    if (iosTip) iosTip.hidden = true;
+  });
+
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  if (isIos && iosTip) {
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(LS_IOS_TIP_DISMISSED) === "1"; } catch (_) { /* ignore */ }
+    if (!dismissed) setTimeout(() => { iosTip.hidden = false; }, 1500);
+    closeIosTip?.addEventListener("click", () => {
+      iosTip.hidden = true;
+      try { localStorage.setItem(LS_IOS_TIP_DISMISSED, "1"); } catch (_) { /* ignore */ }
+    });
+  }
+})();
+
 // --- Sticky search offset -----------------------------------------------
 // Search bars stick just below the header; track its real height (it can
 // change with font load or wrapping)
