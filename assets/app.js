@@ -18,7 +18,7 @@ const AUTO_REFRESH_MS = 60 * 1000; // fallback sync when no price update socket 
 const WS_RECONNECT_MAX_MS = 60 * 1000;
 const WS_URL_STORAGE_KEY = "rpc_price_update_ws";
 const DEFAULT_PRICE_UPDATE_WS_URL = ""; // disabled: Vercel watcher retired to stay on free tier; app uses 60s polling fallback
-const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
+const INVENTORY_URL = "https://pricechecker-api.pages.dev/api/inventory";
 // Bump this when the sheet parser changes so an old, incorrectly parsed
 // price list is never used as the offline fallback.
 const CACHE_KEY = "rpc_cache_v3";
