@@ -5,7 +5,7 @@
    ============================================================ */
 
 (function () {
-  const LEADS_URL = "https://pricechecker-api.pages.dev/api/leads";
+  const LEADS_URL = "https://pricechecker-cyan.vercel.app/api/leads";
   const LS_PIN = "rpc_intake_pin";
   const STATUSES = ["New", "Contacted", "Quoted", "Follow-up", "Won", "Lost"];
   const ISSUES = [
