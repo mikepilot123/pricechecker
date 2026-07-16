@@ -1,0 +1,18 @@
+# Cloudflare Pages config for the pricechecker API (functions/api/*).
+#
+# The static site itself stays on GitHub Pages (mikepilot123.github.io) —
+# this Pages project exists only to host the Cloudflare Workers version of
+# the backend API (intake/inventory/leads), replacing the equivalent
+# Vercel serverless functions to stay clear of Vercel's Fluid Active CPU /
+# Provisioned Memory free-tier caps.
+#
+# nodejs_compat is required by:
+#   - functions/_lib/db.js, tickets.js, leads.js, appointments.js,
+#     expenses.js, inventory.js: read config from process.env (populated
+#     from this project's environment variables by the compat layer).
+#   - functions/_lib/r2.js (via lib/media.js's deleteMedia): uses the AWS
+#     SDK v3 S3 client, which needs Node's Buffer/stream internals.
+name = "pricechecker-api"
+pages_build_output_dir = "."
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
