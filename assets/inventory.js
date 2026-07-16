@@ -4,7 +4,7 @@
    ============================================================ */
 
 (function () {
-  const INVENTORY_URL = "https://pricechecker-api.pages.dev/api/inventory";
+  const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
   const LS_PIN = "rpc_intake_pin";
   const AUTO_REFRESH_MS = 60 * 1000;
   const $ = (id) => document.getElementById(id);
