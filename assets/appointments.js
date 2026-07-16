@@ -21,7 +21,7 @@
   const SLOT_MINUTES = 30;
   const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-  const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
+  const SCRIPT_URL = "https://pricechecker-api.pages.dev/api/intake";
   const LS_PIN = "rpc_intake_pin";
   const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
   const DEVICE_IMAGE_CATALOG_URL = "assets/device-images/catalog.json";
