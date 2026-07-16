@@ -13,8 +13,8 @@
 (function () {
   // Stable production alias for the Vercel project (auto-updates on every
   // push to main) — update if the project or domain ever changes.
-  const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
-  const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
+  const SCRIPT_URL = "https://pricechecker-api.pages.dev/api/intake";
+  const INVENTORY_URL = "https://pricechecker-api.pages.dev/api/inventory";
   const MEDIA_UPLOAD_URL = "https://pricechecker-cyan.vercel.app/api/media-upload";
   const INVOICE_URL = "https://pricechecker-cyan.vercel.app/api/invoice";
   // Ticket media now uploads straight to Cloudflare R2 via a presigned PUT
