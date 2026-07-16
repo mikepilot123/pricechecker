@@ -5,6 +5,8 @@
   "description": "Vercel serverless API for Repair Hub check-in, inventory sync, and live price update helpers. The static site itself stays on GitHub Pages.",
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
-    "@vercel/blob": "^2.5.0"
+    "@vercel/blob": "^2.5.0",
+    "@aws-sdk/client-s3": "^3.1088.0",
+    "@aws-sdk/s3-request-presigner": "^3.1088.0"
   }
 }

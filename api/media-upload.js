@@ -1,58 +1,66 @@
-import { handleUpload } from "@vercel/blob/client";
-import { applyCors } from "../lib/security.js";
+import crypto from "node:crypto";
+import { applyCors, checkPin } from "../lib/security.js";
+import { getUploadUrl, r2PublicUrl } from "../lib/r2.js";
 
-// Separate from api/intake.js because @vercel/blob/client's upload() helper
-// POSTs its own fixed request shape ({type: "blob.generate-client-token", ...})
-// to this URL — it doesn't go through this repo's {action, pin} convention,
-// so it can't share intake.js's action dispatch. The PIN check instead reads
-// `pin` out of clientPayload (set by the frontend before calling upload()).
+// Issues a short-lived presigned R2 PUT URL for the browser to upload a
+// ticket photo/video directly to — same reason the old Vercel Blob version
+// worked this way: it keeps big video uploads off this app's Vercel
+// functions, which cap request bodies around ~4.5MB.
 //
-// This two-phase handshake is why the upload can't just be proxied through a
-// normal JSON API endpoint: phase 1 (this handler) issues a short-lived
-// upload token, phase 2 is the browser PUTting the file bytes directly to
-// Vercel Blob, bypassing Vercel serverless functions' ~4.5MB body limit
-// entirely — necessary since videos can easily exceed that.
+// Flow: frontend POSTs {pin, ticketId, filename, contentType, size} here,
+// gets back {uploadUrl, key, url}, PUTs the file bytes straight to
+// `uploadUrl`, then calls action=addMedia (api/intake.js) with the
+// resulting `url`/`key` to record it in ticket_media. Two requests, same
+// shape as the previous two-phase Blob handshake.
+const ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+]);
+const MAX_BYTES = 50 * 1024 * 1024;
+
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  const body = req.body;
+  let body;
   try {
-    const jsonResponse = await handleUpload({
-      body,
-      request: req,
-      onBeforeGenerateToken: async (pathname, clientPayload) => {
-        let payload = {};
-        try { payload = JSON.parse(clientPayload || "{}"); } catch {}
-        if (String(payload.pin) !== String(process.env.INTAKE_PIN)) {
-          throw new Error("Invalid PIN");
-        }
-        if (!payload.ticketId) {
-          throw new Error("Ticket ID is required");
-        }
-        return {
-          allowedContentTypes: [
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-            "image/heic",
-            "video/mp4",
-            "video/quicktime",
-            "video/webm",
-          ],
-          maximumSizeInBytes: 50 * 1024 * 1024,
-          tokenPayload: JSON.stringify({ ticketId: payload.ticketId }),
-        };
-      },
-      onUploadCompleted: async () => {
-        // No-op: the frontend calls action=addMedia (api/intake.js) itself
-        // right after upload() resolves, so there's no need to also record
-        // it here — and this webhook callback isn't reachable from localhost
-        // during local development anyway.
-      },
-    });
-    return res.status(200).json(jsonResponse);
+    body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  } catch {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+
+  const denied = checkPin(req, body.pin);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
+
+  const ticketId = String(body.ticketId || "").trim();
+  if (!ticketId) return res.status(400).json({ error: "Ticket ID is required" });
+
+  const contentType = String(body.contentType || "");
+  if (!ALLOWED_TYPES.has(contentType)) {
+    return res.status(400).json({ error: "Unsupported file type: " + (contentType || "(none)") });
+  }
+
+  const size = Number(body.size || 0);
+  if (!size || !Number.isFinite(size) || size > MAX_BYTES) {
+    return res.status(400).json({ error: "That file is over 50MB — trim the video or pick a smaller one." });
+  }
+
+  try {
+    const extMatch = String(body.filename || "").match(/\.[a-zA-Z0-9]+$/);
+    const ext = extMatch ? extMatch[0].toLowerCase() : "";
+    const key = `tickets/${ticketId}/${Date.now()}-${crypto.randomUUID()}${ext}`;
+
+    const uploadUrl = await getUploadUrl(key, contentType);
+    return res.status(200).json({ ok: true, uploadUrl, key, url: r2PublicUrl(key) });
   } catch (err) {
-    return res.status(400).json({ error: String((err && err.message) || err) });
+    return res.status(500).json({ error: String((err && err.message) || err) });
   }
 }
