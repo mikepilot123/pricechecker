@@ -4,7 +4,7 @@
    ============================================================ */
 
 (function () {
-  const INTAKE_URL = "https://pricechecker-cyan.vercel.app/api/intake";
+  const INTAKE_URL = "https://pricechecker-api.pages.dev/api/intake";
   const LS_PIN = "rpc_intake_pin";
   const GOAL_KEY = "rpc_monthly_sales_goal";
   const DAILY_GOAL_KEY = "rpc_daily_sales_goal";
