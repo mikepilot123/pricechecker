@@ -2093,6 +2093,19 @@
     render();
   });
 
+  $("completedSearch")?.addEventListener("input", () => {
+    const clear = $("clearCompletedSearch");
+    if (clear) clear.hidden = !$("completedSearch").value;
+    renderCompletedTickets();
+    // The appointments module owns the other half of this view's list —
+    // it binds its own listener on the same input for its own filtering.
+  });
+  $("clearCompletedSearch")?.addEventListener("click", () => {
+    $("completedSearch").value = "";
+    $("clearCompletedSearch").hidden = true;
+    $("completedSearch").dispatchEvent(new Event("input"));
+  });
+
   window.addEventListener("rpc-filter-intake", (event) => {
     const detail = event.detail || {};
     const filter = detail.filter || detail.status || "all";
@@ -2148,7 +2161,13 @@
   function renderCompletedTickets() {
     const list = $("completedTicketsList");
     if (!list) return;
-    const completed = TICKETS.filter((t) => t.status === "Picked Up");
+    const q = ($("completedSearch")?.value || "").trim().toLowerCase();
+    const completed = TICKETS.filter((t) => t.status === "Picked Up").filter((t) => {
+      if (!q) return true;
+      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
+        .map((x) => (x || "").toLowerCase())
+        .some((x) => x.includes(q));
+    });
     const countEl = $("completedTicketsCount");
     if (countEl) countEl.textContent = completed.length ? `${completed.length} completed check-in${completed.length === 1 ? "" : "s"}` : "";
     list.innerHTML = "";
@@ -2160,7 +2179,23 @@
       frag.appendChild(card);
     }
     list.appendChild(frag);
+    updateCompletedEmptyState();
   }
+
+  // Completed Repairs combines this module's check-in tickets with
+  // appointments.js's completed appointments in one shared search box —
+  // each module re-renders its own half, then calls this to decide whether
+  // the "nothing matched" message should show across both.
+  function updateCompletedEmptyState() {
+    const emptyEl = $("completedRepairsEmpty");
+    if (!emptyEl) return;
+    const hasTickets = ($("completedTicketsList")?.children.length || 0) > 0;
+    const hasAppointments = ($("completedAppointmentsList")?.children.length || 0) > 0;
+    const searching = !!($("completedSearch")?.value || "").trim();
+    emptyEl.textContent = searching ? "No completed repairs match your search." : "No completed repairs yet.";
+    emptyEl.hidden = hasTickets || hasAppointments;
+  }
+  window.RPC_UPDATE_COMPLETED_EMPTY = updateCompletedEmptyState;
 
   function render() {
     const list = currentList();

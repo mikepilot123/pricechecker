@@ -3929,6 +3929,15 @@ video.media-viewer-media {
 .appt-subnav-btn:hover { background: var(--card-hover); }
 .appt-subnav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+.completed-repairs-topbar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 18;
+  max-width: min(1060px, 100%);
+  margin: 0 auto;
+  padding: 12px 0;
+  background: var(--bg);
+}
 .completed-repairs-section { margin-bottom: 24px; }
 .completed-repairs-section .booking-list-title { margin-bottom: 12px; }
 .completed-repairs-list,

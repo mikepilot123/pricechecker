@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=pwa-install-1" />
+  <link rel="stylesheet" href="assets/style.css?v=completed-search-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -377,6 +377,14 @@
   <main class="container view" id="view-completed-repairs" hidden>
     <p class="info-banner">Picked-up check-ins and completed appointments, all in one place.</p>
 
+    <div class="completed-repairs-topbar">
+      <div class="leads-searchbar">
+        <svg class="icon"><use href="#i-search"></use></svg>
+        <input id="completedSearch" type="search" inputmode="search" autocomplete="off" placeholder="Search by customer, phone, device, issue…" aria-label="Search completed repairs" />
+        <button id="clearCompletedSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+    </div>
+
     <section class="completed-repairs-section booking-list-card">
       <h2 class="booking-list-title">Completed repairs</h2>
       <p id="completedTicketsCount" class="result-count"></p>
@@ -384,6 +392,7 @@
         <div id="completedTicketsList"></div>
         <div id="completedAppointmentsList"></div>
       </div>
+      <p id="completedRepairsEmpty" class="ops-empty" hidden>No completed repairs match your search.</p>
     </section>
   </main>
 
@@ -1197,9 +1206,9 @@
 
   <script src="assets/app.js?v=pwa-install-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=whatsapp-notify-2"></script>
+  <script src="assets/intake.js?v=completed-search-1"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
-  <script src="assets/appointments.js?v=lead-issue-prefill-1"></script>
+  <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/diagnose.js?v=diagnose-2"></script>
 </body>
