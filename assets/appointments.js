@@ -919,10 +919,8 @@
 
   function renderList() {
     const upcomingList = $("appointmentList");
-    const completedList = $("completedAppointmentsList");
     const appointments = readAppointments().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
     const upcoming = appointments.filter((a) => a.status !== "completed");
-    const completed = appointments.filter((a) => a.status === "completed");
 
     if (upcomingList) {
       upcomingList.innerHTML = upcoming.length
@@ -930,13 +928,26 @@
         : `<p class="booking-empty">No appointments scheduled yet.</p>`;
       bindRowActions(upcomingList);
     }
-    if (completedList) {
-      completedList.innerHTML = "";
-      const frag = document.createDocumentFragment();
-      for (const item of completed) frag.appendChild(completedAppointmentCard(item));
-      completedList.appendChild(frag);
-      bindRowActions(completedList);
-    }
+    renderCompletedAppointments();
+  }
+
+  function renderCompletedAppointments() {
+    const completedList = $("completedAppointmentsList");
+    if (!completedList) return;
+    const q = ($("completedSearch")?.value || "").trim().toLowerCase();
+    const appointments = readAppointments().sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+    const completed = appointments.filter((a) => a.status === "completed").filter((a) => {
+      if (!q) return true;
+      return [a.client, a.phone, a.device, a.issue, a.notes, a.technician]
+        .map((x) => (x || "").toLowerCase())
+        .some((x) => x.includes(q));
+    });
+    completedList.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    for (const item of completed) frag.appendChild(completedAppointmentCard(item));
+    completedList.appendChild(frag);
+    bindRowActions(completedList);
+    window.RPC_UPDATE_COMPLETED_EMPTY?.();
   }
 
   function formatDateTime(dateStr, timeStr) {
@@ -1134,4 +1145,5 @@
     renderList();
     loadAppointments();
   });
+  $("completedSearch")?.addEventListener("input", renderCompletedAppointments);
 })();

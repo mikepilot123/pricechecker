@@ -2124,6 +2124,19 @@
     render();
   });
 
+  $("completedSearch")?.addEventListener("input", () => {
+    const clear = $("clearCompletedSearch");
+    if (clear) clear.hidden = !$("completedSearch").value;
+    renderCompletedTickets();
+    // The appointments module owns the other half of this view's list —
+    // it binds its own listener on the same input for its own filtering.
+  });
+  $("clearCompletedSearch")?.addEventListener("click", () => {
+    $("completedSearch").value = "";
+    $("clearCompletedSearch").hidden = true;
+    $("completedSearch").dispatchEvent(new Event("input"));
+  });
+
   window.addEventListener("rpc-filter-intake", (event) => {
     const detail = event.detail || {};
     const filter = detail.filter || detail.status || "all";
@@ -2179,7 +2192,13 @@
   function renderCompletedTickets() {
     const list = $("completedTicketsList");
     if (!list) return;
-    const completed = TICKETS.filter((t) => t.status === "Picked Up");
+    const q = ($("completedSearch")?.value || "").trim().toLowerCase();
+    const completed = TICKETS.filter((t) => t.status === "Picked Up").filter((t) => {
+      if (!q) return true;
+      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
+        .map((x) => (x || "").toLowerCase())
+        .some((x) => x.includes(q));
+    });
     const countEl = $("completedTicketsCount");
     if (countEl) countEl.textContent = completed.length ? `${completed.length} completed check-in${completed.length === 1 ? "" : "s"}` : "";
     list.innerHTML = "";
@@ -2191,7 +2210,23 @@
       frag.appendChild(card);
     }
     list.appendChild(frag);
+    updateCompletedEmptyState();
   }
+
+  // Completed Repairs combines this module's check-in tickets with
+  // appointments.js's completed appointments in one shared search box —
+  // each module re-renders its own half, then calls this to decide whether
+  // the "nothing matched" message should show across both.
+  function updateCompletedEmptyState() {
+    const emptyEl = $("completedRepairsEmpty");
+    if (!emptyEl) return;
+    const hasTickets = ($("completedTicketsList")?.children.length || 0) > 0;
+    const hasAppointments = ($("completedAppointmentsList")?.children.length || 0) > 0;
+    const searching = !!($("completedSearch")?.value || "").trim();
+    emptyEl.textContent = searching ? "No completed repairs match your search." : "No completed repairs yet.";
+    emptyEl.hidden = hasTickets || hasAppointments;
+  }
+  window.RPC_UPDATE_COMPLETED_EMPTY = updateCompletedEmptyState;
 
   function render() {
     const list = currentList();
@@ -2229,10 +2264,25 @@
     return (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean).join(", ");
   }
 
+  // Full days elapsed since an ISO timestamp (0 if missing/invalid).
+  function daysSince(iso) {
+    if (!iso) return 0;
+    const then = new Date(iso).getTime();
+    if (isNaN(then)) return 0;
+    return Math.floor((Date.now() - then) / 86400000);
+  }
+
+  const PARTS_ALERT_DAYS = 3;
+
   function ticketCard(t) {
     const el = document.createElement("div");
     const statusClass = STATUS_CLASS[t.status] || "st-received";
     el.className = `ticket ${statusClass}`;
+
+    const waitingForParts = t.status === "Waiting for Parts";
+    const waitingDays = waitingForParts ? daysSince(t.waitingForPartsSince) : 0;
+    const showPartsAlert = waitingForParts && !t.partsOrdered && waitingDays >= PARTS_ALERT_DAYS;
+    if (showPartsAlert) el.classList.add("has-parts-alert");
 
     const head = document.createElement("div");
     head.className = "ticket-head";
@@ -2245,6 +2295,11 @@
       ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
       : `<span class="ticket-phone no-phone">No number on file</span>`;
     const deviceIcon = deviceTypeIcon(t.device);
+    const partsBtnHtml = waitingForParts
+      ? `<button type="button" class="ticket-parts-btn${t.partsOrdered ? " is-ordered" : ""}" data-parts-toggle aria-pressed="${t.partsOrdered ? "true" : "false"}">
+          <svg class="icon"><use href="#${t.partsOrdered ? "i-check" : "i-tools"}"></use></svg>${t.partsOrdered ? "Parts ordered" : "Mark parts ordered"}
+        </button>`
+      : "";
     head.innerHTML = `
       <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
         <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
@@ -2263,6 +2318,7 @@
       </div>
       <div class="ticket-status">
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
+        ${partsBtnHtml}
         <button type="button" class="ticket-tech-btn" aria-label="${esc(technicianLabel)}">${esc(technicianLabel)}</button>
       </div>
       <div class="ticket-activity">
@@ -2279,6 +2335,14 @@
         openStatusModalForTicket(t);
       };
       statusBtn.onkeydown = (e) => e.stopPropagation();
+    }
+    const partsBtn = head.querySelector("[data-parts-toggle]");
+    if (partsBtn) {
+      partsBtn.onclick = (e) => {
+        e.stopPropagation();
+        setPartsOrdered(t, !t.partsOrdered);
+      };
+      partsBtn.onkeydown = (e) => e.stopPropagation();
     }
     const techBtn = head.querySelector(".ticket-tech-btn");
     if (techBtn) {
@@ -2307,7 +2371,33 @@
       }
     };
     el.appendChild(head);
+
+    if (showPartsAlert) {
+      const alert = document.createElement("div");
+      alert.className = "ticket-parts-alert";
+      alert.innerHTML = `
+        <svg class="icon"><use href="#i-alert"></use></svg>
+        <span>Waiting on parts for ${waitingDays} day${waitingDays === 1 ? "" : "s"} — order parts?</span>
+        <button type="button" class="ticket-parts-alert-btn">Mark ordered</button>`;
+      alert.querySelector(".ticket-parts-alert-btn").onclick = (e) => {
+        e.stopPropagation();
+        setPartsOrdered(t, true);
+      };
+      el.appendChild(alert);
+    }
+
     return el;
+  }
+
+  async function setPartsOrdered(ticket, ordered) {
+    try {
+      const res = await api({ action: "update", id: ticket.id, partsOrdered: ordered });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      mergeTicket(res.ticket);
+      render();
+    } catch (e) {
+      toast("Couldn't update parts status: " + e.message);
+    }
   }
 
   // ---- Device images --------------------------------------------------------

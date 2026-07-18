@@ -971,6 +971,42 @@ body.nav-open .nav-backdrop { opacity: 1; }
   border-top: 1px solid var(--border);
 }
 
+.install-app-btn { color: var(--accent); }
+.install-app-btn .icon { color: var(--accent); }
+
+.install-ios-tip[hidden] { display: none; }
+.install-ios-tip {
+  position: fixed;
+  left: 50%;
+  /* Sits above where .app-toasts (status/error banners) render, at the
+     same bottom-center anchor, so a transient toast never overlaps this
+     persistent tip. */
+  bottom: calc(max(env(safe-area-inset-bottom), 16px) + 76px);
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 10px 12px 16px;
+  background: var(--text);
+  color: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  animation: view-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.install-ios-tip p { margin: 0; font-size: 0.86rem; line-height: 1.4; }
+.install-ios-tip strong { font-weight: 700; }
+.install-ios-tip .icon-btn {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #fff;
+}
+.install-ios-tip .icon-btn:hover { background: rgba(255, 255, 255, 0.12); }
+
 @media (min-width: 600px) {
   .brand { font-size: 1.35rem; }
 }
@@ -1043,6 +1079,11 @@ body.nav-open .view-nav { transform: translateX(0); }
   cursor: pointer;
   transition: all 0.15s;
 }
+/* The install button starts hidden and is only revealed by JS (when
+   beforeinstallprompt fires) — without this, the base display:inline-flex
+   above wins the cascade over the browser's default [hidden]{display:none},
+   since author styles beat user-agent styles regardless of specificity. */
+.nav-btn[hidden] { display: none; }
 .nav-btn:active { transform: scale(0.98); }
 .nav-btn.active {
   background: var(--card);
@@ -3204,6 +3245,61 @@ body.nav-open .view-nav { transform: translateX(0); }
 .ticket-edit-btn { margin-top: 12px; }
 .ticket-client-btn { margin-top: 12px; margin-left: 8px; }
 .ticket-delete-btn { margin-top: 12px; margin-left: 8px; color: var(--danger); }
+
+/* ---- "Waiting for Parts" sub-status + overdue reminder ------------------- */
+.ticket-parts-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 190px;
+  min-height: 28px;
+  border: 1px solid #f3d9a7;
+  border-radius: var(--radius-sm);
+  background: #fffbeb;
+  color: #a85f12;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ticket-parts-btn .icon { width: 13px; height: 13px; flex: none; }
+.ticket-parts-btn:hover,
+.ticket-parts-btn:focus-visible { border-color: #a85f12; background: #fdf3da; outline: none; }
+.ticket-parts-btn.is-ordered { border-color: #bfe8d8; background: #ecfdf5; color: #047857; }
+.ticket-parts-btn.is-ordered:hover,
+.ticket-parts-btn.is-ordered:focus-visible { border-color: #047857; background: #ddf7ec; }
+
+.ticket-parts-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-top: 1px solid #f2c6c0;
+  background: #fff5f5;
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.ticket-parts-alert .icon { width: 16px; height: 16px; flex: none; }
+.ticket-parts-alert span { flex: 1; min-width: 0; }
+.ticket-parts-alert-btn {
+  flex: none;
+  border: 1px solid #f2c6c0;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--danger);
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ticket-parts-alert-btn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+/* Draw the card's left border in red (overriding its status color) while a
+   parts reminder is showing, so it stands out at a glance in the list. */
+.ticket.has-parts-alert { --status-dot: var(--danger); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .repair-loading {
@@ -3894,6 +3990,15 @@ video.media-viewer-media {
 .appt-subnav-btn:hover { background: var(--card-hover); }
 .appt-subnav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+.completed-repairs-topbar {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 18;
+  max-width: min(1060px, 100%);
+  margin: 0 auto;
+  padding: 12px 0;
+  background: var(--bg);
+}
 .completed-repairs-section { margin-bottom: 24px; }
 .completed-repairs-section .booking-list-title { margin-bottom: 12px; }
 .completed-repairs-list,

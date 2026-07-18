@@ -110,12 +110,11 @@
       </div>`;
   }
 
-  function startHtml() {
+  function startContentHtml() {
     const c = counts();
     const resumable = hasProgress();
     const resumeLabel = TEST_GROUPS[Math.min(Math.max(state.step, 1), TEST_GROUPS.length) - 1].group;
     return `
-      <div class="form-step diagnose-start">
         <div class="diagnose-start-icon" aria-hidden="true"><svg class="icon"><use href="#i-diagnose"></use></svg></div>
         <div class="form-step-heading">
           <p class="form-section-label">Device diagnostics</p>
@@ -132,17 +131,19 @@
           </div>` : `
           <div class="form-actions diagnose-start-actions">
             <button type="button" id="diagnoseStartBtn" class="primary-btn">Start diagnostic<svg class="icon"><use href="#i-chevron-right"></use></svg></button>
-          </div>`}
-      </div>`;
+          </div>`}`;
   }
 
-  function stepHtml(step) {
+  // Inner content only — the .form-step wrapper is created once per step
+  // transition and reused for in-place updates (see renderInto/refreshContent),
+  // so the CSS entrance animation (tied to the wrapper being freshly inserted)
+  // only plays when moving between steps, not on every Pass/Fail/N/A tap.
+  function stepContentHtml(step) {
     const index = step - 1;
     const g = TEST_GROUPS[index];
     const stats = groupStats(index);
     const complete = stats.done === stats.total;
     return `
-      <div class="form-step diagnose-step">
         ${segmentBarHtml()}
         <div class="diagnose-step-meta">
           <p class="form-section-label">Section ${step} of ${TEST_GROUPS.length}${state.device ? ` · ${esc(state.device)}` : ""}</p>
@@ -173,16 +174,14 @@
           <button type="button" id="diagnoseNext" class="primary-btn${complete ? " attention" : ""}">
             ${step === TEST_GROUPS.length ? "Review results" : `Next: ${esc(TEST_GROUPS[step].group)}`}<svg class="icon"><use href="#i-chevron-right"></use></svg>
           </button>
-        </div>
-      </div>`;
+        </div>`;
   }
 
-  function reviewHtml() {
+  function reviewContentHtml() {
     const c = counts();
     const done = c.total - c.untested;
     const pct = c.total ? Math.round((done / c.total) * 100) : 0;
     return `
-      <div class="form-step diagnose-review">
         ${segmentBarHtml()}
         <div class="form-step-heading">
           <p class="form-section-label">Review${state.device ? ` · ${esc(state.device)}` : ""}</p>
@@ -221,16 +220,40 @@
           <button type="button" id="diagnoseBack" class="ghost-btn"><svg class="icon"><use href="#i-chevron-left"></use></svg>Back</button>
           <button type="button" id="diagnoseReset" class="ghost-btn danger-btn"><svg class="icon"><use href="#i-refresh"></use></svg>Start new</button>
           <button type="button" id="diagnoseCopy" class="primary-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy report</button>
-        </div>
-      </div>`;
+        </div>`;
   }
 
+  function stepWrapperClass(step) {
+    if (step === 0) return "diagnose-start";
+    if (step === REVIEW_STEP) return "diagnose-review";
+    return "diagnose-step";
+  }
+
+  function contentHtmlFor(step) {
+    if (step === 0) return startContentHtml();
+    if (step === REVIEW_STEP) return reviewContentHtml();
+    return stepContentHtml(step);
+  }
+
+  // Full render: replaces the whole wizard box, creating a fresh .form-step
+  // wrapper so the step transition plays its entrance animation.
   function render() {
     const box = $("diagnoseWizard");
     if (!box) return;
-    if (state.step === 0) box.innerHTML = startHtml();
-    else if (state.step === REVIEW_STEP) box.innerHTML = reviewHtml();
-    else box.innerHTML = stepHtml(state.step);
+    box.innerHTML = `<div class="form-step ${stepWrapperClass(state.step)}">${contentHtmlFor(state.step)}</div>`;
+  }
+
+  // In-place update: reuses the existing .form-step wrapper if it matches
+  // the current step, so no entrance animation replays. Falls back to a
+  // full render if the wrapper is missing or stale (shouldn't normally happen).
+  function refreshContent() {
+    const box = $("diagnoseWizard");
+    const wrapper = box?.querySelector(":scope > .form-step");
+    if (!wrapper || !wrapper.classList.contains(stepWrapperClass(state.step))) {
+      render();
+      return;
+    }
+    wrapper.innerHTML = contentHtmlFor(state.step);
   }
 
   function goTo(step) {
@@ -247,7 +270,7 @@
       state.results[id] = value;
     }
     saveState();
-    render();
+    refreshContent();
   }
 
   // ---- Report --------------------------------------------------------------
