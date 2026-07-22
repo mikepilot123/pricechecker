@@ -1649,7 +1649,7 @@
     const detail = e.detail || {};
     if (!isConfigured()) {
       pendingLogDevice = detail;
-      toast("Set up the Check In PIN from the Check In tab before logging a device.");
+      toast("Set up the Check In PIN from the Repairs tab before logging a device.");
       return;
     }
     applyLogDevicePrefill(detail);
