@@ -6,7 +6,7 @@
 
    Google Sheet requests are never touched here — prices/intake always go
    straight to the network (with their own localStorage fallback in app.js). */
-const CACHE = "rpc-shell-v56";
+const CACHE = "rpc-shell-v57";
 const SHELL = [
   "./",
   "./index.html",
@@ -48,6 +48,14 @@ self.addEventListener("fetch", (e) => {
   // fonts, POSTs to Apps Script, etc.) go straight to the network.
   if (req.method !== "GET" || url.origin !== self.location.origin) return;
 
+  // A navigation (loading the page itself) is the only request that may fall
+  // back to index.html. Asset requests (JS/CSS/images, incl. versioned
+  // `?v=` URLs) must NOT: substituting index.html's HTML for a missing
+  // .js file makes the browser execute HTML as JavaScript, which throws and
+  // breaks the whole app — the exact failure a flaky connection would hit
+  // right after a new deploy changed an asset's `?v=` string.
+  const isNavigation = req.mode === "navigate";
+
   // Network-first: try the live file, cache a fresh copy, and only fall
   // back to the cached copy if the network is unreachable.
   e.respondWith(
@@ -57,6 +65,15 @@ self.addEventListener("fetch", (e) => {
         caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
         return res;
       })
-      .catch(() => caches.match(req).then((hit) => hit || caches.match("./index.html")))
+      .catch(() =>
+        caches.match(req).then((hit) => {
+          if (hit) return hit;
+          if (isNavigation) return caches.match("./index.html");
+          // No cached asset and we're offline: fail honestly instead of
+          // handing back HTML. The page's own network-first retry (and the
+          // app's localStorage fallbacks) take it from here.
+          return Response.error();
+        })
+      )
   );
 });
