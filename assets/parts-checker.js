@@ -112,6 +112,30 @@
     },
   ];
 
+  const knownLaptopMatchers = [
+    {
+      brand: "hp",
+      name: "HP Pavilion x360 Convertible 14m-dw1013dx",
+      family: "HP Pavilion x360 14-dw",
+      touch: "touch",
+      aliases: ["14-dw1013dx", "14m-dw1013dx"],
+      supportUrl: "https://support.hp.com/si-en/drivers/hp-pavilion-x360-convertible-laptop-pc-14m-dw1000/model/2100019236",
+      test: (key) => key.includes("14dw1013dx") || key.includes("14mdw1013dx"),
+      sources: [
+        {
+          title: "LaptopScreen exact screen",
+          description: "Exact model page for the HP Pavilion x360 14-dw1013dx display assembly.",
+          url: "https://www.laptopscreen.com/English/model/HP/PAVILION~X360~14-DW1013DX/",
+        },
+        {
+          title: "Bliss Computers assembly",
+          description: "Touch screen assembly listings for HP Pavilion x360 14m-dw1013dx.",
+          url: "https://www.blisscomputers.net/14-hp-pavilion-x360-14m-dw0013dx-14m-dw1013dx-lcd-touch-screen-replacement-225816/",
+        },
+      ],
+    },
+  ];
+
   const form = $("partsCheckerForm");
   if (!form) return;
 
@@ -142,16 +166,30 @@
     return String(value || "").trim().replace(/\s+/g, " ");
   }
 
+  function modelKey(value) {
+    return clean(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
+  function findKnownLaptop(model) {
+    const key = modelKey(model);
+    return knownLaptopMatchers.find((item) => item.test(key)) || null;
+  }
+
   function detectBrand(model, selectedBrand) {
     if (selectedBrand !== "auto") return selectedBrand;
+    const known = findKnownLaptop(model);
+    if (known) return known.brand;
     const haystack = model.toLowerCase();
     const match = Object.entries(brandProfiles).find(([, profile]) =>
       profile.hints.some((hint) => haystack.includes(hint))
     );
+    if (/\b\d{2}-[a-z]{2}\d{4}[a-z]{2}\b/i.test(model)) return "hp";
     return match ? match[0] : "unknown";
   }
 
   function detectTouchStatus(model, serial, brand) {
+    const known = findKnownLaptop(model);
+    if (known?.touch) return { value: known.touch, source: "exact-model" };
     const haystack = `${model} ${serial}`.toLowerCase();
     const profile = brandProfiles[brand];
     const touchHints = [
@@ -205,6 +243,7 @@
   }
 
   function formatLaptopName(data, profile) {
+    if (data.exactLaptop?.name) return data.exactLaptop.name;
     const model = clean(data.model);
     if (!profile) return model;
     const brandTokens = profile.name.toLowerCase().split(/\s+/);
@@ -215,8 +254,9 @@
 
   function scoreConfidence(data) {
     let score = 55;
+    if (data.exactLaptop) score += 15;
     if (data.brand !== "unknown") score += 18;
-    if (data.touch) score += data.touchSource === "inferred" ? 17 : 12;
+    if (data.touch) score += data.touchSource === "manual" ? 12 : 17;
     if (data.serial.length >= 5) score += 10;
     return Math.min(score, 100);
   }
@@ -224,11 +264,12 @@
   function buildQueries(data, profile) {
     const laptopName = formatLaptopName(data, profile);
     const touchTerm = data.touch === "touch" ? "touchscreen" : "non-touch";
+    const aliasTerm = data.exactLaptop?.aliases?.join(" ") || data.model;
     return [
       `${laptopName} ${data.serial} ${touchTerm} LCD screen replacement`,
       `${laptopName} ${touchTerm} display assembly part number`,
       `${laptopName} ${touchTerm} laptop screen`,
-      `${data.model} ${data.serial} ${touchTerm} OEM LCD panel`,
+      `${aliasTerm} ${data.serial} ${touchTerm} OEM LCD panel`,
     ]
       .map(clean)
       .filter((value, index, list) => value.length > 8 && list.indexOf(value) === index);
@@ -241,13 +282,14 @@
 
   function renderLaptopMatch(data, profile) {
     const serialLabel = profile?.serialName || "serial";
-    const supportUrl = profile?.support(data) || buildExactSearchUrl(data, profile);
+    const supportUrl = data.exactLaptop?.supportUrl || profile?.support(data) || buildExactSearchUrl(data, profile);
     const laptopName = formatLaptopName(data, profile);
     const rows = [
       ["Laptop", laptopName],
+      ...(data.exactLaptop?.family ? [["Family", data.exactLaptop.family]] : []),
       [serialLabel, data.serial],
       ["Display", touchLabel(data.touch)],
-      ["Touch source", data.touchSource === "inferred" ? "Auto-detected" : "Selected"],
+      ["Touch source", data.touchSource === "manual" ? "Selected" : "Auto-detected"],
     ];
 
     els.laptopMatch.innerHTML = `
@@ -277,9 +319,9 @@
       },
       {
         title: `Display type: ${touchLabel(data.touch)}`,
-        body: data.touchSource === "inferred"
-          ? "Touch status was inferred from the model/serial, so the form did not need to ask."
-          : "Touch status was selected manually because the identifiers did not make it clear.",
+        body: data.touchSource === "manual"
+          ? "Touch status was selected manually because the identifiers did not make it clear."
+          : "Touch status was inferred from the model/serial, so the form did not need to ask.",
       },
       {
         title: "Match size, resolution, connector, and bracket style",
@@ -299,6 +341,14 @@
   }
 
   function renderLinks(data, query, profile) {
+    const exactSources = data.exactLaptop ? [
+      {
+        title: "HP exact laptop support",
+        description: "Exact HP support page for this Pavilion x360 model.",
+        url: data.exactLaptop.supportUrl,
+      },
+      ...(data.exactLaptop.sources || []),
+    ] : [];
     const brandLinks = profile ? [
       {
         title: `${profile.name} exact lookup`,
@@ -313,10 +363,17 @@
       ...(profile.sources || []),
     ] : [];
 
+    const seen = new Set();
     const sources = [
+      ...exactSources,
       ...brandLinks,
       ...universalSources.map((source) => ({ ...source, url: source.url(query) })),
-    ];
+    ].filter((source) => {
+      const key = `${source.title}|${source.url}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     els.links.replaceChildren(...sources.map((source) => {
       const card = document.createElement("a");
@@ -377,6 +434,7 @@
     const formData = new FormData(form);
     const model = clean(formData.get("model"));
     const serial = clean(formData.get("serial"));
+    const exactLaptop = findKnownLaptop(model);
     const brand = detectBrand(model, "auto");
     const touchDetection = detectTouchStatus(model, serial, brand);
     const touch = touchDetection.value || formData.get("touch");
@@ -393,7 +451,8 @@
       serial,
       brand,
       touch,
-      touchSource: touchDetection.value ? "inferred" : "manual",
+      touchSource: touchDetection.value ? touchDetection.source : "manual",
+      exactLaptop,
     };
 
     const profile = brandProfiles[data.brand];
@@ -401,8 +460,12 @@
     const score = scoreConfidence(data);
     activeSearch = searches[0] || "";
 
-    els.brand.textContent = profile ? `${profile.name} ${touchLabel(data.touch)} match packet` : `${touchLabel(data.touch)} match packet`;
-    els.device.textContent = `${data.model} / ${data.serial}`;
+    els.brand.textContent = data.exactLaptop
+      ? "Exact laptop match"
+      : profile
+        ? `${profile.name} ${touchLabel(data.touch)} match packet`
+        : `${touchLabel(data.touch)} match packet`;
+    els.device.textContent = `${formatLaptopName(data, profile)} / ${data.serial}`;
     els.confidenceLabel.textContent = "Lookup confidence before manufacturer confirmation";
     els.confidenceScore.textContent = `${score}%`;
     els.confidenceBar.style.width = `${score}%`;
