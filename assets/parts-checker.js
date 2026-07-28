@@ -6,6 +6,7 @@
       name: "Dell",
       serialName: "service tag",
       hints: ["latitude", "inspiron", "xps", "precision", "alienware", "vostro", "dell"],
+      touchHints: ["2-in-1", "2 in 1", "touch", "7420 2-in-1", "7390 2-in-1", "9310 2-in-1"],
       support: ({ serial }) => `https://www.dell.com/support/home/en-us/product-support/servicetag/${encodeURIComponent(serial)}/overview`,
       parts: "https://www.parts-people.com/index.php?action=category&id=140&subid=screen",
     },
@@ -13,6 +14,7 @@
       name: "HP",
       serialName: "serial",
       hints: ["elitebook", "probook", "pavilion", "envy", "spectre", "omen", "zbook", "hp "],
+      touchHints: ["x360", "2-in-1", "2 in 1", "touch", "spectre folio"],
       support: () => "https://support.hp.com/us-en/check-warranty",
       parts: "https://partsurfer.hp.com/",
     },
@@ -20,6 +22,7 @@
       name: "Lenovo",
       serialName: "serial",
       hints: ["thinkpad", "ideapad", "yoga", "legion", "loq", "lenovo"],
+      touchHints: ["yoga", "flex", "duet", "2-in-1", "2 in 1", "touch"],
       support: () => "https://support.lenovo.com/us/en/parts-lookup",
       parts: "https://support.lenovo.com/us/en/parts-lookup",
     },
@@ -27,6 +30,7 @@
       name: "Apple",
       serialName: "serial",
       hints: ["macbook", "macbook pro", "macbook air", "apple"],
+      nonTouchHints: ["macbook", "macbook pro", "macbook air"],
       support: () => "https://checkcoverage.apple.com/",
       parts: "https://support.apple.com/mac/repair",
     },
@@ -34,6 +38,7 @@
       name: "ASUS",
       serialName: "serial",
       hints: ["vivobook", "zenbook", "rog", "tuf", "asus"],
+      touchHints: ["flip", "2-in-1", "2 in 1", "touch"],
       support: () => "https://www.asus.com/support/",
       parts: "https://www.asus-accessories.com/",
     },
@@ -41,6 +46,7 @@
       name: "Acer",
       serialName: "SNID or serial",
       hints: ["aspire", "swift", "spin", "predator", "travelmate", "acer"],
+      touchHints: ["spin", "2-in-1", "2 in 1", "touch"],
       support: () => "https://www.acer.com/us-en/support",
       parts: "https://www.capitaldatausa.com/acer-laptops/",
     },
@@ -55,6 +61,7 @@
       name: "Microsoft Surface",
       serialName: "serial",
       hints: ["surface", "microsoft"],
+      touchHints: ["surface"],
       support: () => "https://account.microsoft.com/devices",
       parts: "https://www.microsoft.com/en-us/store/b/surface-repair-parts",
     },
@@ -62,6 +69,7 @@
       name: "Samsung",
       serialName: "serial",
       hints: ["galaxy book", "samsung", "np"],
+      touchHints: ["360", "2-in-1", "2 in 1", "touch"],
       support: () => "https://www.samsung.com/us/support/service/",
       parts: "https://samsungparts.com/",
     },
@@ -105,6 +113,12 @@
     links: $("partsLinks"),
     queries: $("partsQueries"),
     copy: $("partsCopySearch"),
+    touch: $("partsTouch"),
+    touchHint: $("partsTouchHint"),
+    touchField: $("partsTouchField"),
+    touchAuto: $("partsTouchAuto"),
+    touchAutoValue: $("partsTouchAutoValue"),
+    message: $("partsFormMessage"),
   };
 
   let activeSearch = "";
@@ -122,24 +136,75 @@
     return match ? match[0] : "unknown";
   }
 
+  function detectTouchStatus(model, serial, brand) {
+    const haystack = `${model} ${serial}`.toLowerCase();
+    const profile = brandProfiles[brand];
+    const touchHints = [
+      ...(profile?.touchHints || []),
+      "touchscreen",
+      "touch screen",
+    ];
+    const nonTouchHints = [
+      ...(profile?.nonTouchHints || []),
+      "non-touch",
+      "non touch",
+      "without touch",
+      "no touch",
+    ];
+
+    if (nonTouchHints.some((hint) => haystack.includes(hint))) {
+      return { value: "non-touch", source: "inferred" };
+    }
+    if (touchHints.some((hint) => haystack.includes(hint))) {
+      return { value: "touch", source: "inferred" };
+    }
+    return { value: "", source: "manual" };
+  }
+
+  function syncTouchField() {
+    const model = clean($("partsModel")?.value);
+    const serial = clean($("partsSerial")?.value);
+    const brand = detectBrand(model, "auto");
+    const detected = detectTouchStatus(model, serial, brand);
+
+    if (detected.value) {
+      els.touch.value = detected.value;
+      els.touch.disabled = true;
+      els.touch.required = false;
+      els.touchField.hidden = true;
+      els.touchAuto.hidden = false;
+      els.touchAutoValue.textContent = `${touchLabel(detected.value)} auto-detected`;
+    } else {
+      if (els.touch.disabled) els.touch.value = "";
+      els.touch.disabled = false;
+      els.touch.required = true;
+      els.touchField.hidden = false;
+      els.touchAuto.hidden = true;
+      els.touchAutoValue.textContent = "";
+      els.touchHint.textContent = "Choose this only when the model/serial does not identify the display type.";
+    }
+  }
+
+  function touchLabel(value) {
+    return value === "touch" ? "Touch" : "Non-touch";
+  }
+
   function scoreConfidence(data) {
-    let score = 42;
+    let score = 55;
     if (data.brand !== "unknown") score += 18;
-    if (data.size) score += 10;
-    if (data.touch) score += 8;
-    if (data.resolution) score += 12;
-    if (data.pins) score += 10;
+    if (data.touch) score += data.touchSource === "inferred" ? 17 : 12;
+    if (data.serial.length >= 5) score += 10;
     return Math.min(score, 100);
   }
 
   function buildQueries(data, profile) {
     const brandName = profile?.name || "";
-    const specTerms = [data.size, data.touch, data.resolution, data.pins].filter(Boolean).join(" ");
+    const touchTerm = data.touch === "touch" ? "touchscreen" : "non-touch";
     return [
-      `${brandName} ${data.model} ${data.serial} LCD screen replacement`,
-      `${brandName} ${data.model} display assembly part number`,
-      `${brandName} ${data.model} ${specTerms} laptop screen`,
-      `${data.model} ${data.serial} OEM LCD panel`,
+      `${brandName} ${data.model} ${data.serial} ${touchTerm} LCD screen replacement`,
+      `${brandName} ${data.model} ${touchTerm} display assembly part number`,
+      `${brandName} ${data.model} ${touchTerm} laptop screen`,
+      `${data.model} ${data.serial} ${touchTerm} OEM LCD panel`,
     ]
       .map(clean)
       .filter((value, index, list) => value.length > 8 && list.indexOf(value) === index);
@@ -152,16 +217,18 @@
         body: "The serial or service tag is the strongest source for the as-built display option.",
       },
       {
-        title: "Match size, resolution, and connector",
-        body: "The same model can ship with different touch, brightness, refresh, and pin layouts.",
+        title: `Display type: ${touchLabel(data.touch)}`,
+        body: data.touchSource === "inferred"
+          ? "Touch status was inferred from the model/serial, so the form did not need to ask."
+          : "Touch status was selected manually because the identifiers did not make it clear.",
       },
       {
-        title: "Use a full assembly when cabling or glass differs",
+        title: "Match size, resolution, connector, and bracket style",
+        body: "Use the manufacturer parts page or original panel code to confirm the exact compatible screen before ordering.",
+      },
+      {
+        title: "Use a full display assembly when cabling or glass differs",
         body: "Panel-only swaps are best after the original LCD code and connector side are confirmed.",
-      },
-      {
-        title: data.pins ? `Connector target: ${data.pins}` : "Confirm connector before ordering",
-        body: "30-pin and 40-pin eDP panels are not interchangeable, and touch panels often need different cabling.",
       },
     ];
 
@@ -248,14 +315,25 @@
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const formData = new FormData(form);
+    const model = clean(formData.get("model"));
+    const serial = clean(formData.get("serial"));
+    const brand = detectBrand(model, "auto");
+    const touchDetection = detectTouchStatus(model, serial, brand);
+    const touch = touchDetection.value || formData.get("touch");
+    if (!touch) {
+      els.message.textContent = "Select touch or non-touch before searching.";
+      els.message.hidden = false;
+      els.touch.focus();
+      return;
+    }
+    els.message.hidden = true;
+
     const data = {
-      model: clean(formData.get("model")),
-      serial: clean(formData.get("serial")),
-      brand: detectBrand(clean(formData.get("model")), formData.get("brand")),
-      size: formData.get("size"),
-      touch: formData.get("touch"),
-      resolution: formData.get("resolution"),
-      pins: formData.get("pins"),
+      model,
+      serial,
+      brand,
+      touch,
+      touchSource: touchDetection.value ? "inferred" : "manual",
     };
 
     const profile = brandProfiles[data.brand];
@@ -263,7 +341,7 @@
     const score = scoreConfidence(data);
     activeSearch = searches[0] || "";
 
-    els.brand.textContent = profile ? `${profile.name} match packet` : "Brand not detected";
+    els.brand.textContent = profile ? `${profile.name} ${touchLabel(data.touch)} match packet` : `${touchLabel(data.touch)} match packet`;
     els.device.textContent = `${data.model} / ${data.serial}`;
     els.confidenceLabel.textContent = "Lookup confidence before manufacturer confirmation";
     els.confidenceScore.textContent = `${score}%`;
@@ -285,4 +363,9 @@
       els.copy.innerHTML = '<svg class="icon"><use href="#i-clipboard"></use></svg>Copy';
     }, 1200);
   });
+
+  ["partsModel", "partsSerial"].forEach((id) => {
+    $(id)?.addEventListener("input", syncTouchField);
+  });
+  syncTouchField();
 })();

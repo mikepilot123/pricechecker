@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=parts-checker-1" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-checker-2" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -518,7 +518,7 @@
 
   <!-- ============ PARTS CHECKER VIEW ============ -->
   <main class="container view" id="view-parts-checker" hidden>
-    <p class="info-banner">Build an exact laptop screen lookup packet from model, serial, and display details.</p>
+    <p class="info-banner">Build an exact laptop screen lookup packet from model, serial, and touch status.</p>
 
     <section class="parts-checker-shell" aria-labelledby="partsCheckerTitle">
       <div class="parts-checker-form-card">
@@ -536,71 +536,20 @@
             <label class="field-label" for="partsSerial">Serial number or service tag</label>
             <input id="partsSerial" class="text-input" name="serial" autocomplete="off" placeholder="ABC1234, PF3XXXXX, CND1234ABC" required />
           </div>
-          <div class="form-grid parts-checker-grid">
-            <div class="form-field">
-              <label class="field-label" for="partsBrand">Brand</label>
-              <select id="partsBrand" class="text-input select-input" name="brand">
-                <option value="auto">Auto detect</option>
-                <option value="dell">Dell</option>
-                <option value="hp">HP</option>
-                <option value="lenovo">Lenovo</option>
-                <option value="apple">Apple</option>
-                <option value="asus">ASUS</option>
-                <option value="acer">Acer</option>
-                <option value="msi">MSI</option>
-                <option value="microsoft">Microsoft Surface</option>
-                <option value="samsung">Samsung</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label class="field-label" for="partsSize">Current size</label>
-              <select id="partsSize" class="text-input select-input" name="size">
-                <option value="">Unknown</option>
-                <option>11.6"</option>
-                <option>12.3"</option>
-                <option>13.3"</option>
-                <option>13.5"</option>
-                <option>14.0"</option>
-                <option>15.6"</option>
-                <option>16.0"</option>
-                <option>17.3"</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label class="field-label" for="partsTouch">Touchscreen</label>
-              <select id="partsTouch" class="text-input select-input" name="touch">
-                <option value="">Unknown</option>
-                <option value="touch">Touch</option>
-                <option value="non-touch">Non-touch</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label class="field-label" for="partsResolution">Resolution</label>
-              <select id="partsResolution" class="text-input select-input" name="resolution">
-                <option value="">Unknown</option>
-                <option>1366x768</option>
-                <option>1600x900</option>
-                <option>1920x1080</option>
-                <option>1920x1200</option>
-                <option>2256x1504</option>
-                <option>2560x1440</option>
-                <option>2560x1600</option>
-                <option>2880x1800</option>
-                <option>3000x2000</option>
-                <option>3840x2160</option>
-              </select>
-            </div>
-            <div class="form-field form-field-full">
-              <label class="field-label" for="partsPins">Connector pins</label>
-              <select id="partsPins" class="text-input select-input" name="pins">
-                <option value="">Unknown</option>
-                <option>30-pin eDP</option>
-                <option>40-pin eDP</option>
-                <option>40-pin eDP touch</option>
-                <option>Other</option>
-              </select>
-            </div>
+          <div id="partsTouchField" class="form-field form-field-full">
+            <label class="field-label" for="partsTouch">Touch status</label>
+            <select id="partsTouch" class="text-input select-input" name="touch">
+              <option value="">Select touch or non-touch</option>
+              <option value="touch">Touch</option>
+              <option value="non-touch">Non-touch</option>
+            </select>
+            <p id="partsTouchHint" class="parts-helper-text">If the model/serial clearly identifies touch status, this field will be filled automatically.</p>
           </div>
+          <div id="partsTouchAuto" class="parts-touch-auto-note" hidden>
+            <span>Touch status</span>
+            <strong id="partsTouchAutoValue"></strong>
+          </div>
+          <p id="partsFormMessage" class="field-error" hidden></p>
           <button type="submit" class="primary-btn"><svg class="icon"><use href="#i-search"></use></svg>Find screens</button>
         </form>
       </div>
@@ -1339,11 +1288,11 @@
 
   <script src="assets/app.js?v=pwa-install-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=parts-checker-1"></script>
+  <script src="assets/intake.js?v=parts-checker-2"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/diagnose.js?v=diagnose-2"></script>
-  <script src="assets/parts-checker.js?v=parts-checker-1"></script>
+  <script src="assets/parts-checker.js?v=parts-checker-2"></script>
 </body>
 </html>
