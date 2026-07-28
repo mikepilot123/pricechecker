@@ -120,6 +120,8 @@
       touch: "touch",
       aliases: ["14-dw1013dx", "14m-dw1013dx"],
       supportUrl: "https://support.hp.com/si-en/drivers/hp-pavilion-x360-convertible-laptop-pc-14m-dw1000/model/2100019236",
+      imageUrl: "https://i5.walmartimages.com/asr/8ea9a272-4633-46a7-9016-12f44f2fa972.392781d5455a242967ad98da0a91bb9c.png?odnBg=FFFFFF&odnHeight=640&odnWidth=640",
+      imageAlt: "HP Pavilion x360 convertible laptop product photo",
       test: (key) => key.includes("14dw1013dx") || key.includes("14mdw1013dx"),
       sources: [
         {
@@ -284,6 +286,11 @@
     const serialLabel = profile?.serialName || "serial";
     const supportUrl = data.exactLaptop?.supportUrl || profile?.support(data) || buildExactSearchUrl(data, profile);
     const laptopName = formatLaptopName(data, profile);
+    const imageHtml = data.exactLaptop?.imageUrl
+      ? `<figure class="parts-laptop-photo">
+          <img src="${escapeHtml(data.exactLaptop.imageUrl)}" alt="${escapeHtml(data.exactLaptop.imageAlt || laptopName)}" loading="lazy" />
+        </figure>`
+      : "";
     const rows = [
       ["Laptop", laptopName],
       ...(data.exactLaptop?.family ? [["Family", data.exactLaptop.family]] : []),
@@ -293,6 +300,7 @@
     ];
 
     els.laptopMatch.innerHTML = `
+      ${imageHtml}
       <div class="parts-laptop-name">
         <svg class="icon"><use href="#i-laptop"></use></svg>
         <strong>${escapeHtml(laptopName)}</strong>
@@ -309,6 +317,9 @@
         </a>
       </div>
     `;
+    els.laptopMatch.querySelector(".parts-laptop-photo img")?.addEventListener("error", (event) => {
+      event.currentTarget.closest(".parts-laptop-photo").hidden = true;
+    });
   }
 
   function renderChecklist(data, profile) {
