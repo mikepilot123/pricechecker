@@ -536,6 +536,12 @@ body.nav-open .nav-backdrop { opacity: 1; }
   gap: 13px;
   margin-top: 16px;
 }
+.parts-submit-note {
+  margin: -2px 0 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
 .parts-checker-grid {
   gap: 12px;
 }
@@ -570,12 +576,6 @@ body.nav-open .nav-backdrop { opacity: 1; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-}
-.parts-checker-empty {
-  min-height: 535px;
-  display: grid;
-  place-content: center;
-  text-align: center;
 }
 .parts-checker-results {
   display: grid;

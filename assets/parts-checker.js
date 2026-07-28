@@ -159,7 +159,7 @@
   if (!form) return;
 
   const els = {
-    empty: $("partsCheckerEmpty"),
+    resultsCard: $("partsCheckerResultsCard"),
     results: $("partsCheckerResults"),
     brand: $("partsCheckerBrand"),
     device: $("partsCheckerDevice"),
@@ -568,8 +568,7 @@
     renderPriceSuggestion();
     renderQueries(searches);
 
-    els.empty.hidden = true;
-    els.results.hidden = false;
+    els.resultsCard.hidden = false;
   });
 
   els.copy?.addEventListener("click", async () => {

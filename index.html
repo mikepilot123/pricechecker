@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=parts-checker-6" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-checker-7" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -539,17 +539,12 @@
           </div>
           <p id="partsFormMessage" class="field-error" hidden></p>
           <button type="submit" class="primary-btn"><svg class="icon"><use href="#i-search"></use></svg>Find screens</button>
+          <p class="parts-submit-note">Enter the laptop identifiers to pull up the exact laptop, matching suppliers, and the screen replacement price suggestion.</p>
         </form>
       </div>
 
-      <div class="parts-checker-results-card">
-        <div id="partsCheckerEmpty" class="parts-checker-empty">
-          <div class="empty-icon"><svg class="icon"><use href="#i-laptop"></use></svg></div>
-          <p class="empty-title">Ready for a match packet</p>
-          <p class="empty-sub">Enter the laptop identifiers to get manufacturer lookup routes, compatible-screen checks, and copy-ready searches.</p>
-        </div>
-
-        <div id="partsCheckerResults" class="parts-checker-results" hidden>
+      <div id="partsCheckerResultsCard" class="parts-checker-results-card" hidden>
+        <div id="partsCheckerResults" class="parts-checker-results">
           <div class="parts-checker-result-head">
             <div>
               <p id="partsCheckerBrand" class="dashboard-eyebrow"></p>
@@ -1302,6 +1297,6 @@
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
-  <script src="assets/parts-checker.js?v=parts-checker-6"></script>
+  <script src="assets/parts-checker.js?v=parts-checker-7"></script>
 </body>
 </html>
