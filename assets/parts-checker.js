@@ -1,5 +1,11 @@
 (function () {
   const $ = (id) => document.getElementById(id);
+  const COST_MULTIPLIER = 7;
+  const CLEARANCE_FEE = 150;
+  const DEFAULT_LABOUR_FEE = 500;
+  const CHROMEBOOK_LABOUR_FEE = 400;
+  const MACBOOK_LABOUR_FEE = 800;
+  const ROUND_TO = 50;
 
   const brandProfiles = {
     dell: {
@@ -136,6 +142,17 @@
         },
       ],
     },
+    {
+      brand: "apple",
+      name: "MacBook Pro 16-inch A2485",
+      family: "MacBook Pro 16-inch",
+      touch: "non-touch",
+      aliases: ["A2485", "A2780", "A2991"],
+      supportUrl: "https://support.apple.com/mac/repair",
+      mobileSentrixUrl: "https://genuineparts.mobilesentrix.com/complete-lcd-display-assembly-compatible-for-macbook-pro-16-a2485-late-2021-pro-16-a2780-early-2023-genuine-oem-silver",
+      mobileSentrixDescription: "Genuine OEM complete LCD display assembly for MacBook Pro 16 A2485/A2780/A2991.",
+      test: (key) => key.includes("a2485") || key.includes("a2780") || key.includes("a2991"),
+    },
   ];
 
   const form = $("partsCheckerForm");
@@ -160,9 +177,18 @@
     touchAuto: $("partsTouchAuto"),
     touchAutoValue: $("partsTouchAutoValue"),
     message: $("partsFormMessage"),
+    costInput: $("partsCostInput"),
+    costConverted: $("partsCostConverted"),
+    clearanceFee: $("partsClearanceFee"),
+    labourLabel: $("partsLabourLabel"),
+    labourFee: $("partsLabourFee"),
+    suggestedPrice: $("partsSuggestedPrice"),
+    priceRule: $("partsPriceRule"),
   };
 
   let activeSearch = "";
+  let activePriceData = null;
+  let activePriceProfile = null;
 
   function clean(value) {
     return String(value || "").trim().replace(/\s+/g, " ");
@@ -263,6 +289,51 @@
     return Math.min(score, 100);
   }
 
+  function formatMoney(value) {
+    const amount = Number.isFinite(value) ? value : 0;
+    return `$${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  }
+
+  function roundFlat(value) {
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    return Math.ceil(value / ROUND_TO) * ROUND_TO;
+  }
+
+  function labourFor(data, profile) {
+    const text = [
+      data.model,
+      data.exactLaptop?.name,
+      data.exactLaptop?.family,
+      profile?.name,
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    if (/\bchrome\s*book\b|\bchromebook\b/.test(text)) {
+      return { amount: CHROMEBOOK_LABOUR_FEE, label: "Chromebook labour" };
+    }
+    if (/\bmac\s*book\b|\bmacbook\b/.test(text)) {
+      return { amount: MACBOOK_LABOUR_FEE, label: "MacBook labour" };
+    }
+    return { amount: DEFAULT_LABOUR_FEE, label: "Installation" };
+  }
+
+  function renderPriceSuggestion() {
+    if (!activePriceData) return;
+    const rawCost = parseFloat(els.costInput?.value || "");
+    const cost = Number.isFinite(rawCost) && rawCost > 0 ? rawCost : 0;
+    const converted = cost * COST_MULTIPLIER;
+    const labour = labourFor(activePriceData, activePriceProfile);
+    const total = roundFlat(converted + CLEARANCE_FEE + labour.amount);
+
+    els.costConverted.textContent = formatMoney(converted);
+    els.clearanceFee.textContent = formatMoney(CLEARANCE_FEE);
+    els.labourLabel.textContent = labour.label;
+    els.labourFee.textContent = formatMoney(labour.amount);
+    els.suggestedPrice.textContent = formatMoney(total);
+    els.priceRule.textContent = cost
+      ? `Formula: ${formatMoney(cost)} x ${COST_MULTIPLIER} + ${formatMoney(CLEARANCE_FEE)} clearance + ${formatMoney(labour.amount)} labour, rounded up to the nearest ${formatMoney(ROUND_TO)}.`
+      : "Enter the supplier screen cost to calculate the suggested customer price.";
+  }
+
   function buildQueries(data, profile) {
     const laptopName = formatLaptopName(data, profile);
     const touchTerm = data.touch === "touch" ? "touchscreen" : "non-touch";
@@ -354,8 +425,8 @@
   function renderLinks(data, query, profile) {
     const exactSources = data.exactLaptop ? [
       {
-        title: "HP exact laptop support",
-        description: "Exact HP support page for this Pavilion x360 model.",
+        title: `${profile?.name || "Manufacturer"} exact laptop support`,
+        description: "Exact support page for this laptop model.",
         url: data.exactLaptop.supportUrl,
       },
       ...(data.exactLaptop.sources || []),
@@ -373,12 +444,20 @@
       },
       ...(profile.sources || []),
     ] : [];
+    const mobileSentrixSources = data.exactLaptop?.mobileSentrixUrl ? [
+      {
+        title: "MobileSentrix",
+        description: data.exactLaptop.mobileSentrixDescription || "Verified MobileSentrix screen listing for this exact model.",
+        url: data.exactLaptop.mobileSentrixUrl,
+      },
+    ] : [];
 
     const seen = new Set();
     const sources = [
       ...exactSources,
       ...brandLinks,
       ...universalSources.map((source) => ({ ...source, url: source.url(query) })),
+      ...mobileSentrixSources,
     ].filter((source) => {
       const key = `${source.title}|${source.url}`;
       if (seen.has(key)) return false;
@@ -467,6 +546,8 @@
     };
 
     const profile = brandProfiles[data.brand];
+    activePriceData = data;
+    activePriceProfile = profile;
     const searches = buildQueries(data, profile);
     const score = scoreConfidence(data);
     activeSearch = searches[0] || "";
@@ -484,6 +565,7 @@
     renderChecklist(data, profile);
     renderLaptopMatch(data, profile);
     renderLinks(data, activeSearch, profile);
+    renderPriceSuggestion();
     renderQueries(searches);
 
     els.empty.hidden = true;
@@ -498,6 +580,8 @@
       els.copy.innerHTML = '<svg class="icon"><use href="#i-clipboard"></use></svg>Copy';
     }, 1200);
   });
+
+  els.costInput?.addEventListener("input", renderPriceSuggestion);
 
   ["partsModel", "partsSerial"].forEach((id) => {
     $(id)?.addEventListener("input", syncTouchField);

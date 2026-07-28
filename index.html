@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=parts-checker-5" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-checker-6" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -570,6 +570,21 @@
             <section>
               <h3 class="parts-section-title">Exact laptop</h3>
               <div id="partsLaptopMatch" class="parts-laptop-match"></div>
+              <div class="parts-price-tool" aria-labelledby="partsPriceTitle">
+                <h3 id="partsPriceTitle" class="parts-section-title">Price suggestion</h3>
+                <label class="field-label" for="partsCostInput">Screen cost</label>
+                <div class="parts-cost-input">
+                  <span aria-hidden="true">$</span>
+                  <input id="partsCostInput" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Enter supplier cost" />
+                </div>
+                <dl class="parts-price-breakdown">
+                  <div><dt>Cost x 7</dt><dd id="partsCostConverted">$0</dd></div>
+                  <div><dt>Clearance</dt><dd id="partsClearanceFee">$150</dd></div>
+                  <div><dt id="partsLabourLabel">Installation</dt><dd id="partsLabourFee">$500</dd></div>
+                  <div class="parts-price-total"><dt>Suggested price</dt><dd id="partsSuggestedPrice">$0</dd></div>
+                </dl>
+                <p id="partsPriceRule" class="parts-helper-text"></p>
+              </div>
             </section>
 
             <section>
@@ -1287,6 +1302,6 @@
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
-  <script src="assets/parts-checker.js?v=parts-checker-5"></script>
+  <script src="assets/parts-checker.js?v=parts-checker-6"></script>
 </body>
 </html>
