@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=parts-alert-1" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-checker-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -78,6 +78,7 @@
         </button>
       </div>
       <button class="nav-btn active" data-target="prices" role="tab" aria-selected="true"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
+      <button class="nav-btn" data-target="parts-checker" role="tab" aria-selected="false"><svg class="icon"><use href="#i-laptop"></use></svg>Parts Checker</button>
       <button class="nav-btn" data-target="dashboard" role="tab" aria-selected="false"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Repairs</button>
       <button class="nav-btn" data-target="diagnose" role="tab" aria-selected="false"><svg class="icon"><use href="#i-diagnose"></use></svg>Diagnose</button>
@@ -513,6 +514,138 @@
       <p class="empty-title">Couldn't load the latest prices</p>
       <p class="empty-sub" id="errorSub">Check your internet connection. The app will keep retrying automatically.</p>
     </div>
+  </main>
+
+  <!-- ============ PARTS CHECKER VIEW ============ -->
+  <main class="container view" id="view-parts-checker" hidden>
+    <p class="info-banner">Build an exact laptop screen lookup packet from model, serial, and display details.</p>
+
+    <section class="parts-checker-shell" aria-labelledby="partsCheckerTitle">
+      <div class="parts-checker-form-card">
+        <div class="parts-checker-heading">
+          <p class="dashboard-eyebrow">Laptop screens</p>
+          <h2 id="partsCheckerTitle">Parts Checker</h2>
+        </div>
+
+        <form id="partsCheckerForm" class="parts-checker-form">
+          <div class="form-field form-field-full">
+            <label class="field-label" for="partsModel">Model number</label>
+            <input id="partsModel" class="text-input" name="model" autocomplete="off" placeholder="Latitude 5420, 20XW004CUS, 15-dy2021nr" required />
+          </div>
+          <div class="form-field form-field-full">
+            <label class="field-label" for="partsSerial">Serial number or service tag</label>
+            <input id="partsSerial" class="text-input" name="serial" autocomplete="off" placeholder="ABC1234, PF3XXXXX, CND1234ABC" required />
+          </div>
+          <div class="form-grid parts-checker-grid">
+            <div class="form-field">
+              <label class="field-label" for="partsBrand">Brand</label>
+              <select id="partsBrand" class="text-input select-input" name="brand">
+                <option value="auto">Auto detect</option>
+                <option value="dell">Dell</option>
+                <option value="hp">HP</option>
+                <option value="lenovo">Lenovo</option>
+                <option value="apple">Apple</option>
+                <option value="asus">ASUS</option>
+                <option value="acer">Acer</option>
+                <option value="msi">MSI</option>
+                <option value="microsoft">Microsoft Surface</option>
+                <option value="samsung">Samsung</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="partsSize">Current size</label>
+              <select id="partsSize" class="text-input select-input" name="size">
+                <option value="">Unknown</option>
+                <option>11.6"</option>
+                <option>12.3"</option>
+                <option>13.3"</option>
+                <option>13.5"</option>
+                <option>14.0"</option>
+                <option>15.6"</option>
+                <option>16.0"</option>
+                <option>17.3"</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="partsTouch">Touchscreen</label>
+              <select id="partsTouch" class="text-input select-input" name="touch">
+                <option value="">Unknown</option>
+                <option value="touch">Touch</option>
+                <option value="non-touch">Non-touch</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="partsResolution">Resolution</label>
+              <select id="partsResolution" class="text-input select-input" name="resolution">
+                <option value="">Unknown</option>
+                <option>1366x768</option>
+                <option>1600x900</option>
+                <option>1920x1080</option>
+                <option>1920x1200</option>
+                <option>2256x1504</option>
+                <option>2560x1440</option>
+                <option>2560x1600</option>
+                <option>2880x1800</option>
+                <option>3000x2000</option>
+                <option>3840x2160</option>
+              </select>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="partsPins">Connector pins</label>
+              <select id="partsPins" class="text-input select-input" name="pins">
+                <option value="">Unknown</option>
+                <option>30-pin eDP</option>
+                <option>40-pin eDP</option>
+                <option>40-pin eDP touch</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="primary-btn"><svg class="icon"><use href="#i-search"></use></svg>Find screens</button>
+        </form>
+      </div>
+
+      <div class="parts-checker-results-card">
+        <div id="partsCheckerEmpty" class="parts-checker-empty">
+          <div class="empty-icon"><svg class="icon"><use href="#i-laptop"></use></svg></div>
+          <p class="empty-title">Ready for a match packet</p>
+          <p class="empty-sub">Enter the laptop identifiers to get manufacturer lookup routes, compatible-screen checks, and copy-ready searches.</p>
+        </div>
+
+        <div id="partsCheckerResults" class="parts-checker-results" hidden>
+          <div class="parts-checker-result-head">
+            <div>
+              <p id="partsCheckerBrand" class="dashboard-eyebrow"></p>
+              <h2 id="partsCheckerDevice"></h2>
+            </div>
+            <button id="partsCopySearch" type="button" class="ghost-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy</button>
+          </div>
+
+          <div class="parts-confidence">
+            <div class="parts-confidence-row">
+              <span id="partsConfidenceLabel"></span>
+              <strong id="partsConfidenceScore"></strong>
+            </div>
+            <div class="parts-meter" aria-hidden="true"><span id="partsConfidenceBar"></span></div>
+          </div>
+
+          <section>
+            <h3 class="parts-section-title">Exact-match checklist</h3>
+            <ul id="partsChecklist" class="parts-checklist"></ul>
+          </section>
+
+          <section>
+            <h3 class="parts-section-title">Best search routes</h3>
+            <div id="partsLinks" class="parts-link-grid"></div>
+          </section>
+
+          <section>
+            <h3 class="parts-section-title">Copy-ready searches</h3>
+            <div id="partsQueries" class="parts-queries"></div>
+          </section>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- ============ INVENTORY VIEW ============ -->
@@ -1206,10 +1339,11 @@
 
   <script src="assets/app.js?v=pwa-install-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=parts-alert-1"></script>
+  <script src="assets/intake.js?v=parts-checker-1"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/diagnose.js?v=diagnose-2"></script>
+  <script src="assets/parts-checker.js?v=parts-checker-1"></script>
 </body>
 </html>

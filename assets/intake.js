@@ -135,6 +135,7 @@
     appointments: $("view-appointments"),
     "completed-repairs": $("view-completed-repairs"),
     prices: $("view-prices"),
+    "parts-checker": $("view-parts-checker"),
     intake: $("view-intake"),
     inventory: $("view-inventory"),
     expenses: $("view-expenses"),
@@ -159,6 +160,7 @@
     if (target === "leads") window.dispatchEvent(new Event("rpc-enter-leads"));
     if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
     if (target === "completed-repairs") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
+    if (target === "parts-checker") window.dispatchEvent(new Event("rpc-enter-parts-checker"));
     if (target === "intake") enterIntake();
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
     if (target === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));

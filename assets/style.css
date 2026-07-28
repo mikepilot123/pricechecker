@@ -501,6 +501,197 @@ body.nav-open .nav-backdrop { opacity: 1; }
   color: var(--warn);
 }
 
+/* ---------- Parts Checker ---------- */
+.parts-checker-shell {
+  display: grid;
+  grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  margin-top: 16px;
+}
+.parts-checker-form-card,
+.parts-checker-results-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.parts-checker-form-card {
+  position: sticky;
+  top: calc(var(--header-h) + 14px);
+  padding: 18px;
+}
+.parts-checker-results-card {
+  min-height: 575px;
+  padding: 18px;
+}
+.parts-checker-heading h2,
+.parts-checker-result-head h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.15;
+}
+.parts-checker-form {
+  display: grid;
+  gap: 13px;
+  margin-top: 16px;
+}
+.parts-checker-grid {
+  gap: 12px;
+}
+.parts-checker-form .primary-btn,
+.parts-checker-result-head .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.parts-checker-empty {
+  min-height: 535px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+.parts-checker-results {
+  display: grid;
+  gap: 18px;
+}
+.parts-checker-result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.parts-checker-result-head .ghost-btn {
+  flex: none;
+}
+.parts-confidence {
+  display: grid;
+  gap: 8px;
+}
+.parts-confidence-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+.parts-confidence-row strong {
+  color: var(--price);
+  font-family: var(--font-mono);
+}
+.parts-meter {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+.parts-meter span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--warn), var(--price));
+}
+.parts-section-title {
+  margin: 0 0 10px;
+  font-size: 0.98rem;
+}
+.parts-checklist {
+  display: grid;
+  gap: 9px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.parts-checklist li {
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--price);
+  border-radius: var(--radius-sm);
+  background: var(--card-hover);
+}
+.parts-checklist strong,
+.parts-link-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+}
+.parts-checklist span,
+.parts-link-card span {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.parts-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.parts-link-card {
+  min-height: 108px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+  background: var(--card);
+  transition: border-color 0.15s, background 0.15s;
+}
+.parts-link-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.parts-queries {
+  display: grid;
+  gap: 8px;
+}
+.parts-query {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: 0.82rem var(--font-mono);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.parts-query:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (max-width: 880px) {
+  .parts-checker-shell {
+    grid-template-columns: 1fr;
+  }
+  .parts-checker-form-card {
+    position: static;
+  }
+  .parts-checker-results-card {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .parts-link-grid {
+    grid-template-columns: 1fr;
+  }
+  .parts-checker-result-head {
+    display: grid;
+  }
+  .parts-checker-result-head .ghost-btn {
+    width: 100%;
+  }
+}
+
 /* ---------- Inventory ---------- */
 .inventory-summary {
   display: grid;
