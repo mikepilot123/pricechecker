@@ -8,7 +8,14 @@
       hints: ["latitude", "inspiron", "xps", "precision", "alienware", "vostro", "dell"],
       touchHints: ["2-in-1", "2 in 1", "touch", "7420 2-in-1", "7390 2-in-1", "9310 2-in-1"],
       support: ({ serial }) => `https://www.dell.com/support/home/en-us/product-support/servicetag/${encodeURIComponent(serial)}/overview`,
-      parts: "https://www.parts-people.com/index.php?action=category&id=140&subid=screen",
+      parts: "https://www.dell.com/en-us/shop/partsforyourdell",
+      sources: [
+        {
+          title: "Parts-People",
+          description: "Dell-specific supplier with service-tag matching for shipped parts.",
+          url: "https://www.parts-people.com/",
+        },
+      ],
     },
     hp: {
       name: "HP",
@@ -17,6 +24,13 @@
       touchHints: ["x360", "2-in-1", "2 in 1", "touch", "spectre folio"],
       support: () => "https://support.hp.com/us-en/check-warranty",
       parts: "https://partsurfer.hp.com/",
+      sources: [
+        {
+          title: "HP Parts Store",
+          description: "Official HP parts store for genuine HP replacement parts.",
+          url: "https://parts.hp.com/",
+        },
+      ],
     },
     lenovo: {
       name: "Lenovo",
@@ -111,6 +125,7 @@
     confidenceBar: $("partsConfidenceBar"),
     checklist: $("partsChecklist"),
     links: $("partsLinks"),
+    laptopMatch: $("partsLaptopMatch"),
     queries: $("partsQueries"),
     copy: $("partsCopySearch"),
     touch: $("partsTouch"),
@@ -189,6 +204,15 @@
     return value === "touch" ? "Touch" : "Non-touch";
   }
 
+  function formatLaptopName(data, profile) {
+    const model = clean(data.model);
+    if (!profile) return model;
+    const brandTokens = profile.name.toLowerCase().split(/\s+/);
+    const modelText = model.toLowerCase();
+    const alreadyNamed = brandTokens.some((token) => modelText === token || modelText.startsWith(`${token} `));
+    return alreadyNamed ? model : `${profile.name} ${model}`;
+  }
+
   function scoreConfidence(data) {
     let score = 55;
     if (data.brand !== "unknown") score += 18;
@@ -198,16 +222,51 @@
   }
 
   function buildQueries(data, profile) {
-    const brandName = profile?.name || "";
+    const laptopName = formatLaptopName(data, profile);
     const touchTerm = data.touch === "touch" ? "touchscreen" : "non-touch";
     return [
-      `${brandName} ${data.model} ${data.serial} ${touchTerm} LCD screen replacement`,
-      `${brandName} ${data.model} ${touchTerm} display assembly part number`,
-      `${brandName} ${data.model} ${touchTerm} laptop screen`,
+      `${laptopName} ${data.serial} ${touchTerm} LCD screen replacement`,
+      `${laptopName} ${touchTerm} display assembly part number`,
+      `${laptopName} ${touchTerm} laptop screen`,
       `${data.model} ${data.serial} ${touchTerm} OEM LCD panel`,
     ]
       .map(clean)
       .filter((value, index, list) => value.length > 8 && list.indexOf(value) === index);
+  }
+
+  function buildExactSearchUrl(data, profile) {
+    const query = clean(`${formatLaptopName(data, profile)} ${data.serial}`);
+    return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+  }
+
+  function renderLaptopMatch(data, profile) {
+    const serialLabel = profile?.serialName || "serial";
+    const supportUrl = profile?.support(data) || buildExactSearchUrl(data, profile);
+    const laptopName = formatLaptopName(data, profile);
+    const rows = [
+      ["Laptop", laptopName],
+      [serialLabel, data.serial],
+      ["Display", touchLabel(data.touch)],
+      ["Touch source", data.touchSource === "inferred" ? "Auto-detected" : "Selected"],
+    ];
+
+    els.laptopMatch.innerHTML = `
+      <div class="parts-laptop-name">
+        <svg class="icon"><use href="#i-laptop"></use></svg>
+        <strong>${escapeHtml(laptopName)}</strong>
+      </div>
+      <dl>
+        ${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}
+      </dl>
+      <div class="parts-laptop-actions">
+        <a class="primary-btn" href="${escapeHtml(supportUrl)}" target="_blank" rel="noreferrer">
+          <svg class="icon"><use href="#i-search"></use></svg>Open exact lookup
+        </a>
+        <a class="ghost-btn" href="${escapeHtml(buildExactSearchUrl(data, profile))}" target="_blank" rel="noreferrer">
+          Search web
+        </a>
+      </div>
+    `;
   }
 
   function renderChecklist(data, profile) {
@@ -242,7 +301,7 @@
   function renderLinks(data, query, profile) {
     const brandLinks = profile ? [
       {
-        title: `${profile.name} Support`,
+        title: `${profile.name} exact lookup`,
         description: `Lookup by ${profile.serialName} for original configuration and parts.`,
         url: profile.support(data),
       },
@@ -251,6 +310,7 @@
         description: "Manufacturer or trusted route for assemblies and official part numbers.",
         url: profile.parts,
       },
+      ...(profile.sources || []),
     ] : [];
 
     const sources = [
@@ -348,6 +408,7 @@
     els.confidenceBar.style.width = `${score}%`;
 
     renderChecklist(data, profile);
+    renderLaptopMatch(data, profile);
     renderLinks(data, activeSearch, profile);
     renderQueries(searches);
 

@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=parts-checker-2" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-checker-3" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -566,14 +566,21 @@
             <div class="parts-meter" aria-hidden="true"><span id="partsConfidenceBar"></span></div>
           </div>
 
+          <div class="parts-result-pair">
+            <section>
+              <h3 class="parts-section-title">Exact laptop</h3>
+              <div id="partsLaptopMatch" class="parts-laptop-match"></div>
+            </section>
+
+            <section>
+              <h3 class="parts-section-title">Places to find parts</h3>
+              <div id="partsLinks" class="parts-link-grid"></div>
+            </section>
+          </div>
+
           <section>
             <h3 class="parts-section-title">Exact-match checklist</h3>
             <ul id="partsChecklist" class="parts-checklist"></ul>
-          </section>
-
-          <section>
-            <h3 class="parts-section-title">Best search routes</h3>
-            <div id="partsLinks" class="parts-link-grid"></div>
           </section>
 
           <section>
@@ -1280,6 +1287,6 @@
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
-  <script src="assets/parts-checker.js?v=parts-checker-2"></script>
+  <script src="assets/parts-checker.js?v=parts-checker-3"></script>
 </body>
 </html>
