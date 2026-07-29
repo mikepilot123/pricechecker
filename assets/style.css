@@ -509,16 +509,22 @@ body.nav-open .nav-backdrop { opacity: 1; }
   align-items: start;
   margin-top: 16px;
 }
+.parts-checker-left {
+  display: grid;
+  gap: 12px;
+  align-self: start;
+  position: sticky;
+  top: calc(var(--header-h) + 14px);
+}
 .parts-checker-form-card,
-.parts-checker-results-card {
+.parts-checker-results-card,
+.parts-price-tool {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 .parts-checker-form-card {
-  position: sticky;
-  top: calc(var(--header-h) + 14px);
   padding: 18px;
 }
 .parts-checker-results-card {
@@ -711,11 +717,10 @@ body.nav-open .nav-backdrop { opacity: 1; }
   text-decoration: none;
 }
 .parts-price-tool {
-  margin-top: 12px;
   padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
+}
+.parts-price-tool[hidden] {
+  display: none;
 }
 .parts-price-tool .parts-section-title {
   margin-bottom: 12px;
@@ -853,6 +858,9 @@ body.nav-open .nav-backdrop { opacity: 1; }
 @media (max-width: 880px) {
   .parts-checker-shell {
     grid-template-columns: 1fr;
+  }
+  .parts-checker-left {
+    position: static;
   }
   .parts-result-pair {
     grid-template-columns: 1fr;

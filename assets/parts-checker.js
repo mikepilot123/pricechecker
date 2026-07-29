@@ -128,6 +128,8 @@
       supportUrl: "https://support.hp.com/si-en/drivers/hp-pavilion-x360-convertible-laptop-pc-14m-dw1000/model/2100019236",
       imageUrl: "https://i5.walmartimages.com/asr/8ea9a272-4633-46a7-9016-12f44f2fa972.392781d5455a242967ad98da0a91bb9c.png?odnBg=FFFFFF&odnHeight=640&odnWidth=640",
       imageAlt: "HP Pavilion x360 convertible laptop product photo",
+      averageScreenCost: 113,
+      averageCostNote: "Average screen cost from current public listings: Bliss $119, FirstLCD $105.99, and eBay $108.",
       test: (key) => key.includes("14dw1013dx") || key.includes("14mdw1013dx"),
       sources: [
         {
@@ -177,6 +179,7 @@
     touchAuto: $("partsTouchAuto"),
     touchAutoValue: $("partsTouchAutoValue"),
     message: $("partsFormMessage"),
+    priceTool: $("partsPriceTool"),
     costInput: $("partsCostInput"),
     costConverted: $("partsCostConverted"),
     clearanceFee: $("partsClearanceFee"),
@@ -323,6 +326,7 @@
     const converted = cost * COST_MULTIPLIER;
     const labour = labourFor(activePriceData, activePriceProfile);
     const total = roundFlat(converted + CLEARANCE_FEE + labour.amount);
+    const averageNote = activePriceData.exactLaptop?.averageCostNote;
 
     els.costConverted.textContent = formatMoney(converted);
     els.clearanceFee.textContent = formatMoney(CLEARANCE_FEE);
@@ -330,7 +334,7 @@
     els.labourFee.textContent = formatMoney(labour.amount);
     els.suggestedPrice.textContent = formatMoney(total);
     els.priceRule.textContent = cost
-      ? `Formula: ${formatMoney(cost)} x ${COST_MULTIPLIER} + ${formatMoney(CLEARANCE_FEE)} clearance + ${formatMoney(labour.amount)} labour, rounded up to the nearest ${formatMoney(ROUND_TO)}.`
+      ? `${averageNote ? averageNote + " " : ""}Formula: ${formatMoney(cost)} x ${COST_MULTIPLIER} + ${formatMoney(CLEARANCE_FEE)} clearance + ${formatMoney(labour.amount)} labour, rounded up to the nearest ${formatMoney(ROUND_TO)}.`
       : "Enter the supplier screen cost to calculate the suggested customer price.";
   }
 
@@ -548,6 +552,7 @@
     const profile = brandProfiles[data.brand];
     activePriceData = data;
     activePriceProfile = profile;
+    els.costInput.value = data.exactLaptop?.averageScreenCost || "";
     const searches = buildQueries(data, profile);
     const score = scoreConfidence(data);
     activeSearch = searches[0] || "";
@@ -568,6 +573,7 @@
     renderPriceSuggestion();
     renderQueries(searches);
 
+    els.priceTool.hidden = false;
     els.resultsCard.hidden = false;
   });
 
