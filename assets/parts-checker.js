@@ -128,8 +128,8 @@
       supportUrl: "https://support.hp.com/si-en/drivers/hp-pavilion-x360-convertible-laptop-pc-14m-dw1000/model/2100019236",
       imageUrl: "https://i5.walmartimages.com/asr/8ea9a272-4633-46a7-9016-12f44f2fa972.392781d5455a242967ad98da0a91bb9c.png?odnBg=FFFFFF&odnHeight=640&odnWidth=640",
       imageAlt: "HP Pavilion x360 convertible laptop product photo",
-      averageScreenCost: 113,
-      averageCostNote: "Average screen cost from current public listings: Bliss $119, FirstLCD $105.99, and eBay $108.",
+      averageScreenCost: 119,
+      averageCostNote: "Prefilled with Bliss Computers' listed screen price: $119.",
       test: (key) => key.includes("14dw1013dx") || key.includes("14mdw1013dx"),
       sources: [
         {
