@@ -164,6 +164,27 @@
     },
     {
       brand: "apple",
+      name: "MacBook Pro 13-inch M1 A2338",
+      family: "MacBook Pro 13-inch",
+      touch: "non-touch",
+      aliases: ["A2338", "MacBook Pro 13 M1", "MacBook Pro 13-inch M1 2020"],
+      supportUrl: "https://support.apple.com/en-us/111893",
+      imageUrl: "https://cdsassets.apple.com/live/SZLF0YNV/images/sp/111893_macbookpro13.png",
+      imageAlt: "Apple MacBook Pro 13-inch M1 2020 product image",
+      mobileSentrixUrl: "https://genuineparts.mobilesentrix.com/complete-lcd-display-assembly-compatible-for-macbook-pro-13-a2338-late-2020-a2338-late-2023-m1-m2-genuine-oem-silver",
+      mobileSentrixDescription: "Genuine OEM complete LCD display assembly for MacBook Pro 13 A2338 M1/M2.",
+      mobileSentrixPrice: "MDL 8,751.77",
+      sources: [
+        {
+          title: "Apple repair manual",
+          description: "Official repair manual route for the MacBook Pro 13-inch M1 display assembly process.",
+          url: "https://support.apple.com/en-us/100530",
+        },
+      ],
+      test: (key) => key.includes("a2338"),
+    },
+    {
+      brand: "apple",
       name: "MacBook Pro 16-inch A2485",
       family: "MacBook Pro 16-inch",
       touch: "non-touch",
@@ -351,7 +372,7 @@
     const cost = Number.isFinite(rawCost) && rawCost > 0 ? rawCost : 0;
     const converted = cost * COST_MULTIPLIER;
     const labour = labourFor(activePriceData, activePriceProfile);
-    const total = roundFlat(converted + CLEARANCE_FEE + labour.amount);
+    const total = cost ? roundFlat(converted + CLEARANCE_FEE + labour.amount) : 0;
     const averageNote = activePriceData.exactLaptop?.averageCostNote;
 
     els.costConverted.textContent = formatMoney(converted);
@@ -490,6 +511,8 @@
       {
         title: "MobileSentrix",
         description: data.exactLaptop.mobileSentrixDescription || "Verified MobileSentrix screen listing for this exact model.",
+        price: data.exactLaptop.mobileSentrixPrice,
+        priceNote: data.exactLaptop.mobileSentrixPrice ? "Site-listed price; confirm account/currency before ordering." : "",
         url: data.exactLaptop.mobileSentrixUrl,
       },
     ] : [];
@@ -501,7 +524,7 @@
       ...universalSources.map((source) => ({ ...source, url: source.url(query) })),
       ...mobileSentrixSources,
     ].filter((source) => {
-      const key = `${source.title}|${source.url}`;
+      const key = source.url;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
