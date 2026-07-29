@@ -519,7 +519,8 @@
           <form id="partsCheckerForm" class="parts-checker-form">
             <div class="form-field form-field-full">
               <label class="field-label" for="partsModel">Model number</label>
-              <input id="partsModel" class="text-input" name="model" autocomplete="off" placeholder="Latitude 5420, 20XW004CUS, 15-dy2021nr" required />
+              <input id="partsModel" class="text-input" name="model" autocomplete="off" placeholder="Latitude 5420, 20XW004CUS, 15-dy2021nr" />
+              <p class="parts-helper-text">MacBooks can be searched with serial number only.</p>
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="partsSerial">Serial number or service tag</label>
@@ -540,7 +541,7 @@
             </div>
             <p id="partsFormMessage" class="field-error" hidden></p>
             <button type="submit" class="primary-btn"><svg class="icon"><use href="#i-search"></use></svg>Find screens</button>
-            <p class="parts-submit-note">Enter the laptop identifiers to pull up the exact laptop, matching suppliers, and the screen replacement price suggestion.</p>
+            <p class="parts-submit-note">Enter the laptop identifiers to pull up the exact laptop, matching suppliers, and the screen replacement price suggestion. MacBooks can be found with serial number only.</p>
           </form>
         </div>
 
@@ -1300,6 +1301,6 @@
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
-  <script src="assets/parts-checker.js?v=parts-checker-9"></script>
+  <script src="assets/parts-checker.js?v=parts-checker-10"></script>
 </body>
 </html>

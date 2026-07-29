@@ -53,6 +53,13 @@
       nonTouchHints: ["macbook", "macbook pro", "macbook air"],
       support: () => "https://checkcoverage.apple.com/",
       parts: "https://support.apple.com/mac/repair",
+      sources: [
+        {
+          title: "EveryMac serial lookup",
+          description: "Use the serial to identify the exact MacBook model and display generation.",
+          url: "https://everymac.com/ultimate-mac-lookup/",
+        },
+      ],
     },
     asus: {
       name: "ASUS",
@@ -201,15 +208,21 @@
     return clean(value).toLowerCase().replace(/[^a-z0-9]/g, "");
   }
 
-  function findKnownLaptop(model) {
-    const key = modelKey(model);
+  function isLikelyAppleSerial(serial) {
+    const key = modelKey(serial).toUpperCase();
+    return /^[A-Z0-9]{10,12}$/.test(key) && /[A-Z]/.test(key) && /\d/.test(key);
+  }
+
+  function findKnownLaptop(model, serial = "") {
+    const key = modelKey(`${model} ${serial}`);
     return knownLaptopMatchers.find((item) => item.test(key)) || null;
   }
 
-  function detectBrand(model, selectedBrand) {
+  function detectBrand(model, serial, selectedBrand) {
     if (selectedBrand !== "auto") return selectedBrand;
-    const known = findKnownLaptop(model);
+    const known = findKnownLaptop(model, serial);
     if (known) return known.brand;
+    if (!clean(model) && isLikelyAppleSerial(serial)) return "apple";
     const haystack = model.toLowerCase();
     const match = Object.entries(brandProfiles).find(([, profile]) =>
       profile.hints.some((hint) => haystack.includes(hint))
@@ -219,8 +232,9 @@
   }
 
   function detectTouchStatus(model, serial, brand) {
-    const known = findKnownLaptop(model);
+    const known = findKnownLaptop(model, serial);
     if (known?.touch) return { value: known.touch, source: "exact-model" };
+    if (brand === "apple" && isLikelyAppleSerial(serial)) return { value: "non-touch", source: "serial" };
     const haystack = `${model} ${serial}`.toLowerCase();
     const profile = brandProfiles[brand];
     const touchHints = [
@@ -248,7 +262,7 @@
   function syncTouchField() {
     const model = clean($("partsModel")?.value);
     const serial = clean($("partsSerial")?.value);
-    const brand = detectBrand(model, "auto");
+    const brand = detectBrand(model, serial, "auto");
     const detected = detectTouchStatus(model, serial, brand);
 
     if (detected.value) {
@@ -276,6 +290,7 @@
   function formatLaptopName(data, profile) {
     if (data.exactLaptop?.name) return data.exactLaptop.name;
     const model = clean(data.model);
+    if (!model && data.brand === "apple") return "Apple MacBook serial lookup pending exact model";
     if (!profile) return model;
     const brandTokens = profile.name.toLowerCase().split(/\s+/);
     const modelText = model.toLowerCase();
@@ -313,7 +328,7 @@
     if (/\bchrome\s*book\b|\bchromebook\b/.test(text)) {
       return { amount: CHROMEBOOK_LABOUR_FEE, label: "Chromebook labour" };
     }
-    if (/\bmac\s*book\b|\bmacbook\b/.test(text)) {
+    if (data.brand === "apple" || /\bmac\s*book\b|\bmacbook\b/.test(text)) {
       return { amount: MACBOOK_LABOUR_FEE, label: "MacBook labour" };
     }
     return { amount: DEFAULT_LABOUR_FEE, label: "Installation" };
@@ -341,7 +356,17 @@
   function buildQueries(data, profile) {
     const laptopName = formatLaptopName(data, profile);
     const touchTerm = data.touch === "touch" ? "touchscreen" : "non-touch";
-    const aliasTerm = data.exactLaptop?.aliases?.join(" ") || data.model;
+    const aliasTerm = data.exactLaptop?.aliases?.join(" ") || data.model || laptopName;
+    if (data.brand === "apple" && !clean(data.model)) {
+      return [
+        `${data.serial} MacBook serial lookup display assembly`,
+        `${data.serial} Apple MacBook screen replacement`,
+        `${data.serial} MacBook model number display assembly`,
+        `${data.serial} MacBook LCD assembly part number`,
+      ]
+        .map(clean)
+        .filter((value, index, list) => value.length > 8 && list.indexOf(value) === index);
+    }
     return [
       `${laptopName} ${data.serial} ${touchTerm} LCD screen replacement`,
       `${laptopName} ${touchTerm} display assembly part number`,
@@ -353,7 +378,9 @@
   }
 
   function buildExactSearchUrl(data, profile) {
-    const query = clean(`${formatLaptopName(data, profile)} ${data.serial}`);
+    const query = data.brand === "apple" && !clean(data.model)
+      ? clean(`${data.serial} MacBook serial lookup`)
+      : clean(`${formatLaptopName(data, profile)} ${data.serial}`);
     return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
   }
 
@@ -528,8 +555,14 @@
     const formData = new FormData(form);
     const model = clean(formData.get("model"));
     const serial = clean(formData.get("serial"));
-    const exactLaptop = findKnownLaptop(model);
-    const brand = detectBrand(model, "auto");
+    const exactLaptop = findKnownLaptop(model, serial);
+    const brand = detectBrand(model, serial, "auto");
+    if (!model && brand !== "apple") {
+      els.message.textContent = "Enter the model number, or enter a MacBook serial number for Apple serial-only lookup.";
+      els.message.hidden = false;
+      $("partsModel")?.focus();
+      return;
+    }
     const touchDetection = detectTouchStatus(model, serial, brand);
     const touch = touchDetection.value || formData.get("touch");
     if (!touch) {
