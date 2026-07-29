@@ -142,12 +142,23 @@
         {
           title: "LaptopScreen exact screen",
           description: "Exact model page for the HP Pavilion x360 14-dw1013dx display assembly.",
-          url: "https://www.laptopscreen.com/English/model/HP/PAVILION~X360~14-DW1013DX/",
+          price: "$126.99",
+          priceNote: "1-unit new customer price; volume pricing from $102.59.",
+          url: "https://www.laptopscreen.com/English/model/HP/PAVILION~X360~14M-DW1013DX/",
         },
         {
           title: "Bliss Computers assembly",
           description: "Touch screen assembly listings for HP Pavilion x360 14m-dw1013dx.",
+          price: "$119.00",
+          priceNote: "Bliss listed price.",
           url: "https://www.blisscomputers.net/14-hp-pavilion-x360-14m-dw0013dx-14m-dw1013dx-lcd-touch-screen-replacement-225816/",
+        },
+        {
+          title: "eBay exact assembly",
+          description: "Exact HP Pavilion x360 14m-dw1013dx touch assembly listing.",
+          price: "$108.00",
+          priceNote: "Current listing price; seller pricing may change.",
+          url: "https://www.ebay.com/itm/156894311748",
         },
       ],
     },
@@ -502,7 +513,16 @@
       card.href = source.url;
       card.target = "_blank";
       card.rel = "noreferrer";
-      card.innerHTML = `<strong>${escapeHtml(source.title)}</strong><span>${escapeHtml(source.description)}</span>`;
+      const priceHtml = source.price
+        ? `<span class="parts-link-price"><span>Website price</span><strong>${escapeHtml(source.price)}</strong>${source.priceNote ? `<small>${escapeHtml(source.priceNote)}</small>` : ""}</span>`
+        : "";
+      card.innerHTML = `
+        <div class="parts-link-card-head">
+          <strong>${escapeHtml(source.title)}</strong>
+          ${priceHtml}
+        </div>
+        <span>${escapeHtml(source.description)}</span>
+      `;
       return card;
     }));
   }
