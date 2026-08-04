@@ -1580,9 +1580,6 @@
     if (field) field.hidden = !$("fSendInvoice").checked;
   });
   $("closeIntakeFormModal").addEventListener("click", closeForm);
-  $("intakeFormModal").addEventListener("click", (e) => {
-    if (e.target.id === "intakeFormModal") closeForm();
-  });
 
   // A quick-log form is opened over the Prices view. On phone-sized screens,
   // a deliberate left swipe is another way to dismiss it and return to the
