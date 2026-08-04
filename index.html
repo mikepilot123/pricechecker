@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=parts-checker-11" />
+  <link rel="stylesheet" href="assets/style.css?v=diagnostics-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -61,6 +61,21 @@
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4.5 7.5h3l1.5-2.5h6l1.5 2.5h3a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V9a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5L8 5.5Z"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11.5M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"/></symbol>
+    <!-- Diagnostics: nav mark + one icon per testable device part. -->
+    <symbol id="i-diagnose" viewBox="0 0 24 24"><path d="M3 12h3.5l2-5.5 4 12 2-6.5h3"/><circle cx="19.5" cy="12" r="1.6"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="13" rx="2"/><path d="M8.5 21h7M12 17.5V21"/></symbol>
+    <symbol id="i-touch" viewBox="0 0 24 24"><path d="M9 12V6.4a1.8 1.8 0 0 1 3.6 0v5.1"/><path d="M12.6 11.2a1.7 1.7 0 0 1 3.4 0v.9"/><path d="M16 12.1a1.7 1.7 0 0 1 3.4 0v3.4a5.2 5.2 0 0 1-5.2 5.2h-1.4a4.8 4.8 0 0 1-3.6-1.7l-3.4-4a1.7 1.7 0 0 1 2.5-2.2l1 1.1"/></symbol>
+    <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2.5" y="7" width="16" height="10" rx="2.5"/><path d="M21 10.5v3"/><path d="M6 10.2v3.6M9.2 10.2v3.6M12.4 10.2v3.6"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M3.2 9.3a13 13 0 0 1 17.6 0"/><path d="M6.6 12.9a8.2 8.2 0 0 1 10.8 0"/><path d="M9.9 16.4a4 4 0 0 1 4.2 0"/><path d="M12 19.6h.01"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24"><path d="M4 20v-4.5M9.3 20v-8.5M14.7 20V7M20 20V3.5"/></symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.3h3.4L12 5.2v13.6L7.4 14.7H4z"/><path d="M15.4 9.6a3.8 3.8 0 0 1 0 4.8M18 7a7.4 7.4 0 0 1 0 10"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2.8" width="6" height="11" rx="3"/><path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0"/><path d="M12 17.8v3.4"/></symbol>
+    <symbol id="i-usb" viewBox="0 0 24 24"><rect x="6.5" y="9" width="11" height="11.5" rx="2"/><path d="M9.6 9V5.5a1 1 0 0 1 1-1h2.8a1 1 0 0 1 1 1V9"/><path d="M9.8 13.2h4.4"/></symbol>
+    <symbol id="i-vibrate" viewBox="0 0 24 24"><rect x="8.2" y="4" width="7.6" height="16" rx="2"/><path d="M4.8 9.2v5.6M2.2 10.8v2.4M19.2 9.2v5.6M21.8 10.8v2.4"/></symbol>
+    <symbol id="i-power-btn" viewBox="0 0 24 24"><path d="M12 3.4v7.2"/><path d="M17.4 6.6a7.8 7.8 0 1 1-10.8 0"/></symbol>
+    <symbol id="i-volume-btn" viewBox="0 0 24 24"><rect x="9.8" y="3" width="4.4" height="7.4" rx="2.2"/><rect x="9.8" y="13.6" width="4.4" height="7.4" rx="2.2"/></symbol>
+    <symbol id="i-face-id" viewBox="0 0 24 24"><path d="M3.5 8.5V6a2.5 2.5 0 0 1 2.5-2.5h2.5M15.5 3.5H18A2.5 2.5 0 0 1 20.5 6v2.5M20.5 15.5V18a2.5 2.5 0 0 1-2.5 2.5h-2.5M8.5 20.5H6A2.5 2.5 0 0 1 3.5 18v-2.5"/><path d="M9 9.8v1.8M15 9.8v1.8M9.2 15a3.8 3.8 0 0 0 5.6 0"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 9.6h.01M9.6 9.6h.01M13.2 9.6h.01M16.8 9.6h.01M6 13.4h.01M18 13.4h.01M9.2 13.4h5.6"/></symbol>
   </svg>
   <header class="app-header">
     <div class="header-row">
@@ -78,6 +93,7 @@
       </div>
       <button class="nav-btn active" data-target="prices" role="tab" aria-selected="true"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Repairs</button>
+      <button class="nav-btn" data-target="diagnostics" role="tab" aria-selected="false"><svg class="icon"><use href="#i-diagnose"></use></svg>Diagnostics</button>
       <button class="nav-btn" data-target="parts-checker" role="tab" aria-selected="false"><svg class="icon"><use href="#i-laptop"></use></svg>Parts Checker</button>
       <button class="nav-btn" data-target="dashboard" role="tab" aria-selected="false"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
       <button class="nav-btn" data-target="leads" role="tab" aria-selected="false"><svg class="icon"><use href="#i-user"></use></svg>Leads</button>
@@ -505,6 +521,111 @@
   </main>
 
   <!-- ============ PARTS CHECKER VIEW ============ -->
+  <!-- ============ DIAGNOSTICS VIEW ============ -->
+  <main class="container view" id="view-diagnostics" hidden>
+    <p class="info-banner">Tap each part on the device to record how it tests — before the repair, then again after.</p>
+
+    <section class="dg-shell" aria-labelledby="dgTitle">
+      <div class="leads-heading-row">
+        <div>
+          <p class="dashboard-eyebrow">Testing</p>
+          <h2 id="dgTitle">Device diagnostics</h2>
+        </div>
+        <p id="dgStatusLine" class="result-count"></p>
+      </div>
+
+      <!-- Client / device -->
+      <div class="dg-client-card">
+        <div class="dg-field dg-field-search">
+          <label class="field-label" for="dgClientSearch">Link a logged device <span class="field-optional">(optional)</span></label>
+          <div class="dg-combo">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <input id="dgClientSearch" class="dg-combo-input" type="search" autocomplete="off" placeholder="Search Repairs by client, phone, device or ticket #…" aria-label="Search logged devices" />
+          </div>
+          <div id="dgComboList" class="dg-combo-list" hidden role="listbox"></div>
+          <p id="dgComboHint" class="parts-helper-text">Pick a logged device to tag this report to it, or just type the client's details below.</p>
+        </div>
+
+        <div id="dgTagged" class="dg-tagged" hidden></div>
+
+        <div class="dg-client-grid">
+          <div class="dg-field">
+            <label class="field-label" for="dgClientName">Client name</label>
+            <input id="dgClientName" class="text-input" autocomplete="off" placeholder="Walk-in customer" />
+          </div>
+          <div class="dg-field">
+            <label class="field-label" for="dgClientContact">Contact</label>
+            <input id="dgClientContact" class="text-input" autocomplete="off" placeholder="Phone or email" />
+          </div>
+          <div class="dg-field">
+            <label class="field-label" for="dgDevice">Device</label>
+            <input id="dgDevice" class="text-input" autocomplete="off" placeholder="iPhone 11, MacBook A1466" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Before / after stage -->
+      <div class="dg-stage-bar" role="tablist" aria-label="Repair stage">
+        <button type="button" class="dg-stage-btn active" data-dg-stage="before" role="tab" aria-selected="true">
+          <span class="dg-stage-name">Before repair</span>
+          <span class="dg-stage-meta" data-dg-stage-meta="before">0 tested</span>
+        </button>
+        <button type="button" class="dg-stage-btn" data-dg-stage="after" role="tab" aria-selected="false">
+          <span class="dg-stage-name">After repair</span>
+          <span class="dg-stage-meta" data-dg-stage-meta="after">0 tested</span>
+        </button>
+      </div>
+
+      <div class="dg-main">
+        <div class="dg-map-card">
+          <div class="dg-map-head">
+            <div class="dg-type-switch" role="group" aria-label="Device layout">
+              <button type="button" class="dg-type-btn" data-dg-type="phone"><svg class="icon"><use href="#i-smartphone"></use></svg>Phone / tablet</button>
+              <button type="button" class="dg-type-btn" data-dg-type="laptop"><svg class="icon"><use href="#i-laptop"></use></svg>Laptop</button>
+            </div>
+            <div class="dg-legend" aria-hidden="true">
+              <span class="dg-legend-item"><i class="dg-swatch state-untested"></i>Untested</span>
+              <span class="dg-legend-item"><i class="dg-swatch state-pass"></i>Pass</span>
+              <span class="dg-legend-item"><i class="dg-swatch state-fail"></i>Fail</span>
+              <span class="dg-legend-item"><i class="dg-swatch state-na"></i>N/A</span>
+            </div>
+          </div>
+          <div id="dgMap" class="dg-map"></div>
+          <p class="dg-hint">Tap a part to cycle it: Untested → Pass → Fail → N/A.</p>
+        </div>
+
+        <div class="dg-side">
+          <div id="dgProgress" class="dg-progress-card" aria-live="polite"></div>
+          <div id="dgPartList" class="dg-part-list"></div>
+        </div>
+      </div>
+
+      <div id="dgCompare" class="dg-compare-card" aria-live="polite"></div>
+
+      <div class="dg-field dg-notes">
+        <label class="field-label" for="dgNotes">Notes</label>
+        <textarea id="dgNotes" class="text-input" rows="2" placeholder="Parts used, faults found, anything to tell the client…"></textarea>
+      </div>
+
+      <div class="dg-actions">
+        <button type="button" id="dgSave" class="primary-btn"><svg class="icon"><use href="#i-check"></use></svg>Save report</button>
+        <button type="button" id="dgCopy" class="ghost-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy summary</button>
+        <button type="button" id="dgReset" class="ghost-btn danger-btn"><svg class="icon"><use href="#i-refresh"></use></svg>New report</button>
+      </div>
+
+      <div class="dg-saved">
+        <div class="leads-heading-row">
+          <div>
+            <p class="dashboard-eyebrow">History</p>
+            <h3 class="dg-saved-title">Saved reports</h3>
+          </div>
+          <p id="dgSavedCount" class="result-count"></p>
+        </div>
+        <div id="dgSavedList" class="dg-saved-list"></div>
+      </div>
+    </section>
+  </main>
+
   <main class="container view" id="view-parts-checker" hidden>
     <p class="info-banner">Build an exact laptop screen lookup packet from model, serial, and touch status.</p>
 
@@ -1297,10 +1418,11 @@
 
   <script src="assets/app.js?v=pwa-install-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=parts-checker-2"></script>
+  <script src="assets/intake.js?v=diagnostics-1"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>
+  <script src="assets/diagnostics.js?v=diagnostics-1"></script>
 </body>
 </html>
