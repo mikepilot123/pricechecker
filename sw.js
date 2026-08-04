@@ -6,7 +6,11 @@
 
    Google Sheet requests are never touched here — prices/intake always go
    straight to the network (with their own localStorage fallback in app.js). */
-const CACHE = "rpc-shell-v57";
+const CACHE = "rpc-shell-v58";
+// Keep this list in sync with the <script>/<link> tags in index.html.
+// cache.addAll() is all-or-nothing: one 404 here rejects the whole install
+// and the device silently ends up with no offline shell at all, so a file
+// removed from the repo must be removed from this list too.
 const SHELL = [
   "./",
   "./index.html",
@@ -17,7 +21,8 @@ const SHELL = [
   "./assets/leads.js",
   "./assets/inventory.js",
   "./assets/intake.js",
-  "./assets/diagnose.js",
+  "./assets/parts-checker.js",
+  "./assets/diagnostics.js",
   "./manifest.webmanifest",
   "./assets/branding/jq-electronics-logo.png",
   "./assets/branding/icon-192.png",
