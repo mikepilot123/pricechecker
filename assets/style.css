@@ -4635,6 +4635,21 @@ video.media-viewer-media {
   gap: 14px;
   margin-top: 14px;
   align-items: start;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+/* ---- Section transitions ---- */
+.dg-main.dg-slide-out-left { transform: translateX(-18px); opacity: 0; }
+.dg-main.dg-slide-out-right { transform: translateX(18px); opacity: 0; }
+.dg-main.dg-slide-in-left { transform: translateX(-18px); opacity: 0; }
+.dg-main.dg-slide-in-right { transform: translateX(18px); opacity: 0; }
+.dg-main.dg-no-transition { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dg-main, .dg-main.dg-slide-out-left, .dg-main.dg-slide-out-right,
+  .dg-main.dg-slide-in-left, .dg-main.dg-slide-in-right {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
 }
 .dg-map-card, .dg-section-panel, .dg-compare-card, .dg-saved-list {
   background: var(--card);
@@ -4710,6 +4725,15 @@ video.media-viewer-media {
 .dg-hotspot.state-na { color: var(--warn); }
 .dg-hotspot.state-na .dg-dot { fill: #fdf5e6; stroke: var(--warn); }
 .dg-hotspot.state-na .dg-dot-icon { stroke: #8a4f0f; }
+.dg-hotspot.dg-just-set .dg-dot { animation: dg-just-set-dot 0.6s ease; transform-box: fill-box; transform-origin: center; }
+@keyframes dg-just-set-dot {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dg-test-card.dg-just-set, .dg-hotspot.dg-just-set .dg-dot { animation: none; }
+}
 .dg-hint { margin: 6px 0 4px; text-align: center; font-size: 0.76rem; color: var(--text-dim); }
 
 .dg-side { display: grid; gap: 12px; align-content: start; }
@@ -4810,6 +4834,12 @@ video.media-viewer-media {
 .dg-test-card.state-pass { border-color: #b7e0cd; background: #f0f9f4; }
 .dg-test-card.state-fail { border-color: #f2c6c0; background: #fff5f5; }
 .dg-test-card.state-na { border-color: #ecd4ac; background: #fdf7ec; }
+.dg-test-card.dg-just-set { animation: dg-just-set-card 0.6s ease; }
+@keyframes dg-just-set-card {
+  0% { box-shadow: 0 0 0 0 rgba(31, 95, 191, 0.4); transform: scale(1); }
+  30% { box-shadow: 0 0 0 5px rgba(31, 95, 191, 0.16); transform: scale(1.015); }
+  100% { box-shadow: 0 0 0 0 rgba(31, 95, 191, 0); transform: scale(1); }
+}
 .dg-test-icon {
   display: inline-flex;
   align-items: center;

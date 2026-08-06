@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=diagnostics-3" />
+  <link rel="stylesheet" href="assets/style.css?v=diagnostics-4" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -562,6 +562,11 @@
             <input id="dgDevice" class="text-input" autocomplete="off" placeholder="iPhone 11, MacBook A1466" />
           </div>
         </div>
+
+        <div class="dg-field dg-notes">
+          <label class="field-label" for="dgNotes">Notes</label>
+          <textarea id="dgNotes" class="text-input" rows="2" placeholder="Parts used, faults found, anything to tell the client…"></textarea>
+        </div>
       </div>
 
       <!-- Before / after stage -->
@@ -592,7 +597,7 @@
 
       <div id="dgStepper" class="dg-stepper" role="tablist" aria-label="Test sections"></div>
 
-      <div class="dg-main">
+      <div class="dg-main" id="dgMain">
         <div class="dg-map-card">
           <div id="dgMap" class="dg-map"></div>
           <p class="dg-hint">Tap a part on the device, or use the buttons alongside it.</p>
@@ -610,11 +615,6 @@
       </div>
 
       <div id="dgCompare" class="dg-compare-card" aria-live="polite"></div>
-
-      <div class="dg-field dg-notes">
-        <label class="field-label" for="dgNotes">Notes</label>
-        <textarea id="dgNotes" class="text-input" rows="2" placeholder="Parts used, faults found, anything to tell the client…"></textarea>
-      </div>
 
       <div class="dg-actions">
         <button type="button" id="dgSave" class="primary-btn"><svg class="icon"><use href="#i-check"></use></svg>Save report</button>
@@ -1433,6 +1433,6 @@
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>
-  <script src="assets/diagnostics.js?v=diagnostics-3"></script>
+  <script src="assets/diagnostics.js?v=diagnostics-4"></script>
 </body>
 </html>
