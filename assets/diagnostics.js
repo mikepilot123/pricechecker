@@ -8,9 +8,9 @@
 
    Tests are grouped into short sections — Display, Cameras, Audio,
    Connectivity, and so on — and staff step through them one at a time
-   rather than facing every test at once. The device map dims the parts
-   that aren't in the current section, so it still doubles as a map of
-   where you are in the run.
+   rather than facing every test at once. The device only ever shows the
+   handful of parts belonging to the current section, so it reads as
+   "test these two things, here" instead of a field of dots.
 
    Everything is recorded twice, once BEFORE the repair to capture what
    came in broken and once AFTER to prove what got fixed. The comparison
@@ -215,29 +215,34 @@
 
   // ---- Rendering -----------------------------------------------------------
 
+  // Only the current section's parts are drawn. Showing all seventeen at
+  // once — even dimmed — buries the handful actually being tested under a
+  // field of dots; an near-empty device with two markers on it says
+  // "test these two things, here" at a glance.
   function renderMap() {
     const box = $("dgMap");
     if (!box) return;
     const l = layout();
-    const inSection = new Set(currentGroup().parts);
-    const hotspots = l.parts.map((p) => {
-      const state = stateOf(draft.stage, p.key);
-      const focused = inSection.has(p.key);
+    const g = currentGroup();
+    const hotspots = g.parts.map((key) => {
+      const p = partByKey(key);
+      if (!p) return "";
+      const state = stateOf(draft.stage, key);
       return `
-        <g class="dg-hotspot state-${state} ${focused ? "is-focused" : "is-dimmed"}" data-dg-part="${esc(p.key)}"
+        <g class="dg-hotspot state-${state}" data-dg-part="${esc(p.key)}"
            transform="translate(${p.x},${p.y})" role="button" tabindex="0"
            aria-label="${esc(p.label)}: ${STATE_LABEL[state]}">
           <title>${esc(p.label)} — ${STATE_LABEL[state]}</title>
-          <circle class="dg-dot" r="18"/>
-          <use class="dg-dot-icon" href="#${esc(p.icon)}" x="-10" y="-10" width="20" height="20"/>
-          ${state === "pass" ? `<circle class="dg-dot-badge" cx="13" cy="-13" r="6"/><path class="dg-dot-tick" d="M10.2 -13.3l1.9 1.9 3.7-3.9"/>` : ""}
-          ${state === "fail" ? `<circle class="dg-dot-badge" cx="13" cy="-13" r="6"/><path class="dg-dot-tick" d="M10.8 -15.2l4.4 4.4M15.2 -15.2l-4.4 4.4"/>` : ""}
-          ${state === "na" ? `<circle class="dg-dot-badge" cx="13" cy="-13" r="6"/><path class="dg-dot-tick" d="M10.4 -13h5.2"/>` : ""}
+          <circle class="dg-dot" r="22"/>
+          <use class="dg-dot-icon" href="#${esc(p.icon)}" x="-12" y="-12" width="24" height="24"/>
+          ${state === "pass" ? `<circle class="dg-dot-badge" cx="16" cy="-16" r="7"/><path class="dg-dot-tick" d="M12.8 -16.4l2.2 2.2 4.2-4.4"/>` : ""}
+          ${state === "fail" ? `<circle class="dg-dot-badge" cx="16" cy="-16" r="7"/><path class="dg-dot-tick" d="M13.4 -18.6l5.2 5.2M18.6 -18.6l-5.2 5.2"/>` : ""}
+          ${state === "na" ? `<circle class="dg-dot-badge" cx="16" cy="-16" r="7"/><path class="dg-dot-tick" d="M13 -16h6"/>` : ""}
         </g>`;
     }).join("");
 
     box.innerHTML = `
-      <svg class="dg-svg" viewBox="${l.viewBox}" role="group" aria-label="Device diagram — parts in the current section are highlighted">
+      <svg class="dg-svg" viewBox="${l.viewBox}" role="group" aria-label="${esc(g.label)} — tap a part on the device to set its result">
         ${l.frame}
         ${hotspots}
       </svg>`;
@@ -513,21 +518,6 @@
     render();
   }
 
-  // Tapping a part on the map that belongs to another section jumps to that
-  // section first, so the map stays a navigation aid as well as an input.
-  function handleMapTap(key) {
-    if (!currentGroup().parts.includes(key)) {
-      const target = groups().findIndex((g) => g.parts.includes(key));
-      if (target >= 0) {
-        draft.section = target;
-        saveDraft();
-        render();
-        return;
-      }
-    }
-    cyclePart(key);
-  }
-
   function setSection(index) {
     const max = groups().length - 1;
     draft.section = Math.min(Math.max(index, 0), max);
@@ -775,7 +765,7 @@
       const setBtn = event.target.closest("[data-dg-set]");
       if (setBtn) { setPartState(setBtn.dataset.dgSet, setBtn.dataset.dgValue); return; }
       const hotspot = event.target.closest("[data-dg-part]");
-      if (hotspot) { handleMapTap(hotspot.dataset.dgPart); return; }
+      if (hotspot) { cyclePart(hotspot.dataset.dgPart); return; }
       const step = event.target.closest("[data-dg-section]");
       if (step) { setSection(Number(step.dataset.dgSection)); return; }
       const stageBtn = event.target.closest("[data-dg-stage]");
@@ -797,7 +787,7 @@
       const hotspot = event.target.closest("[data-dg-part]");
       if (hotspot && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
-        handleMapTap(hotspot.dataset.dgPart);
+        cyclePart(hotspot.dataset.dgPart);
       }
     });
 
