@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=diagnostics-1" />
+  <link rel="stylesheet" href="assets/style.css?v=diagnostics-2" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -576,28 +576,37 @@
         </button>
       </div>
 
+      <!-- Section stepper: one group of related tests at a time -->
+      <div class="dg-type-row">
+        <div class="dg-type-switch" role="group" aria-label="Device layout">
+          <button type="button" class="dg-type-btn" data-dg-type="phone"><svg class="icon"><use href="#i-smartphone"></use></svg>Phone / tablet</button>
+          <button type="button" class="dg-type-btn" data-dg-type="laptop"><svg class="icon"><use href="#i-laptop"></use></svg>Laptop</button>
+        </div>
+        <div class="dg-legend" aria-hidden="true">
+          <span class="dg-legend-item"><i class="dg-swatch state-untested"></i>Untested</span>
+          <span class="dg-legend-item"><i class="dg-swatch state-pass"></i>Pass</span>
+          <span class="dg-legend-item"><i class="dg-swatch state-fail"></i>Fail</span>
+          <span class="dg-legend-item"><i class="dg-swatch state-na"></i>N/A</span>
+        </div>
+      </div>
+
+      <div id="dgStepper" class="dg-stepper" role="tablist" aria-label="Test sections"></div>
+
       <div class="dg-main">
         <div class="dg-map-card">
-          <div class="dg-map-head">
-            <div class="dg-type-switch" role="group" aria-label="Device layout">
-              <button type="button" class="dg-type-btn" data-dg-type="phone"><svg class="icon"><use href="#i-smartphone"></use></svg>Phone / tablet</button>
-              <button type="button" class="dg-type-btn" data-dg-type="laptop"><svg class="icon"><use href="#i-laptop"></use></svg>Laptop</button>
-            </div>
-            <div class="dg-legend" aria-hidden="true">
-              <span class="dg-legend-item"><i class="dg-swatch state-untested"></i>Untested</span>
-              <span class="dg-legend-item"><i class="dg-swatch state-pass"></i>Pass</span>
-              <span class="dg-legend-item"><i class="dg-swatch state-fail"></i>Fail</span>
-              <span class="dg-legend-item"><i class="dg-swatch state-na"></i>N/A</span>
-            </div>
-          </div>
           <div id="dgMap" class="dg-map"></div>
-          <p class="dg-hint">Tap a part to cycle it: Untested → Pass → Fail → N/A.</p>
+          <p class="dg-hint">Parts in this section are highlighted — tap one on the device, or use the buttons.</p>
         </div>
 
         <div class="dg-side">
-          <div id="dgProgress" class="dg-progress-card" aria-live="polite"></div>
-          <div id="dgPartList" class="dg-part-list"></div>
+          <div id="dgSectionPanel" class="dg-section-panel" aria-live="polite"></div>
         </div>
+      </div>
+
+      <div class="dg-section-nav">
+        <button type="button" id="dgPrevSection" class="ghost-btn"><svg class="icon"><use href="#i-chevron-left"></use></svg>Back</button>
+        <div id="dgProgress" class="dg-progress-inline" aria-live="polite"></div>
+        <button type="button" id="dgNextSection" class="primary-btn">Next<svg class="icon"><use href="#i-chevron-right"></use></svg></button>
       </div>
 
       <div id="dgCompare" class="dg-compare-card" aria-live="polite"></div>
@@ -610,6 +619,7 @@
       <div class="dg-actions">
         <button type="button" id="dgSave" class="primary-btn"><svg class="icon"><use href="#i-check"></use></svg>Save report</button>
         <button type="button" id="dgCopy" class="ghost-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy summary</button>
+        <button type="button" id="dgResetStage" class="ghost-btn"><svg class="icon"><use href="#i-restore"></use></svg>Reset this test</button>
         <button type="button" id="dgReset" class="ghost-btn danger-btn"><svg class="icon"><use href="#i-refresh"></use></svg>New report</button>
       </div>
 
@@ -1423,6 +1433,6 @@
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>
-  <script src="assets/diagnostics.js?v=diagnostics-1"></script>
+  <script src="assets/diagnostics.js?v=diagnostics-2"></script>
 </body>
 </html>

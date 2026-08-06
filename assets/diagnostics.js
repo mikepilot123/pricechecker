@@ -1,17 +1,24 @@
 /* ============================================================
    Visual diagnostics — test a device before and after a repair.
 
-   The point of this tool is that it is a *picture*, not a checklist:
-   staff tap the part of the device they just tested (charging port at
-   the bottom edge, volume keys on the left rail, camera in the top
-   bezel…) and it turns green/red in place. Each part is tested twice —
-   once BEFORE the repair to record what came in broken, once AFTER to
-   prove what got fixed — and the comparison panel calls out anything
-   that regressed, which is the thing you never want to hand back to a
-   client unnoticed.
+   The tool is a *picture*, not a checklist: each testable part is a
+   hotspot sitting where it physically lives (charging port on the bottom
+   edge, volume keys on the left rail, webcam in the laptop lid), and
+   setting it colours it in place.
 
-   Client details can be typed in free-hand for a walk-in, or the report
-   can be tagged to a device already logged in Repairs, in which case the
+   Tests are grouped into short sections — Display, Cameras, Audio,
+   Connectivity, and so on — and staff step through them one at a time
+   rather than facing every test at once. The device map dims the parts
+   that aren't in the current section, so it still doubles as a map of
+   where you are in the run.
+
+   Everything is recorded twice, once BEFORE the repair to capture what
+   came in broken and once AFTER to prove what got fixed. The comparison
+   panel calls out anything that regressed, which is the thing you never
+   want to hand back to a client unnoticed.
+
+   Client details can be typed free-hand for a walk-in, or the report can
+   be tagged to a device already logged in Repairs, in which case the
    name/contact/device are pulled from that ticket and the report keeps a
    reference to it.
 
@@ -26,10 +33,11 @@
 
   const STATES = ["untested", "pass", "fail", "na"];
   const STATE_LABEL = { untested: "Untested", pass: "Pass", fail: "Fail", na: "N/A" };
+  const SETTABLE = ["pass", "fail", "na"];
 
-  // Each part sits where it physically lives on the device, so the map
-  // reads as the device rather than as a list. x/y are in the layout's
-  // own viewBox units.
+  // Parts sit where they physically are on the device, so the map reads as
+  // the device rather than as a list. x/y are in the layout's viewBox units.
+  // `groups` splits them into the sections staff step through.
   const LAYOUTS = {
     phone: {
       viewBox: "0 0 300 450",
@@ -55,6 +63,14 @@
         { key: "charging", label: "Charging port", icon: "i-usb", x: 150, y: 408 },
         { key: "speaker", label: "Loudspeaker", icon: "i-speaker", x: 188, y: 408 },
       ],
+      groups: [
+        { label: "Display & touch", icon: "i-screen", hint: "Look over the panel, then swipe around the whole screen.", parts: ["display", "touch"] },
+        { label: "Cameras", icon: "i-camera", hint: "Open the camera app and try both lenses and the flash.", parts: ["frontCamera", "rearCamera"] },
+        { label: "Audio", icon: "i-speaker", hint: "Ring it, play a clip, then record a voice note.", parts: ["earpiece", "speaker", "mic"] },
+        { label: "Connectivity", icon: "i-wifi", hint: "Join Wi-Fi, pair Bluetooth, check signal with a SIM in.", parts: ["wifi", "cellular"] },
+        { label: "Buttons & sensors", icon: "i-power-btn", hint: "Press every button; test unlock, vibrate and auto-brightness.", parts: ["powerButton", "volumeButtons", "biometrics", "vibration", "sensors"] },
+        { label: "Power & software", icon: "i-battery", hint: "Check battery health, plug in to charge, confirm it boots clean.", parts: ["battery", "charging", "software"] },
+      ],
     },
     laptop: {
       viewBox: "0 0 400 340",
@@ -77,6 +93,13 @@
         { key: "thermals", label: "Fan / thermals", icon: "i-refresh", x: 320, y: 278 },
         { key: "charging", label: "Charging port", icon: "i-usb", x: 50, y: 255 },
       ],
+      groups: [
+        { label: "Display & lid", icon: "i-screen", hint: "Check the panel for marks, then open and close the lid.", parts: ["display", "webcam", "hinge"] },
+        { label: "Input", icon: "i-keyboard", hint: "Type every key and test clicks, scroll and gestures.", parts: ["keyboard", "trackpad"] },
+        { label: "Audio", icon: "i-speaker", hint: "Play a clip, then plug in headphones and record something.", parts: ["speaker", "audio"] },
+        { label: "Connectivity & ports", icon: "i-wifi", hint: "Join Wi-Fi, pair Bluetooth, try each USB and video port.", parts: ["wifi", "ports"] },
+        { label: "Power & thermals", icon: "i-battery", hint: "Check battery health, charge it, listen to the fan under load.", parts: ["battery", "charging", "powerButton", "thermals"] },
+      ],
     },
   };
 
@@ -98,6 +121,7 @@
       ticketId: "",
       ticketLabel: "",
       stage: "before",
+      section: 0,
       before: {},
       after: {},
       notes: "",
@@ -105,9 +129,15 @@
     };
   }
 
-  function layout() {
-    return LAYOUTS[draft.deviceType] || LAYOUTS.phone;
+  const layout = () => LAYOUTS[draft.deviceType] || LAYOUTS.phone;
+  const groups = () => layout().groups;
+  const partByKey = (key) => layout().parts.find((p) => p.key === key);
+
+  function sectionIndex() {
+    const max = groups().length - 1;
+    return Math.min(Math.max(Number(draft.section) || 0, 0), max);
   }
+  const currentGroup = () => groups()[sectionIndex()];
 
   // Same broad buckets intake.js uses for its device thumbnails — a
   // laptop gets the laptop map, everything else the handheld one.
@@ -128,6 +158,7 @@
     if (draft.stage !== "after") draft.stage = "before";
     if (!draft.before || typeof draft.before !== "object") draft.before = {};
     if (!draft.after || typeof draft.after !== "object") draft.after = {};
+    draft.section = sectionIndex();
 
     try {
       const rawReports = localStorage.getItem(LS_REPORTS);
@@ -158,6 +189,17 @@
     return out;
   }
 
+  function groupTally(group, stage) {
+    const out = { tested: 0, fail: 0, total: group.parts.length };
+    group.parts.forEach((key) => {
+      const s = stateOf(stage, key);
+      if (s !== "untested") out.tested += 1;
+      if (s === "fail") out.fail += 1;
+    });
+    out.complete = out.tested === out.total;
+    return out;
+  }
+
   // fail → pass is the win; pass → fail is the one that must never ship.
   function comparison() {
     const out = { fixed: [], stillFaulty: [], newIssues: [] };
@@ -177,11 +219,14 @@
     const box = $("dgMap");
     if (!box) return;
     const l = layout();
+    const inSection = new Set(currentGroup().parts);
     const hotspots = l.parts.map((p) => {
       const state = stateOf(draft.stage, p.key);
+      const focused = inSection.has(p.key);
       return `
-        <g class="dg-hotspot state-${state}" data-dg-part="${esc(p.key)}" transform="translate(${p.x},${p.y})"
-           role="button" tabindex="0" aria-label="${esc(p.label)}: ${STATE_LABEL[state]}">
+        <g class="dg-hotspot state-${state} ${focused ? "is-focused" : "is-dimmed"}" data-dg-part="${esc(p.key)}"
+           transform="translate(${p.x},${p.y})" role="button" tabindex="0"
+           aria-label="${esc(p.label)}: ${STATE_LABEL[state]}">
           <title>${esc(p.label)} — ${STATE_LABEL[state]}</title>
           <circle class="dg-dot" r="18"/>
           <use class="dg-dot-icon" href="#${esc(p.icon)}" x="-10" y="-10" width="20" height="20"/>
@@ -192,10 +237,83 @@
     }).join("");
 
     box.innerHTML = `
-      <svg class="dg-svg" viewBox="${l.viewBox}" role="group" aria-label="Device diagram — tap a part to set its result">
+      <svg class="dg-svg" viewBox="${l.viewBox}" role="group" aria-label="Device diagram — parts in the current section are highlighted">
         ${l.frame}
         ${hotspots}
       </svg>`;
+  }
+
+  function renderStepper() {
+    const box = $("dgStepper");
+    if (!box) return;
+    const active = sectionIndex();
+    box.innerHTML = groups().map((g, i) => {
+      const t = groupTally(g, draft.stage);
+      const cls = ["dg-step"];
+      if (i === active) cls.push("active");
+      if (t.complete) cls.push("is-complete");
+      if (t.fail) cls.push("has-fail");
+      return `
+        <button type="button" class="${cls.join(" ")}" data-dg-section="${i}" role="tab"
+          aria-selected="${i === active ? "true" : "false"}" title="${esc(g.label)} — ${t.tested}/${t.total} tested">
+          <span class="dg-step-mark">${t.complete ? `<svg class="icon"><use href="#i-check"></use></svg>` : i + 1}</span>
+          <span class="dg-step-text">
+            <span class="dg-step-label">${esc(g.label)}</span>
+            <span class="dg-step-meta">${t.tested}/${t.total}${t.fail ? ` · ${t.fail} fail` : ""}</span>
+          </span>
+        </button>`;
+    }).join("");
+  }
+
+  function renderSectionPanel() {
+    const box = $("dgSectionPanel");
+    if (!box) return;
+    const g = currentGroup();
+    const t = groupTally(g, draft.stage);
+    const rows = g.parts.map((key) => {
+      const p = partByKey(key);
+      if (!p) return "";
+      const state = stateOf(draft.stage, key);
+      const buttons = SETTABLE.map((s) => `
+        <button type="button" class="dg-test-btn is-${s}${state === s ? " active" : ""}"
+          data-dg-set="${esc(key)}" data-dg-value="${s}" aria-pressed="${state === s ? "true" : "false"}">
+          ${STATE_LABEL[s]}
+        </button>`).join("");
+      return `
+        <div class="dg-test-card state-${state}">
+          <span class="dg-test-icon"><svg class="icon"><use href="#${esc(p.icon)}"></use></svg></span>
+          <span class="dg-test-name">${esc(p.label)}</span>
+          <span class="dg-test-btns">${buttons}</span>
+        </div>`;
+    }).join("");
+
+    box.innerHTML = `
+      <div class="dg-section-head">
+        <span class="dg-section-icon"><svg class="icon"><use href="#${esc(g.icon)}"></use></svg></span>
+        <div class="dg-section-titles">
+          <p class="dg-section-eyebrow">Section ${sectionIndex() + 1} of ${groups().length} · ${draft.stage === "before" ? "Before repair" : "After repair"}</p>
+          <h3 class="dg-section-title">${esc(g.label)}</h3>
+        </div>
+        <span class="dg-section-count${t.complete ? " is-complete" : ""}">${t.tested}/${t.total}</span>
+      </div>
+      <p class="dg-section-hint">${esc(g.hint)}</p>
+      <div class="dg-test-cards">${rows}</div>`;
+  }
+
+  function renderSectionNav() {
+    const prev = $("dgPrevSection");
+    const next = $("dgNextSection");
+    const i = sectionIndex();
+    const last = groups().length - 1;
+    if (prev) prev.disabled = i === 0;
+    if (next) {
+      const done = groupTally(currentGroup(), draft.stage).complete;
+      next.disabled = i === last;
+      next.classList.toggle("attention", done && i < last);
+      next.innerHTML = i === last
+        ? `All sections done<svg class="icon"><use href="#i-check"></use></svg>`
+        : `Next: ${esc(groups()[i + 1].label)}<svg class="icon"><use href="#i-chevron-right"></use></svg>`;
+    }
   }
 
   function renderTypeSwitch() {
@@ -226,35 +344,11 @@
     const t = tally(draft.stage);
     const pct = t.total ? Math.round((t.tested / t.total) * 100) : 0;
     box.innerHTML = `
-      <p class="dg-progress-title">${draft.stage === "before" ? "Before repair" : "After repair"}</p>
-      <div class="dg-progress-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+      <div class="dg-progress-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
+           aria-label="${draft.stage === "before" ? "Before" : "After"} repair progress">
         <div class="dg-progress-fill" style="width:${pct}%"></div>
       </div>
-      <p class="dg-progress-sub">${t.tested} of ${t.total} parts tested</p>
-      <div class="dg-tallies">
-        <span class="dg-tally is-pass"><strong>${t.pass}</strong> pass</span>
-        <span class="dg-tally is-fail"><strong>${t.fail}</strong> fail</span>
-        <span class="dg-tally is-na"><strong>${t.na}</strong> n/a</span>
-      </div>`;
-  }
-
-  function renderPartList() {
-    const box = $("dgPartList");
-    if (!box) return;
-    box.innerHTML = layout().parts.map((p) => {
-      const before = stateOf("before", p.key);
-      const after = stateOf("after", p.key);
-      return `
-        <button type="button" class="dg-part-row" data-dg-part="${esc(p.key)}">
-          <span class="dg-part-icon"><svg class="icon"><use href="#${esc(p.icon)}"></use></svg></span>
-          <span class="dg-part-name">${esc(p.label)}</span>
-          <span class="dg-part-states">
-            <i class="dg-swatch state-${before}" title="Before: ${STATE_LABEL[before]}"></i>
-            <svg class="icon dg-part-arrow"><use href="#i-chevron-right"></use></svg>
-            <i class="dg-swatch state-${after}" title="After: ${STATE_LABEL[after]}"></i>
-          </span>
-        </button>`;
-    }).join("");
+      <p class="dg-progress-sub">${t.tested}/${t.total} tested · <span class="dg-ink-pass">${t.pass} pass</span> · <span class="dg-ink-fail">${t.fail} fail</span></p>`;
   }
 
   function renderCompare() {
@@ -387,15 +481,27 @@
   function render() {
     renderTypeSwitch();
     renderStage();
+    renderStepper();
     renderMap();
+    renderSectionPanel();
+    renderSectionNav();
     renderProgress();
-    renderPartList();
     renderCompare();
     renderTagged();
     renderStatusLine();
   }
 
   // ---- Interactions --------------------------------------------------------
+
+  function setPartState(key, value) {
+    if (!draft[draft.stage]) draft[draft.stage] = {};
+    // Tapping the state a part is already in clears it back to untested,
+    // so a mis-tap is undone with a second tap on the same button.
+    if (stateOf(draft.stage, key) === value) delete draft[draft.stage][key];
+    else draft[draft.stage][key] = value;
+    saveDraft();
+    render();
+  }
 
   function cyclePart(key) {
     const current = stateOf(draft.stage, key);
@@ -407,6 +513,29 @@
     render();
   }
 
+  // Tapping a part on the map that belongs to another section jumps to that
+  // section first, so the map stays a navigation aid as well as an input.
+  function handleMapTap(key) {
+    if (!currentGroup().parts.includes(key)) {
+      const target = groups().findIndex((g) => g.parts.includes(key));
+      if (target >= 0) {
+        draft.section = target;
+        saveDraft();
+        render();
+        return;
+      }
+    }
+    cyclePart(key);
+  }
+
+  function setSection(index) {
+    const max = groups().length - 1;
+    draft.section = Math.min(Math.max(index, 0), max);
+    saveDraft();
+    render();
+    $("dgStepper")?.querySelector(".dg-step.active")?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }
+
   function setStage(stage) {
     draft.stage = stage === "after" ? "after" : "before";
     saveDraft();
@@ -416,6 +545,7 @@
   function setDeviceType(type) {
     if (!LAYOUTS[type] || draft.deviceType === type) return;
     draft.deviceType = type;
+    draft.section = 0; // the two layouts have different sections
     saveDraft();
     render();
   }
@@ -470,7 +600,9 @@
     draft.clientName = ticket.customerName || "";
     draft.clientContact = ticket.phone || ticket.email || "";
     draft.device = ticket.device || "";
-    draft.deviceType = detectType(ticket.device);
+    const type = detectType(ticket.device);
+    if (type !== draft.deviceType) draft.section = 0;
+    draft.deviceType = type;
     saveDraft();
     if ($("dgClientSearch")) $("dgClientSearch").value = "";
     renderCombo("");
@@ -478,7 +610,7 @@
     render();
   }
 
-  // ---- Save / load / copy --------------------------------------------------
+  // ---- Save / load / reset / copy -----------------------------------------
 
   function saveReport() {
     const b = tally("before");
@@ -494,6 +626,7 @@
       updated: now,
     });
     delete record.stage;
+    delete record.section;
     const existing = reports.findIndex((r) => r.id === record.id);
     if (existing >= 0) reports[existing] = record;
     else reports.unshift(record);
@@ -509,7 +642,7 @@
   function openReport(id) {
     const record = reports.find((r) => r.id === id);
     if (!record) return;
-    draft = Object.assign(newDraft(), record, { stage: "before" });
+    draft = Object.assign(newDraft(), record, { stage: "before", section: 0 });
     if (!LAYOUTS[draft.deviceType]) draft.deviceType = "phone";
     saveDraft();
     renderFields();
@@ -524,6 +657,23 @@
     reports = reports.filter((r) => r.id !== id);
     saveReports();
     renderSaved();
+  }
+
+  // Clears just the current stage's results, keeping the client details and
+  // the other stage — for when a test run needs starting over rather than
+  // the whole report.
+  function resetStage() {
+    const stageLabel = draft.stage === "before" ? "before repair" : "after repair";
+    if (!tally(draft.stage).tested) {
+      toast(`Nothing recorded in the ${stageLabel} test yet.`);
+      return;
+    }
+    if (!window.confirm(`Clear every result in the ${stageLabel} test? The client details and the other test are kept.`)) return;
+    draft[draft.stage] = {};
+    draft.section = 0;
+    saveDraft();
+    render();
+    toast(`Cleared the ${stageLabel} test.`);
   }
 
   function resetDraft() {
@@ -554,10 +704,15 @@
       const t = tally(stage);
       if (!t.tested) return;
       lines.push(stage === "before" ? "BEFORE REPAIR" : "AFTER REPAIR");
-      l.parts.forEach((p) => {
-        const s = stateOf(stage, p.key);
-        if (s === "untested") return;
-        lines.push(`${s === "pass" ? "[OK]" : s === "fail" ? "[X]" : "[-]"} ${p.label}`);
+      l.groups.forEach((g) => {
+        const tested = g.parts.filter((k) => stateOf(stage, k) !== "untested");
+        if (!tested.length) return;
+        lines.push(`  ${g.label}`);
+        tested.forEach((k) => {
+          const s = stateOf(stage, k);
+          const p = partByKey(k);
+          lines.push(`  ${s === "pass" ? "[OK]" : s === "fail" ? "[X]" : "[-]"} ${p ? p.label : k}`);
+        });
       });
       lines.push("");
     });
@@ -617,8 +772,12 @@
     bound = true;
 
     shell.addEventListener("click", (event) => {
+      const setBtn = event.target.closest("[data-dg-set]");
+      if (setBtn) { setPartState(setBtn.dataset.dgSet, setBtn.dataset.dgValue); return; }
       const hotspot = event.target.closest("[data-dg-part]");
-      if (hotspot) { cyclePart(hotspot.dataset.dgPart); return; }
+      if (hotspot) { handleMapTap(hotspot.dataset.dgPart); return; }
+      const step = event.target.closest("[data-dg-section]");
+      if (step) { setSection(Number(step.dataset.dgSection)); return; }
       const stageBtn = event.target.closest("[data-dg-stage]");
       if (stageBtn) { setStage(stageBtn.dataset.dgStage); return; }
       const typeBtn = event.target.closest("[data-dg-type]");
@@ -638,9 +797,12 @@
       const hotspot = event.target.closest("[data-dg-part]");
       if (hotspot && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
-        cyclePart(hotspot.dataset.dgPart);
+        handleMapTap(hotspot.dataset.dgPart);
       }
     });
+
+    $("dgPrevSection")?.addEventListener("click", () => setSection(sectionIndex() - 1));
+    $("dgNextSection")?.addEventListener("click", () => setSection(sectionIndex() + 1));
 
     $("dgClientSearch")?.addEventListener("input", (e) => renderCombo(e.target.value));
     $("dgClientSearch")?.addEventListener("focus", (e) => renderCombo(e.target.value));
@@ -648,10 +810,7 @@
     $("dgClientName")?.addEventListener("input", (e) => { draft.clientName = e.target.value; saveDraft(); });
     $("dgClientContact")?.addEventListener("input", (e) => { draft.clientContact = e.target.value; saveDraft(); });
     $("dgNotes")?.addEventListener("input", (e) => { draft.notes = e.target.value; saveDraft(); });
-    $("dgDevice")?.addEventListener("input", (e) => {
-      draft.device = e.target.value;
-      saveDraft();
-    });
+    $("dgDevice")?.addEventListener("input", (e) => { draft.device = e.target.value; saveDraft(); });
     // Switching the map on every keystroke would fight someone mid-word, so
     // the auto-detect only runs once they've finished typing the model.
     $("dgDevice")?.addEventListener("change", () => {
@@ -661,6 +820,7 @@
 
     $("dgSave")?.addEventListener("click", saveReport);
     $("dgCopy")?.addEventListener("click", copySummary);
+    $("dgResetStage")?.addEventListener("click", resetStage);
     $("dgReset")?.addEventListener("click", resetDraft);
 
     // Keep the picker's source list fresh when Repairs finishes loading.
