@@ -4688,18 +4688,13 @@ video.media-viewer-media {
 .dg-frame { fill: var(--bg-soft); stroke: #c8d2e0; stroke-width: 2.5; }
 .dg-frame-screen { fill: var(--card); stroke: #dde4ee; stroke-width: 1.5; }
 
-.dg-hotspot { cursor: pointer; transition: opacity 0.18s ease; }
-/* Parts outside the current section stay visible for context but recede;
-   tapping one jumps to its section rather than editing it blind. */
-.dg-hotspot.is-dimmed { opacity: 0.34; }
-.dg-hotspot.is-dimmed:hover { opacity: 0.6; }
-.dg-hotspot.is-focused .dg-dot { stroke-width: 2.2; }
+.dg-hotspot { cursor: pointer; }
 .dg-hotspot:focus-visible { outline: none; }
 .dg-hotspot:focus-visible .dg-dot { stroke: var(--accent); stroke-width: 3; }
 .dg-dot {
   fill: #eef2f7;
   stroke: #c2ccd9;
-  stroke-width: 1.6;
+  stroke-width: 2;
   transition: fill 0.14s ease, stroke 0.14s ease;
 }
 .dg-hotspot:hover .dg-dot { stroke: var(--text-dim); }
