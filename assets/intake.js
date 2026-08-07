@@ -85,6 +85,12 @@
   let statusFilter = "all";
   let editingId = null;
   let formStep = 1;
+  // Highest step the user has validated their way to in this form session —
+  // lets the progress-step numbers jump straight to any already-visited step.
+  let maxStepReached = 1;
+  // Devices already confirmed via "Add another device" for the client
+  // currently being checked in — each becomes its own ticket on save.
+  let formDevices = [];
   // True when the form was opened from a Prices-tab repair click — device and
   // issue are already known, so the wizard skips straight to Payment.
   let quickLogMode = false;
@@ -1314,26 +1320,32 @@
     renderPendingFormMedia();
   });
 
-  // Uploads the queued files once the ticket exists, narrating progress on
-  // the success screen. Failures never undo the saved check-in.
-  async function uploadPendingFormMedia(ticket) {
-    const queue = pendingFormMedia.slice();
-    if (!queue.length || !ticket?.id) return;
+  // Uploads a queued batch of files once its ticket exists. Failures never
+  // undo the saved check-in. When narrate is on (the common single-device
+  // save), progress is written into the success screen; otherwise — several
+  // devices uploading in the background at once — failures surface as a toast
+  // instead, so concurrent uploads don't stomp on the same message.
+  async function uploadMediaQueueForTicket(ticket, queue, { narrate = false } = {}) {
+    if (!queue || !queue.length || !ticket?.id) return;
     const msg = $("formSuccessMessage");
-    const baseText = msg.textContent;
+    const baseText = narrate ? msg.textContent : "";
     let failed = 0;
     for (let i = 0; i < queue.length; i++) {
-      msg.textContent = `${baseText} Uploading ${queue[i].type} ${i + 1} of ${queue.length}…`;
+      if (narrate) msg.textContent = `${baseText} Uploading ${queue[i].type} ${i + 1} of ${queue.length}…`;
       try {
         await uploadTicketMedia(ticket, queue[i].file);
       } catch (_) {
         failed++;
       }
+      URL.revokeObjectURL(queue[i].url);
     }
-    msg.textContent = failed
-      ? `${baseText} ${queue.length - failed} of ${queue.length} files uploaded — ${failed} failed. You can retry from the ticket's Photos & videos section.`
-      : `${baseText} ${queue.length} ${queue.length === 1 ? "file" : "files"} uploaded.`;
-    resetPendingFormMedia();
+    if (narrate) {
+      msg.textContent = failed
+        ? `${baseText} ${queue.length - failed} of ${queue.length} files uploaded — ${failed} failed. You can retry from the ticket's Photos & videos section.`
+        : `${baseText} ${queue.length} ${queue.length === 1 ? "file" : "files"} uploaded.`;
+    } else if (failed) {
+      toast(`${failed} of ${queue.length} file(s) for ${ticket.device || "a device"} failed to upload — retry from the ticket's Photos & videos section.`);
+    }
   }
 
   async function sendInvoiceForTicket(ticket, delivery) {
@@ -1478,9 +1490,134 @@
     $("quotedPriceSummary").hidden = !on;
   }
 
+  // ---- Multiple devices for one client --------------------------------------
+  // "Add another device" snapshots the device/issue/status/inventory/notes/media
+  // currently on Step 2 into formDevices, then clears those fields so staff can
+  // enter the next device. Each entry becomes its own ticket on save, sharing
+  // the customer details entered once on Step 1.
+  function clearFormDevices() {
+    formDevices.forEach((d) => (d.media || []).forEach((m) => URL.revokeObjectURL(m.url)));
+    formDevices = [];
+    renderAddedDevices();
+  }
+
+  function renderAddedDevices() {
+    const wrap = $("addedDevicesWrap");
+    const list = $("addedDevicesList");
+    if (!wrap || !list) return;
+    wrap.hidden = !formDevices.length;
+    list.innerHTML = formDevices.map((d, i) => `
+      <div class="added-device-item">
+        <div class="added-device-main">
+          <div class="added-device-name">${esc(d.device || "Device")}</div>
+          <div class="added-device-issues">${esc(issueSummaryText(d.issues) || "No issues selected")}</div>
+        </div>
+        <button type="button" class="icon-btn ghost-btn added-device-remove" data-remove-device="${i}" aria-label="Remove ${esc(d.device || "device")}">
+          <svg class="icon"><use href="#i-xmark"></use></svg>
+        </button>
+      </div>
+    `).join("");
+  }
+
+  $("addedDevicesList")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-remove-device]");
+    if (!btn) return;
+    const idx = Number(btn.dataset.removeDevice);
+    const removed = formDevices.splice(idx, 1)[0];
+    if (removed) (removed.media || []).forEach((m) => URL.revokeObjectURL(m.url));
+    renderAddedDevices();
+  });
+
+  $("addAnotherDevice")?.addEventListener("click", () => {
+    const err = $("formError");
+    err.hidden = true;
+    if (!$("fDevice").value.trim()) {
+      err.textContent = "Enter the device model.";
+      err.hidden = false;
+      return;
+    }
+    const issuesStr = buildIssuesString();
+    if (!issuesStr) {
+      err.textContent = "Select at least one issue.";
+      err.hidden = false;
+      return;
+    }
+    const inventoryOption = $("fInventoryItem").selectedOptions[0];
+    formDevices.push({
+      device: $("fDevice").value.trim(),
+      issues: issuesStr,
+      status: $("fStatus").value,
+      inventoryItemKey: $("fInventoryItem").value,
+      inventoryItemLabel: $("fInventoryItem").value && inventoryOption ? inventoryOption.textContent : "",
+      notes: $("fNotes").value.trim(),
+      media: pendingFormMedia.slice(),
+      repairCost: "",
+      amountPaid: "",
+    });
+    renderAddedDevices();
+    // Clear the current entry (but don't revoke its media — ownership just
+    // moved to the device entry above) so staff can fill in the next device.
+    $("fDevice").value = "";
+    $("fStatus").value = "Received";
+    $("fNotes").value = "";
+    setIssueTags("");
+    pendingFormMedia = [];
+    renderPendingFormMedia();
+    updateInventoryOptions("");
+    toast("Device added — enter the next one.", { tone: "info", duration: 2500 });
+    focusUnlessTouch($("fDevice"));
+  });
+
+  function paymentDeviceLabelHtml(device, issuesStr) {
+    const issueSummary = issueSummaryText(issuesStr);
+    return `${esc(device || "Device")}${issueSummary ? `<span>${esc(issueSummary)}</span>` : ""}`;
+  }
+
+  // Rebuilds the Payment step's per-device cards from formDevices. The last
+  // (current) device always keeps the original fRepairCost/fAmountPaid fields.
+  function renderPaymentCards() {
+    const container = $("paymentDeviceCards");
+    const currentLabel = $("currentPaymentLabel");
+    if (!container || !currentLabel) return;
+    const multi = formDevices.length > 0;
+    container.innerHTML = formDevices.map((d, i) => `
+      <div class="payment-device-card">
+        <p class="payment-device-label">${paymentDeviceLabelHtml(d.device, d.issues)}</p>
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="field-label" for="devRepairCost_${i}">Repair cost (TTD)</label>
+            <input id="devRepairCost_${i}" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 450.00" value="${esc(d.repairCost || "")}" />
+          </div>
+          <div class="form-field">
+            <label class="field-label" for="devAmountPaid_${i}">Amount paid (TTD)</label>
+            <input id="devAmountPaid_${i}" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 150.00" value="${esc(d.amountPaid || "")}" />
+          </div>
+        </div>
+      </div>
+    `).join("");
+    currentLabel.hidden = !multi;
+    if (multi) currentLabel.innerHTML = paymentDeviceLabelHtml($("fDevice").value.trim(), buildIssuesString());
+  }
+
+  // Persists whatever staff typed into the dynamic per-device payment cards
+  // back onto formDevices before they're rebuilt or the step is left.
+  function syncPaymentCardsToFormDevices() {
+    formDevices.forEach((d, i) => {
+      const rc = $("devRepairCost_" + i);
+      const ap = $("devAmountPaid_" + i);
+      if (rc) d.repairCost = rc.value;
+      if (ap) d.amountPaid = ap.value;
+    });
+  }
+
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
     setQuickLogMode(false);
+    maxStepReached = 1;
+    clearFormDevices();
+    // Editing an existing ticket is always a single device — multi-device
+    // logging only applies when checking in a fresh client.
+    $("addAnotherDeviceWrap").hidden = Boolean(ticket);
     $("intakeFormTitle").textContent = ticket ? "Edit device" : "Log device";
     $("fName").value = ticket ? ticket.customerName || "" : "";
     $("fPhone").value = ticket ? ticket.phone || "" : "";
@@ -1514,19 +1651,29 @@
     $("intakeFormModal").hidden = true;
     editingId = null;
     setQuickLogMode(false);
+    clearFormDevices();
+    resetPendingFormMedia();
   }
   $("fDevice").addEventListener("input", () => updateInventoryOptions($("fInventoryItem").value));
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
   function setFormStep(step) {
+    // Leaving the payment step: capture any edits made in the per-device
+    // payment cards before they're rebuilt or hidden.
+    if (formStep === 3 && step !== 3) syncPaymentCardsToFormDevices();
     formStep = step;
+    maxStepReached = Math.max(maxStepReached, step);
     document.querySelectorAll("[data-form-step]").forEach((panel) => {
       panel.hidden = Number(panel.dataset.formStep) !== step;
     });
+    // Clickable now: every already-visited step, plus the one step ahead
+    // (clicking it validates the current step first, same as Continue).
+    const nextReachable = quickLogMode && step === 1 ? 3 : Math.min(step + 1, 3);
     document.querySelectorAll("[data-progress-step]").forEach((indicator) => {
       const indicatorStep = Number(indicator.dataset.progressStep);
       indicator.classList.toggle("active", indicatorStep === step);
       indicator.classList.toggle("complete", indicatorStep < step);
+      indicator.disabled = step === 4 || !(indicatorStep <= maxStepReached || indicatorStep === nextReachable);
     });
     document.querySelectorAll(".form-progress-line").forEach((line, index) => {
       line.classList.toggle("complete", index < step - 1);
@@ -1538,7 +1685,29 @@
     $("cancelForm").hidden = isComplete;
     $("doneForm").hidden = !isComplete;
     $("formError").hidden = true;
+    if (step === 3) renderPaymentCards();
   }
+
+  // Clicking a step number jumps straight there: backward or to any
+  // already-visited step always works; moving to the next not-yet-seen
+  // step still validates the current one first (same as Continue).
+  function goToStep(target) {
+    if (formStep === 4 || target === formStep) return;
+    if (quickLogMode && target === 2) return;
+    if (target < formStep || target <= maxStepReached) {
+      setFormStep(target);
+    } else if (target === formStep + 1 || (quickLogMode && formStep === 1 && target === 3)) {
+      if (!validateFormStep(formStep)) return;
+      setFormStep(target);
+    } else {
+      return;
+    }
+    const firstField = document.querySelector(`[data-form-step="${formStep}"] input, [data-form-step="${formStep}"] select, [data-form-step="${formStep}"] button`);
+    if (firstField) firstField.focus();
+  }
+  document.querySelectorAll("[data-progress-step]").forEach((btn) => {
+    btn.addEventListener("click", () => goToStep(Number(btn.dataset.progressStep)));
+  });
 
   function customerFieldsError() {
     const name = $("fName").value.trim();
@@ -1926,69 +2095,160 @@
       err.hidden = false;
       return;
     }
-    const issuesStr = buildIssuesString();
-    if (!issuesStr) {
+    const currentIssuesStr = buildIssuesString();
+    if (!currentIssuesStr) {
       err.textContent = "Select at least one issue.";
       err.hidden = false;
       return;
     }
-    const notes = $("fNotes").value.trim();
+    const customerName = $("fName").value.trim();
+    const phone = $("fPhone").value.trim();
+    const email = $("fEmail").value.trim();
     const shouldSendInvoice = $("fSendInvoice").checked && !editingId;
     const invoiceDelivery = $("fInvoiceDelivery").value === "whatsapp" ? "whatsapp" : "email";
+    const saveBtn = $("saveForm");
+    const original = saveBtn.textContent;
+
+    // Editing an existing ticket is always a single device — keep that path
+    // exactly as it was.
+    if (editingId) {
+      const payload = {
+        action: "update",
+        id: editingId,
+        customerName,
+        client: customerName,
+        phone,
+        email,
+        device: $("fDevice").value.trim(),
+        issues: currentIssuesStr,
+        issue: currentIssuesStr,
+        status: $("fStatus").value,
+        notes: $("fNotes").value.trim(),
+        repairCost: $("fRepairCost").value.trim(),
+        amountPaid: $("fAmountPaid").value.trim(),
+        inventoryItemKey: $("fInventoryItem").value,
+      };
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving…";
+      try {
+        const res = await api(payload);
+        if (!res.ok) throw new Error(res.error || "Rejected");
+        mergeTicket(res.ticket);
+        refreshInventoryAfterStockChange();
+        renderStatusChips();
+        render();
+        $("intakeFormTitle").textContent = "Device updated";
+        $("formSuccessTitle").textContent = "Device successfully updated";
+        $("formSuccessMessage").textContent = "The device check-in has been saved.";
+        setFormStep(4);
+        $("doneForm").focus();
+        uploadMediaQueueForTicket(res.ticket, pendingFormMedia.slice(), { narrate: true });
+        pendingFormMedia = [];
+      } catch (ex) {
+        err.textContent = "Couldn't save: " + ex.message;
+        err.hidden = false;
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = original;
+      }
+      return;
+    }
+
+    // New check-in: one ticket per device, all sharing this client's details.
+    // formDevices holds everything confirmed via "Add another device"; the
+    // fields still on screen are always the last (or only) device.
+    const devices = formDevices.map((d, i) => ({
+      device: d.device,
+      issues: d.issues,
+      status: d.status,
+      inventoryItemKey: d.inventoryItemKey,
+      notes: d.notes,
+      media: d.media || [],
+      repairCost: ($("devRepairCost_" + i)?.value ?? d.repairCost ?? "").toString().trim(),
+      amountPaid: ($("devAmountPaid_" + i)?.value ?? d.amountPaid ?? "").toString().trim(),
+    }));
+    devices.push({
+      device: $("fDevice").value.trim(),
+      issues: currentIssuesStr,
+      status: $("fStatus").value,
+      inventoryItemKey: $("fInventoryItem").value,
+      notes: $("fNotes").value.trim(),
+      media: pendingFormMedia.slice(),
+      repairCost: $("fRepairCost").value.trim(),
+      amountPaid: $("fAmountPaid").value.trim(),
+    });
+    formDevices = [];
+    pendingFormMedia = [];
+
     const invoiceNote = shouldSendInvoice
       ? `Invoice requested by ${invoiceDelivery === "whatsapp" ? "WhatsApp" : "email"}.`
       : "";
-    const payload = {
-      action: editingId ? "update" : "add",
-      id: editingId || undefined,
-      customerName: $("fName").value.trim(),
-      // Older deployed backends used `client`; send both names so a
-      // frontend update never silently drops customer details.
-      client: $("fName").value.trim(),
-      phone: $("fPhone").value.trim(),
-      email: $("fEmail").value.trim(),
-      device: $("fDevice").value.trim(),
-      issues: issuesStr,
-      issue: issuesStr,
-      status: $("fStatus").value,
-      notes: [invoiceNote, notes].filter(Boolean).join("\n"),
-      repairCost: $("fRepairCost").value.trim(),
-      amountPaid: $("fAmountPaid").value.trim(),
-      inventoryItemKey: $("fInventoryItem").value,
-    };
-    $("saveForm").disabled = true;
-    const original = $("saveForm").textContent;
-    $("saveForm").textContent = "Saving…";
-    try {
-      const res = await api(payload);
-      if (!res.ok) throw new Error(res.error || "Rejected");
-      const wasEditing = Boolean(editingId);
-      mergeTicket(res.ticket);
-      refreshInventoryAfterStockChange();
-      renderStatusChips();
-      render();
-      let invoiceMessage = "";
-      if (shouldSendInvoice) {
-        $("saveForm").textContent = invoiceDelivery === "whatsapp" ? "Creating invoice…" : "Sending invoice…";
-        invoiceMessage = await sendInvoiceForTicket(res.ticket, invoiceDelivery);
+    saveBtn.disabled = true;
+    const savedTickets = [];
+    const invoiceMessages = [];
+    let failureMessage = "";
+    for (let i = 0; i < devices.length; i++) {
+      const dev = devices[i];
+      saveBtn.textContent = devices.length > 1 ? `Saving device ${i + 1} of ${devices.length}…` : "Saving…";
+      try {
+        const res = await api({
+          action: "add",
+          customerName,
+          client: customerName,
+          phone,
+          email,
+          device: dev.device,
+          issues: dev.issues,
+          issue: dev.issues,
+          status: dev.status,
+          notes: [invoiceNote, dev.notes].filter(Boolean).join("\n"),
+          repairCost: dev.repairCost,
+          amountPaid: dev.amountPaid,
+          inventoryItemKey: dev.inventoryItemKey,
+        });
+        if (!res.ok) throw new Error(res.error || "Rejected");
+        mergeTicket(res.ticket);
+        savedTickets.push(res.ticket);
+        if (shouldSendInvoice) {
+          saveBtn.textContent = invoiceDelivery === "whatsapp" ? "Creating invoice…" : "Sending invoice…";
+          invoiceMessages.push(await sendInvoiceForTicket(res.ticket, invoiceDelivery));
+        }
+      } catch (ex) {
+        failureMessage = `Couldn't save ${dev.device || "a device"}: ${ex.message}`;
+        break;
       }
-      $("intakeFormTitle").textContent = wasEditing ? "Device updated" : "Device logged";
-      $("formSuccessTitle").textContent = wasEditing ? "Device successfully updated" : "Device successfully logged";
-      $("formSuccessMessage").textContent = invoiceMessage
-        ? `The device was logged. ${invoiceMessage}`
-        : "The device check-in has been saved.";
-      setFormStep(4);
-      $("doneForm").focus();
-      // Fire-and-forget: queued photos/videos upload while the success
-      // screen is showing, narrated via formSuccessMessage.
-      uploadPendingFormMedia(res.ticket);
-    } catch (ex) {
-      err.textContent = "Couldn't save: " + ex.message;
-      err.hidden = false;
-    } finally {
-      $("saveForm").disabled = false;
-      $("saveForm").textContent = original;
     }
+
+    refreshInventoryAfterStockChange();
+    renderStatusChips();
+    render();
+    saveBtn.disabled = false;
+    saveBtn.textContent = original;
+
+    if (!savedTickets.length) {
+      err.textContent = failureMessage || "Couldn't save: nothing was logged.";
+      err.hidden = false;
+      return;
+    }
+
+    const wasPartial = savedTickets.length < devices.length;
+    $("intakeFormTitle").textContent = savedTickets.length > 1 ? "Devices logged" : "Device logged";
+    $("formSuccessTitle").textContent = savedTickets.length > 1
+      ? `${savedTickets.length} devices successfully logged`
+      : "Device successfully logged";
+    const summaryLines = [
+      savedTickets.length > 1
+        ? `${savedTickets.length} devices were checked in for ${customerName}.`
+        : "The device check-in has been saved.",
+      ...invoiceMessages,
+    ];
+    if (wasPartial) summaryLines.push(`${failureMessage} The remaining device(s) were not logged — add them separately.`);
+    $("formSuccessMessage").textContent = summaryLines.join(" ");
+    setFormStep(4);
+    $("doneForm").focus();
+    // Fire-and-forget: queued photos/videos upload per ticket while the
+    // success screen is showing.
+    savedTickets.forEach((ticket, i) => uploadMediaQueueForTicket(ticket, devices[i].media, { narrate: savedTickets.length === 1 }));
   });
 
   function mergeTicket(t) {

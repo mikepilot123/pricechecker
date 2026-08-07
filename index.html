@@ -912,11 +912,11 @@
       <div class="modal-body">
         <form id="intakeForm" autocomplete="off">
           <div class="form-progress" aria-label="Device check-in progress">
-            <span class="form-progress-step active" data-progress-step="1">1<span>Customer</span></span>
+            <button type="button" class="form-progress-step active" data-progress-step="1">1<span>Customer</span></button>
             <span class="form-progress-line"></span>
-            <span class="form-progress-step" data-progress-step="2">2<span>Device</span></span>
+            <button type="button" class="form-progress-step" data-progress-step="2">2<span>Devices</span></button>
             <span class="form-progress-line"></span>
-            <span class="form-progress-step" data-progress-step="3">3<span>Payment</span></span>
+            <button type="button" class="form-progress-step" data-progress-step="3">3<span>Payment</span></button>
           </div>
 
           <section class="form-step" data-form-step="1">
@@ -998,20 +998,35 @@
                 <p class="field-hint">Snap the device's condition now — uploads happen after the check-in saves.</p>
                 <p id="fMediaError" class="field-error" hidden></p>
               </div>
+              <div class="form-field form-field-full" id="addedDevicesWrap" hidden>
+                <label class="field-label">Devices added</label>
+                <div id="addedDevicesList" class="added-device-list"></div>
+              </div>
+              <div class="form-field form-field-full" id="addAnotherDeviceWrap">
+                <button type="button" id="addAnotherDevice" class="ghost-btn add-device-btn">
+                  <svg class="icon"><use href="#i-plus"></use></svg>
+                  Add another device for this client
+                </button>
+                <p class="field-hint">Logging more than one device for the same client? Save this one and add the next — one invoice per device.</p>
+              </div>
             </div>
           </section>
 
           <section class="form-step" data-form-step="3" hidden>
             <div class="form-step-heading"><p class="form-section-label">Step 3</p><h4>Payment</h4><p>Add the repair cost and how much the client paid today.</p></div>
             <p id="quotedPriceSummary" class="quoted-price-summary" hidden></p>
-            <div class="form-grid">
-              <div id="repairCostField" class="form-field">
-                <label class="field-label" for="fRepairCost">Repair cost (TTD)</label>
-                <input id="fRepairCost" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 450.00" />
-              </div>
-              <div class="form-field">
-                <label class="field-label" for="fAmountPaid">Amount paid (TTD)</label>
-                <input id="fAmountPaid" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 150.00" />
+            <div id="paymentDeviceCards"></div>
+            <div class="payment-device-card" id="currentPaymentCard">
+              <p class="payment-device-label" id="currentPaymentLabel" hidden></p>
+              <div class="form-grid">
+                <div id="repairCostField" class="form-field">
+                  <label class="field-label" for="fRepairCost">Repair cost (TTD)</label>
+                  <input id="fRepairCost" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 450.00" />
+                </div>
+                <div class="form-field">
+                  <label class="field-label" for="fAmountPaid">Amount paid (TTD)</label>
+                  <input id="fAmountPaid" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 150.00" />
+                </div>
               </div>
             </div>
           </section>
