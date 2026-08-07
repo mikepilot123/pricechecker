@@ -110,6 +110,10 @@
   let reports = [];
   let bound = false;
   let comboOpen = false;
+  // Key of the part most recently set, so the map/checklist can flash a
+  // quick "just set" pulse on it before an auto-advance moves the section on.
+  let justSetKey = null;
+  let pendingAdvanceTimer = null;
 
   function newDraft() {
     return {
@@ -229,7 +233,7 @@
       if (!p) return "";
       const state = stateOf(draft.stage, key);
       return `
-        <g class="dg-hotspot state-${state}" data-dg-part="${esc(p.key)}"
+        <g class="dg-hotspot state-${state}${key === justSetKey ? " dg-just-set" : ""}" data-dg-part="${esc(p.key)}"
            transform="translate(${p.x},${p.y})" role="button" tabindex="0"
            aria-label="${esc(p.label)}: ${STATE_LABEL[state]}">
           <title>${esc(p.label)} — ${STATE_LABEL[state]}</title>
@@ -285,7 +289,7 @@
           ${STATE_LABEL[s]}
         </button>`).join("");
       return `
-        <div class="dg-test-card state-${state}">
+        <div class="dg-test-card state-${state}${key === justSetKey ? " dg-just-set" : ""}">
           <span class="dg-test-icon"><svg class="icon"><use href="#${esc(p.icon)}"></use></svg></span>
           <span class="dg-test-name">${esc(p.label)}</span>
           <span class="dg-test-btns">${buttons}</span>
@@ -498,35 +502,104 @@
 
   // ---- Interactions --------------------------------------------------------
 
+  function clearPendingAdvance() {
+    if (pendingAdvanceTimer) {
+      clearTimeout(pendingAdvanceTimer);
+      pendingAdvanceTimer = null;
+    }
+  }
+
+  // Sets a part's result, then — if that was the last untested part in the
+  // section — flashes it and, after a beat to register, auto-advances to
+  // the next section. Any other interaction cancels a pending advance.
   function setPartState(key, value) {
     if (!draft[draft.stage]) draft[draft.stage] = {};
+    const wasComplete = groupTally(currentGroup(), draft.stage).complete;
     // Tapping the state a part is already in clears it back to untested,
     // so a mis-tap is undone with a second tap on the same button.
-    if (stateOf(draft.stage, key) === value) delete draft[draft.stage][key];
+    const clearing = stateOf(draft.stage, key) === value;
+    if (clearing) delete draft[draft.stage][key];
     else draft[draft.stage][key] = value;
     saveDraft();
+    clearPendingAdvance();
+    justSetKey = clearing ? null : key;
     render();
+    if (!clearing) scheduleAutoAdvance(wasComplete);
   }
 
   function cyclePart(key) {
     const current = stateOf(draft.stage, key);
     const next = STATES[(STATES.indexOf(current) + 1) % STATES.length];
     if (!draft[draft.stage]) draft[draft.stage] = {};
+    const wasComplete = groupTally(currentGroup(), draft.stage).complete;
     if (next === "untested") delete draft[draft.stage][key];
     else draft[draft.stage][key] = next;
     saveDraft();
+    clearPendingAdvance();
+    justSetKey = next === "untested" ? null : key;
     render();
+    if (next !== "untested") scheduleAutoAdvance(wasComplete);
   }
 
-  function setSection(index) {
+  function scheduleAutoAdvance(wasComplete) {
+    const nowComplete = groupTally(currentGroup(), draft.stage).complete;
+    const i = sectionIndex();
+    const last = groups().length - 1;
+    if (!nowComplete || wasComplete || i >= last) return;
+    // Hold on the finished section for a moment — long enough to register
+    // the pulse on the part that was just set — before sliding on.
+    pendingAdvanceTimer = setTimeout(() => {
+      pendingAdvanceTimer = null;
+      goToSection(i + 1, "forward");
+    }, 650);
+  }
+
+  function reduceMotion() {
+    return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  // Instant section change — used internally by the animated transition,
+  // and as the fallback when the visitor has reduced motion switched on.
+  function applySection(index) {
     const max = groups().length - 1;
     draft.section = Math.min(Math.max(index, 0), max);
+    justSetKey = null;
     saveDraft();
     render();
     $("dgStepper")?.querySelector(".dg-step.active")?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
   }
 
+  // Slides the map + checklist out, swaps in the new section underneath,
+  // then slides it in from the other side — used for Back/Next, the
+  // stepper, and the pass/fail auto-advance so every section change reads
+  // the same way instead of only some of them animating.
+  function goToSection(index, direction) {
+    clearPendingAdvance();
+    const max = groups().length - 1;
+    const target = Math.min(Math.max(index, 0), max);
+    if (target === sectionIndex()) return;
+    const dir = direction || (target > sectionIndex() ? "forward" : "back");
+    const main = $("dgMain");
+    if (!main || reduceMotion()) {
+      applySection(target);
+      return;
+    }
+    const outClass = dir === "forward" ? "dg-slide-out-left" : "dg-slide-out-right";
+    const inClass = dir === "forward" ? "dg-slide-in-right" : "dg-slide-in-left";
+    main.classList.add(outClass);
+    setTimeout(() => {
+      applySection(target);
+      main.classList.remove(outClass);
+      main.classList.add("dg-no-transition", inClass);
+      void main.offsetWidth; // force reflow so the "in" position applies instantly, without animating
+      main.classList.remove("dg-no-transition");
+      requestAnimationFrame(() => main.classList.remove(inClass));
+    }, 200);
+  }
+
   function setStage(stage) {
+    clearPendingAdvance();
+    justSetKey = null;
     draft.stage = stage === "after" ? "after" : "before";
     saveDraft();
     render();
@@ -534,6 +607,8 @@
 
   function setDeviceType(type) {
     if (!LAYOUTS[type] || draft.deviceType === type) return;
+    clearPendingAdvance();
+    justSetKey = null;
     draft.deviceType = type;
     draft.section = 0; // the two layouts have different sections
     saveDraft();
@@ -585,6 +660,8 @@
   function pickTicket(id) {
     const ticket = knownTickets().find((t) => t.id === id);
     if (!ticket) return;
+    clearPendingAdvance();
+    justSetKey = null;
     draft.ticketId = ticket.id || "";
     draft.ticketLabel = ticket.device || "";
     draft.clientName = ticket.customerName || "";
@@ -632,6 +709,8 @@
   function openReport(id) {
     const record = reports.find((r) => r.id === id);
     if (!record) return;
+    clearPendingAdvance();
+    justSetKey = null;
     draft = Object.assign(newDraft(), record, { stage: "before", section: 0 });
     if (!LAYOUTS[draft.deviceType]) draft.deviceType = "phone";
     saveDraft();
@@ -659,6 +738,8 @@
       return;
     }
     if (!window.confirm(`Clear every result in the ${stageLabel} test? The client details and the other test are kept.`)) return;
+    clearPendingAdvance();
+    justSetKey = null;
     draft[draft.stage] = {};
     draft.section = 0;
     saveDraft();
@@ -670,6 +751,8 @@
     const b = tally("before");
     const a = tally("after");
     if ((b.tested || a.tested) && !window.confirm("Start a new report? Save the current one first if you still need it.")) return;
+    clearPendingAdvance();
+    justSetKey = null;
     draft = newDraft();
     saveDraft();
     if ($("dgClientSearch")) $("dgClientSearch").value = "";
@@ -767,7 +850,7 @@
       const hotspot = event.target.closest("[data-dg-part]");
       if (hotspot) { cyclePart(hotspot.dataset.dgPart); return; }
       const step = event.target.closest("[data-dg-section]");
-      if (step) { setSection(Number(step.dataset.dgSection)); return; }
+      if (step) { goToSection(Number(step.dataset.dgSection)); return; }
       const stageBtn = event.target.closest("[data-dg-stage]");
       if (stageBtn) { setStage(stageBtn.dataset.dgStage); return; }
       const typeBtn = event.target.closest("[data-dg-type]");
@@ -791,8 +874,8 @@
       }
     });
 
-    $("dgPrevSection")?.addEventListener("click", () => setSection(sectionIndex() - 1));
-    $("dgNextSection")?.addEventListener("click", () => setSection(sectionIndex() + 1));
+    $("dgPrevSection")?.addEventListener("click", () => goToSection(sectionIndex() - 1, "back"));
+    $("dgNextSection")?.addEventListener("click", () => goToSection(sectionIndex() + 1, "forward"));
 
     $("dgClientSearch")?.addEventListener("input", (e) => renderCombo(e.target.value));
     $("dgClientSearch")?.addEventListener("focus", (e) => renderCombo(e.target.value));
@@ -821,6 +904,8 @@
   }
 
   function enterDiagnostics() {
+    clearPendingAdvance();
+    justSetKey = null;
     loadStored();
     bindOnce();
     renderFields();
