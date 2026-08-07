@@ -3117,12 +3117,50 @@ body.nav-open .view-nav { transform: translateX(0); }
   font-size: 0.88rem;
   font-weight: 500;
 }
-.form-progress-step { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 50%; color: var(--text-dim); font-size: 0.74rem; font-weight: 500; line-height: 1; }
+.form-progress-step { position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 50%; color: var(--text-dim); font-size: 0.74rem; font-weight: 500; line-height: 1; background: none; padding: 0; font-family: inherit; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease; }
 .form-progress-step > span { position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%); color: var(--text-dim); font-size: 0.67rem; font-weight: 500; line-height: 1; white-space: nowrap; }
 .form-progress-step.active { border-color: var(--accent); background: var(--accent); color: #fff; }
 .form-progress-step.complete { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .form-progress-step.active > span,
 .form-progress-step.complete > span { color: var(--accent); }
+.form-progress-step:hover:not(:disabled):not(.active) { border-color: var(--accent); color: var(--accent); }
+.form-progress-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.form-progress-step:disabled { cursor: not-allowed; opacity: 0.5; }
+
+/* ---------- Multi-device check-in (add another device for the same client) ---------- */
+.added-device-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.added-device-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+.added-device-main { flex: 1; min-width: 0; }
+.added-device-name { font-weight: 500; font-size: 0.9rem; }
+.added-device-issues {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.added-device-remove { flex: none; }
+.add-device-btn { width: 100%; justify-content: center; }
+
+.payment-device-card {
+  padding: 14px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+  background: var(--bg-soft);
+}
+.payment-device-card:last-child { margin-bottom: 0; }
+.payment-device-label { margin: 0 0 10px; font-weight: 500; font-size: 0.88rem; }
+.payment-device-label span { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.76rem; font-weight: 400; }
 .form-progress-line { height: 1px; flex: 1; min-width: 18px; margin-top: 14px; background: var(--border); }
 .form-progress-line.complete { background: var(--accent); }
 .form-step-heading { margin: 0 0 18px; }
