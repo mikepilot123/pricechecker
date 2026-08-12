@@ -3150,6 +3150,9 @@ body.nav-open .view-nav { transform: translateX(0); }
 }
 .added-device-remove { flex: none; }
 .add-device-btn { width: 100%; justify-content: center; }
+.cancel-device-btn { margin-top: 10px; }
+/* .ghost-btn's display would otherwise win over the browser's [hidden]. */
+.cancel-device-btn[hidden] { display: none; }
 
 .payment-device-card {
   padding: 14px 15px;
@@ -3533,6 +3536,45 @@ body.nav-open .view-nav { transform: translateX(0); }
 /* Draw the card's left border in red (overriding its status color) while a
    parts reminder is showing, so it stands out at a glance in the list. */
 .ticket.has-parts-alert { --status-dot: var(--danger); }
+
+/* ---------- Grouped check-in card (one client, several devices) ----------
+   Devices dropped off together are saved as separate tickets but share one
+   card: the client sits in the header, each device keeps its own row. */
+.ticket-group-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 14px 18px;
+}
+.ticket-group-identity { flex: 1; min-width: 0; }
+.ticket-group-head .ticket-phone { width: fit-content; max-width: 100%; margin-top: 6px; min-height: 36px; }
+.ticket-group-count {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+.ticket-group-devices { display: flex; flex-direction: column; }
+.ticket-group-item {
+  border-top: 1px solid var(--border);
+  border-left: 4px solid var(--status-dot, var(--border));
+}
+.ticket-group-item.has-parts-alert { --status-dot: var(--danger); }
+.ticket-head-compact { min-height: 88px; }
+@media (max-width: 559px) {
+  .ticket-group-head { padding: 14px; }
+  /* Compact rows have no phone line — drop that row from the mobile grid. */
+  .ticket-head-compact {
+    grid-template-areas:
+      "thumb identity activity"
+      "repair repair status";
+  }
+}
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .repair-loading {

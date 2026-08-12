@@ -1506,6 +1506,7 @@
     const list = $("addedDevicesList");
     if (!wrap || !list) return;
     wrap.hidden = !formDevices.length;
+    updateExtraDeviceControls();
     list.innerHTML = formDevices.map((d, i) => `
       <div class="added-device-item">
         <div class="added-device-main">
@@ -1565,6 +1566,61 @@
     renderPendingFormMedia();
     updateInventoryOptions("");
     toast("Device added — enter the next one.", { tone: "info", duration: 2500 });
+    focusUnlessTouch($("fDevice"));
+  });
+
+  // Anything typed into the on-screen (in-progress) device entry. Used to
+  // decide whether cancelling that entry needs a confirmation first.
+  function currentDeviceEntryTouched() {
+    return Boolean(
+      $("fDevice").value.trim() ||
+      buildIssuesString() ||
+      $("fNotes").value.trim() ||
+      $("fInventoryItem").value ||
+      $("fRepairCost").value.trim() ||
+      $("fAmountPaid").value.trim() ||
+      pendingFormMedia.length ||
+      $("fStatus").value !== "Received"
+    );
+  }
+
+  // The escape hatch out of "Add another device": while an extra device is
+  // being entered, staff can drop it and fall back to the device they last
+  // confirmed — the client details and the other devices are untouched.
+  function updateExtraDeviceControls() {
+    const btn = $("cancelExtraDevice");
+    const hint = $("cancelExtraDeviceHint");
+    if (!btn || !hint) return;
+    const previous = formDevices[formDevices.length - 1];
+    btn.hidden = !previous;
+    hint.hidden = !previous;
+    if (previous) {
+      hint.textContent = `Changed your mind? This clears what's on screen and brings back ${previous.device || "the last device"} — the client details and any other devices stay.`;
+    }
+  }
+
+  $("cancelExtraDevice")?.addEventListener("click", () => {
+    if (!formDevices.length) return;
+    if (
+      currentDeviceEntryTouched() &&
+      !window.confirm("Cancel this extra device? What's on screen is dropped — the client details and the devices already added are kept.")
+    ) return;
+    const previous = formDevices.pop();
+    // The in-progress entry is going away, so its queued media goes with it.
+    resetPendingFormMedia();
+    $("fDevice").value = previous.device || "";
+    $("fStatus").value = previous.status || "Received";
+    $("fNotes").value = previous.notes || "";
+    $("fRepairCost").value = previous.repairCost || "";
+    $("fAmountPaid").value = previous.amountPaid || "";
+    setIssueTags(previous.issues || "");
+    // Ownership of the restored entry's media moves back to the live form.
+    pendingFormMedia = previous.media || [];
+    renderPendingFormMedia();
+    updateInventoryOptions(previous.inventoryItemKey || "");
+    $("formError").hidden = true;
+    renderAddedDevices();
+    toast(`Back to ${previous.device || "the previous device"}.`, { tone: "info", duration: 2500 });
     focusUnlessTouch($("fDevice"));
   });
 
@@ -2462,8 +2518,10 @@
     if (countEl) countEl.textContent = completed.length ? `${completed.length} completed check-in${completed.length === 1 ? "" : "s"}` : "";
     list.innerHTML = "";
     const frag = document.createDocumentFragment();
-    for (const t of completed) {
-      const card = ticketCard(t);
+    for (const group of groupTicketsByCheckin(completed)) {
+      const card = checkinCard(group);
+      // The card's first .ticket-customer is the client's name — on a grouped
+      // card that's the header, on a single one it's the ticket row itself.
       const customerEl = card.querySelector(".ticket-customer");
       if (customerEl) customerEl.insertAdjacentHTML("beforeend", `<span class="source-tag source-tag-checkin">Check-In</span>`);
       frag.appendChild(card);
@@ -2489,18 +2547,27 @@
 
   function render() {
     const list = currentList();
-    const visible = list.slice(0, visibleTicketCount);
+    // Paginate by device count, but never split one client's check-in across
+    // the "View more" boundary.
+    const groups = groupTicketsByCheckin(list);
+    const visibleGroups = [];
+    let shownCount = 0;
+    for (const group of groups) {
+      if (shownCount >= visibleTicketCount) break;
+      visibleGroups.push(group);
+      shownCount += group.length;
+    }
     $("intakeList").innerHTML = "";
     $("intakeEmpty").hidden = list.length > 0;
     $("intakeError").hidden = true;
     $("intakeCount").textContent = list.length
-      ? `Showing ${visible.length} of ${list.length} device${list.length === 1 ? "" : "s"}`
+      ? `Showing ${shownCount} of ${list.length} device${list.length === 1 ? "" : "s"}`
       : "";
     const frag = document.createDocumentFragment();
-    for (const t of visible) frag.appendChild(ticketCard(t));
-    if (visible.length < list.length) {
+    for (const group of visibleGroups) frag.appendChild(checkinCard(group));
+    if (shownCount < list.length) {
       const more = document.createElement("button");
-      const remaining = list.length - visible.length;
+      const remaining = list.length - shownCount;
       more.className = "view-more-btn";
       more.innerHTML = `View ${Math.min(TICKET_PAGE_SIZE, remaining)} more <span aria-hidden="true">↓</span>`;
       more.onclick = () => {
@@ -2533,44 +2600,71 @@
 
   const PARTS_ALERT_DAYS = 3;
 
-  function ticketCard(t) {
-    const el = document.createElement("div");
+  function ticketPhoneLineHtml(t) {
+    return t.phone
+      ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
+      : `<span class="ticket-phone no-phone">No number on file</span>`;
+  }
+
+  function showsPartsAlert(t) {
+    return t.status === "Waiting for Parts" && !t.partsOrdered && daysSince(t.waitingForPartsSince) >= PARTS_ALERT_DAYS;
+  }
+
+  // The red "waiting on parts" strip under a ticket's head, or null when the
+  // ticket isn't overdue on parts.
+  function partsAlertEl(t) {
+    if (!showsPartsAlert(t)) return null;
+    const waitingDays = daysSince(t.waitingForPartsSince);
+    const alert = document.createElement("div");
+    alert.className = "ticket-parts-alert";
+    alert.innerHTML = `
+      <svg class="icon"><use href="#i-alert"></use></svg>
+      <span>Waiting on parts for ${waitingDays} day${waitingDays === 1 ? "" : "s"} — order parts?</span>
+      <button type="button" class="ticket-parts-alert-btn">Mark ordered</button>`;
+    alert.querySelector(".ticket-parts-alert-btn").onclick = (e) => {
+      e.stopPropagation();
+      setPartsOrdered(t, true);
+    };
+    return alert;
+  }
+
+  // Builds one ticket's clickable head row, with every control wired up.
+  // `compact` drops the customer name and phone and leads with the device
+  // instead — used for the device rows of a grouped check-in card, where the
+  // client's details are shown once in the card header.
+  function ticketHead(t, { compact = false } = {}) {
     const statusClass = STATUS_CLASS[t.status] || "st-received";
-    el.className = `ticket ${statusClass}`;
-
-    const waitingForParts = t.status === "Waiting for Parts";
-    const waitingDays = waitingForParts ? daysSince(t.waitingForPartsSince) : 0;
-    const showPartsAlert = waitingForParts && !t.partsOrdered && waitingDays >= PARTS_ALERT_DAYS;
-    if (showPartsAlert) el.classList.add("has-parts-alert");
-
     const head = document.createElement("div");
-    head.className = "ticket-head";
+    head.className = compact ? "ticket-head ticket-head-compact" : "ticket-head";
     head.tabIndex = 0;
     head.setAttribute("role", "button");
     head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
-    const hasPhone = !!t.phone;
     const technicianLabel = t.technician ? `Assigned to ${t.technician}` : "Assign technician";
-    const phoneLine = hasPhone
-      ? `<a class="ticket-phone" href="tel:${esc(t.phone)}" aria-label="Call ${esc(t.customerName || "customer")}"><svg class="icon ticket-phone-icon"><use href="#i-phone"></use></svg>${esc(t.phone)}</a>`
-      : `<span class="ticket-phone no-phone">No number on file</span>`;
+    const phoneLine = ticketPhoneLineHtml(t);
     const deviceIcon = deviceTypeIcon(t.device);
-    const partsBtnHtml = waitingForParts
+    const partsBtnHtml = t.status === "Waiting for Parts"
       ? `<button type="button" class="ticket-parts-btn${t.partsOrdered ? " is-ordered" : ""}" data-parts-toggle aria-pressed="${t.partsOrdered ? "true" : "false"}">
           <svg class="icon"><use href="#${t.partsOrdered ? "i-check" : "i-tools"}"></use></svg>${t.partsOrdered ? "Parts ordered" : "Mark parts ordered"}
         </button>`
       : "";
-    head.innerHTML = `
-      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
-        <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
-        <img alt="" />
-      </div>
-      <div class="ticket-identity">
+    const identityHtml = compact
+      ? `<div class="ticket-identity">
+        <span class="ticket-num mono">#${esc(t.id || "")}</span>
+        <div class="ticket-customer">${esc(t.device || "—")}</div>
+      </div>`
+      : `<div class="ticket-identity">
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
         ${phoneLine}
       </div>
-      <div class="ticket-phone-row">${phoneLine}</div>
+      <div class="ticket-phone-row">${phoneLine}</div>`;
+    head.innerHTML = `
+      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
+        <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
+        <img alt="" />
+      </div>
+      ${identityHtml}
       <div class="ticket-repair">
         <span class="ticket-repair-label">Repair</span>
         <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
@@ -2629,23 +2723,89 @@
         openTicketModal(t);
       }
     };
-    el.appendChild(head);
+    return head;
+  }
 
-    if (showPartsAlert) {
-      const alert = document.createElement("div");
-      alert.className = "ticket-parts-alert";
-      alert.innerHTML = `
-        <svg class="icon"><use href="#i-alert"></use></svg>
-        <span>Waiting on parts for ${waitingDays} day${waitingDays === 1 ? "" : "s"} — order parts?</span>
-        <button type="button" class="ticket-parts-alert-btn">Mark ordered</button>`;
-      alert.querySelector(".ticket-parts-alert-btn").onclick = (e) => {
-        e.stopPropagation();
-        setPartsOrdered(t, true);
-      };
-      el.appendChild(alert);
-    }
-
+  function ticketCard(t) {
+    const el = document.createElement("div");
+    el.className = `ticket ${STATUS_CLASS[t.status] || "st-received"}`;
+    if (showsPartsAlert(t)) el.classList.add("has-parts-alert");
+    el.appendChild(ticketHead(t));
+    const alert = partsAlertEl(t);
+    if (alert) el.appendChild(alert);
     return el;
+  }
+
+  // One card for a client who dropped off several devices in the same
+  // check-in: their details sit in the header once, and each device keeps its
+  // own row with its own status, technician, and activity log.
+  function ticketGroupCard(tickets) {
+    const first = tickets[0];
+    const el = document.createElement("div");
+    el.className = "ticket ticket-group";
+    const header = document.createElement("div");
+    header.className = "ticket-group-head";
+    header.innerHTML = `
+      <div class="ticket-group-identity">
+        <div class="ticket-customer">${esc(first.customerName || "Unknown customer")}</div>
+        ${ticketPhoneLineHtml(first)}
+      </div>
+      <span class="ticket-group-count">${tickets.length} devices</span>`;
+    header.querySelectorAll("a.ticket-phone").forEach((phoneEl) => {
+      phoneEl.onclick = (e) => e.stopPropagation();
+    });
+    el.appendChild(header);
+
+    const rows = document.createElement("div");
+    rows.className = "ticket-group-devices";
+    for (const t of tickets) {
+      const row = document.createElement("div");
+      row.className = `ticket-group-item ${STATUS_CLASS[t.status] || "st-received"}`;
+      if (showsPartsAlert(t)) row.classList.add("has-parts-alert");
+      row.appendChild(ticketHead(t, { compact: true }));
+      const alert = partsAlertEl(t);
+      if (alert) row.appendChild(alert);
+      rows.appendChild(row);
+    }
+    el.appendChild(rows);
+    return el;
+  }
+
+  // Devices logged for one client through "Add another device" are saved as
+  // separate tickets (one invoice each), so the list re-joins the ones checked
+  // in together and shows them on a single card.
+  const CHECKIN_GROUP_WINDOW_MS = 15 * 60 * 1000;
+
+  function checkinGroupKey(t) {
+    const name = (t.customerName || "").trim().toLowerCase();
+    const phone = (t.phone || "").replace(/\D/g, "");
+    const email = (t.email || "").trim().toLowerCase();
+    return name || phone || email ? `${name}|${phone}|${email}` : "";
+  }
+
+  // Returns the list re-grouped in place: each entry is one card's worth of
+  // tickets, in the order the tickets already came in. Tickets without a
+  // usable client key or timestamp always stand alone.
+  function groupTicketsByCheckin(list) {
+    const groups = [];
+    const openByKey = new Map();
+    for (const t of list) {
+      const key = checkinGroupKey(t);
+      const time = t.created ? new Date(t.created).getTime() : NaN;
+      const open = key && !isNaN(time) ? openByKey.get(key) : null;
+      if (open && Math.abs(time - open.time) <= CHECKIN_GROUP_WINDOW_MS) {
+        open.tickets.push(t);
+        continue;
+      }
+      const group = { time, tickets: [t] };
+      groups.push(group);
+      if (key && !isNaN(time)) openByKey.set(key, group);
+    }
+    return groups.map((g) => g.tickets);
+  }
+
+  function checkinCard(tickets) {
+    return tickets.length > 1 ? ticketGroupCard(tickets) : ticketCard(tickets[0]);
   }
 
   async function setPartsOrdered(ticket, ordered) {
