@@ -82,6 +82,7 @@
   // State
   let TICKETS = [];
   let TECHNICIANS = [];
+  let CUSTOMERS = [];
   let statusFilter = "all";
   let editingId = null;
   let formStep = 1;
@@ -214,7 +215,10 @@
     $("intakeMain").hidden = true;
     $("settingsMaintenance").hidden = !prefill;
     if (prefill) $("cfgPin").value = getCfg().pin;
-    if (prefill && isConfigured()) loadTechnicians();
+    if (prefill && isConfigured()) {
+      loadTechnicians();
+      loadCustomers();
+    }
   }
   function showMain() {
     $("intakeSetup").hidden = true;
@@ -561,6 +565,68 @@
       addTechnicianFromSettings();
     }
   });
+
+  // ---- Customer directory -----------------------------------------------------
+  // Read-only here: every check-in's name/phone/email is saved server-side
+  // into a shared customers table (lib/customers.js), matched by phone
+  // number, whenever a device is logged or edited. This just lists what's
+  // already been saved — there's no separate "add customer" flow.
+  async function loadCustomers() {
+    try {
+      const res = await api({ action: "listCustomers" });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      CUSTOMERS = res.customers || [];
+      renderCustomerSettings();
+    } catch (e) {
+      renderCustomerSettings("Couldn't load customers: " + e.message);
+    }
+  }
+
+  function renderCustomerSettings(message = "") {
+    const box = $("customerSettingsList");
+    if (!box) return;
+    const err = $("customerSettingsError");
+    if (err) {
+      err.hidden = !message;
+      if (message) err.textContent = message;
+    }
+    const q = ($("customerSearch")?.value || "").trim().toLowerCase();
+    const list = !q ? CUSTOMERS : CUSTOMERS.filter((c) =>
+      [c.name, c.phone, c.email].map((x) => (x || "").toLowerCase()).some((x) => x.includes(q)));
+    const countEl = $("customerCount");
+    if (countEl) {
+      countEl.textContent = CUSTOMERS.length
+        ? `Showing ${list.length} of ${CUSTOMERS.length} customer${CUSTOMERS.length === 1 ? "" : "s"}`
+        : "";
+    }
+    if (!CUSTOMERS.length) {
+      box.innerHTML = `<p class="empty-sub">No customers saved yet — they're added automatically when a device is logged.</p>`;
+      return;
+    }
+    if (!list.length) {
+      box.innerHTML = `<p class="empty-sub">No customers match your search.</p>`;
+      return;
+    }
+    box.innerHTML = list.map((c) => `
+      <div class="customer-row">
+        <div class="customer-row-main">
+          <div class="customer-name">${esc(c.name || "Unknown customer")}</div>
+          <div class="customer-meta">
+            ${c.phone
+              ? `<a class="customer-phone" href="tel:${esc(c.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>${esc(c.phone)}</a>`
+              : `<span class="customer-phone no-phone">No number</span>`}
+            ${c.email ? `<span class="customer-email">${esc(c.email)}</span>` : ""}
+          </div>
+        </div>
+        <div class="customer-stats">
+          <span class="customer-count">${c.ticketCount} device${c.ticketCount === 1 ? "" : "s"}</span>
+          <span class="customer-last">${c.lastTicketAt ? "Last visit " + fmtDate(c.lastTicketAt) : "No repairs yet"}</span>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  $("customerSearch")?.addEventListener("input", () => renderCustomerSettings());
 
   // ---- Clear all -------------------------------------------------------------
   function openClearAllModal() {
@@ -1569,6 +1635,15 @@
     focusUnlessTouch($("fDevice"));
   });
 
+  // True when the on-screen device entry has neither a model nor an issue —
+  // i.e. nothing that could be saved as a device. Adding a second device is
+  // optional: once one is confirmed, leaving this blank and pressing
+  // Continue just proceeds with what's already been added instead of
+  // demanding a second device be filled in.
+  function pendingDeviceIsBlank() {
+    return !$("fDevice").value.trim() && !buildIssuesString();
+  }
+
   // Anything typed into the on-screen (in-progress) device entry. Used to
   // decide whether cancelling that entry needs a confirmation first.
   function currentDeviceEntryTouched() {
@@ -1630,12 +1705,15 @@
   }
 
   // Rebuilds the Payment step's per-device cards from formDevices. The last
-  // (current) device always keeps the original fRepairCost/fAmountPaid fields.
+  // (current) device keeps the original fRepairCost/fAmountPaid fields —
+  // unless it was left blank (no second device wanted), in which case that
+  // card is hidden entirely and only the already-added device(s) show.
   function renderPaymentCards() {
     const container = $("paymentDeviceCards");
+    const currentCard = $("currentPaymentCard");
     const currentLabel = $("currentPaymentLabel");
-    if (!container || !currentLabel) return;
-    const multi = formDevices.length > 0;
+    if (!container || !currentCard || !currentLabel) return;
+    const pendingBlank = formDevices.length > 0 && pendingDeviceIsBlank();
     container.innerHTML = formDevices.map((d, i) => `
       <div class="payment-device-card">
         <p class="payment-device-label">${paymentDeviceLabelHtml(d.device, d.issues)}</p>
@@ -1651,6 +1729,8 @@
         </div>
       </div>
     `).join("");
+    currentCard.hidden = pendingBlank;
+    const multi = formDevices.length > 0 && !pendingBlank;
     currentLabel.hidden = !multi;
     if (multi) currentLabel.innerHTML = paymentDeviceLabelHtml($("fDevice").value.trim(), buildIssuesString());
   }
@@ -1780,6 +1860,10 @@
       const message = customerFieldsError();
       if (message) err.textContent = message;
       else return true;
+    } else if (step === 2 && formDevices.length && pendingDeviceIsBlank()) {
+      // A second device is optional — nothing typed for it and at least one
+      // device is already added, so there's nothing left to validate here.
+      return true;
     } else if (step === 2 && !$("fDevice").value.trim()) {
       err.textContent = "Enter the device model.";
     } else if (step === 2 && !buildIssuesString()) {
@@ -2151,11 +2235,23 @@
       err.hidden = false;
       return;
     }
+    const currentDeviceValue = $("fDevice").value.trim();
     const currentIssuesStr = buildIssuesString();
-    if (!currentIssuesStr) {
-      err.textContent = "Select at least one issue.";
-      err.hidden = false;
-      return;
+    // A second device is optional: once one's already been added, leaving
+    // the fields for the next one untouched isn't an error — it just won't
+    // be saved as a device below.
+    const pendingDeviceBlank = !editingId && formDevices.length > 0 && !currentDeviceValue && !currentIssuesStr;
+    if (!pendingDeviceBlank) {
+      if (!currentDeviceValue) {
+        err.textContent = "Enter the device model.";
+        err.hidden = false;
+        return;
+      }
+      if (!currentIssuesStr) {
+        err.textContent = "Select at least one issue.";
+        err.hidden = false;
+        return;
+      }
     }
     const customerName = $("fName").value.trim();
     const phone = $("fPhone").value.trim();
@@ -2175,7 +2271,7 @@
         client: customerName,
         phone,
         email,
-        device: $("fDevice").value.trim(),
+        device: currentDeviceValue,
         issues: currentIssuesStr,
         issue: currentIssuesStr,
         status: $("fStatus").value,
@@ -2223,16 +2319,21 @@
       repairCost: ($("devRepairCost_" + i)?.value ?? d.repairCost ?? "").toString().trim(),
       amountPaid: ($("devAmountPaid_" + i)?.value ?? d.amountPaid ?? "").toString().trim(),
     }));
-    devices.push({
-      device: $("fDevice").value.trim(),
-      issues: currentIssuesStr,
-      status: $("fStatus").value,
-      inventoryItemKey: $("fInventoryItem").value,
-      notes: $("fNotes").value.trim(),
-      media: pendingFormMedia.slice(),
-      repairCost: $("fRepairCost").value.trim(),
-      amountPaid: $("fAmountPaid").value.trim(),
-    });
+    if (!pendingDeviceBlank) {
+      devices.push({
+        device: currentDeviceValue,
+        issues: currentIssuesStr,
+        status: $("fStatus").value,
+        inventoryItemKey: $("fInventoryItem").value,
+        notes: $("fNotes").value.trim(),
+        media: pendingFormMedia.slice(),
+        repairCost: $("fRepairCost").value.trim(),
+        amountPaid: $("fAmountPaid").value.trim(),
+      });
+    } else {
+      // No second device after all — release its queued media, if any.
+      pendingFormMedia.forEach((m) => URL.revokeObjectURL(m.url));
+    }
     formDevices = [];
     pendingFormMedia = [];
 
