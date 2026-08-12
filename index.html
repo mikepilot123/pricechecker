@@ -829,6 +829,14 @@
           <div id="technicianSettingsList" class="technician-list"></div>
           <p id="technicianSettingsError" class="field-error" hidden></p>
         </div>
+        <div class="customer-settings">
+          <p class="field-label">Customers</p>
+          <p class="settings-help">Every client entered through Log device is saved here automatically, matched by phone number.</p>
+          <input id="customerSearch" class="text-input" type="search" autocomplete="off" placeholder="Search name, phone, email…" aria-label="Search customers" />
+          <p id="customerCount" class="result-count"></p>
+          <div id="customerSettingsList" class="customer-list"></div>
+          <p id="customerSettingsError" class="field-error" hidden></p>
+        </div>
         <button id="closeIntakeSettings" class="ghost-btn settings-back" type="button">Back to Repairs</button>
       </div>
     </section>
@@ -956,7 +964,7 @@
               <div class="form-field form-field-full">
                 <label class="field-label" for="fDevice">Device *</label>
                 <div class="device-combobox" id="fDeviceCombobox">
-                  <input id="fDevice" class="text-input" autocomplete="off" required placeholder="Select or search for your device" aria-autocomplete="list" aria-expanded="false" aria-controls="fDeviceDropdown" />
+                  <input id="fDevice" class="text-input" autocomplete="off" placeholder="Select or search for your device" aria-autocomplete="list" aria-expanded="false" aria-controls="fDeviceDropdown" />
                   <button type="button" id="openFDeviceDropdown" class="device-dropdown-btn" aria-label="Show devices"><svg class="icon"><use href="#i-chevron-down"></use></svg></button>
                   <div id="fDeviceDropdown" class="device-dropdown" role="listbox" hidden></div>
                 </div>

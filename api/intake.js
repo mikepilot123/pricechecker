@@ -13,6 +13,7 @@ import {
   rebuildMonthlySales,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
+import { listCustomers } from "../lib/customers.js";
 import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../lib/appointments.js";
 import { listExpenses, addExpense, updateExpense, deleteExpense } from "../lib/expenses.js";
 import { ensureSchema } from "../lib/db.js";
@@ -70,6 +71,9 @@ export default async function handler(req, res) {
     }
     if (action === "deleteTechnician") {
       return res.status(200).json({ ok: true, technicians: await deleteTechnician(body) });
+    }
+    if (action === "listCustomers") {
+      return res.status(200).json({ ok: true, customers: await listCustomers() });
     }
     if (action === "listMedia") {
       return res.status(200).json({ ok: true, media: await listMedia(body.ticketId) });
