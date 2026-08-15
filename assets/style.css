@@ -2715,11 +2715,6 @@ body.nav-open .view-nav { transform: translateX(0); }
 .settings-actions .ghost-btn { justify-content: center; min-height: 42px; }
 .settings-actions .danger-btn { grid-column: 1 / -1; }
 .settings-back { width: 100%; justify-content: center; margin-top: 12px; }
-.technician-settings {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
 .technician-create-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2783,11 +2778,6 @@ body.nav-open .view-nav { transform: translateX(0); }
   .technician-create-row { grid-template-columns: 1fr; }
   .technician-create-row .primary-btn { width: 100%; }
 }
-.customer-settings {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
 .customer-settings .result-count { margin: 10px 0 0; }
 .customer-list {
   display: flex;
@@ -2840,11 +2830,6 @@ body.nav-open .view-nav { transform: translateX(0); }
 .customer-count { font-weight: 500; color: var(--text); }
 
 /* ---- Settings → Repair prices (bulk editor) ------------------------------ */
-.price-settings {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
 .price-settings .result-count { margin: 10px 0 0; }
 .price-admin-toolbar {
   display: grid;
