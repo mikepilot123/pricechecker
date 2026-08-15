@@ -210,6 +210,24 @@
   });
   const isConfigured = () => !!getCfg().pin;
 
+  // ---- Settings sub-tabs -----------------------------------------------------
+  // General / Technicians / Customers / Prices, so a page that used to be one
+  // long scroll of unrelated sections reads as separate destinations. Same
+  // subnav pattern as Appointments/Targets (.appt-subnav / .appt-panel).
+  function setSettingsPanel(panel) {
+    document.querySelectorAll("[data-settings-panel-section]").forEach((section) => {
+      section.hidden = section.dataset.settingsPanelSection !== panel;
+    });
+    document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
+      const active = btn.dataset.settingsPanel === panel;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+  }
+  document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
+    btn.addEventListener("click", () => setSettingsPanel(btn.dataset.settingsPanel));
+  });
+
   function showSetup(prefill) {
     $("intakeSetup").hidden = false;
     $("intakeMain").hidden = true;
