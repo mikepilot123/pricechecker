@@ -139,7 +139,6 @@
     targets: $("view-targets"),
     leads: $("view-leads"),
     appointments: $("view-appointments"),
-    "completed-repairs": $("view-completed-repairs"),
     prices: $("view-prices"),
     diagnostics: $("view-diagnostics"),
     "parts-checker": $("view-parts-checker"),
@@ -165,7 +164,6 @@
     if (target === "targets") window.dispatchEvent(new Event("rpc-enter-targets"));
     if (target === "leads") window.dispatchEvent(new Event("rpc-enter-leads"));
     if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
-    if (target === "completed-repairs") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
     if (target === "diagnostics") window.dispatchEvent(new Event("rpc-enter-diagnostics"));
     if (target === "parts-checker") window.dispatchEvent(new Event("rpc-enter-parts-checker"));
     if (target === "intake") enterIntake();
@@ -226,6 +224,27 @@
   }
   document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
     btn.addEventListener("click", () => setSettingsPanel(btn.dataset.settingsPanel));
+  });
+
+  // ---- Repairs sub-tabs -------------------------------------------------------
+  // "Existing repairs" (in progress) / "Completed Repairs" (was its own top-level
+  // nav item — merged in here as a second sub-tab, same as Appointments'
+  // Create/View split). Switching to "completed" re-fires the load that used to
+  // run on navigating to the standalone view, so both halves (check-in tickets
+  // here, appointments in assets/appointments.js) stay fresh.
+  function setRepairsPanel(panel) {
+    document.querySelectorAll("[data-repairs-panel-section]").forEach((section) => {
+      section.hidden = section.dataset.repairsPanelSection !== panel;
+    });
+    document.querySelectorAll(".appt-subnav-btn[data-repairs-panel]").forEach((btn) => {
+      const active = btn.dataset.repairsPanel === panel;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (panel === "completed") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
+  }
+  document.querySelectorAll(".appt-subnav-btn[data-repairs-panel]").forEach((btn) => {
+    btn.addEventListener("click", () => setRepairsPanel(btn.dataset.repairsPanel));
   });
 
   function showSetup(prefill) {
@@ -2580,6 +2599,7 @@
       showView("intake");
       enterIntake();
     }
+    setRepairsPanel("existing"); // these filters (active/ready/etc) only apply to in-progress repairs
     statusFilter = filter === "active" ? "__active" : filter === "ready" ? "Repaired" : filter;
     if ($("intakeSearch")) $("intakeSearch").value = "";
     visibleTicketCount = TICKET_PAGE_SIZE;

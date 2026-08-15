@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=settings-subtabs-1" />
+  <link rel="stylesheet" href="assets/style.css?v=sidebar-subtabs-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -93,6 +93,10 @@
       </div>
       <button class="nav-btn active" data-target="prices" role="tab" aria-selected="true"><svg class="icon"><use href="#i-tag"></use></svg>Prices</button>
       <button class="nav-btn" data-target="intake" role="tab" aria-selected="false"><svg class="icon"><use href="#i-clipboard"></use></svg>Repairs</button>
+      <div class="appt-sidebar-subnav" role="group" aria-label="Repairs sections">
+        <button type="button" class="appt-subnav-btn active" data-repairs-panel="existing" aria-selected="true">Existing repairs</button>
+        <button type="button" class="appt-subnav-btn" data-repairs-panel="completed" aria-selected="false">Completed Repairs</button>
+      </div>
       <button class="nav-btn" data-target="diagnostics" role="tab" aria-selected="false"><svg class="icon"><use href="#i-diagnose"></use></svg>Diagnostics</button>
       <button class="nav-btn" data-target="parts-checker" role="tab" aria-selected="false"><svg class="icon"><use href="#i-laptop"></use></svg>Parts Checker</button>
       <button class="nav-btn" data-target="dashboard" role="tab" aria-selected="false"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
@@ -102,7 +106,6 @@
         <button type="button" class="appt-subnav-btn active" data-appt-panel="create" aria-selected="true">Create</button>
         <button type="button" class="appt-subnav-btn" data-appt-panel="view" aria-selected="false">View</button>
       </div>
-      <button class="nav-btn" data-target="completed-repairs" role="tab" aria-selected="false"><svg class="icon"><use href="#i-check"></use></svg>Completed Repairs</button>
       <button class="nav-btn" data-target="inventory" role="tab" aria-selected="false"><svg class="icon"><use href="#i-inventory-flow"></use></svg>Inventory</button>
       <button class="nav-btn" data-target="targets" role="tab" aria-selected="false"><svg class="icon"><use href="#i-target"></use></svg>Targets</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Targets sections">
@@ -111,6 +114,12 @@
       </div>
       <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
+      <div class="appt-sidebar-subnav" role="group" aria-label="Settings sections">
+        <button type="button" class="appt-subnav-btn active" data-settings-panel="general" aria-selected="true">General</button>
+        <button type="button" class="appt-subnav-btn" data-settings-panel="technicians" aria-selected="false">Technicians</button>
+        <button type="button" class="appt-subnav-btn" data-settings-panel="customers" aria-selected="false">Customers</button>
+        <button type="button" class="appt-subnav-btn" data-settings-panel="prices" aria-selected="false">Prices</button>
+      </div>
       <button class="nav-btn install-app-btn" id="installAppBtn" type="button" hidden><svg class="icon"><use href="#i-download"></use></svg>Install app</button>
     </nav>
     <div class="nav-backdrop" id="navBackdrop" hidden></div>
@@ -375,29 +384,6 @@
         <h2 class="booking-list-title">Upcoming appointments</h2>
         <div id="appointmentList" class="booking-list" aria-live="polite"></div>
       </section>
-    </section>
-  </main>
-
-  <!-- ============ COMPLETED REPAIRS VIEW ============ -->
-  <main class="container view" id="view-completed-repairs" hidden>
-    <p class="info-banner">Picked-up check-ins and completed appointments, all in one place.</p>
-
-    <div class="completed-repairs-topbar">
-      <div class="leads-searchbar">
-        <svg class="icon"><use href="#i-search"></use></svg>
-        <input id="completedSearch" type="search" inputmode="search" autocomplete="off" placeholder="Search by customer, phone, device, issue…" aria-label="Search completed repairs" />
-        <button id="clearCompletedSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
-      </div>
-    </div>
-
-    <section class="completed-repairs-section booking-list-card">
-      <h2 class="booking-list-title">Completed repairs</h2>
-      <p id="completedTicketsCount" class="result-count"></p>
-      <div class="completed-repairs-list" aria-live="polite">
-        <div id="completedTicketsList"></div>
-        <div id="completedAppointmentsList"></div>
-      </div>
-      <p id="completedRepairsEmpty" class="ops-empty" hidden>No completed repairs match your search.</p>
     </section>
   </main>
 
@@ -907,35 +893,64 @@
 
     <!-- Main intake UI: shown once configured -->
     <section id="intakeMain" hidden>
-      <div class="intake-action-row">
-        <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg><span>Log device</span></button>
+      <div class="appt-subnav repairs-subnav" role="tablist" aria-label="Repairs sections">
+        <button type="button" class="appt-subnav-btn active" data-repairs-panel="existing" role="tab" aria-selected="true">Existing repairs</button>
+        <button type="button" class="appt-subnav-btn" data-repairs-panel="completed" role="tab" aria-selected="false">Completed Repairs</button>
       </div>
 
-      <div class="intake-filter-bar">
-        <div class="select-wrap intake-status-filter-wrap">
-          <select id="statusFilterSelect" class="intake-status-select" aria-label="Filter devices by status"></select>
+      <section class="appt-panel" data-repairs-panel-section="existing">
+        <div class="intake-action-row">
+          <button id="newIntakeBtn" class="intake-fab" aria-label="Log device" title="Log device"><svg class="icon"><use href="#i-plus"></use></svg><span>Log device</span></button>
         </div>
-        <div class="intake-search-field">
-          <svg class="icon"><use href="#i-search"></use></svg>
-          <input id="intakeSearch" type="search" autocomplete="off"
-            placeholder="Search device, issue, ticket…" aria-label="Search devices" />
+
+        <div class="intake-filter-bar">
+          <div class="select-wrap intake-status-filter-wrap">
+            <select id="statusFilterSelect" class="intake-status-select" aria-label="Filter devices by status"></select>
+          </div>
+          <div class="intake-search-field">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <input id="intakeSearch" type="search" autocomplete="off"
+              placeholder="Search device, issue, ticket…" aria-label="Search devices" />
+          </div>
         </div>
-      </div>
 
-      <p id="intakeCount" class="result-count"></p>
-      <div id="intakeList" class="results" aria-live="polite"></div>
+        <p id="intakeCount" class="result-count"></p>
+        <div id="intakeList" class="results" aria-live="polite"></div>
 
-      <div id="intakeEmpty" class="empty-state" hidden>
-        <div class="empty-icon"><svg class="icon"><use href="#i-clipboard"></use></svg></div>
-        <p class="empty-title">No devices logged yet</p>
-        <p class="empty-sub">Tap “+ Log device” to add the first one.</p>
-      </div>
-      <div id="intakeError" class="error-state" hidden>
-        <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
-        <p class="empty-title">Couldn't load devices</p>
-        <p class="empty-sub" id="intakeErrorSub">Check the connection and try again.</p>
-      </div>
-      <div id="intakeLoading" class="repair-loading">Loading devices…</div>
+        <div id="intakeEmpty" class="empty-state" hidden>
+          <div class="empty-icon"><svg class="icon"><use href="#i-clipboard"></use></svg></div>
+          <p class="empty-title">No devices logged yet</p>
+          <p class="empty-sub">Tap “+ Log device” to add the first one.</p>
+        </div>
+        <div id="intakeError" class="error-state" hidden>
+          <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
+          <p class="empty-title">Couldn't load devices</p>
+          <p class="empty-sub" id="intakeErrorSub">Check the connection and try again.</p>
+        </div>
+        <div id="intakeLoading" class="repair-loading">Loading devices…</div>
+      </section>
+
+      <section class="appt-panel" data-repairs-panel-section="completed" hidden>
+        <p class="info-banner">Picked-up check-ins and completed appointments, all in one place.</p>
+
+        <div class="completed-repairs-topbar">
+          <div class="leads-searchbar">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <input id="completedSearch" type="search" inputmode="search" autocomplete="off" placeholder="Search by customer, phone, device, issue…" aria-label="Search completed repairs" />
+            <button id="clearCompletedSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+        </div>
+
+        <section class="completed-repairs-section booking-list-card">
+          <h2 class="booking-list-title">Completed repairs</h2>
+          <p id="completedTicketsCount" class="result-count"></p>
+          <div class="completed-repairs-list" aria-live="polite">
+            <div id="completedTicketsList"></div>
+            <div id="completedAppointmentsList"></div>
+          </div>
+          <p id="completedRepairsEmpty" class="ops-empty" hidden>No completed repairs match your search.</p>
+        </section>
+      </section>
     </section>
   </main>
 
@@ -1518,7 +1533,7 @@
 
   <script src="assets/app.js?v=price-catalog-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=settings-subtabs-1"></script>
+  <script src="assets/intake.js?v=sidebar-subtabs-1"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
