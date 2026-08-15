@@ -2,8 +2,8 @@
 
 A live, mobile-friendly tool for the phone & tablet repair team: look up
 repair prices, check inventory, and log devices coming in for repair with
-their status. Prices and inventory pull from Google Sheets — edit the sheet
-and the app updates.
+their status. Prices are edited in the app (Settings → Repair prices) on top of
+a published Google Sheet; inventory pulls from a Google Sheet.
 
 **Live app:** https://mikepilot123.github.io/pricechecker/
 
@@ -24,15 +24,31 @@ It opens full-screen and even loads offline (showing the last saved prices).
 
 ---
 
-## How it stays in sync with the sheet
+## Where prices come from
 
-The app reads three tabs of the published Google Sheet as CSV:
+Two layers, merged in the browser on every sync:
 
-| Tab | Sheet `gid` |
-|-----|-------------|
-| iPhones (incl. iPads) | `0` |
-| Techno | `1021598529` |
-| Samsung | `1256027568` |
+1. **The published Google Sheet** (base list), read as CSV from three tabs:
+
+   | Tab | Sheet `gid` |
+   |-----|-------------|
+   | iPhones (incl. iPads) | `0` |
+   | Techno | `1021598529` |
+   | Samsung | `1256027568` |
+
+2. **The app's own price catalog** (`api/prices.js`, tables `price_models` /
+   `price_entries`), which holds every price edited in the app plus models the
+   sheet never had — Pixel is entirely here, since that tab was never wired
+   into the list above.
+
+Catalog rows win: they override a sheet model's repair price, add repair types
+to it, add models the sheet doesn't list, or hide a model entirely. A price
+cleared in the app is stored as an empty override, which is the only way to
+retract a sheet cell — the CSV would otherwise re-add it on the next sync.
+
+If the catalog is unreachable the sheet's prices still render on their own, and
+if the *sheet* is unreachable the app falls back to the last saved list (or the
+catalog alone on a device with no cache yet).
 
 - Prices load **on open**, **auto-sync in the background**, and when you
   reopen the tab.
@@ -56,11 +72,28 @@ The app reads three tabs of the published Google Sheet as CSV:
 
 ### Updating prices
 
-Just edit the Google Sheet. No code changes, no redeploy — new models,
-new prices, and new repair columns all flow through automatically because
-the app reads each table's structure dynamically. A tab may contain multiple
-tables with different repair columns: for example, the iPhone table can use
-`Incell Screen` while an iPad table in the same tab uses `Front Glass`.
+**In the app (preferred): Settings → Repair prices.** A spreadsheet-style grid
+of every model and repair type, so nobody needs to open the Google Sheet:
+
+- Filter by brand or search for a model. The columns shown are the repair types
+  the filtered models actually use, so picking *Pixel* gives you Pixel's three
+  columns rather than every column in the shop.
+- Edit any cell; changed cells stay highlighted and a bar counts unsaved edits
+  until you **Save changes** or **Discard**.
+- Tick rows and use the bulk bar to **set / raise / lower** one column across
+  every selected model at once, by a dollar amount or a percentage.
+- **Add model** creates a new one (its brand becomes a filter chip on the
+  Prices tab automatically); the bin icon removes a model from the price list.
+- Editing needs the team PIN, same as every other write in the app. The pencil
+  icon on a price row in the Prices tab saves to the same place.
+
+**In the Google Sheet** still works for the three tabs above. No code changes,
+no redeploy — new models, new prices, and new repair columns all flow through
+because the app reads each table's structure dynamically. A tab may contain
+multiple tables with different repair columns: for example, the iPhone table
+can use `Incell Screen` while an iPad table in the same tab uses `Front Glass`.
+Note that a price edited in the app overrides the sheet's value for that cell
+from then on.
 
 ### If the sheet link ever changes
 
@@ -210,10 +243,14 @@ installed to a home screen and opened offline.
 ```
 index.html                 # markup (Prices + Check In views)
 assets/style.css           # styling (mobile-first, dark theme)
-assets/app.js              # CSV fetch + parse + search/filter UI (Prices)
+assets/app.js              # CSV fetch + parse + catalog merge + Prices UI
+assets/prices-admin.js     # Settings → Repair prices bulk editor
 assets/inventory.js        # Inventory tab UI and stock list loader
 assets/intake.js           # device check-in UI (talks to Apps Script backend)
 api/inventory.js           # Vercel API for inventory reads
+api/prices.js              # Vercel API for the price catalog (public reads)
+lib/prices.js              # price catalog queries
+lib/price-seed.js          # Pixel price list shipped as seed data
 api/price-updates.js       # Vercel WebSocket watcher for price sheet changes
 apps-script/Code.gs         # Apps Script backend for the check-in sheet
 manifest.webmanifest       # installable PWA

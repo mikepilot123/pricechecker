@@ -19,6 +19,10 @@ const WS_RECONNECT_MAX_MS = 60 * 1000;
 const WS_URL_STORAGE_KEY = "rpc_price_update_ws";
 const DEFAULT_PRICE_UPDATE_WS_URL = ""; // disabled: Vercel watcher retired to stay on free tier; app uses 60s polling fallback
 const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
+// The app's own price catalog, layered over the sheet above: it holds models
+// the sheet never had (Pixel) plus every price edited in the app, so staff can
+// work entirely from Settings → Repair prices. See lib/prices.js.
+const PRICES_API_URL = "https://pricechecker-cyan.vercel.app/api/prices";
 // Bump this when the sheet parser changes so an old, incorrectly parsed
 // price list is never used as the offline fallback.
 const CACHE_KEY = "rpc_cache_v3";
@@ -42,7 +46,6 @@ const els = {
   statusDot: document.getElementById("statusDot"),
   pricesSetupModal: document.getElementById("pricesSetupModal"),
   closePricesSetupModal: document.getElementById("closePricesSetupModal"),
-  pricesScriptUrlInput: document.getElementById("pricesScriptUrlInput"),
   pricesPinInput: document.getElementById("pricesPinInput"),
   pricesSetupSave: document.getElementById("pricesSetupSave"),
   pricesSetupError: document.getElementById("pricesSetupError"),
@@ -63,14 +66,15 @@ let syncTimer = null;
 let loadInFlight = null;
 let INVENTORY_ITEMS = [];
 let inventoryLoadInFlight = null;
+let PRICE_OVERRIDES = [];   // catalog rows layered over the sheet (lib/prices.js)
 
 // --- Price editing state ----------------------------------------------------
-const PRICES_SCRIPT_URL_KEY = "rpc_prices_script_url";
+// Edits used to be written back into the Google Sheet through a bound Apps
+// Script, which meant configuring a script URL per device. They now go to the
+// price catalog (api/prices.js) instead, so the team PIN is the only thing a
+// device needs — same gate as every other write in the app.
 const INTAKE_PIN_KEY = "rpc_intake_pin";
 
-function pricesScriptUrl() {
-  try { return localStorage.getItem(PRICES_SCRIPT_URL_KEY) || ""; } catch(_) { return ""; }
-}
 function storedPin() {
   try { return localStorage.getItem(INTAKE_PIN_KEY) || ""; } catch(_) { return ""; }
 }
@@ -163,9 +167,106 @@ function deriveBrand(name, tabKey) {
   const n = name.toLowerCase();
   if (n.startsWith("ipad")) return "iPad";
   if (n.startsWith("iphone")) return "iPhone";
+  if (n.startsWith("pixel")) return "Pixel";
   if (tabKey === "techno" || n.startsWith("techno") || n.startsWith("tecno")) return "Techno";
   if (tabKey === "samsung" || n.startsWith("samsung")) return "Samsung";
   return "Other";
+}
+
+// --- Price catalog overlay --------------------------------------------------
+/** Matching key between a sheet row and a catalog row. Mirrors lib/prices.js. */
+function priceModelKey(name) {
+  return String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+async function fetchPriceOverrides() {
+  try {
+    const res = await fetch(PRICES_API_URL + "?_=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Prices rejected");
+    return data.models || [];
+  } catch (err) {
+    // Non-fatal: the sheet is still the base list, so a catalog outage costs
+    // the Pixel models and any in-app edits, not the whole price list.
+    console.warn("Price catalog unavailable:", err);
+    return null;
+  }
+}
+
+/**
+ * Sheet rows are the base; catalog rows override a matching model's repair
+ * types, add new ones, or (via `deleted`) hide the model entirely. A catalog
+ * model the sheet has never heard of is appended.
+ *
+ * An override value of "" means "clear this price" — the only way to retract a
+ * sheet cell from the app, since the CSV would otherwise re-add it every sync.
+ */
+function mergePriceOverrides(sheetModels, overrides) {
+  const byKey = new Map();
+  const order = [];
+
+  for (const model of sheetModels) {
+    const key = priceModelKey(model.name);
+    const existing = byKey.get(key);
+    if (existing) {
+      // Same model listed twice across tabs — fold the price lists together
+      // rather than rendering two cards that override identically.
+      for (const price of model.prices) {
+        if (!existing.prices.some((p) => p.type === price.type)) existing.prices.push({ ...price });
+      }
+      continue;
+    }
+    byKey.set(key, { name: model.name, brand: model.brand, prices: model.prices.map((p) => ({ ...p })), fromSheet: true, edited: false });
+    order.push(key);
+  }
+
+  for (const override of overrides || []) {
+    const key = override.key || priceModelKey(override.name);
+    if (!key) continue;
+    if (override.deleted) {
+      byKey.delete(key);
+      continue;
+    }
+    let target = byKey.get(key);
+    if (!target) {
+      target = { name: override.name, brand: override.brand || deriveBrand(override.name, ""), prices: [], fromSheet: false, edited: true };
+      byKey.set(key, target);
+      order.push(key);
+    } else {
+      target.edited = true;
+      if (override.brand) target.brand = override.brand;
+    }
+    for (const entry of override.entries || []) {
+      const value = String(entry.value == null ? "" : entry.value).trim();
+      const idx = target.prices.findIndex((p) => p.type === entry.type);
+      if (!value) {
+        if (idx >= 0) target.prices.splice(idx, 1);
+        continue;
+      }
+      if (idx >= 0) target.prices[idx].value = value;
+      else target.prices.push({ type: entry.type, value });
+    }
+  }
+
+  return order
+    .filter((key) => byKey.has(key))
+    .map((key) => {
+      const model = byKey.get(key);
+      let min = Infinity;
+      for (const price of model.prices) {
+        const num = parseFloat(String(price.value).replace(/[^0-9.]/g, ""));
+        if (!isNaN(num) && num < min) min = num;
+      }
+      return {
+        name: model.name,
+        brand: model.brand,
+        prices: model.prices,
+        minPrice: min === Infinity ? null : min,
+        fromSheet: model.fromSheet,
+        edited: model.edited,
+      };
+    });
 }
 
 // --- Fetch ------------------------------------------------------------------
@@ -176,9 +277,23 @@ async function fetchTab(tab) {
   return parseCSV(await res.text());
 }
 
+// Expose the merged list: the Intake form autosuggests devices from it, and
+// the Settings price editor renders it rather than re-parsing the sheet.
+function publishModels() {
+  window.RPC_MODEL_NAMES = MODELS.map((m) => m.name.trim());
+  window.RPC_PRICE_MODELS = MODELS;
+  window.dispatchEvent(new Event("rpc-models"));
+  window.dispatchEvent(new Event("rpc-price-models"));
+}
+
 async function loadData({ reason = "auto" } = {}) {
   if (loadInFlight) return loadInFlight;
   loadInFlight = (async () => {
+    // Both sources start together. fetchPriceOverrides() resolves to null
+    // rather than throwing, so a catalog outage can never take down the
+    // sheet's prices — and it stays available in the catch below for when
+    // it's the sheet that's unreachable.
+    const overridesPromise = fetchPriceOverrides();
     try {
       const results = await Promise.all(TABS.map((t) => fetchTab(t).then((rows) => ({ t, rows }))));
       const all = [];
@@ -188,10 +303,9 @@ async function loadData({ reason = "auto" } = {}) {
         all.push(...models);
         if (b.length > banner.length) banner = b; // keep the richest info line
       }
-      MODELS = all;
-      // Expose model names so the Intake form can autosuggest devices.
-      window.RPC_MODEL_NAMES = all.map((m) => m.name.trim());
-      window.dispatchEvent(new Event("rpc-models"));
+      PRICE_OVERRIDES = (await overridesPromise) || [];
+      MODELS = mergePriceOverrides(all, PRICE_OVERRIDES);
+      publishModels();
       infoLines = banner;
       lastFetchTime = Date.now();
       persistCache();
@@ -202,14 +316,26 @@ async function loadData({ reason = "auto" } = {}) {
       els.error.hidden = true;
     } catch (err) {
       console.error("Load failed:", err);
-      const restored = restoreCache();
-      if (restored) {
+      const overrides = await overridesPromise;
+      if (restoreCache()) {
+        publishModels();
         renderInfo();
         buildChips();
         render();
         setStatus("stale");
         els.errorSub.textContent =
           "Showing the last saved prices — couldn't reach the sheet. The app will keep retrying automatically.";
+      } else if (overrides && overrides.length) {
+        // No cache to fall back on, but the catalog answered — showing the
+        // models it holds beats showing an error screen.
+        PRICE_OVERRIDES = overrides;
+        MODELS = mergePriceOverrides([], overrides);
+        publishModels();
+        lastFetchTime = Date.now();
+        renderInfo();
+        buildChips();
+        render();
+        setStatus("stale");
       } else {
         setStatus("error");
         showError("Check your internet connection. The app will keep retrying automatically.");
@@ -280,7 +406,7 @@ function renderInfo() {
 
 function buildChips() {
   const brands = ["all", ...new Set(MODELS.map((m) => m.brand))];
-  const labels = { all: "All", iPhone: "iPhone", iPad: "iPad", Techno: "Techno", Samsung: "Samsung", Other: "Other" };
+  const labels = { all: "All", iPhone: "iPhone", iPad: "iPad", Pixel: "Pixel", Techno: "Techno", Samsung: "Samsung", Other: "Other" };
   els.chips.innerHTML = "";
   brands.forEach((b) => {
     const btn = document.createElement("button");
@@ -562,7 +688,7 @@ function bindPriceEditBtn(rowEl, model, priceEntry) {
 }
 
 function startPriceInlineEdit(rowEl, model, priceEntry) {
-  if (!pricesScriptUrl()) { openPricesSetupModal(); return; }
+  if (!storedPin()) { openPricesSetupModal(); return; }
   const raw = String(priceEntry.value).replace(/[^0-9.]/g, "");
   rowEl.querySelector(".price-val").outerHTML = `
     <span class="price-val price-val-editing">
@@ -600,7 +726,6 @@ function renderPriceRowStatic(rowEl, model, priceEntry) {
 }
 
 async function savePriceInlineEdit(rowEl, model, priceEntry) {
-  const url = pricesScriptUrl();
   const pin = storedPin();
   const input = rowEl.querySelector(".price-inline-input");
   const saveBtn = rowEl.querySelector("[data-save-price]");
@@ -611,21 +736,12 @@ async function savePriceInlineEdit(rowEl, model, priceEntry) {
   }
   saveBtn.disabled = true;
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        action: "updatePrice",
-        pin,
-        model: model.name,
-        repairType: priceEntry.type,
-        value,
-      }),
-    });
-    const data = await res.json();
+    const data = await savePriceEntries([
+      { name: model.name, brand: model.brand, entries: [{ type: priceEntry.type, value }] },
+    ], pin);
     if (!data.ok) throw new Error(data.error || "Update failed");
     // Optimistic local update so the row reflects the new value immediately;
-    // still reload from the sheet in the background to reconcile formatting.
+    // still reload in the background to reconcile formatting.
     priceEntry.value = value;
     renderPriceRowStatic(rowEl, model, priceEntry);
     loadData({ reason: "price-edit" });
@@ -635,28 +751,31 @@ async function savePriceInlineEdit(rowEl, model, priceEntry) {
   }
 }
 
+/** Shared write path for the pencil edit and the Settings bulk editor. */
+async function savePriceEntries(models, pin) {
+  const res = await fetch(PRICES_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "save", pin: pin || storedPin(), models }),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
 function openPricesSetupModal() {
-  els.pricesScriptUrlInput.value = pricesScriptUrl();
   els.pricesPinInput.value = storedPin();
   els.pricesSetupError.hidden = true;
   els.pricesSetupModal.hidden = false;
 }
 
 function savePricesSetup() {
-  const url = (els.pricesScriptUrlInput.value || "").trim();
   const pin = (els.pricesPinInput.value || "").trim();
-  if (!url) {
-    els.pricesSetupError.textContent = "Enter the Apps Script URL";
-    els.pricesSetupError.hidden = false;
-    return;
-  }
   if (!pin) {
     els.pricesSetupError.textContent = "Enter the team PIN";
     els.pricesSetupError.hidden = false;
     return;
   }
   try {
-    localStorage.setItem(PRICES_SCRIPT_URL_KEY, url);
     localStorage.setItem(INTAKE_PIN_KEY, pin);
   } catch(_) {}
   els.pricesSetupModal.hidden = true;
@@ -900,6 +1019,22 @@ if ("serviceWorker" in navigator) {
   if ("ResizeObserver" in window) new ResizeObserver(setH).observe(header);
   window.addEventListener("resize", setH);
 })();
+
+// --- Settings price editor hooks ---------------------------------------------
+// assets/prices-admin.js owns the Settings grid but not the price data — it
+// reads the merged catalog from window.RPC_PRICE_MODELS and writes through
+// these, so there's exactly one place that talks to api/prices.js.
+window.RPC_RELOAD_PRICES = () => loadData({ reason: "price-admin" });
+window.RPC_SAVE_PRICES = savePriceEntries;
+window.RPC_DELETE_PRICE_MODEL = async (name, pin) => {
+  const res = await fetch(PRICES_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "delete", pin: pin || storedPin(), name }),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+};
 
 // --- Go ---------------------------------------------------------------------
 showSkeleton();
