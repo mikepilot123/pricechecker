@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=diagnostics-3" />
+  <link rel="stylesheet" href="assets/style.css?v=price-catalog-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -837,6 +837,51 @@
           <div id="customerSettingsList" class="customer-list"></div>
           <p id="customerSettingsError" class="field-error" hidden></p>
         </div>
+        <div class="price-settings">
+          <p class="field-label">Repair prices</p>
+          <p class="settings-help">Edit prices here and they go live in the Prices tab straight away — no spreadsheet needed. Pick a brand to edit its columns, change any cells, then save.</p>
+          <div class="price-admin-toolbar">
+            <input id="priceAdminSearch" class="text-input" type="search" autocomplete="off" placeholder="Search model…" aria-label="Search models" />
+            <div class="select-wrap">
+              <select id="priceAdminBrand" class="text-input" aria-label="Filter by brand"></select>
+            </div>
+            <button id="priceAdminAddToggle" class="ghost-btn" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Add model</button>
+          </div>
+          <div id="priceAdminAddRow" class="price-admin-add-row" hidden>
+            <input id="priceAdminNewName" class="text-input" placeholder="Model name (e.g. Pixel 9a)" autocomplete="off" />
+            <input id="priceAdminNewBrand" class="text-input" placeholder="Brand (e.g. Pixel)" autocomplete="off" />
+            <button id="priceAdminAdd" class="primary-btn" type="button">Add</button>
+          </div>
+          <div id="priceAdminBulk" class="price-admin-bulk" hidden>
+            <span id="priceAdminSelectedCount" class="price-admin-selected"></span>
+            <div class="select-wrap">
+              <select id="priceAdminBulkColumn" class="text-input" aria-label="Column to adjust"></select>
+            </div>
+            <div class="select-wrap">
+              <select id="priceAdminBulkMode" class="text-input" aria-label="Adjustment type">
+                <option value="set">Set to</option>
+                <option value="increase-amount">Increase by $</option>
+                <option value="decrease-amount">Decrease by $</option>
+                <option value="increase-percent">Increase by %</option>
+                <option value="decrease-percent">Decrease by %</option>
+              </select>
+            </div>
+            <input id="priceAdminBulkValue" class="text-input price-admin-bulk-value" type="text" inputmode="decimal" placeholder="0" aria-label="Adjustment value" />
+            <button id="priceAdminBulkApply" class="ghost-btn" type="button">Apply</button>
+          </div>
+          <p id="priceAdminCount" class="result-count"></p>
+          <div class="price-admin-grid-wrap">
+            <table id="priceAdminGrid" class="price-admin-grid"></table>
+          </div>
+          <p id="priceAdminError" class="field-error" hidden></p>
+          <div id="priceAdminSaveBar" class="price-admin-savebar" hidden>
+            <span id="priceAdminDirtyCount" class="price-admin-dirty"></span>
+            <div class="price-admin-savebar-actions">
+              <button id="priceAdminDiscard" class="ghost-btn" type="button">Discard</button>
+              <button id="priceAdminSave" class="primary-btn" type="button">Save changes</button>
+            </div>
+          </div>
+        </div>
         <button id="closeIntakeSettings" class="ghost-btn settings-back" type="button">Back to Repairs</button>
       </div>
     </section>
@@ -895,10 +940,8 @@
         <button type="button" id="closePricesSetupModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </div>
       <div class="modal-body">
-        <p class="settings-help">Paste the Apps Script web app URL and your team PIN. Changes save directly to the Google Sheet.</p>
-        <label class="field-label" for="pricesScriptUrlInput">Apps Script URL</label>
-        <input id="pricesScriptUrlInput" class="text-input" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" />
-        <label class="field-label" for="pricesPinInput" style="margin-top:12px">Team PIN</label>
+        <p class="settings-help">Enter the team PIN to edit prices on this device. Changes save to the app and go live straight away.</p>
+        <label class="field-label" for="pricesPinInput">Team PIN</label>
         <input id="pricesPinInput" class="text-input" type="password" inputmode="numeric" placeholder="••••" />
         <p id="pricesSetupError" class="field-error" hidden></p>
       </div>
@@ -1454,7 +1497,7 @@
     </div>
   </div>
 
-  <script src="assets/app.js?v=pwa-install-1"></script>
+  <script src="assets/app.js?v=price-catalog-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
   <script src="assets/intake.js?v=diagnostics-1"></script>
   <script src="assets/dashboard.js?v=synced-data-1"></script>
@@ -1462,5 +1505,6 @@
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>
   <script src="assets/diagnostics.js?v=diagnostics-3"></script>
+  <script src="assets/prices-admin.js?v=price-catalog-1"></script>
 </body>
 </html>

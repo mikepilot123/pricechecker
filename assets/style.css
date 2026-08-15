@@ -2838,6 +2838,152 @@ body.nav-open .view-nav { transform: translateX(0); }
   color: var(--text-dim);
 }
 .customer-count { font-weight: 500; color: var(--text); }
+
+/* ---- Settings → Repair prices (bulk editor) ------------------------------ */
+.price-settings {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.price-settings .result-count { margin: 10px 0 0; }
+.price-admin-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+.price-admin-toolbar .select-wrap { min-width: 140px; }
+.price-admin-add-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+.price-admin-bulk {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+}
+.price-admin-selected {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.price-admin-bulk .select-wrap { min-width: 150px; }
+.price-admin-bulk-value { max-width: 110px; }
+
+/* The grid is intentionally the only thing on the page allowed to scroll
+   sideways — a shop with a dozen repair types would otherwise push the whole
+   settings page off screen on a phone. */
+.price-admin-grid-wrap {
+  margin-top: 10px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.price-admin-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.price-admin-grid th,
+.price-admin-grid td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.price-admin-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-soft);
+  font-weight: 600;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.price-admin-grid tbody tr:last-child td { border-bottom: 0; }
+.price-admin-grid tbody tr:hover { background: var(--bg-soft); }
+.price-admin-check-col { width: 34px; }
+.price-admin-actions-col { width: 44px; }
+.price-admin-model-col { min-width: 150px; white-space: normal; }
+.price-admin-model-name { display: block; font-weight: 500; color: var(--text); }
+.price-admin-brand {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.price-admin-cell {
+  width: 92px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: right;
+}
+.price-admin-cell:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+/* Unsaved cells stay visibly marked while scrolling a long list. */
+.price-admin-cell.dirty {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+}
+.price-admin-empty {
+  padding: 18px 12px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.price-admin-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+}
+.price-admin-dirty { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.price-admin-savebar-actions { display: flex; gap: 8px; }
+/* These three are toggled with the `hidden` attribute, and an explicit
+   `display` above would otherwise beat the browser's `[hidden]` rule and leave
+   an empty bar on screen. Same trap as .cancel-device-btn[hidden]. */
+.price-admin-add-row[hidden],
+.price-admin-bulk[hidden],
+.price-admin-savebar[hidden] { display: none; }
+@media (max-width: 560px) {
+  .price-admin-toolbar,
+  .price-admin-add-row { grid-template-columns: 1fr; }
+  .price-admin-toolbar .ghost-btn,
+  .price-admin-add-row .primary-btn { width: 100%; justify-content: center; }
+  .price-admin-bulk > *,
+  .price-admin-bulk .select-wrap { flex: 1 1 100%; }
+  .price-admin-bulk-value { max-width: none; }
+  .price-admin-savebar-actions { flex: 1 1 100%; }
+  .price-admin-savebar-actions .ghost-btn,
+  .price-admin-savebar-actions .primary-btn { flex: 1; justify-content: center; }
+}
+
 .technician-combobox {
   position: relative;
   z-index: 1200;
