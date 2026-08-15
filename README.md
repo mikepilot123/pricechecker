@@ -22,6 +22,13 @@ a published Google Sheet; inventory pulls from a Google Sheet.
 Tip: on a phone, use **Share → Add to Home Screen** to install it like an app.
 It opens full-screen and even loads offline (showing the last saved prices).
 
+There's also a Chrome extension (`extension/`) for the counter/office laptop:
+click its toolbar icon on *any* site — Facebook, WhatsApp Web, email — to open
+the live app in the side panel alongside whatever page you're already on. It's
+a thin wrapper (just an iframe pointed at the live URL, same login/PIN state
+as the regular tab), not a separate build to maintain. See
+[`extension/README.md`](extension/README.md) to load it.
+
 ---
 
 ## Where prices come from
@@ -255,6 +262,7 @@ api/price-updates.js       # Vercel WebSocket watcher for price sheet changes
 apps-script/Code.gs         # Apps Script backend for the check-in sheet
 manifest.webmanifest       # installable PWA
 sw.js                      # offline app shell
+extension/                 # Chrome side-panel extension (thin iframe wrapper)
 ```
 
 ## Running locally
