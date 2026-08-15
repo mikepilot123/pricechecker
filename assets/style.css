@@ -4535,10 +4535,19 @@ video.media-viewer-media {
 
 @media (min-width: 900px) {
   .nav-btn[data-target="appointments"]:not(.active) + .appt-sidebar-subnav,
-  .nav-btn[data-target="targets"]:not(.active) + .appt-sidebar-subnav {
+  .nav-btn[data-target="targets"]:not(.active) + .appt-sidebar-subnav,
+  .nav-btn[data-target="intake"]:not(.active) + .appt-sidebar-subnav,
+  .settings-nav-btn:not(.active) + .appt-sidebar-subnav {
     display: none;
   }
   #view-targets > .targets-content-subnav {
+    display: none;
+  }
+  /* Settings and Repairs show their sub-tabs in the sidebar (above) at this
+     width, same as Appointments/Targets — the pill row inside the content
+     area is the mobile-only fallback, so it's redundant here. */
+  .settings-subnav,
+  .repairs-subnav {
     display: none;
   }
   .appt-sidebar-subnav {
