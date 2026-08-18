@@ -241,6 +241,18 @@ INVOICE_CURRENCY=TTD
 
 ---
 
+## Reminders
+
+The **Reminders** tab is a shared staff to-do list — add a reminder with an
+optional due date/time and notes, tick it off when done, or delete it. It
+syncs across every device the same way tickets, leads, and expenses do.
+Reminders past their due date and not yet done are flagged **Overdue** in
+the list. Filter chips switch between Open, Done, and All.
+
+Editing needs the team PIN, same as every other write in the app.
+
+---
+
 ## Tech
 
 Plain HTML/CSS/JS — **no build step, no dependencies**. Just static files
@@ -254,10 +266,12 @@ assets/app.js              # CSV fetch + parse + catalog merge + Prices UI
 assets/prices-admin.js     # Settings → Repair prices bulk editor
 assets/inventory.js        # Inventory tab UI and stock list loader
 assets/intake.js           # device check-in UI (talks to Apps Script backend)
+assets/dashboard.js        # Dashboard, Targets, Expenses, and Reminders tabs
 api/inventory.js           # Vercel API for inventory reads
 api/prices.js              # Vercel API for the price catalog (public reads)
 lib/prices.js              # price catalog queries
 lib/price-seed.js          # Pixel price list shipped as seed data
+lib/reminders.js           # reminders queries (Reminders tab)
 api/price-updates.js       # Vercel WebSocket watcher for price sheet changes
 apps-script/Code.gs         # Apps Script backend for the check-in sheet
 manifest.webmanifest       # installable PWA
