@@ -192,6 +192,10 @@
   navBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       navigateTo(btn.dataset.target);
+      const mobileRepairParent = btn.dataset.target === "intake"
+        && window.matchMedia("(max-width: 899.98px)").matches
+        && document.body.classList.contains("nav-open");
+      if (mobileRepairParent) return;
       closeNavDrawer();
     });
   });
@@ -271,7 +275,11 @@
     if (panel === "completed") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
   }
   document.querySelectorAll(".appt-subnav-btn[data-repairs-panel]").forEach((btn) => {
-    btn.addEventListener("click", () => setRepairsPanel(btn.dataset.repairsPanel));
+    btn.addEventListener("click", () => {
+      navigateTo("intake");
+      setRepairsPanel(btn.dataset.repairsPanel);
+      closeNavDrawer();
+    });
   });
 
   function showSetup(prefill) {

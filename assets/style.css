@@ -1586,6 +1586,13 @@ body.nav-open .view-nav { transform: translateX(0); }
   color: var(--accent);
   box-shadow: 0 1px 2px rgba(18, 24, 38, 0.08);
 }
+.nav-parent-btn .nav-chevron {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+.nav-parent-btn.active .nav-chevron { transform: rotate(180deg); }
 @media (min-width: 900px) {
   :root {
     --workspace-max: 1280px;
@@ -4863,6 +4870,51 @@ video.media-viewer-media {
 .technician-chip-name { font-size: 0.74rem; text-align: center; line-height: 1.25; color: var(--text-dim); }
 .technician-chip.is-selected .technician-chip-avatar { background: var(--accent); color: #fff; }
 .technician-chip.is-selected .technician-chip-name { color: var(--text); font-weight: 600; }
+
+@media (max-width: 899.98px) {
+  .nav-btn[data-target="intake"].active + .appt-sidebar-subnav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: -1px 0 6px 34px;
+    padding: 0 0 2px;
+  }
+  .view-nav .appt-sidebar-subnav .appt-subnav-btn {
+    position: relative;
+    min-height: 34px;
+    padding: 7px 10px 7px 22px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #475569;
+    box-shadow: none;
+    font-size: 0.86rem;
+    font-weight: 500;
+    text-align: left;
+  }
+  .view-nav .appt-sidebar-subnav .appt-subnav-btn::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+  .view-nav .appt-sidebar-subnav .appt-subnav-btn:hover {
+    background: var(--bg-soft);
+    color: var(--text);
+  }
+  .view-nav .appt-sidebar-subnav .appt-subnav-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .view-nav .appt-sidebar-subnav .appt-subnav-btn.active::before {
+    background: currentColor;
+  }
+}
 
 @media (min-width: 900px) {
   .nav-btn[data-target="appointments"]:not(.active) + .appt-sidebar-subnav,
