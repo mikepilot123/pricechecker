@@ -40,6 +40,7 @@
     "Part Ordered",
     "In Progress",
     "Repaired",
+    "No Fix",
     "Picked Up",
     "Cancelled",
   ];
@@ -51,6 +52,7 @@
     "Part Ordered": "st-parts-ordered",
     "In Progress": "st-progress",
     "Repaired": "st-repaired",
+    "No Fix": "st-no-fix",
     "Picked Up": "st-pickedup",
     "Cancelled": "st-cancelled",
   };

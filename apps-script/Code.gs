@@ -34,6 +34,7 @@ var STATUSES = [
   "Part Ordered",
   "In Progress",
   "Repaired",
+  "No Fix",
   "Picked Up",
   "Cancelled",
 ];

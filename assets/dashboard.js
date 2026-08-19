@@ -29,7 +29,7 @@
     "Part Ordered",
     "In Progress",
   ]);
-  const FINAL_STATUSES = new Set(["Picked Up", "Cancelled"]);
+  const FINAL_STATUSES = new Set(["Picked Up", "No Fix", "Cancelled"]);
   const $ = (id) => document.getElementById(id);
 
   let tickets = [];

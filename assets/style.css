@@ -4163,6 +4163,12 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   --status-ink: #607086;
   --status-dot: #94a3b8;
 }
+.st-no-fix {
+  --status-bg: #f4f4f5;
+  --status-border: #d4d4d8;
+  --status-ink: #3f3f46;
+  --status-dot: #52525b;
+}
 .st-cancelled {
   --status-bg: #fff5f5;
   --status-border: #f4c7c3;
