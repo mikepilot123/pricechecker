@@ -226,28 +226,8 @@ body.nav-open .nav-backdrop { opacity: 1; }
   line-height: 1;
   cursor: pointer;
 }
-.save-price-search {
-  position: absolute;
-  right: 44px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: none;
-  background: var(--bg-soft);
-  color: var(--text);
-  cursor: pointer;
-}
-.save-price-search[hidden],
 .clear-search[hidden] { display: none; }
-.save-price-search .icon { width: 15px; height: 15px; }
-.save-price-search:hover,
 .clear-search:hover { background: var(--card-hover); }
-.search-wrap:has(.save-price-search:not([hidden])) .search-input { padding-right: 80px; }
 .clear-search .icon { width: 16px; height: 16px; }
 
 .common-price-searches {

@@ -6,6 +6,7 @@ import {
   listCommonSearches,
   saveCommonSearch,
   recordCommonSearchUse,
+  renameCommonSearch,
   deleteCommonSearch,
 } from "../lib/prices.js";
 import { ensureSchema } from "../lib/db.js";
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
     }
 
     const body = readBody(req);
-    if (body.action === "recordCommonSearchUse") {
+    if (body.action === "recordCommonSearchUse" || body.action === "trackPriceSearch") {
       await recordCommonSearchUse(body);
       return res.status(200).json({ ok: true, commonSearches: await listCommonSearches() });
     }
@@ -55,6 +56,10 @@ export default async function handler(req, res) {
     }
     if (body.action === "saveCommonSearch") {
       const savedId = await saveCommonSearch(body);
+      return res.status(200).json({ ok: true, savedId, commonSearches: await listCommonSearches() });
+    }
+    if (body.action === "renameCommonSearch") {
+      const savedId = await renameCommonSearch(body);
       return res.status(200).json({ ok: true, savedId, commonSearches: await listCommonSearches() });
     }
     if (body.action === "deleteCommonSearch") {

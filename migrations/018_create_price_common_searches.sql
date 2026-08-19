@@ -1,5 +1,5 @@
--- Shared common searches for the Prices tab.
--- Read by every device; save/delete requires the team PIN via api/prices.js.
+-- Shared automatic search tracking for the Prices tab.
+-- Read by every device; deletes/renames require the team PIN via api/prices.js.
 
 CREATE TABLE IF NOT EXISTS price_common_searches (
   id           TEXT PRIMARY KEY,
