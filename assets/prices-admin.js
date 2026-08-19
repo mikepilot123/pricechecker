@@ -23,11 +23,13 @@
   // name -> { type -> value }. Only cells the user actually changed, so a
   // save sends a handful of rows even after scrolling the whole catalog.
   let dirty = new Map();
-  // Models added here but not yet saved, plus brand-new columns.
+  // Spreadsheet-style rows/columns added here but not yet saved.
   let pending = [];
+  let manualColumns = [];
   let selected = new Set();
   let brandFilter = ALL_BRANDS;
   let saving = false;
+  let draftSeq = 1;
 
   const esc = (s) =>
     String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
@@ -42,11 +44,15 @@
   function allModels() {
     const live = Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : [];
     const liveNames = new Set(live.map((m) => m.name.toLowerCase()));
-    const extras = pending.filter((p) => !liveNames.has(p.name.toLowerCase()));
+    const extras = pending.filter((p) => !p.name || !liveNames.has(p.name.toLowerCase()));
     return live.concat(extras);
   }
 
   function valueFor(model, type) {
+    if (model.draftId) {
+      const entry = model.prices.find((p) => p.type === type);
+      return entry ? String(entry.value) : "";
+    }
     const edit = dirty.get(model.name);
     if (edit && Object.prototype.hasOwnProperty.call(edit, type)) return edit[type];
     const entry = model.prices.find((p) => p.type === type);
@@ -60,9 +66,30 @@
     renderSaveBar();
   }
 
+  function draftById(id) {
+    return pending.find((row) => row.draftId === id);
+  }
+
+  function setDraftValue(id, type, value) {
+    const draft = draftById(id);
+    if (!draft) return;
+    const idx = draft.prices.findIndex((p) => p.type === type);
+    if (idx >= 0) draft.prices[idx].value = value;
+    else draft.prices.push({ type, value });
+    renderSaveBar();
+  }
+
+  function updateDraftField(id, field, value) {
+    const draft = draftById(id);
+    if (!draft) return;
+    draft[field] = value.trim();
+    renderSaveBar();
+  }
+
   function visibleModels() {
     const q = ($("priceAdminSearch")?.value || "").trim().toLowerCase();
     return allModels().filter((m) => {
+      if (m.draftId) return true;
       if (brandFilter !== ALL_BRANDS && m.brand !== brandFilter) return false;
       if (q && !m.name.toLowerCase().includes(q)) return false;
       return true;
@@ -72,17 +99,22 @@
   /** Repair-type columns for the models on screen, in first-seen order. */
   function columnsFor(models) {
     const seen = [];
+    const add = (type) => {
+      const clean = String(type || "").trim();
+      if (clean && !seen.some((c) => c.toLowerCase() === clean.toLowerCase())) seen.push(clean);
+    };
     for (const model of models) {
       for (const price of model.prices) {
-        if (!seen.includes(price.type)) seen.push(price.type);
+        add(price.type);
       }
       const edit = dirty.get(model.name);
       if (edit) {
         for (const type of Object.keys(edit)) {
-          if (!seen.includes(type)) seen.push(type);
+          add(type);
         }
       }
     }
+    manualColumns.forEach(add);
     return seen;
   }
 
@@ -128,6 +160,7 @@
         <tr>
           <th class="price-admin-check-col"><input type="checkbox" id="priceAdminSelectAll" aria-label="Select all shown" /></th>
           <th class="price-admin-model-col">Model</th>
+          <th class="price-admin-brand-col">Brand</th>
           ${columns.map((c) => `<th>${esc(c)}</th>`).join("")}
           <th class="price-admin-actions-col" aria-label="Actions"></th>
         </tr>
@@ -135,24 +168,32 @@
 
     const rows = models
       .map((model) => {
+        const draft = !!model.draftId;
         const cells = columns
           .map((type) => {
             const value = valueFor(model, type);
-            const isDirty = dirty.get(model.name) && Object.prototype.hasOwnProperty.call(dirty.get(model.name), type);
+            const isDirty = draft || (dirty.get(model.name) && Object.prototype.hasOwnProperty.call(dirty.get(model.name), type));
             return `<td><input class="price-admin-cell${isDirty ? " dirty" : ""}" type="text" inputmode="decimal"
-              value="${esc(value)}" data-model="${esc(model.name)}" data-type="${esc(type)}"
-              aria-label="${esc(model.name)} — ${esc(type)}" /></td>`;
+              value="${esc(value)}" data-model="${esc(model.name)}" data-draft-id="${esc(model.draftId || "")}" data-type="${esc(type)}"
+              aria-label="${esc((model.name || "New model") + " — " + type)}" /></td>`;
           })
           .join("");
-        return `<tr data-model="${esc(model.name)}">
-          <td class="price-admin-check-col"><input type="checkbox" class="price-admin-select" data-model="${esc(model.name)}" ${selected.has(model.name) ? "checked" : ""} aria-label="Select ${esc(model.name)}" /></td>
+        const rowLabel = model.name || "New model";
+        return `<tr data-model="${esc(model.name)}" data-draft-id="${esc(model.draftId || "")}" class="${draft ? "price-admin-draft-row" : ""}">
+          <td class="price-admin-check-col">${draft ? "" : `<input type="checkbox" class="price-admin-select" data-model="${esc(model.name)}" ${selected.has(model.name) ? "checked" : ""} aria-label="Select ${esc(model.name)}" />`}</td>
           <td class="price-admin-model-col">
-            <span class="price-admin-model-name">${esc(model.name)}</span>
-            <span class="price-admin-brand">${esc(model.brand || "—")}</span>
+            ${draft
+              ? `<input class="price-admin-text-cell price-admin-model-input" type="text" value="${esc(model.name)}" data-draft-id="${esc(model.draftId)}" data-draft-field="name" placeholder="Model name" aria-label="New model name" />`
+              : `<span class="price-admin-model-name">${esc(model.name)}</span>`}
+          </td>
+          <td class="price-admin-brand-col">
+            ${draft
+              ? `<input class="price-admin-text-cell" type="text" value="${esc(model.brand || "")}" data-draft-id="${esc(model.draftId)}" data-draft-field="brand" placeholder="Brand" aria-label="New model brand" />`
+              : `<span class="price-admin-brand">${esc(model.brand || "—")}</span>`}
           </td>
           ${cells}
           <td class="price-admin-actions-col">
-            <button type="button" class="icon-btn ghost-btn danger-btn price-admin-delete" data-model="${esc(model.name)}" aria-label="Delete ${esc(model.name)}"><svg class="icon"><use href="#i-trash"></use></svg></button>
+            <button type="button" class="icon-btn ghost-btn danger-btn price-admin-delete" ${draft ? `data-draft-id="${esc(model.draftId)}"` : `data-model="${esc(model.name)}"`} aria-label="Delete ${esc(rowLabel)}"><svg class="icon"><use href="#i-trash"></use></svg></button>
           </td>
         </tr>`;
       })
@@ -168,8 +209,17 @@
     grid.querySelectorAll(".price-admin-cell").forEach((input) => {
       input.addEventListener("input", () => {
         input.classList.add("dirty");
-        setValue(input.dataset.model, input.dataset.type, input.value.trim());
+        if (input.dataset.draftId) setDraftValue(input.dataset.draftId, input.dataset.type, input.value.trim());
+        else setValue(input.dataset.model, input.dataset.type, input.value.trim());
       });
+      input.addEventListener("keydown", handleCellKeydown);
+    });
+    grid.querySelectorAll("[data-draft-field]").forEach((input) => {
+      input.addEventListener("input", () => {
+        input.classList.add("dirty");
+        updateDraftField(input.dataset.draftId, input.dataset.draftField, input.value);
+      });
+      input.addEventListener("keydown", handleCellKeydown);
     });
     grid.querySelectorAll(".price-admin-select").forEach((box) => {
       box.addEventListener("change", () => {
@@ -179,14 +229,33 @@
       });
     });
     $("priceAdminSelectAll")?.addEventListener("change", (e) => {
-      const names = visibleModels().map((m) => m.name);
+      const names = visibleModels().filter((m) => !m.draftId).map((m) => m.name);
       if (e.target.checked) names.forEach((n) => selected.add(n));
       else names.forEach((n) => selected.delete(n));
       render();
     });
     grid.querySelectorAll(".price-admin-delete").forEach((btn) => {
-      btn.addEventListener("click", () => deleteModel(btn.dataset.model));
+      btn.addEventListener("click", () => {
+        if (btn.dataset.draftId) deleteDraft(btn.dataset.draftId);
+        else deleteModel(btn.dataset.model);
+      });
     });
+  }
+
+  function handleCellKeydown(event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const cell = event.target.closest("td");
+    const row = event.target.closest("tr");
+    if (!cell || !row) return;
+    const rowIndex = [...row.parentElement.children].indexOf(row);
+    const cellIndex = [...row.children].indexOf(cell);
+    const nextRow = row.parentElement.children[rowIndex + 1];
+    const next = nextRow?.children[cellIndex]?.querySelector("input");
+    if (next) {
+      next.focus();
+      next.select?.();
+    }
   }
 
   function renderBulkBar(columns) {
@@ -205,11 +274,19 @@
   function renderSaveBar() {
     const bar = $("priceAdminSaveBar");
     if (!bar) return;
-    let cells = 0;
-    for (const edit of dirty.values()) cells += Object.keys(edit).length;
+    const cells = unsavedCount();
     bar.hidden = cells === 0;
     $("priceAdminDirtyCount").textContent =
       `${cells} unsaved change${cells === 1 ? "" : "s"}`;
+  }
+
+  function unsavedCount() {
+    let cells = 0;
+    for (const edit of dirty.values()) cells += Object.keys(edit).length;
+    cells += pending.filter((row) =>
+      row.name || row.brand || row.prices.some((price) => String(price.value || "").trim())
+    ).length;
+    return cells;
   }
 
   function showError(message) {
@@ -259,7 +336,7 @@
 
   // ---- Saving ---------------------------------------------------------------
   async function save() {
-    if (saving || !dirty.size) return;
+    if (saving || !unsavedCount()) return;
     if (!storedPin()) return showError("Enter the team PIN in Settings first.");
     const btn = $("priceAdminSave");
     saving = true;
@@ -273,12 +350,41 @@
       brand: byName.get(name)?.brand || "",
       entries: Object.entries(entries).map(([type, value]) => ({ type, value })),
     }));
+    const liveNames = new Set((Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : []).map((m) => m.name.toLowerCase()));
+    const draftNames = new Set();
+    for (const row of pending) {
+      const name = String(row.name || "").trim();
+      const brand = String(row.brand || "").trim();
+      const entries = row.prices
+        .map((entry) => ({ type: String(entry.type || "").trim(), value: String(entry.value || "").trim() }))
+        .filter((entry) => entry.type && entry.value);
+      const hasAnyValue = !!brand || entries.length > 0;
+      if (!name && hasAnyValue) {
+        showError("New rows need a model name before saving.");
+        saving = false;
+        btn.disabled = false;
+        btn.textContent = "Save changes";
+        return;
+      }
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (liveNames.has(key) || draftNames.has(key)) {
+        showError(`${name} is already in the list.`);
+        saving = false;
+        btn.disabled = false;
+        btn.textContent = "Save changes";
+        return;
+      }
+      draftNames.add(key);
+      payload.push({ name, brand, entries });
+    }
 
     try {
       const res = await window.RPC_SAVE_PRICES(payload);
       if (!res.ok) throw new Error(res.error || "Rejected");
       dirty = new Map();
       pending = [];
+      manualColumns = [];
       selected = new Set();
       await window.RPC_RELOAD_PRICES();
       render();
@@ -308,25 +414,39 @@
     }
   }
 
-  function addModel() {
-    const nameInput = $("priceAdminNewName");
-    const brandInput = $("priceAdminNewBrand");
-    const name = (nameInput.value || "").trim();
-    const brand = (brandInput.value || "").trim();
-    if (!name) return showError("Enter a model name.");
-    if (allModels().some((m) => m.name.toLowerCase() === name.toLowerCase())) {
-      return showError(`${name} is already in the list.`);
-    }
+  function deleteDraft(id) {
     showError("");
-    // Held locally until Save, same as any other edit — a model with no prices
-    // yet would otherwise be written to the catalog on every keystroke.
-    pending.push({ name, brand, prices: [], fromSheet: false, edited: true });
-    dirty.set(name, dirty.get(name) || {});
-    nameInput.value = "";
-    brandInput.value = "";
-    if (brand) brandFilter = brand;
+    pending = pending.filter((row) => row.draftId !== id);
     render();
     renderSaveBar();
+  }
+
+  function addRow() {
+    showError("");
+    const draftId = "draft-" + (draftSeq++);
+    pending.unshift({
+      draftId,
+      name: "",
+      brand: brandFilter !== ALL_BRANDS ? brandFilter : "",
+      prices: [],
+      fromSheet: false,
+      edited: true,
+    });
+    render();
+    grid.querySelector(`[data-draft-id="${draftId}"][data-draft-field="name"]`)?.focus();
+  }
+
+  function addColumn() {
+    const raw = prompt("Repair column name");
+    const name = String(raw || "").trim().replace(/\s+/g, " ");
+    if (!name) return;
+    const exists = columnsFor(allModels()).some((c) => c.toLowerCase() === name.toLowerCase());
+    if (exists) return showError(`${name} is already a column.`);
+    showError("");
+    manualColumns.push(name);
+    render();
+    const firstCell = [...grid.querySelectorAll(".price-admin-cell")].find((input) => input.dataset.type === name);
+    firstCell?.focus();
   }
 
   // ---- Wiring ---------------------------------------------------------------
@@ -335,23 +455,14 @@
     brandFilter = e.target.value;
     render();
   });
-  $("priceAdminAddToggle")?.addEventListener("click", () => {
-    const row = $("priceAdminAddRow");
-    row.hidden = !row.hidden;
-    if (!row.hidden) $("priceAdminNewName").focus();
-  });
-  $("priceAdminAdd")?.addEventListener("click", addModel);
-  $("priceAdminNewBrand")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); addModel(); }
-  });
-  $("priceAdminNewName")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); addModel(); }
-  });
+  $("priceAdminAddRowBtn")?.addEventListener("click", addRow);
+  $("priceAdminAddColumn")?.addEventListener("click", addColumn);
   $("priceAdminBulkApply")?.addEventListener("click", applyBulk);
   $("priceAdminSave")?.addEventListener("click", save);
   $("priceAdminDiscard")?.addEventListener("click", () => {
     dirty = new Map();
     pending = [];
+    manualColumns = [];
     showError("");
     render();
   });

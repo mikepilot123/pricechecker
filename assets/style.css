@@ -3148,7 +3148,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .price-settings .result-count { margin: 10px 0 0; }
 .price-admin-toolbar {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto auto;
   gap: 8px;
   margin-top: 10px;
 }
@@ -3214,13 +3214,30 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .price-admin-grid tbody tr:hover { background: var(--bg-soft); }
 .price-admin-check-col { width: 34px; }
 .price-admin-actions-col { width: 44px; }
-.price-admin-model-col { min-width: 150px; white-space: normal; }
+.price-admin-model-col { min-width: 170px; white-space: normal; }
+.price-admin-brand-col { min-width: 130px; white-space: normal; }
 .price-admin-model-name { display: block; font-weight: 500; color: var(--text); }
 .price-admin-brand {
   display: block;
   margin-top: 1px;
   font-size: 0.72rem;
   color: var(--text-dim);
+}
+.price-admin-draft-row { background: color-mix(in srgb, var(--accent) 5%, var(--bg)); }
+.price-admin-text-cell {
+  width: 100%;
+  min-width: 130px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.price-admin-text-cell:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .price-admin-cell {
   width: 92px;
@@ -3268,14 +3285,11 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 /* These three are toggled with the `hidden` attribute, and an explicit
    `display` above would otherwise beat the browser's `[hidden]` rule and leave
    an empty bar on screen. Same trap as .cancel-device-btn[hidden]. */
-.price-admin-add-row[hidden],
 .price-admin-bulk[hidden],
 .price-admin-savebar[hidden] { display: none; }
 @media (max-width: 560px) {
-  .price-admin-toolbar,
-  .price-admin-add-row { grid-template-columns: 1fr; }
-  .price-admin-toolbar .ghost-btn,
-  .price-admin-add-row .primary-btn { width: 100%; justify-content: center; }
+  .price-admin-toolbar { grid-template-columns: 1fr; }
+  .price-admin-toolbar .ghost-btn { width: 100%; justify-content: center; }
   .price-admin-bulk > *,
   .price-admin-bulk .select-wrap { flex: 1 1 100%; }
   .price-admin-bulk-value { max-width: none; }

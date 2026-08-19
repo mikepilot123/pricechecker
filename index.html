@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=repairs-submenu-2" />
+  <link rel="stylesheet" href="assets/style.css?v=price-grid-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -953,26 +953,22 @@
         <section class="appt-panel" data-settings-panel-section="prices" hidden>
           <div class="price-settings">
             <p class="field-label">Repair prices</p>
-            <p class="settings-help">Edit prices here and they go live in the Prices tab straight away — no spreadsheet needed. Pick a brand to edit its columns, change any cells, then save.</p>
+            <p class="settings-help">Edit prices here and they go live in the Prices tab straight away — no spreadsheet needed. Add rows or columns, type into the cells, then save.</p>
             <div class="price-admin-toolbar">
               <input id="priceAdminSearch" class="text-input" type="search" autocomplete="off" placeholder="Search model…" aria-label="Search models" />
               <div class="select-wrap">
-                <select id="priceAdminBrand" class="text-input" aria-label="Filter by brand"></select>
+                <select id="priceAdminBrand" class="text-input select-input" aria-label="Filter by brand"></select>
               </div>
-              <button id="priceAdminAddToggle" class="ghost-btn" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Add model</button>
-            </div>
-            <div id="priceAdminAddRow" class="price-admin-add-row" hidden>
-              <input id="priceAdminNewName" class="text-input" placeholder="Model name (e.g. Pixel 9a)" autocomplete="off" />
-              <input id="priceAdminNewBrand" class="text-input" placeholder="Brand (e.g. Pixel)" autocomplete="off" />
-              <button id="priceAdminAdd" class="primary-btn" type="button">Add</button>
+              <button id="priceAdminAddRowBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Add row</button>
+              <button id="priceAdminAddColumn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-plus"></use></svg>Add column</button>
             </div>
             <div id="priceAdminBulk" class="price-admin-bulk" hidden>
               <span id="priceAdminSelectedCount" class="price-admin-selected"></span>
               <div class="select-wrap">
-                <select id="priceAdminBulkColumn" class="text-input" aria-label="Column to adjust"></select>
+                <select id="priceAdminBulkColumn" class="text-input select-input" aria-label="Column to adjust"></select>
               </div>
               <div class="select-wrap">
-                <select id="priceAdminBulkMode" class="text-input" aria-label="Adjustment type">
+                <select id="priceAdminBulkMode" class="text-input select-input" aria-label="Adjustment type">
                   <option value="set">Set to</option>
                   <option value="increase-amount">Increase by $</option>
                   <option value="decrease-amount">Decrease by $</option>
@@ -1645,6 +1641,6 @@
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>
   <script src="assets/diagnostics.js?v=diagnostics-3"></script>
-  <script src="assets/prices-admin.js?v=price-catalog-1"></script>
+  <script src="assets/prices-admin.js?v=price-grid-1"></script>
 </body>
 </html>
