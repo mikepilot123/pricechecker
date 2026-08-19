@@ -5276,7 +5276,7 @@ video.media-viewer-media {
 }
 
 /* ============ Diagnostics — visual before/after device testing ============ */
-.dg-shell { margin-top: 14px; max-width: min(1120px, 100%); }
+.dg-shell { margin-top: 14px; max-width: min(1180px, 100%); }
 
 /* ---- Client / ticket tagging ---- */
 .dg-client-card {
@@ -5417,10 +5417,71 @@ video.media-viewer-media {
 .dg-stage-btn.active .dg-stage-name { color: var(--accent); }
 .dg-stage-meta { font-size: 0.76rem; color: var(--text-dim); }
 
+.dg-overview {
+  display: grid;
+  grid-template-columns: auto auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.dg-overview-item,
+.dg-overview-active {
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+.dg-overview-item {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1px 10px;
+  align-items: baseline;
+  min-width: 120px;
+}
+.dg-overview-item.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.dg-overview-item strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.dg-overview-item span:last-child {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+.dg-overview-label {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.dg-overview-active {
+  display: grid;
+  gap: 8px;
+}
+.dg-overview-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-soft);
+}
+.dg-overview-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
 /* ---- Map + side rail ---- */
 .dg-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 14px;
   margin-top: 14px;
   align-items: start;
@@ -5431,7 +5492,7 @@ video.media-viewer-media {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
 }
-.dg-map-card { padding: 14px 16px 8px; }
+.dg-map-card { padding: 18px 18px 10px; }
 .dg-type-row {
   display: flex;
   flex-wrap: wrap;
@@ -5552,7 +5613,7 @@ video.media-viewer-media {
 .dg-step.active .dg-step-label { color: var(--accent); }
 
 /* ---- Current section panel ---- */
-.dg-section-panel { padding: 14px 16px 16px; }
+.dg-section-panel { padding: 16px; }
 .dg-section-head { display: flex; align-items: center; gap: 10px; }
 .dg-section-icon {
   display: inline-flex;
@@ -5584,6 +5645,33 @@ video.media-viewer-media {
 }
 .dg-section-count.is-complete { color: var(--price); }
 .dg-section-hint { margin: 10px 0 12px; font-size: 0.82rem; color: var(--text-dim); line-height: 1.45; }
+.dg-section-quick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.dg-quick-btn {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text-dim);
+  font: 600 0.78rem var(--font-sans);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.dg-quick-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.dg-quick-btn.is-pass:hover {
+  border-color: var(--price);
+  background: #e3f6ec;
+  color: #04684b;
+}
+.dg-quick-btn.is-na:hover {
+  border-color: var(--warn);
+  background: #fdf5e6;
+  color: #8a4f0f;
+}
 
 .dg-test-cards { display: grid; gap: 8px; }
 .dg-test-card {
@@ -5750,11 +5838,19 @@ video.media-viewer-media {
 
 @media (max-width: 860px) {
   .dg-main { grid-template-columns: 1fr; }
+  .dg-side { order: -1; }
   .dg-svg { max-width: 260px; }
+  .dg-overview { grid-template-columns: 1fr 1fr; }
+  .dg-overview-active { grid-column: 1 / -1; }
 }
 @media (max-width: 520px) {
   .dg-stage-bar { grid-template-columns: 1fr; }
+  .dg-overview { grid-template-columns: 1fr; }
+  .dg-overview-active { grid-column: auto; }
   .dg-type-row { flex-direction: column; align-items: flex-start; }
+  .dg-type-switch { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .dg-type-btn { justify-content: center; }
+  .dg-section-quick { grid-template-columns: 1fr; }
   .dg-section-nav { flex-wrap: wrap; }
   .dg-section-nav .ghost-btn, .dg-section-nav .primary-btn { flex: 1; justify-content: center; }
   .dg-progress-inline { order: -1; width: 100%; flex-basis: 100%; }

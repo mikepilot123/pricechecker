@@ -302,6 +302,11 @@
         <span class="dg-section-count${t.complete ? " is-complete" : ""}">${t.tested}/${t.total}</span>
       </div>
       <p class="dg-section-hint">${esc(g.hint)}</p>
+      <div class="dg-section-quick">
+        <button type="button" class="dg-quick-btn is-pass" data-dg-section-bulk="pass">All pass</button>
+        <button type="button" class="dg-quick-btn is-na" data-dg-section-bulk="na">All N/A</button>
+        <button type="button" class="dg-quick-btn" data-dg-section-bulk="clear">Clear</button>
+      </div>
       <div class="dg-test-cards">${rows}</div>`;
   }
 
@@ -354,6 +359,31 @@
         <div class="dg-progress-fill" style="width:${pct}%"></div>
       </div>
       <p class="dg-progress-sub">${t.tested}/${t.total} tested · <span class="dg-ink-pass">${t.pass} pass</span> · <span class="dg-ink-fail">${t.fail} fail</span></p>`;
+  }
+
+  function renderOverview() {
+    const box = $("dgOverview");
+    if (!box) return;
+    const before = tally("before");
+    const after = tally("after");
+    const active = tally(draft.stage);
+    const activeLabel = draft.stage === "before" ? "Before" : "After";
+    const activePct = active.total ? Math.round((active.tested / active.total) * 100) : 0;
+    box.innerHTML = `
+      <div class="dg-overview-item${draft.stage === "before" ? " active" : ""}">
+        <span class="dg-overview-label">Before</span>
+        <strong>${before.tested}/${before.total}</strong>
+        <span>${before.fail} fail</span>
+      </div>
+      <div class="dg-overview-item${draft.stage === "after" ? " active" : ""}">
+        <span class="dg-overview-label">After</span>
+        <strong>${after.tested}/${after.total}</strong>
+        <span>${after.fail} fail</span>
+      </div>
+      <div class="dg-overview-active">
+        <span class="dg-overview-label">${activeLabel} progress</span>
+        <div class="dg-overview-bar"><span style="width:${activePct}%"></span></div>
+      </div>`;
   }
 
   function renderCompare() {
@@ -490,6 +520,7 @@
     renderMap();
     renderSectionPanel();
     renderSectionNav();
+    renderOverview();
     renderProgress();
     renderCompare();
     renderTagged();
@@ -514,6 +545,16 @@
     if (!draft[draft.stage]) draft[draft.stage] = {};
     if (next === "untested") delete draft[draft.stage][key];
     else draft[draft.stage][key] = next;
+    saveDraft();
+    render();
+  }
+
+  function setCurrentSectionState(value) {
+    if (!draft[draft.stage]) draft[draft.stage] = {};
+    currentGroup().parts.forEach((key) => {
+      if (value === "clear") delete draft[draft.stage][key];
+      else draft[draft.stage][key] = value;
+    });
     saveDraft();
     render();
   }
@@ -764,6 +805,8 @@
     shell.addEventListener("click", (event) => {
       const setBtn = event.target.closest("[data-dg-set]");
       if (setBtn) { setPartState(setBtn.dataset.dgSet, setBtn.dataset.dgValue); return; }
+      const bulkBtn = event.target.closest("[data-dg-section-bulk]");
+      if (bulkBtn) { setCurrentSectionState(bulkBtn.dataset.dgSectionBulk); return; }
       const hotspot = event.target.closest("[data-dg-part]");
       if (hotspot) { cyclePart(hotspot.dataset.dgPart); return; }
       const step = event.target.closest("[data-dg-section]");
