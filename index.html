@@ -113,6 +113,7 @@
         <button type="button" class="appt-subnav-btn" data-targets-panel="goals" aria-selected="false">Goals &amp; actions</button>
       </div>
       <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
+      <button class="nav-btn" data-target="reminders" role="tab" aria-selected="false"><svg class="icon"><use href="#i-alert"></use></svg>Reminders</button>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Settings sections">
         <button type="button" class="appt-subnav-btn active" data-settings-panel="general" aria-selected="true">General</button>
@@ -464,6 +465,68 @@
         <div class="form-actions">
           <button type="button" id="expenseCancelBtn" class="ghost-btn">Cancel</button>
           <button type="button" id="expenseSubmit" class="primary-btn">Save expense</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REMINDERS VIEW ============ -->
+  <main class="container view" id="view-reminders" hidden>
+    <p class="info-banner">Shared staff to-do list — reminders sync across every device.</p>
+
+    <section class="expenses-workspace" aria-labelledby="remindersTitle">
+      <div class="leads-topbar expenses-topbar">
+        <div class="filter-chips" id="reminderFilterChips" role="tablist" aria-label="Filter reminders">
+          <button type="button" class="chip active" data-reminder-filter="open">Open</button>
+          <button type="button" class="chip" data-reminder-filter="done">Done</button>
+          <button type="button" class="chip" data-reminder-filter="all">All</button>
+        </div>
+        <button type="button" id="reminderNewBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add reminder</button>
+      </div>
+
+      <div class="leads-heading-row expenses-heading-row">
+        <div>
+          <p class="dashboard-eyebrow">Reminders</p>
+          <h2 id="remindersTitle">Staff to-do list</h2>
+        </div>
+      </div>
+
+      <p id="reminderCount" class="result-count"></p>
+      <div id="reminderList" class="ops-list reminder-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- Reminder form modal -->
+  <div id="reminderFormModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="reminderFormTitle">
+      <div class="modal-header">
+        <h3 id="reminderFormTitle">Add reminder</h3>
+        <button type="button" id="closeReminderFormModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="reminderForm" autocomplete="off">
+          <input id="reminderId" type="hidden" />
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="reminderTitleInput">Reminder</label>
+              <input id="reminderTitleInput" class="text-input" placeholder="e.g. Call supplier about screen order" required />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="reminderDue">Due (optional)</label>
+              <input id="reminderDue" class="text-input" type="datetime-local" />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="reminderNotes">Notes</label>
+              <textarea id="reminderNotes" class="text-input" rows="2" placeholder="Optional notes"></textarea>
+            </div>
+          </div>
+          <p id="reminderMessage" class="field-error" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="reminderCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="reminderSubmit" class="primary-btn">Save reminder</button>
         </div>
       </div>
     </div>
@@ -1534,7 +1597,7 @@
   <script src="assets/app.js?v=price-catalog-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
   <script src="assets/intake.js?v=sidebar-subtabs-1"></script>
-  <script src="assets/dashboard.js?v=synced-data-1"></script>
+  <script src="assets/dashboard.js?v=reminders-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>

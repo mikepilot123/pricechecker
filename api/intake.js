@@ -16,6 +16,7 @@ import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { listCustomers } from "../lib/customers.js";
 import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../lib/appointments.js";
 import { listExpenses, addExpense, updateExpense, deleteExpense } from "../lib/expenses.js";
+import { listReminders, addReminder, updateReminder, deleteReminder } from "../lib/reminders.js";
 import { ensureSchema } from "../lib/db.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
@@ -113,6 +114,18 @@ export default async function handler(req, res) {
     }
     if (action === "deleteExpense") {
       return res.status(200).json({ ok: true, deletedId: await deleteExpense(body) });
+    }
+    if (action === "listReminders") {
+      return res.status(200).json({ ok: true, reminders: await listReminders() });
+    }
+    if (action === "addReminder") {
+      return res.status(200).json({ ok: true, reminder: await addReminder(body) });
+    }
+    if (action === "updateReminder") {
+      return res.status(200).json({ ok: true, reminder: await updateReminder(body) });
+    }
+    if (action === "deleteReminder") {
+      return res.status(200).json({ ok: true, deletedId: await deleteReminder(body) });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {

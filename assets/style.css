@@ -1986,6 +1986,16 @@ body.nav-open .view-nav { transform: translateX(0); }
   margin: 4px 0 0;
   color: var(--text-dim);
 }
+.reminder-row { align-items: center; }
+.reminder-row-body { flex: 1; min-width: 0; }
+.reminder-checkbox { display: flex; align-items: center; padding-top: 2px; }
+.reminder-checkbox input { width: 18px; height: 18px; accent-color: var(--accent, #2563eb); cursor: pointer; }
+.reminder-row.is-done .reminder-row-body strong { text-decoration: line-through; color: var(--text-dim); }
+.reminder-row.is-done { opacity: 0.68; }
+.reminder-due { color: var(--text-dim); }
+.reminder-row.is-overdue { border-color: var(--danger); }
+.reminder-row.is-overdue .reminder-due { color: var(--danger); font-weight: 500; }
+
 .leads-workspace { margin-top: 14px; }
 .leads-topbar {
   position: sticky;

@@ -956,6 +956,244 @@
     });
   }
 
+  /* ---- Reminders (shared staff to-do list) --------------------------- */
+
+  // Offline fallback: the last reminder list the server returned.
+  const REMINDERS_CACHE_KEY = "rpc_reminders_cache";
+  let REMINDERS = readJson(REMINDERS_CACHE_KEY, []);
+  let reminderFilter = "open";
+  let editingReminderId = null;
+
+  function setReminders(list) {
+    REMINDERS = Array.isArray(list) ? list : [];
+    writeJson(REMINDERS_CACHE_KEY, REMINDERS);
+  }
+
+  async function remindersApi(payload) {
+    const res = await fetch(INTAKE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ pin: pin() }, payload)),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Rejected");
+    return data;
+  }
+
+  function notifyReminderError(message) {
+    if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message);
+    else console.warn(message);
+  }
+
+  let remindersLoadInFlight = null;
+  function loadReminders() {
+    if (remindersLoadInFlight) return remindersLoadInFlight;
+    remindersLoadInFlight = (async () => {
+      try {
+        const data = await remindersApi({ action: "listReminders" });
+        setReminders(data.reminders || []);
+        renderReminders();
+      } catch (err) {
+        console.warn("Couldn't sync reminders:", err);
+        notifyReminderError("Couldn't sync reminders — showing this device's last saved copy.");
+      } finally {
+        remindersLoadInFlight = null;
+      }
+    })();
+    return remindersLoadInFlight;
+  }
+
+  function initReminders() {
+    bindReminderFormOnce();
+    renderReminders();
+    loadReminders();
+  }
+
+  function bindReminderFormOnce() {
+    const form = $("reminderForm");
+    if (!form || form.dataset.bound) return;
+    form.dataset.bound = "true";
+
+    $("reminderNewBtn")?.addEventListener("click", openNewReminderForm);
+    $("closeReminderFormModal")?.addEventListener("click", closeReminderForm);
+    $("reminderCancelBtn")?.addEventListener("click", closeReminderForm);
+    $("reminderSubmit")?.addEventListener("click", saveReminderForm);
+    $("reminderFormModal")?.addEventListener("click", (event) => {
+      if (event.target.id === "reminderFormModal") closeReminderForm();
+    });
+
+    $("reminderList")?.addEventListener("click", handleReminderListClick);
+    $("reminderFilterChips")?.addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-reminder-filter]");
+      if (!chip) return;
+      reminderFilter = chip.dataset.reminderFilter;
+      renderReminders();
+    });
+  }
+
+  function openNewReminderForm() {
+    editingReminderId = null;
+    $("reminderFormTitle").textContent = "Add reminder";
+    $("reminderId").value = "";
+    $("reminderTitleInput").value = "";
+    $("reminderDue").value = "";
+    $("reminderNotes").value = "";
+    const msg = $("reminderMessage");
+    if (msg) { msg.hidden = true; msg.textContent = ""; }
+    $("reminderFormModal").hidden = false;
+    $("reminderTitleInput")?.focus();
+  }
+
+  function editReminder(reminder) {
+    if (!reminder) return;
+    editingReminderId = reminder.id;
+    $("reminderFormTitle").textContent = "Edit reminder";
+    $("reminderId").value = reminder.id;
+    $("reminderTitleInput").value = reminder.title || "";
+    $("reminderDue").value = reminder.dueAt ? toDatetimeLocal(reminder.dueAt) : "";
+    $("reminderNotes").value = reminder.notes || "";
+    const msg = $("reminderMessage");
+    if (msg) { msg.hidden = true; msg.textContent = ""; }
+    $("reminderFormModal").hidden = false;
+    $("reminderTitleInput")?.focus();
+  }
+
+  function closeReminderForm() {
+    $("reminderFormModal").hidden = true;
+    editingReminderId = null;
+  }
+
+  async function saveReminderForm() {
+    const title = ($("reminderTitleInput")?.value || "").trim();
+    const msg = $("reminderMessage");
+    if (!title) {
+      if (msg) { msg.textContent = "Add a reminder title."; msg.hidden = false; }
+      return;
+    }
+    const dueLocal = $("reminderDue")?.value || "";
+    const payload = {
+      title,
+      notes: ($("reminderNotes")?.value || "").trim(),
+      dueAt: dueLocal ? new Date(dueLocal).toISOString() : null,
+    };
+    const submitBtn = $("reminderSubmit");
+    const originalLabel = submitBtn?.textContent;
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Saving…"; }
+    try {
+      const data = editingReminderId
+        ? await remindersApi({ action: "updateReminder", id: editingReminderId, ...payload })
+        : await remindersApi({ action: "addReminder", ...payload });
+      setReminders(
+        editingReminderId
+          ? REMINDERS.map((item) => (item.id === data.reminder.id ? data.reminder : item))
+          : [data.reminder].concat(REMINDERS)
+      );
+    } catch (err) {
+      if (msg) { msg.textContent = "Couldn't save the reminder: " + err.message; msg.hidden = false; }
+      return;
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalLabel; }
+    }
+    closeReminderForm();
+    renderReminders();
+  }
+
+  async function handleReminderListClick(event) {
+    const editBtn = event.target.closest("[data-reminder-edit]");
+    const deleteBtn = event.target.closest("[data-reminder-delete]");
+    const doneBox = event.target.closest("[data-reminder-toggle]");
+    if (editBtn) {
+      editReminder(REMINDERS.find((item) => item.id === editBtn.dataset.reminderEdit));
+      return;
+    }
+    if (doneBox) {
+      const id = doneBox.dataset.reminderToggle;
+      const current = REMINDERS.find((item) => item.id === id);
+      if (!current) return;
+      try {
+        const data = await remindersApi({ action: "updateReminder", id, done: !current.done });
+        setReminders(REMINDERS.map((item) => (item.id === id ? data.reminder : item)));
+        renderReminders();
+      } catch (err) {
+        notifyReminderError("Couldn't update reminder: " + err.message);
+      }
+      return;
+    }
+    if (!deleteBtn) return;
+    if (!window.confirm("Delete this reminder?")) return;
+    const id = deleteBtn.dataset.reminderDelete;
+    try {
+      await remindersApi({ action: "deleteReminder", id });
+      setReminders(REMINDERS.filter((item) => item.id !== id));
+      renderReminders();
+    } catch (err) {
+      notifyReminderError("Couldn't delete reminder: " + err.message);
+    }
+  }
+
+  function toDatetimeLocal(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function formatReminderDue(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const sameYear = d.getFullYear() === new Date().getFullYear();
+    return d.toLocaleString([], { month: "short", day: "numeric", year: sameYear ? undefined : "numeric", hour: "numeric", minute: "2-digit" });
+  }
+
+  function filteredReminders(reminders) {
+    if (reminderFilter === "done") return reminders.filter((item) => item.done);
+    if (reminderFilter === "all") return reminders;
+    return reminders.filter((item) => !item.done);
+  }
+
+  function renderReminders() {
+    const list = $("reminderList");
+    const count = $("reminderCount");
+    if (!list && !count) return;
+    const now = Date.now();
+    const reminders = REMINDERS.slice().sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      if (!a.dueAt && !b.dueAt) return 0;
+      if (!a.dueAt) return 1;
+      if (!b.dueAt) return -1;
+      return new Date(a.dueAt) - new Date(b.dueAt);
+    });
+    const visible = filteredReminders(reminders);
+    if (count) {
+      count.textContent = reminders.length
+        ? `${visible.length} of ${reminders.length} reminder${reminders.length === 1 ? "" : "s"}`
+        : "No reminders yet";
+    }
+    if (list) {
+      list.innerHTML = visible.length ? visible.map((item) => {
+        const overdue = !item.done && item.dueAt && new Date(item.dueAt).getTime() < now;
+        return `
+        <article class="ops-row reminder-row${item.done ? " is-done" : ""}${overdue ? " is-overdue" : ""}">
+          <label class="reminder-checkbox">
+            <input type="checkbox" data-reminder-toggle="${esc(item.id)}" ${item.done ? "checked" : ""} aria-label="Mark reminder done" />
+          </label>
+          <div class="reminder-row-body">
+            <strong>${esc(item.title)}</strong>
+            ${item.dueAt ? `<p class="reminder-due">${overdue ? "Overdue — " : ""}${esc(formatReminderDue(item.dueAt))}</p>` : ""}
+            ${item.notes ? `<small>${esc(item.notes)}</small>` : ""}
+          </div>
+          <div class="ops-row-actions">
+            <button type="button" data-reminder-edit="${esc(item.id)}">Edit</button>
+            <button type="button" class="danger-text" data-reminder-delete="${esc(item.id)}">Delete</button>
+          </div>
+        </article>
+      `; }).join("") : `<p class="ops-empty">${reminders.length ? "No reminders match this filter." : "No reminders yet."}</p>`;
+    }
+  }
+
+  window.addEventListener("rpc-enter-reminders", initReminders);
+
   window.addEventListener("rpc-enter-dashboard", () => loadDashboard({ force: true }));
   window.addEventListener("rpc-enter-targets", () => {
     bindTargetsSubnavOnce();

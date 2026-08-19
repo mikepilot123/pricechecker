@@ -145,6 +145,7 @@
     intake: $("view-intake"),
     inventory: $("view-inventory"),
     expenses: $("view-expenses"),
+    reminders: $("view-reminders"),
   };
   function setActiveNav(target) {
     navBtns.forEach((b) => {
@@ -169,6 +170,7 @@
     if (target === "intake") enterIntake();
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
     if (target === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
+    if (target === "reminders") window.dispatchEvent(new Event("rpc-enter-reminders"));
   }
   window.RPC_SHOW_VIEW = navigateTo;
   navBtns.forEach((btn) => {
