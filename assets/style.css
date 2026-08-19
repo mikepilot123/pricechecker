@@ -2214,11 +2214,12 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   margin: 6px 0 0;
 }
 
-.rem-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.rem-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; max-width: 100%; }
 .rem-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 0.74rem;
@@ -2226,6 +2227,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   line-height: 1.5;
   white-space: nowrap;
 }
+.rem-tag .icon { flex: none; }
 .rem-tag-priority.pr-urgent { background: var(--rem-red-soft); color: var(--rem-red); }
 .rem-tag-priority.pr-customer_update { background: #eff6ff; color: #2563eb; }
 .rem-tag-priority.pr-parts { background: #fff7ed; color: #c2410c; }
@@ -2238,8 +2240,20 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   border: 0;
   cursor: pointer;
   font: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 .rem-tag-ticket:hover { background: var(--rem-red-soft); color: var(--rem-red); }
+
+@media (max-width: 420px) {
+  .rem-page-head { gap: 10px; }
+  .rem-add-btn { width: 100%; justify-content: center; }
+  .rem-toolbar { flex-direction: column; }
+  select.rem-assignee-filter { width: 100%; }
+  .rem-segmented { display: flex; width: 100%; }
+  .rem-seg-btn { flex: 1; min-width: 0; padding-inline: 8px; }
+}
 
 .leads-workspace { margin-top: 14px; }
 .leads-topbar {
