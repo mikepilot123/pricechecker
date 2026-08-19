@@ -1447,6 +1447,11 @@ body.nav-open .nav-backdrop { opacity: 1; }
 .empty-icon.error { color: var(--danger); background: #fce7e5; }
 .empty-title { font-size: 1.05rem; font-weight: 500; color: var(--text); margin: 0 0 4px; }
 .empty-sub { font-size: 0.88rem; margin: 0; }
+.price-empty-add {
+  width: auto;
+  margin-top: 16px;
+}
+.price-empty-add[hidden] { display: none; }
 
 .skeleton {
   height: 56px;
@@ -4438,6 +4443,20 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .modal-footer .form-actions { margin-top: 0; }
 .modal-footer .form-actions .ghost-btn,
 .modal-footer .form-actions .primary-btn { flex: 1; width: auto; }
+.add-price-device-body {
+  display: grid;
+  gap: 8px;
+}
+.add-price-device-body .settings-help { margin-bottom: 0; }
+.add-price-device-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(110px, 0.8fr);
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .add-price-device-grid { grid-template-columns: 1fr; }
+  .price-empty-add { width: 100%; justify-content: center; }
+}
 #technicianModal .modal-panel {
   max-width: min(760px, calc(100vw - 32px));
   max-height: min(92vh, 760px);

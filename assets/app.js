@@ -34,6 +34,15 @@ const SECTION_RE = /(series|^table\d*$)/i;
 const els = {
   search: document.getElementById("searchInput"),
   clearSearch: document.getElementById("clearSearch"),
+  addMissingPriceDevice: document.getElementById("addMissingPriceDevice"),
+  addPriceDeviceModal: document.getElementById("addPriceDeviceModal"),
+  closeAddPriceDeviceModal: document.getElementById("closeAddPriceDeviceModal"),
+  addPriceDeviceName: document.getElementById("addPriceDeviceName"),
+  addPriceDeviceBrand: document.getElementById("addPriceDeviceBrand"),
+  addPriceDeviceRepair: document.getElementById("addPriceDeviceRepair"),
+  addPriceDeviceValue: document.getElementById("addPriceDeviceValue"),
+  addPriceDeviceSave: document.getElementById("addPriceDeviceSave"),
+  addPriceDeviceError: document.getElementById("addPriceDeviceError"),
   commonSearchSettingsFilter: document.getElementById("commonSearchSettingsFilter"),
   commonSearchSettingsRefresh: document.getElementById("commonSearchSettingsRefresh"),
   commonSearchSettingsCount: document.getElementById("commonSearchSettingsCount"),
@@ -449,6 +458,7 @@ function render() {
   if (!hasQuery) setPriceFiltersCollapsed(false);
   els.results.innerHTML = "";
   els.empty.hidden = list.length > 0;
+  renderMissingDeviceAction(list, hasQuery);
   els.error.hidden = true;
 
   els.count.textContent = list.length
@@ -489,6 +499,17 @@ function render() {
   } else if (!expand || list.length !== 1) {
     lastAutoScrolledModel = null;
   }
+}
+
+function renderMissingDeviceAction(list, hasQuery) {
+  if (!els.addMissingPriceDevice) return;
+  const query = els.search.value.trim().replace(/\s+/g, " ");
+  const show = hasQuery && !list.length && !!query;
+  els.addMissingPriceDevice.hidden = !show;
+  if (!show) return;
+  els.addMissingPriceDevice.dataset.deviceName = query;
+  els.addMissingPriceDevice.innerHTML =
+    `<svg class="icon"><use href="#i-plus"></use></svg><span>Add "${escapeHtml(query)}"</span>`;
 }
 
 function formatCommonSearchDate(value) {
@@ -918,6 +939,74 @@ function savePricesSetup() {
   els.pricesSetupModal.hidden = true;
 }
 
+function showAddPriceDeviceError(message) {
+  if (!els.addPriceDeviceError) return;
+  els.addPriceDeviceError.textContent = message || "";
+  els.addPriceDeviceError.hidden = !message;
+}
+
+function openAddPriceDeviceModal() {
+  const name = (els.addMissingPriceDevice?.dataset.deviceName || els.search.value || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!name) return;
+  if (!storedPin()) {
+    openPricesSetupModal();
+    return;
+  }
+  els.addPriceDeviceName.value = name;
+  els.addPriceDeviceBrand.value = deriveBrand(name, "");
+  els.addPriceDeviceRepair.value = "";
+  els.addPriceDeviceValue.value = "";
+  showAddPriceDeviceError("");
+  els.addPriceDeviceModal.hidden = false;
+  els.addPriceDeviceName.focus();
+  els.addPriceDeviceName.select?.();
+}
+
+function closeAddPriceDeviceModal() {
+  if (els.addPriceDeviceModal) els.addPriceDeviceModal.hidden = true;
+}
+
+async function saveAddedPriceDevice() {
+  const pin = storedPin();
+  if (!pin) {
+    openPricesSetupModal();
+    return;
+  }
+  const name = (els.addPriceDeviceName.value || "").trim().replace(/\s+/g, " ");
+  const brand = (els.addPriceDeviceBrand.value || "").trim().replace(/\s+/g, " ");
+  const repairType = (els.addPriceDeviceRepair.value || "").trim().replace(/\s+/g, " ");
+  const value = (els.addPriceDeviceValue.value || "").trim();
+  if (!name) return showAddPriceDeviceError("Enter a device name.");
+  if (MODELS.some((model) => priceModelKey(model.name) === priceModelKey(name))) {
+    return showAddPriceDeviceError(`${name} is already in the price list.`);
+  }
+  if ((repairType && !value) || (!repairType && value)) {
+    return showAddPriceDeviceError("Enter both the first repair type and price, or leave both blank.");
+  }
+
+  const entries = repairType && value ? [{ type: repairType, value }] : [];
+  const btn = els.addPriceDeviceSave;
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  showAddPriceDeviceError("");
+  try {
+    const data = await savePriceEntries([{ name, brand, entries }], pin);
+    if (!data.ok) throw new Error(data.error || "Save failed");
+    els.search.value = name;
+    forceSearchScroll = true;
+    closeAddPriceDeviceModal();
+    await loadData({ reason: "add-price-device" });
+    if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Device added", { tone: "success" });
+  } catch (err) {
+    showAddPriceDeviceError("Couldn't save device: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="icon"><use href="#i-check"></use></svg>Save device`;
+  }
+}
+
 // --- Log device from a price row --------------------------------------------
 // Lets staff jump straight from "how much for X" to logging the device for
 // that exact repair, instead of re-typing the model/issue in the Intake tab.
@@ -997,6 +1086,19 @@ function showSkeleton() {
 // --- Wire up events ---------------------------------------------------------
 if (els.closePricesSetupModal) els.closePricesSetupModal.addEventListener("click", () => { els.pricesSetupModal.hidden = true; });
 if (els.pricesSetupSave) els.pricesSetupSave.addEventListener("click", savePricesSetup);
+els.addMissingPriceDevice?.addEventListener("click", openAddPriceDeviceModal);
+els.closeAddPriceDeviceModal?.addEventListener("click", closeAddPriceDeviceModal);
+els.addPriceDeviceModal?.addEventListener("click", (e) => {
+  if (e.target === els.addPriceDeviceModal) closeAddPriceDeviceModal();
+});
+els.addPriceDeviceSave?.addEventListener("click", saveAddedPriceDevice);
+els.addPriceDeviceModal?.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeAddPriceDeviceModal();
+  if (e.key === "Enter" && e.target?.tagName === "INPUT") {
+    e.preventDefault();
+    saveAddedPriceDevice();
+  }
+});
 
 els.search.addEventListener("input", () => {
   render();

@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=no-fix-status-1" />
+  <link rel="stylesheet" href="assets/style.css?v=add-price-device-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -608,6 +608,7 @@
       <div class="empty-icon"><svg class="icon"><use href="#i-search"></use></svg></div>
       <p class="empty-title">No matching models</p>
       <p class="empty-sub">Try a shorter search, like just the number.</p>
+      <button type="button" id="addMissingPriceDevice" class="primary-btn price-empty-add" hidden><svg class="icon"><use href="#i-plus"></use></svg>Add device</button>
     </div>
     <div id="errorState" class="error-state" hidden>
       <div class="empty-icon error"><svg class="icon"><use href="#i-alert"></use></svg></div>
@@ -1099,6 +1100,39 @@
         <div class="form-actions">
           <button type="button" id="pricesSetupSave" class="primary-btn">Enable editing</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="addPriceDeviceModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="addPriceDeviceTitle">
+      <div class="modal-header">
+        <div>
+          <p class="modal-eyebrow">Price catalog</p>
+          <h3 id="addPriceDeviceTitle">Add device</h3>
+        </div>
+        <button type="button" id="closeAddPriceDeviceModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body add-price-device-body">
+        <label class="field-label" for="addPriceDeviceName">Device name</label>
+        <input id="addPriceDeviceName" class="text-input" type="text" autocomplete="off" placeholder="Pixel 8 Pro" />
+        <label class="field-label" for="addPriceDeviceBrand">Brand</label>
+        <input id="addPriceDeviceBrand" class="text-input" type="text" autocomplete="off" placeholder="Pixel" />
+        <div class="add-price-device-grid">
+          <div>
+            <label class="field-label" for="addPriceDeviceRepair">First repair type</label>
+            <input id="addPriceDeviceRepair" class="text-input" type="text" autocomplete="off" placeholder="Screen" />
+          </div>
+          <div>
+            <label class="field-label" for="addPriceDeviceValue">Price</label>
+            <input id="addPriceDeviceValue" class="text-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0" />
+          </div>
+        </div>
+        <p class="settings-help">You can leave the first repair blank and fill the price row later in Settings.</p>
+        <p id="addPriceDeviceError" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="addPriceDeviceSave" class="primary-btn"><svg class="icon"><use href="#i-check"></use></svg>Save device</button>
       </div>
     </div>
   </div>
@@ -1647,7 +1681,7 @@
     </div>
   </div>
 
-  <script src="assets/app.js?v=common-searches-settings-1"></script>
+  <script src="assets/app.js?v=add-price-device-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
   <script src="assets/intake.js?v=common-searches-settings-1"></script>
   <script src="assets/dashboard.js?v=no-fix-status-1"></script>
