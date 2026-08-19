@@ -2168,11 +2168,49 @@ body.nav-open .view-nav { transform: translateX(0); }
   cursor: pointer;
 }
 .rem-title { font-size: 0.95rem; color: var(--text); overflow-wrap: anywhere; }
-.rem-notes { font-size: 0.84rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.rem-notes { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
 .rem-due { font-size: 0.82rem; color: var(--text-dim); }
 .rem-item.is-overdue .rem-due { color: var(--rem-red); font-weight: 600; }
 /* Completed items stay readable but recede — Apple dims rather than strikes. */
 .rem-item.is-done .rem-title { color: var(--text-dim); }
+
+.rem-note-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 1px;
+}
+.rem-note-preview {
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.rem-note-row:not(.is-open) .rem-note-preview {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rem-note-row.is-open .rem-note-preview {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+.rem-note-toggle {
+  flex: none;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2, #f1f3f6);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.rem-note-toggle:hover { background: #e8eefb; }
 
 .rem-delete {
   flex: none;
@@ -2228,6 +2266,12 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   white-space: nowrap;
 }
 .rem-tag .icon { flex: none; }
+.rem-tag-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .rem-tag-priority.pr-urgent { background: var(--rem-red-soft); color: var(--rem-red); }
 .rem-tag-priority.pr-customer_update { background: #eff6ff; color: #2563eb; }
 .rem-tag-priority.pr-parts { background: #fff7ed; color: #c2410c; }
@@ -2240,8 +2284,10 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   border: 0;
   cursor: pointer;
   font: inherit;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  padding: 3px 8px;
+  overflow: hidden;
   text-align: left;
 }
 .rem-tag-ticket:hover { background: var(--rem-red-soft); color: var(--rem-red); }

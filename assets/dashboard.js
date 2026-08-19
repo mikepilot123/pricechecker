@@ -976,6 +976,7 @@
   let REM_TECHNICIANS = [];
   let remTechniciansLoaded = false;
   let selectedTicketForReminder = null; // { id, label }
+  const expandedReminderNotes = new Set();
 
   const REMINDER_PRIORITIES = {
     urgent: "Urgent",
@@ -1336,6 +1337,14 @@
     const editBtn = event.target.closest("[data-reminder-edit]");
     const deleteBtn = event.target.closest("[data-reminder-delete]");
     const ticketBtn = event.target.closest("[data-reminder-open-ticket]");
+    const noteBtn = event.target.closest("[data-reminder-note-toggle]");
+    if (noteBtn) {
+      const id = noteBtn.dataset.reminderNoteToggle;
+      if (expandedReminderNotes.has(id)) expandedReminderNotes.delete(id);
+      else expandedReminderNotes.add(id);
+      renderReminders();
+      return;
+    }
     if (ticketBtn) {
       const id = ticketBtn.dataset.reminderOpenTicket;
       if (typeof window.RPC_OPEN_TICKET_BY_ID === "function") window.RPC_OPEN_TICKET_BY_ID(id);
@@ -1478,6 +1487,7 @@
     const dueLabel = item.done
       ? reminderCompletedLabel(item.doneAt, now)
       : (item.dueAt ? reminderDueLabel(item.dueAt, now) : "");
+    const noteExpanded = expandedReminderNotes.has(item.id);
     const tags = [];
     if (item.priority && REMINDER_PRIORITIES[item.priority]) {
       tags.push(`<span class="rem-tag rem-tag-priority pr-${esc(item.priority)}">${esc(REMINDER_PRIORITIES[item.priority])}</span>`);
@@ -1486,8 +1496,9 @@
       tags.push(`<span class="rem-tag rem-tag-assignee"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-user"></use></svg>${esc(item.assignee)}</span>`);
     }
     if (item.ticketId) {
-      tags.push(`<button type="button" class="rem-tag rem-tag-ticket" data-reminder-open-ticket="${esc(item.ticketId)}">
-        <svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-clipboard"></use></svg>${esc(item.ticketLabel || "Linked repair")}
+      const ticketLabel = item.ticketLabel || "Linked repair";
+      tags.push(`<button type="button" class="rem-tag rem-tag-ticket" data-reminder-open-ticket="${esc(item.ticketId)}" title="${esc(ticketLabel)}">
+        <svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-clipboard"></use></svg><span class="rem-tag-text">${esc(ticketLabel)}</span>
       </button>`);
     }
     return `
@@ -1500,9 +1511,15 @@
           <div class="rem-body-wrap">
             <button type="button" class="rem-body" data-reminder-edit="${esc(item.id)}" aria-label="Edit ${esc(item.title)}">
               <span class="rem-title">${esc(item.title)}</span>
-              ${item.notes ? `<span class="rem-notes">${esc(item.notes)}</span>` : ""}
               ${dueLabel ? `<span class="rem-due">${esc(dueLabel)}</span>` : ""}
             </button>
+            ${item.notes ? `
+              <div class="rem-note-row${noteExpanded ? " is-open" : ""}">
+                <span class="rem-note-preview">${noteExpanded ? esc(item.notes) : "Note added"}</span>
+                <button type="button" class="rem-note-toggle" data-reminder-note-toggle="${esc(item.id)}" aria-expanded="${noteExpanded ? "true" : "false"}">
+                  ${noteExpanded ? "Hide note" : "View note"}
+                </button>
+              </div>` : ""}
             ${tags.length ? `<div class="rem-tags">${tags.join("")}</div>` : ""}
           </div>
           <button type="button" class="rem-delete" data-reminder-delete="${esc(item.id)}" aria-label="Delete ${esc(item.title)}">
