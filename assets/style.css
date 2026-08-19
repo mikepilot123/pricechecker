@@ -3183,13 +3183,15 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
    settings page off screen on a phone. */
 .price-admin-grid-wrap {
   margin-top: 10px;
-  overflow-x: auto;
+  max-height: min(64vh, 720px);
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
 .price-admin-grid {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.82rem;
 }
 .price-admin-grid th,
@@ -3202,8 +3204,9 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .price-admin-grid thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 3;
   background: var(--bg-soft);
+  box-shadow: 0 1px 0 var(--border);
   font-weight: 600;
   font-size: 0.76rem;
   color: var(--text-dim);
@@ -3290,6 +3293,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 @media (max-width: 560px) {
   .price-admin-toolbar { grid-template-columns: 1fr; }
   .price-admin-toolbar .ghost-btn { width: 100%; justify-content: center; }
+  .price-admin-grid-wrap { max-height: 58vh; }
   .price-admin-bulk > *,
   .price-admin-bulk .select-wrap { flex: 1 1 100%; }
   .price-admin-bulk-value { max-width: none; }
