@@ -226,7 +226,91 @@ body.nav-open .nav-backdrop { opacity: 1; }
   line-height: 1;
   cursor: pointer;
 }
+.save-price-search {
+  position: absolute;
+  right: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-soft);
+  color: var(--text);
+  cursor: pointer;
+}
+.save-price-search[hidden],
+.clear-search[hidden] { display: none; }
+.save-price-search .icon { width: 15px; height: 15px; }
+.save-price-search:hover,
+.clear-search:hover { background: var(--card-hover); }
+.search-wrap:has(.save-price-search:not([hidden])) .search-input { padding-right: 80px; }
 .clear-search .icon { width: 16px; height: 16px; }
+
+.common-price-searches {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 14px;
+}
+.common-price-searches[hidden] { display: none; }
+.common-searches-label {
+  flex: none;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.common-searches-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.common-search-chip {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(35, 45, 72, 0.04);
+}
+.common-search-apply,
+.common-search-delete {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.common-search-apply {
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px 0 12px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.common-search-delete {
+  justify-content: center;
+  width: 30px;
+  height: 32px;
+  color: var(--text-dim);
+  border-left: 1px solid var(--border);
+}
+.common-search-delete .icon { width: 13px; height: 13px; }
+.common-search-apply:hover,
+.common-search-delete:hover { background: var(--bg-soft); }
+.common-search-count {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
 
 /* ---------- Filter chips ---------- */
 .filter-chips {

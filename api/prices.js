@@ -1,4 +1,13 @@
-import { listPriceModels, savePriceModels, deletePriceModel, restorePriceModel } from "../lib/prices.js";
+import {
+  listPriceModels,
+  savePriceModels,
+  deletePriceModel,
+  restorePriceModel,
+  listCommonSearches,
+  saveCommonSearch,
+  recordCommonSearchUse,
+  deleteCommonSearch,
+} from "../lib/prices.js";
 import { ensureSchema } from "../lib/db.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
@@ -17,10 +26,16 @@ export default async function handler(req, res) {
     await ensureSchema();
 
     if (req.method === "GET") {
-      return res.status(200).json({ ok: true, models: await listPriceModels() });
+      const [models, commonSearches] = await Promise.all([listPriceModels(), listCommonSearches()]);
+      return res.status(200).json({ ok: true, models, commonSearches });
     }
 
     const body = readBody(req);
+    if (body.action === "recordCommonSearchUse") {
+      await recordCommonSearchUse(body);
+      return res.status(200).json({ ok: true, commonSearches: await listCommonSearches() });
+    }
+
     const denied = checkPin(req, body.pin);
     if (denied) {
       return res.status(denied.status).json({ ok: false, error: denied.error });
@@ -37,6 +52,14 @@ export default async function handler(req, res) {
     if (body.action === "restore") {
       const restoredId = await restorePriceModel(body);
       return res.status(200).json({ ok: true, restoredId, models: await listPriceModels() });
+    }
+    if (body.action === "saveCommonSearch") {
+      const savedId = await saveCommonSearch(body);
+      return res.status(200).json({ ok: true, savedId, commonSearches: await listCommonSearches() });
+    }
+    if (body.action === "deleteCommonSearch") {
+      const deletedId = await deleteCommonSearch(body);
+      return res.status(200).json({ ok: true, deletedId, commonSearches: await listCommonSearches() });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + (body.action || "") });
   } catch (err) {

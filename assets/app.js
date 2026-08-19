@@ -34,6 +34,8 @@ const SECTION_RE = /(series|^table\d*$)/i;
 const els = {
   search: document.getElementById("searchInput"),
   clearSearch: document.getElementById("clearSearch"),
+  savePriceSearch: document.getElementById("savePriceSearch"),
+  commonPriceSearches: document.getElementById("commonPriceSearches"),
   chips: document.getElementById("filterChips"),
   pricesView: document.getElementById("view-prices"),
   results: document.getElementById("results"),
@@ -67,6 +69,8 @@ let loadInFlight = null;
 let INVENTORY_ITEMS = [];
 let inventoryLoadInFlight = null;
 let PRICE_OVERRIDES = [];   // catalog rows layered over the sheet (lib/prices.js)
+let COMMON_SEARCHES = [];
+let commonSearchSaving = false;
 
 // --- Price editing state ----------------------------------------------------
 // Edits used to be written back into the Google Sheet through a bound Apps
@@ -185,6 +189,8 @@ async function fetchPriceOverrides() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "Prices rejected");
+    COMMON_SEARCHES = Array.isArray(data.commonSearches) ? data.commonSearches : [];
+    renderCommonSearches();
     return data.models || [];
   } catch (err) {
     // Non-fatal: the sheet is still the base list, so a catalog outage costs
@@ -435,6 +441,10 @@ function render() {
   const list = currentFilter();
   const hasQuery = els.search.value.trim().length > 0;
   els.clearSearch.hidden = !els.search.value;
+  if (els.savePriceSearch) {
+    const q = normalizeSearchText(els.search.value);
+    els.savePriceSearch.hidden = !q || COMMON_SEARCHES.some((item) => normalizeSearchText(item.query) === q);
+  }
   if (!hasQuery) setPriceFiltersCollapsed(false);
   els.results.innerHTML = "";
   els.empty.hidden = list.length > 0;
@@ -478,6 +488,103 @@ function render() {
   } else if (!expand || list.length !== 1) {
     lastAutoScrolledModel = null;
   }
+}
+
+function renderCommonSearches() {
+  if (!els.commonPriceSearches) return;
+  const visible = COMMON_SEARCHES.filter((item) => item && item.query).slice(0, 10);
+  if (!visible.length) {
+    els.commonPriceSearches.hidden = true;
+    els.commonPriceSearches.innerHTML = "";
+    return;
+  }
+  els.commonPriceSearches.hidden = false;
+  els.commonPriceSearches.innerHTML = `
+    <span class="common-searches-label">Common searches</span>
+    <div class="common-searches-list">
+      ${visible.map((item) => `
+        <span class="common-search-chip">
+          <button type="button" class="common-search-apply" data-common-search-id="${escapeHtml(item.id)}" data-common-search-query="${escapeHtml(item.query)}">
+            ${escapeHtml(item.label || item.query)}
+            ${item.useCount ? `<span class="common-search-count">${Number(item.useCount)}</span>` : ""}
+          </button>
+          <button type="button" class="common-search-delete" data-common-search-delete="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.label || item.query)}">
+            <svg class="icon"><use href="#i-xmark"></use></svg>
+          </button>
+        </span>`).join("")}
+    </div>`;
+}
+
+function applyCommonSearch(id, query) {
+  els.search.value = query || "";
+  forceSearchScroll = true;
+  render();
+  recordCommonSearchUse(id, query);
+}
+
+async function saveCurrentCommonSearch() {
+  if (commonSearchSaving) return;
+  const query = els.search.value.trim().replace(/\s+/g, " ");
+  if (!query) return;
+  const pin = storedPin();
+  if (!pin) {
+    openPricesSetupModal();
+    return;
+  }
+  commonSearchSaving = true;
+  if (els.savePriceSearch) els.savePriceSearch.disabled = true;
+  try {
+    const data = await commonSearchApi({ action: "saveCommonSearch", pin, query });
+    if (!data.ok) throw new Error(data.error || "Couldn't save search");
+    COMMON_SEARCHES = data.commonSearches || [];
+    renderCommonSearches();
+    render();
+  } catch (err) {
+    console.warn("Couldn't save common search:", err);
+  } finally {
+    commonSearchSaving = false;
+    if (els.savePriceSearch) els.savePriceSearch.disabled = false;
+  }
+}
+
+async function deleteCommonSearch(id) {
+  if (!id) return;
+  const pin = storedPin();
+  if (!pin) {
+    openPricesSetupModal();
+    return;
+  }
+  try {
+    const data = await commonSearchApi({ action: "deleteCommonSearch", pin, id });
+    if (!data.ok) throw new Error(data.error || "Couldn't remove search");
+    COMMON_SEARCHES = data.commonSearches || [];
+    renderCommonSearches();
+    render();
+  } catch (err) {
+    console.warn("Couldn't delete common search:", err);
+  }
+}
+
+async function recordCommonSearchUse(id, query) {
+  try {
+    const data = await commonSearchApi({ action: "recordCommonSearchUse", id, query });
+    if (data.ok) {
+      COMMON_SEARCHES = data.commonSearches || COMMON_SEARCHES;
+      renderCommonSearches();
+    }
+  } catch (err) {
+    console.warn("Couldn't record common search:", err);
+  }
+}
+
+async function commonSearchApi(payload) {
+  const res = await fetch(PRICES_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
 }
 
 function setPriceFiltersCollapsed(collapsed) {
@@ -872,6 +979,16 @@ els.clearSearch.addEventListener("click", () => {
   els.search.value = "";
   els.search.focus();
   render();
+});
+els.savePriceSearch?.addEventListener("click", saveCurrentCommonSearch);
+els.commonPriceSearches?.addEventListener("click", (event) => {
+  const applyBtn = event.target.closest("[data-common-search-id]");
+  const deleteBtn = event.target.closest("[data-common-search-delete]");
+  if (deleteBtn) {
+    deleteCommonSearch(deleteBtn.dataset.commonSearchDelete);
+    return;
+  }
+  if (applyBtn) applyCommonSearch(applyBtn.dataset.commonSearchId, applyBtn.dataset.commonSearchQuery);
 });
 window.addEventListener("rpc-inventory", (event) => {
   INVENTORY_ITEMS = ((event.detail && event.detail.items) || window.RPC_INVENTORY_ITEMS || [])
