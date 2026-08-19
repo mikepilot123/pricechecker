@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/style.css?v=sidebar-subtabs-1" />
+  <link rel="stylesheet" href="assets/style.css?v=reminders-standalone-2" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -484,6 +484,17 @@
 
       <p class="rem-page-sub">Shared staff to-do list — synced across every device.</p>
 
+      <div class="rem-toolbar">
+        <div class="leads-searchbar rem-searchbar">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input id="reminderSearch" type="search" inputmode="search" autocomplete="off" placeholder="Search reminders, assignee, ticket…" aria-label="Search reminders" />
+          <button id="clearReminderSearch" class="inventory-clear-search" aria-label="Clear reminder search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+        </div>
+        <select id="reminderAssigneeFilter" class="text-input select-input rem-assignee-filter" aria-label="Filter by assignee">
+          <option value="">Everyone</option>
+        </select>
+      </div>
+
       <div class="rem-segmented" id="reminderFilterChips" role="tablist" aria-label="Filter reminders">
         <button type="button" class="rem-seg-btn active" data-reminder-filter="open" role="tab" aria-selected="true">Open</button>
         <button type="button" class="rem-seg-btn" data-reminder-filter="done" role="tab" aria-selected="false">Done</button>
@@ -508,6 +519,24 @@
             <div class="form-field form-field-full">
               <label class="field-label" for="reminderTitleInput">Reminder</label>
               <input id="reminderTitleInput" class="text-input" placeholder="e.g. Call supplier about screen order" required />
+              <p id="reminderDuplicateWarning" class="field-warning" hidden></p>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="reminderPriority">Priority</label>
+              <select id="reminderPriority" class="text-input select-input">
+                <option value="">No label</option>
+                <option value="urgent">Urgent</option>
+                <option value="customer_update">Customer update</option>
+                <option value="parts">Parts</option>
+                <option value="repair">Repair</option>
+                <option value="pickup">Pickup</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="reminderAssignee">Assign to</label>
+              <select id="reminderAssignee" class="text-input select-input">
+                <option value="">Unassigned</option>
+              </select>
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="reminderDue">Due (optional)</label>
@@ -518,6 +547,16 @@
                 <button type="button" class="chip" data-reminder-preset="none">No due date</button>
               </div>
               <input id="reminderDue" class="text-input" type="datetime-local" />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="reminderTicketSearch">Link to a repair (optional)</label>
+              <div class="device-combobox" id="reminderTicketCombobox">
+                <input id="reminderTicketSearch" class="text-input" autocomplete="off" placeholder="Search customer, device, or ticket #" aria-autocomplete="list" aria-expanded="false" aria-controls="reminderTicketDropdown" />
+                <button type="button" id="clearReminderTicket" class="device-dropdown-btn" aria-label="Clear linked ticket" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+                <div id="reminderTicketDropdown" class="device-dropdown" role="listbox" hidden></div>
+              </div>
+              <input id="reminderTicketId" type="hidden" />
+              <input id="reminderTicketLabel" type="hidden" />
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="reminderNotes">Notes</label>
@@ -1601,8 +1640,8 @@
 
   <script src="assets/app.js?v=price-catalog-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=parts-status-1"></script>
-  <script src="assets/dashboard.js?v=reminders-3"></script>
+  <script src="assets/intake.js?v=reminders-standalone-1"></script>
+  <script src="assets/dashboard.js?v=reminders-4"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>

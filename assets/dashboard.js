@@ -969,7 +969,21 @@
   const REMINDERS_CACHE_KEY = "rpc_reminders_cache";
   let REMINDERS = readJson(REMINDERS_CACHE_KEY, []);
   let reminderFilter = "open";
+  let reminderSearchText = "";
+  let reminderAssigneeFilterValue = "";
   let editingReminderId = null;
+  let reminderDuplicateConfirmed = false;
+  let REM_TECHNICIANS = [];
+  let remTechniciansLoaded = false;
+  let selectedTicketForReminder = null; // { id, label }
+
+  const REMINDER_PRIORITIES = {
+    urgent: "Urgent",
+    customer_update: "Customer update",
+    parts: "Parts",
+    repair: "Repair",
+    pickup: "Pickup",
+  };
 
   function setReminders(list) {
     REMINDERS = Array.isArray(list) ? list : [];
@@ -1015,6 +1029,47 @@
     bindReminderFormOnce();
     renderReminders();
     loadReminders();
+    loadReminderTechnicians();
+  }
+
+  async function loadReminderTechnicians() {
+    if (remTechniciansLoaded) return;
+    try {
+      const res = await fetch(INTAKE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ pin: pin(), action: "listTechnicians" }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        REM_TECHNICIANS = (data.technicians || [])
+          .map((t) => String(t.name || "").trim())
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+      }
+    } catch (_) {
+      // Offline / no pin yet — assignee dropdown just stays empty.
+    } finally {
+      remTechniciansLoaded = true;
+      renderReminderAssigneeOptions();
+    }
+  }
+
+  function renderReminderAssigneeOptions() {
+    const formSelect = $("reminderAssignee");
+    if (formSelect) {
+      const current = formSelect.value;
+      formSelect.innerHTML = `<option value="">Unassigned</option>` +
+        REM_TECHNICIANS.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("");
+      formSelect.value = REM_TECHNICIANS.includes(current) ? current : "";
+    }
+    const filterSelect = $("reminderAssigneeFilter");
+    if (filterSelect) {
+      const current = filterSelect.value;
+      filterSelect.innerHTML = `<option value="">Everyone</option>` +
+        REM_TECHNICIANS.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("");
+      filterSelect.value = REM_TECHNICIANS.includes(current) ? current : "";
+    }
   }
 
   function bindReminderFormOnce() {
@@ -1046,6 +1101,114 @@
       });
       renderReminders();
     });
+
+    const searchInput = $("reminderSearch");
+    const clearSearchBtn = $("clearReminderSearch");
+    searchInput?.addEventListener("input", () => {
+      reminderSearchText = searchInput.value.trim().toLowerCase();
+      if (clearSearchBtn) clearSearchBtn.hidden = !reminderSearchText;
+      renderReminders();
+    });
+    clearSearchBtn?.addEventListener("click", () => {
+      if (searchInput) searchInput.value = "";
+      reminderSearchText = "";
+      clearSearchBtn.hidden = true;
+      renderReminders();
+      searchInput?.focus();
+    });
+
+    $("reminderAssigneeFilter")?.addEventListener("change", (event) => {
+      reminderAssigneeFilterValue = event.target.value;
+      renderReminders();
+    });
+
+    $("reminderTitleInput")?.addEventListener("input", checkReminderDuplicate);
+    bindReminderTicketCombobox();
+  }
+
+  // ---- Link-to-ticket combobox in the reminder form ----------------------
+  function bindReminderTicketCombobox() {
+    const input = $("reminderTicketSearch");
+    const dropdown = $("reminderTicketDropdown");
+    const combobox = $("reminderTicketCombobox");
+    const clearBtn = $("clearReminderTicket");
+    if (!input || !dropdown || !combobox) return;
+
+    function ticketMatchLabel(t) {
+      const device = t.device || "Device";
+      const who = t.customerName || "Unknown customer";
+      return `${who} — ${device}`;
+    }
+
+    function closeDropdown() {
+      dropdown.hidden = true;
+      combobox.classList.remove("open");
+      input.setAttribute("aria-expanded", "false");
+    }
+
+    function renderDropdown(query) {
+      const q = query.trim().toLowerCase();
+      const matches = (tickets || [])
+        .filter((t) => !q || [t.customerName, t.device, t.phone, t.id].some((v) => String(v || "").toLowerCase().includes(q)))
+        .slice(0, 8);
+      if (!matches.length) {
+        dropdown.innerHTML = `<div class="device-dropdown-empty">No matching repairs</div>`;
+      } else {
+        dropdown.innerHTML = matches.map((t) => `
+          <button type="button" class="device-option" role="option" data-ticket-id="${esc(t.id)}" data-ticket-label="${esc(ticketMatchLabel(t))}">
+            ${esc(ticketMatchLabel(t))} <span class="rem-notes">#${esc(t.id)}</span>
+          </button>`).join("");
+      }
+      dropdown.hidden = false;
+      combobox.classList.add("open");
+      input.setAttribute("aria-expanded", "true");
+    }
+
+    function selectTicket(id, label) {
+      selectedTicketForReminder = id ? { id, label } : null;
+      input.value = label || "";
+      if (clearBtn) clearBtn.hidden = !id;
+      closeDropdown();
+    }
+    window.RPC_REMINDER_SELECT_TICKET = selectTicket;
+
+    input.addEventListener("input", () => {
+      selectedTicketForReminder = null;
+      if (clearBtn) clearBtn.hidden = true;
+      renderDropdown(input.value);
+    });
+    input.addEventListener("focus", () => renderDropdown(input.value));
+    dropdown.addEventListener("mousedown", (event) => {
+      const item = event.target.closest("[data-ticket-id]");
+      if (!item) return;
+      event.preventDefault();
+      selectTicket(item.dataset.ticketId, item.dataset.ticketLabel);
+    });
+    clearBtn?.addEventListener("click", () => selectTicket("", ""));
+    document.addEventListener("click", (event) => {
+      if (!combobox.contains(event.target)) closeDropdown();
+    });
+  }
+
+  // Warn (don't block) when a very similar open reminder already exists.
+  function checkReminderDuplicate() {
+    const warn = $("reminderDuplicateWarning");
+    if (!warn) return;
+    reminderDuplicateConfirmed = false;
+    const title = ($("reminderTitleInput")?.value || "").trim().toLowerCase();
+    if (title.length < 4) { warn.hidden = true; return; }
+    const match = REMINDERS.find((item) => {
+      if (item.done || item.id === editingReminderId) return false;
+      const existing = (item.title || "").trim().toLowerCase();
+      if (!existing) return false;
+      return existing === title || existing.includes(title) || title.includes(existing);
+    });
+    if (match) {
+      warn.textContent = `A similar open reminder already exists: “${match.title}”.`;
+      warn.hidden = false;
+    } else {
+      warn.hidden = true;
+    }
   }
 
   // Quick due-date picks for staff who don't want to fuss with the datetime
@@ -1061,13 +1224,35 @@
     input.value = toDatetimeLocal(d);
   }
 
+  function resetReminderTicketField(id, label) {
+    selectedTicketForReminder = id ? { id, label } : null;
+    const input = $("reminderTicketSearch");
+    const clearBtn = $("clearReminderTicket");
+    if (input) input.value = label || "";
+    if (clearBtn) clearBtn.hidden = !id;
+    const dropdown = $("reminderTicketDropdown");
+    if (dropdown) dropdown.hidden = true;
+  }
+
+  function resetReminderSubmitLabel() {
+    const submitBtn = $("reminderSubmit");
+    if (submitBtn) submitBtn.textContent = "Save reminder";
+  }
+
   function openNewReminderForm() {
     editingReminderId = null;
+    reminderDuplicateConfirmed = false;
     $("reminderFormTitle").textContent = "Add reminder";
     $("reminderId").value = "";
     $("reminderTitleInput").value = "";
     $("reminderDue").value = "";
     $("reminderNotes").value = "";
+    if ($("reminderPriority")) $("reminderPriority").value = "";
+    if ($("reminderAssignee")) $("reminderAssignee").value = "";
+    resetReminderTicketField("", "");
+    resetReminderSubmitLabel();
+    const warn = $("reminderDuplicateWarning");
+    if (warn) warn.hidden = true;
     const msg = $("reminderMessage");
     if (msg) { msg.hidden = true; msg.textContent = ""; }
     $("reminderFormModal").hidden = false;
@@ -1077,11 +1262,18 @@
   function editReminder(reminder) {
     if (!reminder) return;
     editingReminderId = reminder.id;
+    reminderDuplicateConfirmed = false;
     $("reminderFormTitle").textContent = "Edit reminder";
     $("reminderId").value = reminder.id;
     $("reminderTitleInput").value = reminder.title || "";
     $("reminderDue").value = reminder.dueAt ? toDatetimeLocal(reminder.dueAt) : "";
     $("reminderNotes").value = reminder.notes || "";
+    if ($("reminderPriority")) $("reminderPriority").value = reminder.priority || "";
+    if ($("reminderAssignee")) $("reminderAssignee").value = reminder.assignee || "";
+    resetReminderTicketField(reminder.ticketId || "", reminder.ticketLabel || "");
+    resetReminderSubmitLabel();
+    const warn = $("reminderDuplicateWarning");
+    if (warn) warn.hidden = true;
     const msg = $("reminderMessage");
     if (msg) { msg.hidden = true; msg.textContent = ""; }
     $("reminderFormModal").hidden = false;
@@ -1100,14 +1292,24 @@
       if (msg) { msg.textContent = "Add a reminder title."; msg.hidden = false; }
       return;
     }
+    const warn = $("reminderDuplicateWarning");
+    if (warn && !warn.hidden && !reminderDuplicateConfirmed) {
+      reminderDuplicateConfirmed = true;
+      const submitBtn = $("reminderSubmit");
+      if (submitBtn) submitBtn.textContent = "Save anyway";
+      return;
+    }
     const dueLocal = $("reminderDue")?.value || "";
     const payload = {
       title,
       notes: ($("reminderNotes")?.value || "").trim(),
       dueAt: dueLocal ? new Date(dueLocal).toISOString() : null,
+      priority: $("reminderPriority")?.value || "",
+      assignee: $("reminderAssignee")?.value || "",
+      ticketId: selectedTicketForReminder?.id || "",
+      ticketLabel: selectedTicketForReminder?.label || "",
     };
     const submitBtn = $("reminderSubmit");
-    const originalLabel = submitBtn?.textContent;
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Saving…"; }
     try {
       const data = editingReminderId
@@ -1122,16 +1324,23 @@
       if (msg) { msg.textContent = "Couldn't save the reminder: " + err.message; msg.hidden = false; }
       return;
     } finally {
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalLabel; }
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Save reminder"; }
     }
     closeReminderForm();
     renderReminders();
+    if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Saved");
   }
 
   async function handleReminderListClick(event) {
     const doneBox = event.target.closest("[data-reminder-toggle]");
     const editBtn = event.target.closest("[data-reminder-edit]");
     const deleteBtn = event.target.closest("[data-reminder-delete]");
+    const ticketBtn = event.target.closest("[data-reminder-open-ticket]");
+    if (ticketBtn) {
+      const id = ticketBtn.dataset.reminderOpenTicket;
+      if (typeof window.RPC_OPEN_TICKET_BY_ID === "function") window.RPC_OPEN_TICKET_BY_ID(id);
+      return;
+    }
     if (editBtn && !doneBox) {
       editReminder(REMINDERS.find((item) => item.id === editBtn.dataset.reminderEdit));
       return;
@@ -1185,7 +1394,7 @@
     const d = new Date(iso);
     if (isNaN(d)) return "";
     const diff = calendarDayDiff(d, now);
-    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
     if (diff < 0) {
       const days = Math.abs(diff);
       return `Overdue by ${days} day${days === 1 ? "" : "s"} · ${time}`;
@@ -1225,9 +1434,17 @@
   const REMINDER_SECTION_LABELS = { overdue: "Overdue", today: "Due today", upcoming: "Upcoming", noDue: "No due date", done: "Done" };
 
   function filteredReminders(reminders) {
-    if (reminderFilter === "done") return reminders.filter((item) => item.done);
-    if (reminderFilter === "all") return reminders;
-    return reminders.filter((item) => !item.done);
+    let list = reminders;
+    if (reminderFilter === "done") list = list.filter((item) => item.done);
+    else if (reminderFilter !== "all") list = list.filter((item) => !item.done);
+    if (reminderAssigneeFilterValue) {
+      list = list.filter((item) => item.assignee === reminderAssigneeFilterValue);
+    }
+    if (reminderSearchText) {
+      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority]]
+        .some((v) => String(v || "").toLowerCase().includes(reminderSearchText)));
+    }
+    return list;
   }
 
   function updateReminderFilterChips(counts) {
@@ -1261,6 +1478,18 @@
     const dueLabel = item.done
       ? reminderCompletedLabel(item.doneAt, now)
       : (item.dueAt ? reminderDueLabel(item.dueAt, now) : "");
+    const tags = [];
+    if (item.priority && REMINDER_PRIORITIES[item.priority]) {
+      tags.push(`<span class="rem-tag rem-tag-priority pr-${esc(item.priority)}">${esc(REMINDER_PRIORITIES[item.priority])}</span>`);
+    }
+    if (item.assignee) {
+      tags.push(`<span class="rem-tag rem-tag-assignee"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-user"></use></svg>${esc(item.assignee)}</span>`);
+    }
+    if (item.ticketId) {
+      tags.push(`<button type="button" class="rem-tag rem-tag-ticket" data-reminder-open-ticket="${esc(item.ticketId)}">
+        <svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-clipboard"></use></svg>${esc(item.ticketLabel || "Linked repair")}
+      </button>`);
+    }
     return `
         <article class="rem-item${item.done ? " is-done" : ""}${overdue ? " is-overdue" : ""}">
           <button type="button" class="rem-check" data-reminder-toggle="${esc(item.id)}"
@@ -1268,11 +1497,14 @@
             aria-label="${item.done ? "Mark not done" : "Mark done"}: ${esc(item.title)}">
             <svg class="icon rem-check-mark" aria-hidden="true"><use href="#i-check"></use></svg>
           </button>
-          <button type="button" class="rem-body" data-reminder-edit="${esc(item.id)}" aria-label="Edit ${esc(item.title)}">
-            <span class="rem-title">${esc(item.title)}</span>
-            ${item.notes ? `<span class="rem-notes">${esc(item.notes)}</span>` : ""}
-            ${dueLabel ? `<span class="rem-due">${esc(dueLabel)}</span>` : ""}
-          </button>
+          <div class="rem-body-wrap">
+            <button type="button" class="rem-body" data-reminder-edit="${esc(item.id)}" aria-label="Edit ${esc(item.title)}">
+              <span class="rem-title">${esc(item.title)}</span>
+              ${item.notes ? `<span class="rem-notes">${esc(item.notes)}</span>` : ""}
+              ${dueLabel ? `<span class="rem-due">${esc(dueLabel)}</span>` : ""}
+            </button>
+            ${tags.length ? `<div class="rem-tags">${tags.join("")}</div>` : ""}
+          </div>
           <button type="button" class="rem-delete" data-reminder-delete="${esc(item.id)}" aria-label="Delete ${esc(item.title)}">
             <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
           </button>

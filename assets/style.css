@@ -1091,6 +1091,7 @@ body.nav-open .nav-backdrop { opacity: 1; }
 }
 .inventory-clear-search:hover,
 .inventory-view-btn:hover { background: var(--bg-soft); color: var(--text); }
+.inventory-clear-search[hidden] { display: none; }
 .inventory-view-btn {
   border: 1px solid var(--border);
   background: var(--card);
@@ -2088,9 +2089,9 @@ body.nav-open .view-nav { transform: translateX(0); }
 .rem-item.is-done .rem-check { background: var(--rem-red); border-color: var(--rem-red); }
 .rem-item.is-done .rem-check-mark { opacity: 1; }
 
+.rem-body-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .rem-body {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2137,6 +2138,44 @@ body.nav-open .view-nav { transform: translateX(0); }
 /* Quick due-date presets in the add/edit sheet */
 .reminder-due-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .reminder-due-presets .chip { padding: 6px 12px; font-size: 0.8rem; }
+
+.rem-toolbar { display: flex; gap: 10px; margin-bottom: 12px; }
+.rem-searchbar { flex: 1; min-height: 44px; }
+.rem-searchbar input { min-height: 40px; }
+select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
+
+.field-warning {
+  color: var(--warn);
+  font-size: 0.83rem;
+  margin: 6px 0 0;
+}
+
+.rem-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.rem-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.rem-tag-priority.pr-urgent { background: var(--rem-red-soft); color: var(--rem-red); }
+.rem-tag-priority.pr-customer_update { background: #eff6ff; color: #2563eb; }
+.rem-tag-priority.pr-parts { background: #fff7ed; color: #c2410c; }
+.rem-tag-priority.pr-repair { background: #ecfdf5; color: #059669; }
+.rem-tag-priority.pr-pickup { background: #f5f3ff; color: #7c3aed; }
+.rem-tag-assignee { background: var(--surface-2, #f1f3f6); color: var(--text-dim); }
+.rem-tag-ticket {
+  background: var(--surface-2, #f1f3f6);
+  color: var(--text-dim);
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.rem-tag-ticket:hover { background: var(--rem-red-soft); color: var(--rem-red); }
 
 .leads-workspace { margin-top: 14px; }
 .leads-topbar {
@@ -3232,6 +3271,7 @@ body.nav-open .view-nav { transform: translateX(0); }
   background: var(--accent-soft);
   color: var(--accent);
 }
+.device-dropdown-btn[hidden] { display: none; }
 .device-dropdown-btn .icon {
   width: 16px;
   height: 16px;

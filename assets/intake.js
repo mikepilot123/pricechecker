@@ -172,9 +172,11 @@
   function showView(target) {
     Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
   }
+  const LS_LAST_VIEW = "rpc_last_view";
   function navigateTo(target) {
     setActiveNav(target);
     showView(target);
+    try { localStorage.setItem(LS_LAST_VIEW, target); } catch (_) {}
     if (target === "dashboard") window.dispatchEvent(new Event("rpc-enter-dashboard"));
     if (target === "targets") window.dispatchEvent(new Event("rpc-enter-targets"));
     if (target === "leads") window.dispatchEvent(new Event("rpc-enter-leads"));
@@ -192,6 +194,14 @@
       navigateTo(btn.dataset.target);
       closeNavDrawer();
     });
+  });
+  // Restore whichever tab was open last time, once every module further down
+  // the script list (dashboard.js, appointments.js, ...) has registered its
+  // "rpc-enter-*" listener — DOMContentLoaded fires after all of them run.
+  document.addEventListener("DOMContentLoaded", () => {
+    let saved = null;
+    try { saved = localStorage.getItem(LS_LAST_VIEW); } catch (_) {}
+    if (saved && views[saved]) navigateTo(saved);
   });
 
   // ---- Mobile nav drawer ----------------------------------------------------
@@ -1032,6 +1042,17 @@
     $("ticketModal").hidden = false;
     $("closeTicketModal").focus();
   }
+
+  // Lets other tabs (Reminders) jump straight to a specific repair ticket.
+  async function openTicketById(id) {
+    navigateTo("intake");
+    closeNavDrawer();
+    if (!loadedOnce) await loadTickets();
+    const ticket = TICKETS.find((t) => t.id === id);
+    if (ticket) openTicketModal(ticket);
+    else if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Couldn't find that repair ticket — it may have been deleted.");
+  }
+  window.RPC_OPEN_TICKET_BY_ID = openTicketById;
 
   function closeTicketModal() {
     closeMediaViewer();
