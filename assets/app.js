@@ -34,7 +34,11 @@ const SECTION_RE = /(series|^table\d*$)/i;
 const els = {
   search: document.getElementById("searchInput"),
   clearSearch: document.getElementById("clearSearch"),
-  commonPriceSearches: document.getElementById("commonPriceSearches"),
+  commonSearchSettingsFilter: document.getElementById("commonSearchSettingsFilter"),
+  commonSearchSettingsRefresh: document.getElementById("commonSearchSettingsRefresh"),
+  commonSearchSettingsCount: document.getElementById("commonSearchSettingsCount"),
+  commonSearchSettingsList: document.getElementById("commonSearchSettingsList"),
+  commonSearchSettingsError: document.getElementById("commonSearchSettingsError"),
   chips: document.getElementById("filterChips"),
   pricesView: document.getElementById("view-prices"),
   results: document.getElementById("results"),
@@ -70,8 +74,8 @@ let inventoryLoadInFlight = null;
 let PRICE_OVERRIDES = [];   // catalog rows layered over the sheet (lib/prices.js)
 let COMMON_SEARCHES = [];
 let commonSearchTimer = null;
-let lastTrackedSearchKey = "";
 let commonSearchTrackingInFlight = false;
+let queuedCommonSearchTrack = null;
 
 // --- Price editing state ----------------------------------------------------
 // Edits used to be written back into the Google Sheet through a bound Apps
@@ -487,32 +491,61 @@ function render() {
   }
 }
 
+function formatCommonSearchDate(value) {
+  if (!value) return "Not used yet";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not used yet";
+  return "Last searched " + date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function renderCommonSearches() {
-  if (!els.commonPriceSearches) return;
-  const visible = COMMON_SEARCHES.filter((item) => item && item.query).slice(0, 10);
-  if (!visible.length) {
-    els.commonPriceSearches.hidden = true;
-    els.commonPriceSearches.innerHTML = "";
+  if (!els.commonSearchSettingsList) return;
+  const all = COMMON_SEARCHES.filter((item) => item && item.query);
+  const q = normalizeSearchText(els.commonSearchSettingsFilter?.value || "");
+  const visible = q
+    ? all.filter((item) => normalizeSearchText(`${item.label || ""} ${item.query || ""}`).includes(q))
+    : all;
+  if (els.commonSearchSettingsError) els.commonSearchSettingsError.hidden = true;
+  if (els.commonSearchSettingsCount) {
+    els.commonSearchSettingsCount.textContent = all.length
+      ? `Showing ${visible.length} of ${all.length} search${all.length === 1 ? "" : "es"}`
+      : "";
+  }
+  if (!all.length) {
+    els.commonSearchSettingsList.innerHTML = `
+      <div class="common-search-settings-empty">
+        Searches from the Prices tab will appear here automatically.
+      </div>`;
     return;
   }
-  els.commonPriceSearches.hidden = false;
-  els.commonPriceSearches.innerHTML = `
-    <span class="common-searches-label">Frequently searched</span>
-    <div class="common-searches-list">
+  if (!visible.length) {
+    els.commonSearchSettingsList.innerHTML = `
+      <div class="common-search-settings-empty">
+        No saved searches match this filter.
+      </div>`;
+    return;
+  }
+  els.commonSearchSettingsList.innerHTML = `
       ${visible.map((item) => `
-        <span class="common-search-chip">
-          <button type="button" class="common-search-apply" data-common-search-id="${escapeHtml(item.id)}" data-common-search-query="${escapeHtml(item.query)}">
-            ${escapeHtml(item.label || item.query)}
-            ${item.useCount ? `<span class="common-search-count">${Number(item.useCount)}</span>` : ""}
+        <div class="common-search-settings-row">
+          <button type="button" class="common-search-settings-query" data-common-search-id="${escapeHtml(item.id)}" data-common-search-query="${escapeHtml(item.query)}">
+            <span class="common-search-settings-text">${escapeHtml(item.label || item.query)}</span>
+            <span class="common-search-settings-meta">${escapeHtml(formatCommonSearchDate(item.lastUsedAt || item.updated))}</span>
           </button>
-          <button type="button" class="common-search-delete" data-common-search-delete="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.label || item.query)}">
+          <span class="common-search-settings-count">${Number(item.useCount || 0)}</span>
+          <button type="button" class="common-search-settings-delete" data-common-search-delete="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.label || item.query)}">
             <svg class="icon"><use href="#i-xmark"></use></svg>
           </button>
-        </span>`).join("")}
-    </div>`;
+        </div>`).join("")}`;
 }
 
 function applyCommonSearch(id, query) {
+  if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("prices");
   els.search.value = query || "";
   forceSearchScroll = true;
   render();
@@ -522,7 +555,7 @@ function applyCommonSearch(id, query) {
 function schedulePriceSearchTracking() {
   if (commonSearchTimer) clearTimeout(commonSearchTimer);
   const query = els.search.value.trim().replace(/\s+/g, " ");
-  if (normalizeSearchText(query).length < 3) return;
+  if (!normalizeSearchText(query)) return;
   commonSearchTimer = setTimeout(() => trackPriceSearch(query), 1400);
 }
 
@@ -538,20 +571,24 @@ async function deleteCommonSearch(id) {
     if (!data.ok) throw new Error(data.error || "Couldn't remove search");
     COMMON_SEARCHES = data.commonSearches || [];
     renderCommonSearches();
-    render();
   } catch (err) {
     console.warn("Couldn't delete common search:", err);
+    if (els.commonSearchSettingsError) {
+      els.commonSearchSettingsError.textContent = "Couldn't remove search. Check the connection and try again.";
+      els.commonSearchSettingsError.hidden = false;
+    }
   }
 }
 
 async function trackPriceSearch(query, { id = "", force = false } = {}) {
   const cleanQuery = String(query || "").trim().replace(/\s+/g, " ");
   const key = normalizeSearchText(cleanQuery);
-  if (key.length < 3) return;
-  if (!force && key === lastTrackedSearchKey) return;
-  if (commonSearchTrackingInFlight) return;
+  if (!key) return;
+  if (commonSearchTrackingInFlight) {
+    queuedCommonSearchTrack = { query: cleanQuery, id, force };
+    return;
+  }
   commonSearchTrackingInFlight = true;
-  lastTrackedSearchKey = key;
   try {
     const data = await commonSearchApi({ action: "trackPriceSearch", id, query: cleanQuery });
     if (data.ok) {
@@ -560,9 +597,13 @@ async function trackPriceSearch(query, { id = "", force = false } = {}) {
     }
   } catch (err) {
     console.warn("Couldn't track price search:", err);
-    if (lastTrackedSearchKey === key) lastTrackedSearchKey = "";
   } finally {
     commonSearchTrackingInFlight = false;
+    if (queuedCommonSearchTrack) {
+      const next = queuedCommonSearchTrack;
+      queuedCommonSearchTrack = null;
+      trackPriceSearch(next.query, { id: next.id, force: next.force });
+    }
   }
 }
 
@@ -975,8 +1016,10 @@ els.clearSearch.addEventListener("click", () => {
   els.search.focus();
   render();
 });
-els.commonPriceSearches?.addEventListener("click", (event) => {
-  const applyBtn = event.target.closest("[data-common-search-id]");
+els.commonSearchSettingsFilter?.addEventListener("input", renderCommonSearches);
+els.commonSearchSettingsRefresh?.addEventListener("click", () => loadData({ reason: "common-searches" }));
+els.commonSearchSettingsList?.addEventListener("click", (event) => {
+  const applyBtn = event.target.closest("[data-common-search-query]");
   const deleteBtn = event.target.closest("[data-common-search-delete]");
   if (deleteBtn) {
     deleteCommonSearch(deleteBtn.dataset.commonSearchDelete);

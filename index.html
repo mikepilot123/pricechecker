@@ -123,6 +123,7 @@
         <button type="button" class="appt-subnav-btn" data-settings-panel="technicians" aria-selected="false">Technicians</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="customers" aria-selected="false">Customers</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="prices" aria-selected="false">Prices</button>
+        <button type="button" class="appt-subnav-btn" data-settings-panel="searches" aria-selected="false">Frequent searches</button>
       </div>
       <button class="nav-btn install-app-btn" id="installAppBtn" type="button" hidden><svg class="icon"><use href="#i-download"></use></svg>Install app</button>
     </nav>
@@ -599,8 +600,6 @@
       <button id="clearSearch" class="clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
     </div>
 
-    <div id="commonPriceSearches" class="common-price-searches" hidden></div>
-
     <div id="filterChips" class="filter-chips brand-filter-chips" role="tablist" aria-label="Filter by brand"></div>
     <p id="resultCount" class="result-count"></p>
     <div id="results" class="results" aria-live="polite"></div>
@@ -914,6 +913,7 @@
           <button type="button" class="appt-subnav-btn" data-settings-panel="technicians" role="tab" aria-selected="false">Technicians</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="customers" role="tab" aria-selected="false">Customers</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="prices" role="tab" aria-selected="false">Prices</button>
+          <button type="button" class="appt-subnav-btn" data-settings-panel="searches" role="tab" aria-selected="false">Frequent searches</button>
         </div>
 
         <section class="appt-panel" data-settings-panel-section="general">
@@ -947,6 +947,20 @@
             <p id="customerCount" class="result-count"></p>
             <div id="customerSettingsList" class="customer-list"></div>
             <p id="customerSettingsError" class="field-error" hidden></p>
+          </div>
+        </section>
+
+        <section class="appt-panel" data-settings-panel-section="searches" hidden>
+          <div class="common-search-settings">
+            <p class="field-label">Frequent searches</p>
+            <p class="settings-help">Every Prices search is saved for the team here, with counts to help decide what parts to stock.</p>
+            <div class="common-search-settings-toolbar">
+              <input id="commonSearchSettingsFilter" class="text-input" type="search" autocomplete="off" placeholder="Filter searches…" aria-label="Filter frequent searches" />
+              <button id="commonSearchSettingsRefresh" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
+            </div>
+            <p id="commonSearchSettingsCount" class="result-count"></p>
+            <div id="commonSearchSettingsList" class="common-search-settings-list"></div>
+            <p id="commonSearchSettingsError" class="field-error" hidden></p>
           </div>
         </section>
 
@@ -1633,9 +1647,9 @@
     </div>
   </div>
 
-  <script src="assets/app.js?v=common-searches-2"></script>
+  <script src="assets/app.js?v=common-searches-settings-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=no-fix-status-1"></script>
+  <script src="assets/intake.js?v=common-searches-settings-1"></script>
   <script src="assets/dashboard.js?v=no-fix-status-1"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
