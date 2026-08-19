@@ -1986,6 +1986,25 @@ body.nav-open .view-nav { transform: translateX(0); }
   margin: 4px 0 0;
   color: var(--text-dim);
 }
+.reminder-due-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.reminder-due-presets .chip { padding: 6px 12px; font-size: 0.8rem; }
+
+.reminder-section-heading {
+  margin: 8px 0 -2px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+.reminder-section-heading:first-child { margin-top: 0; }
+.reminder-section-heading .reminder-section-count {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.8;
+}
+
 .reminder-row { align-items: center; }
 .reminder-row-body { flex: 1; min-width: 0; }
 .reminder-checkbox { display: flex; align-items: center; padding-top: 2px; }

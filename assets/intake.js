@@ -234,7 +234,16 @@
   // Create/View split). Switching to "completed" re-fires the load that used to
   // run on navigating to the standalone view, so both halves (check-in tickets
   // here, appointments in assets/appointments.js) stay fresh.
+  //
+  // "Reminders" is a shortcut, not a real Repairs panel — Reminders is its own
+  // top-level view (shared data, own nav entry) so this just jumps there
+  // instead of toggling a data-repairs-panel-section that doesn't exist.
   function setRepairsPanel(panel) {
+    if (panel === "reminders") {
+      navigateTo("reminders");
+      closeNavDrawer();
+      return;
+    }
     document.querySelectorAll("[data-repairs-panel-section]").forEach((section) => {
       section.hidden = section.dataset.repairsPanelSection !== panel;
     });

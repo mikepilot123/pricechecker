@@ -1023,13 +1023,33 @@
       if (event.target.id === "reminderFormModal") closeReminderForm();
     });
 
+    form.querySelectorAll("[data-reminder-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => applyReminderPreset(btn.dataset.reminderPreset));
+    });
+
     $("reminderList")?.addEventListener("click", handleReminderListClick);
     $("reminderFilterChips")?.addEventListener("click", (event) => {
       const chip = event.target.closest("[data-reminder-filter]");
       if (!chip) return;
       reminderFilter = chip.dataset.reminderFilter;
+      document.querySelectorAll("#reminderFilterChips [data-reminder-filter]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.reminderFilter === reminderFilter);
+      });
       renderReminders();
     });
+  }
+
+  // Quick due-date picks for staff who don't want to fuss with the datetime
+  // field — "today" defaults to end of day, "tomorrow"/"week" to morning.
+  function applyReminderPreset(preset) {
+    const input = $("reminderDue");
+    if (!input) return;
+    if (preset === "none") { input.value = ""; return; }
+    const d = new Date();
+    if (preset === "today") d.setHours(17, 0, 0, 0);
+    else if (preset === "tomorrow") { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
+    else if (preset === "week") { d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); }
+    input.value = toDatetimeLocal(d);
   }
 
   function openNewReminderForm() {
@@ -1139,12 +1159,61 @@
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  function formatReminderDue(iso) {
+  function startOfDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function calendarDayDiff(date, now) {
+    return Math.round((startOfDay(date) - startOfDay(now)) / 86400000);
+  }
+
+  // Human-friendly due label: "Today, 5:00 PM" / "Tomorrow, 9:00 AM" /
+  // "Mon, 9:00 AM" within the week / a full date beyond that, with an
+  // "Overdue by N days" lead-in once the due time has passed.
+  function reminderDueLabel(iso, now) {
     const d = new Date(iso);
     if (isNaN(d)) return "";
-    const sameYear = d.getFullYear() === new Date().getFullYear();
-    return d.toLocaleString([], { month: "short", day: "numeric", year: sameYear ? undefined : "numeric", hour: "numeric", minute: "2-digit" });
+    const diff = calendarDayDiff(d, now);
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (diff < 0) {
+      const days = Math.abs(diff);
+      return `Overdue by ${days} day${days === 1 ? "" : "s"} · ${time}`;
+    }
+    if (diff === 0) return `Today, ${time}`;
+    if (diff === 1) return `Tomorrow, ${time}`;
+    if (diff < 7) return `${d.toLocaleDateString([], { weekday: "short" })}, ${time}`;
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return `${d.toLocaleDateString([], { month: "short", day: "numeric", year: sameYear ? undefined : "numeric" })}, ${time}`;
   }
+
+  // "Completed 20 min ago" / "Completed yesterday" / a full date once it's old.
+  function reminderCompletedLabel(iso, now) {
+    if (!iso) return "Completed";
+    const d = new Date(iso);
+    if (isNaN(d)) return "Completed";
+    const minutes = Math.round((now - d) / 60000);
+    if (minutes < 1) return "Completed just now";
+    if (minutes < 60) return `Completed ${minutes} min${minutes === 1 ? "" : "s"} ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `Completed ${hours} hour${hours === 1 ? "" : "s"} ago`;
+    const days = Math.abs(calendarDayDiff(d, now));
+    if (days === 1) return "Completed yesterday";
+    if (days < 7) return `Completed ${days} days ago`;
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return `Completed ${d.toLocaleDateString([], { month: "short", day: "numeric", year: sameYear ? undefined : "numeric" })}`;
+  }
+
+  function reminderBucket(item, now) {
+    if (!item.dueAt) return "noDue";
+    const diff = calendarDayDiff(new Date(item.dueAt), now);
+    if (diff < 0) return "overdue";
+    if (diff === 0) return "today";
+    return "upcoming";
+  }
+
+  const REMINDER_SECTION_LABELS = { overdue: "Overdue", today: "Due today", upcoming: "Upcoming", noDue: "No due date", done: "Done" };
 
   function filteredReminders(reminders) {
     if (reminderFilter === "done") return reminders.filter((item) => item.done);
@@ -1152,44 +1221,103 @@
     return reminders.filter((item) => !item.done);
   }
 
-  function renderReminders() {
-    const list = $("reminderList");
-    const count = $("reminderCount");
-    if (!list && !count) return;
-    const now = Date.now();
-    const reminders = REMINDERS.slice().sort((a, b) => {
-      if (a.done !== b.done) return a.done ? 1 : -1;
-      if (!a.dueAt && !b.dueAt) return 0;
-      if (!a.dueAt) return 1;
-      if (!b.dueAt) return -1;
-      return new Date(a.dueAt) - new Date(b.dueAt);
+  function updateReminderFilterChips(counts) {
+    document.querySelectorAll("#reminderFilterChips [data-reminder-filter]").forEach((btn) => {
+      const key = btn.dataset.reminderFilter;
+      const label = key === "open" ? "Open" : key === "done" ? "Done" : "All";
+      btn.textContent = `${label} (${counts[key] || 0})`;
     });
-    const visible = filteredReminders(reminders);
-    if (count) {
-      count.textContent = reminders.length
-        ? `${visible.length} of ${reminders.length} reminder${reminders.length === 1 ? "" : "s"}`
-        : "No reminders yet";
+  }
+
+  function reminderEmptyStateHtml() {
+    if (reminderFilter === "done") {
+      return emptyStateHtml("i-clock", "Nothing completed yet", "Reminders you mark done will show up here.");
     }
-    if (list) {
-      list.innerHTML = visible.length ? visible.map((item) => {
-        const overdue = !item.done && item.dueAt && new Date(item.dueAt).getTime() < now;
-        return `
+    if (!REMINDERS.length) {
+      return emptyStateHtml("i-alert", "No reminders yet", "Add one to keep the team on track.");
+    }
+    return emptyStateHtml("i-check", "All caught up", "No open reminders right now.");
+  }
+
+  function emptyStateHtml(icon, title, sub) {
+    return `<div class="empty-state">
+      <div class="empty-icon"><svg class="icon"><use href="#${icon}"></use></svg></div>
+      <p class="empty-title">${esc(title)}</p>
+      <p class="empty-sub">${esc(sub)}</p>
+    </div>`;
+  }
+
+  function reminderRowHtml(item, now) {
+    const overdue = !item.done && item.dueAt && new Date(item.dueAt).getTime() < now.getTime();
+    const dueLabel = item.done
+      ? reminderCompletedLabel(item.doneAt, now)
+      : (item.dueAt ? reminderDueLabel(item.dueAt, now) : "");
+    return `
         <article class="ops-row reminder-row${item.done ? " is-done" : ""}${overdue ? " is-overdue" : ""}">
           <label class="reminder-checkbox">
             <input type="checkbox" data-reminder-toggle="${esc(item.id)}" ${item.done ? "checked" : ""} aria-label="Mark reminder done" />
           </label>
           <div class="reminder-row-body">
             <strong>${esc(item.title)}</strong>
-            ${item.dueAt ? `<p class="reminder-due">${overdue ? "Overdue — " : ""}${esc(formatReminderDue(item.dueAt))}</p>` : ""}
+            ${dueLabel ? `<p class="reminder-due">${esc(dueLabel)}</p>` : ""}
             ${item.notes ? `<small>${esc(item.notes)}</small>` : ""}
           </div>
           <div class="ops-row-actions">
             <button type="button" data-reminder-edit="${esc(item.id)}">Edit</button>
             <button type="button" class="danger-text" data-reminder-delete="${esc(item.id)}">Delete</button>
           </div>
-        </article>
-      `; }).join("") : `<p class="ops-empty">${reminders.length ? "No reminders match this filter." : "No reminders yet."}</p>`;
+        </article>`;
+  }
+
+  function renderReminders() {
+    const list = $("reminderList");
+    const count = $("reminderCount");
+    if (!list && !count) return;
+    const now = new Date();
+    const reminders = REMINDERS.slice().sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      if (a.done && b.done) return new Date(b.doneAt || 0) - new Date(a.doneAt || 0);
+      if (!a.dueAt && !b.dueAt) return 0;
+      if (!a.dueAt) return 1;
+      if (!b.dueAt) return -1;
+      return new Date(a.dueAt) - new Date(b.dueAt);
+    });
+    const openCount = reminders.filter((item) => !item.done).length;
+    updateReminderFilterChips({ open: openCount, done: reminders.length - openCount, all: reminders.length });
+
+    const visible = filteredReminders(reminders);
+    if (count) {
+      count.textContent = reminders.length
+        ? `${visible.length} of ${reminders.length} reminder${reminders.length === 1 ? "" : "s"}`
+        : "";
     }
+    if (!list) return;
+
+    if (!visible.length) {
+      list.innerHTML = reminderEmptyStateHtml();
+      return;
+    }
+
+    if (reminderFilter === "done") {
+      list.innerHTML = visible.map((item) => reminderRowHtml(item, now)).join("");
+      return;
+    }
+
+    const buckets = { overdue: [], today: [], upcoming: [], noDue: [], done: [] };
+    visible.forEach((item) => {
+      buckets[item.done ? "done" : reminderBucket(item, now)].push(item);
+    });
+    const order = reminderFilter === "all"
+      ? ["overdue", "today", "upcoming", "noDue", "done"]
+      : ["overdue", "today", "upcoming", "noDue"];
+
+    list.innerHTML = order
+      .filter((key) => buckets[key].length)
+      .map((key) => {
+        const heading = `<p class="reminder-section-heading">${esc(REMINDER_SECTION_LABELS[key])} <span class="reminder-section-count">(${buckets[key].length})</span></p>`;
+        return heading + buckets[key].map((item) => reminderRowHtml(item, now)).join("");
+      })
+      .join("");
   }
 
   window.addEventListener("rpc-enter-reminders", initReminders);
