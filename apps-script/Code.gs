@@ -30,6 +30,8 @@ var STATUSES = [
   "Received",
   "Diagnosing",
   "Waiting for Parts",
+  "Part to be Ordered",
+  "Part Ordered",
   "In Progress",
   "Repaired",
   "Picked Up",

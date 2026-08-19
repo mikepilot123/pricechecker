@@ -36,6 +36,8 @@
     "Received",
     "Diagnosing",
     "Waiting for Parts",
+    "Part to be Ordered",
+    "Part Ordered",
     "In Progress",
     "Repaired",
     "Picked Up",
@@ -45,12 +47,24 @@
     "Received": "st-received",
     "Diagnosing": "st-diagnosing",
     "Waiting for Parts": "st-parts",
+    "Part to be Ordered": "st-parts-needed",
+    "Part Ordered": "st-parts-ordered",
     "In Progress": "st-progress",
     "Repaired": "st-repaired",
     "Picked Up": "st-pickedup",
     "Cancelled": "st-cancelled",
   };
-  const ACTIVE_REPAIR_STATUSES = new Set(["Received", "Diagnosing", "Waiting for Parts", "In Progress"]);
+  const ACTIVE_REPAIR_STATUSES = new Set([
+    "Received",
+    "Diagnosing",
+    "Waiting for Parts",
+    "Part to be Ordered",
+    "Part Ordered",
+    "In Progress",
+  ]);
+  // Every status where the repair is blocked on a part — keep in sync with
+  // lib/tickets.js PARTS_STATUSES.
+  const PARTS_STATUSES = new Set(["Waiting for Parts", "Part to be Ordered", "Part Ordered"]);
 
   // Common issue presets — "Other" reveals a free-text field.
   const ISSUES = [
@@ -234,7 +248,16 @@
   // Create/View split). Switching to "completed" re-fires the load that used to
   // run on navigating to the standalone view, so both halves (check-in tickets
   // here, appointments in assets/appointments.js) stay fresh.
+  //
+  // "Reminders" is a shortcut, not a real Repairs panel — Reminders is its own
+  // top-level view (shared data, own nav entry) so this just jumps there
+  // instead of toggling a data-repairs-panel-section that doesn't exist.
   function setRepairsPanel(panel) {
+    if (panel === "reminders") {
+      navigateTo("reminders");
+      closeNavDrawer();
+      return;
+    }
     document.querySelectorAll("[data-repairs-panel-section]").forEach((section) => {
       section.hidden = section.dataset.repairsPanelSection !== panel;
     });
@@ -2622,7 +2645,12 @@
     filterableStatuses.forEach((s) => (counts[s] = TICKETS.filter((t) => t.status === s).length));
     const select = $("statusFilterSelect");
     if (!select) return;
+    // Cross-status shortcut: every repair still waiting on someone to place
+    // the order, whether it's on the explicit "Part to be Ordered" status or
+    // an older "Waiting for Parts" ticket whose flag was never set.
+    const partsToOrder = TICKETS.filter((t) => t.status !== "Picked Up" && needsPartsOrdered(t)).length;
     const options = [{ key: "all", label: `All (${counts.all})` }]
+      .concat([{ key: "__parts_needed", label: `⚠ Parts to order (${partsToOrder})` }])
       .concat(filterableStatuses.map((status) => ({ key: status, label: `${status} (${counts[status]})` })));
     const current = statusFilter === "__active" ? "all" : statusFilter;
     select.innerHTML = options.map((option) =>
@@ -2637,6 +2665,8 @@
       if (t.status === "Picked Up") return false; // moved to the Completed Repairs tab
       if (statusFilter === "__active") {
         if (!ACTIVE_REPAIR_STATUSES.has(t.status)) return false;
+      } else if (statusFilter === "__parts_needed") {
+        if (!needsPartsOrdered(t)) return false;
       } else if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (!q) return true;
       return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
@@ -2747,8 +2777,31 @@
       : `<span class="ticket-phone no-phone">No number on file</span>`;
   }
 
+  // Whether this ticket is still waiting on someone to actually place the
+  // order. "Part Ordered"/"Part to be Ordered" say it in the status itself;
+  // the older "Waiting for Parts" carries it in the partsOrdered flag.
+  function needsPartsOrdered(t) {
+    if (t.status === "Part Ordered") return false;
+    if (t.status === "Part to be Ordered") return true;
+    return t.status === "Waiting for Parts" && !t.partsOrdered;
+  }
+
   function showsPartsAlert(t) {
-    return t.status === "Waiting for Parts" && !t.partsOrdered && daysSince(t.waitingForPartsSince) >= PARTS_ALERT_DAYS;
+    return needsPartsOrdered(t) && daysSince(t.waitingForPartsSince) >= PARTS_ALERT_DAYS;
+  }
+
+  // One tap from "this needs a part" to "the part is on its way". On the
+  // explicit statuses that means moving the status; on the older flag-based
+  // "Waiting for Parts" it means setting the flag.
+  function markPartsOrdered(t) {
+    if (t.status === "Part to be Ordered") return setStatus(t, "Part Ordered");
+    return setPartsOrdered(t, true);
+  }
+
+  function togglePartsOrdered(t) {
+    if (needsPartsOrdered(t)) return markPartsOrdered(t);
+    if (t.status === "Part Ordered") return setStatus(t, "Part to be Ordered");
+    return setPartsOrdered(t, false);
   }
 
   // The red "waiting on parts" strip under a ticket's head, or null when the
@@ -2764,7 +2817,7 @@
       <button type="button" class="ticket-parts-alert-btn">Mark ordered</button>`;
     alert.querySelector(".ticket-parts-alert-btn").onclick = (e) => {
       e.stopPropagation();
-      setPartsOrdered(t, true);
+      markPartsOrdered(t);
     };
     return alert;
   }
@@ -2783,9 +2836,10 @@
     const technicianLabel = t.technician ? `Assigned to ${t.technician}` : "Assign technician";
     const phoneLine = ticketPhoneLineHtml(t);
     const deviceIcon = deviceTypeIcon(t.device);
-    const partsBtnHtml = t.status === "Waiting for Parts"
-      ? `<button type="button" class="ticket-parts-btn${t.partsOrdered ? " is-ordered" : ""}" data-parts-toggle aria-pressed="${t.partsOrdered ? "true" : "false"}">
-          <svg class="icon"><use href="#${t.partsOrdered ? "i-check" : "i-tools"}"></use></svg>${t.partsOrdered ? "Parts ordered" : "Mark parts ordered"}
+    const partsPending = needsPartsOrdered(t);
+    const partsBtnHtml = PARTS_STATUSES.has(t.status)
+      ? `<button type="button" class="ticket-parts-btn${partsPending ? "" : " is-ordered"}" data-parts-toggle aria-pressed="${partsPending ? "false" : "true"}">
+          <svg class="icon"><use href="#${partsPending ? "i-tools" : "i-check"}"></use></svg>${partsPending ? "Mark parts ordered" : "Parts ordered"}
         </button>`
       : "";
     const identityHtml = compact
@@ -2834,7 +2888,7 @@
     if (partsBtn) {
       partsBtn.onclick = (e) => {
         e.stopPropagation();
-        setPartsOrdered(t, !t.partsOrdered);
+        togglePartsOrdered(t);
       };
       partsBtn.onkeydown = (e) => e.stopPropagation();
     }

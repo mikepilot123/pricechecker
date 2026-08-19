@@ -1986,15 +1986,157 @@ body.nav-open .view-nav { transform: translateX(0); }
   margin: 4px 0 0;
   color: var(--text-dim);
 }
-.reminder-row { align-items: center; }
-.reminder-row-body { flex: 1; min-width: 0; }
-.reminder-checkbox { display: flex; align-items: center; padding-top: 2px; }
-.reminder-checkbox input { width: 18px; height: 18px; accent-color: var(--accent, #2563eb); cursor: pointer; }
-.reminder-row.is-done .reminder-row-body strong { text-decoration: line-through; color: var(--text-dim); }
-.reminder-row.is-done { opacity: 0.68; }
-.reminder-due { color: var(--text-dim); }
-.reminder-row.is-overdue { border-color: var(--danger); }
-.reminder-row.is-overdue .reminder-due { color: var(--danger); font-weight: 500; }
+/* ---------- Reminders (Apple Reminders-style list) ----------
+   Flat rows on one card with hairline separators, a round tap-to-complete
+   circle on the left, and red reserved for the things that are late. */
+:root {
+  --rem-red: #dc2626;
+  --rem-red-soft: #fef2f2;
+}
+
+/* Red clock in the sidebar — these sit after .nav-btn .icon / .nav-btn.active
+   .icon in the cascade, so the equal-specificity rules below win on order. */
+.nav-btn .icon-reminders,
+.nav-btn.active .icon-reminders { color: var(--rem-red); }
+
+.reminders-page { max-width: min(760px, 100%); margin: 0 auto; }
+.rem-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+.rem-page-title-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rem-page-icon { width: 26px; height: 26px; flex: none; color: var(--rem-red); }
+.rem-page-title { margin: 0; font-size: 1.55rem; font-weight: 700; letter-spacing: -0.01em; }
+.rem-page-count { font-size: 1.3rem; font-weight: 600; color: var(--text-dim); }
+.rem-page-sub { margin: 0 0 16px; font-size: 0.88rem; color: var(--text-dim); }
+
+/* Segmented control (Open / Done / All) */
+.rem-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 18px;
+  background: #e9ecf1;
+  border-radius: 10px;
+}
+.rem-seg-btn {
+  min-width: 84px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rem-seg-btn:hover { color: var(--text); }
+.rem-seg-btn.active {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.16);
+}
+
+/* Grouped sections */
+.rem-group + .rem-group { margin-top: 24px; }
+.rem-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px 2px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.rem-group-count { font-size: 0.88rem; font-weight: 600; color: var(--text-dim); }
+.rem-group.is-overdue-group .rem-group-title { color: var(--rem-red); }
+.rem-group.is-overdue-group .rem-group-count { color: var(--rem-red); opacity: 0.75; }
+
+.rem-group-items {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* Rows */
+.rem-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 10px 12px 14px; }
+.rem-item + .rem-item { border-top: 1px solid var(--border); }
+.rem-item:hover { background: #fafbfd; }
+
+.rem-check {
+  flex: none;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 1.6px solid #c3cad6;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.rem-check:hover { border-color: var(--rem-red); }
+.rem-check-mark { width: 13px; height: 13px; color: #fff; opacity: 0; stroke-width: 3.2; }
+.rem-item.is-overdue .rem-check { border-color: var(--rem-red); }
+.rem-item.is-done .rem-check { background: var(--rem-red); border-color: var(--rem-red); }
+.rem-item.is-done .rem-check-mark { opacity: 1; }
+
+.rem-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rem-title { font-size: 0.95rem; color: var(--text); overflow-wrap: anywhere; }
+.rem-notes { font-size: 0.84rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.rem-due { font-size: 0.82rem; color: var(--text-dim); }
+.rem-item.is-overdue .rem-due { color: var(--rem-red); font-weight: 600; }
+/* Completed items stay readable but recede — Apple dims rather than strikes. */
+.rem-item.is-done .rem-title { color: var(--text-dim); }
+
+.rem-delete {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #9aa4b2;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.rem-delete .icon { width: 16px; height: 16px; }
+.rem-item:hover .rem-delete,
+.rem-delete:focus-visible { opacity: 1; }
+.rem-delete:hover { color: var(--rem-red); background: var(--rem-red-soft); }
+/* Touch devices never hover, so the control has to stay put. */
+@media (hover: none) { .rem-delete { opacity: 1; } }
+
+.rem-empty { padding: 44px 20px; }
+.rem-empty-icon { color: var(--rem-red); background: var(--rem-red-soft); }
+
+/* Quick due-date presets in the add/edit sheet */
+.reminder-due-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.reminder-due-presets .chip { padding: 6px 12px; font-size: 0.8rem; }
 
 .leads-workspace { margin-top: 14px; }
 .leads-topbar {
@@ -3805,6 +3947,21 @@ body.nav-open .view-nav { transform: translateX(0); }
   --status-border: #f3d9a7;
   --status-ink: #a85f12;
   --status-dot: #c8791a;
+}
+/* Part to be Ordered reads as blocking (red); Part Ordered as in-flight
+   (blue) — so a glance at the board separates "someone must act" from
+   "we're waiting on the courier". */
+.st-parts-needed {
+  --status-bg: #fff5f4;
+  --status-border: #f6c9c4;
+  --status-ink: #c0341f;
+  --status-dot: #d0402a;
+}
+.st-parts-ordered {
+  --status-bg: #eef4ff;
+  --status-border: #cbd9f5;
+  --status-ink: #2b52b8;
+  --status-dot: #3560c9;
 }
 .st-progress {
   --status-bg: #ecfdf5;
