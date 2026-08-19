@@ -114,7 +114,7 @@
         <button type="button" class="appt-subnav-btn" data-targets-panel="goals" aria-selected="false">Goals &amp; actions</button>
       </div>
       <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
-      <button class="nav-btn" data-target="reminders" role="tab" aria-selected="false"><svg class="icon"><use href="#i-alert"></use></svg>Reminders</button>
+      <button class="nav-btn" data-target="reminders" role="tab" aria-selected="false"><svg class="icon icon-reminders"><use href="#i-clock"></use></svg>Reminders</button>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Settings sections">
         <button type="button" class="appt-subnav-btn active" data-settings-panel="general" aria-selected="true">General</button>
@@ -473,27 +473,25 @@
 
   <!-- ============ REMINDERS VIEW ============ -->
   <main class="container view" id="view-reminders" hidden>
-    <p class="info-banner">Shared staff to-do list — reminders sync across every device.</p>
-
-    <section class="expenses-workspace" aria-labelledby="remindersTitle">
-      <div class="leads-topbar expenses-topbar">
-        <div class="filter-chips" id="reminderFilterChips" role="tablist" aria-label="Filter reminders">
-          <button type="button" class="chip active" data-reminder-filter="open">Open</button>
-          <button type="button" class="chip" data-reminder-filter="done">Done</button>
-          <button type="button" class="chip" data-reminder-filter="all">All</button>
+    <section class="reminders-page" aria-labelledby="remindersTitle">
+      <header class="rem-page-head">
+        <div class="rem-page-title-wrap">
+          <svg class="icon rem-page-icon" aria-hidden="true"><use href="#i-clock"></use></svg>
+          <h2 id="remindersTitle" class="rem-page-title">Reminders</h2>
+          <span class="rem-page-count" id="reminderCount"></span>
         </div>
-        <button type="button" id="reminderNewBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add reminder</button>
+        <button type="button" id="reminderNewBtn" class="primary-btn rem-add-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add reminder</button>
+      </header>
+
+      <p class="rem-page-sub">Shared staff to-do list — synced across every device.</p>
+
+      <div class="rem-segmented" id="reminderFilterChips" role="tablist" aria-label="Filter reminders">
+        <button type="button" class="rem-seg-btn active" data-reminder-filter="open" role="tab" aria-selected="true">Open</button>
+        <button type="button" class="rem-seg-btn" data-reminder-filter="done" role="tab" aria-selected="false">Done</button>
+        <button type="button" class="rem-seg-btn" data-reminder-filter="all" role="tab" aria-selected="false">All</button>
       </div>
 
-      <div class="leads-heading-row expenses-heading-row">
-        <div>
-          <p class="dashboard-eyebrow">Reminders</p>
-          <h2 id="remindersTitle">Staff to-do list</h2>
-        </div>
-      </div>
-
-      <p id="reminderCount" class="result-count"></p>
-      <div id="reminderList" class="ops-list reminder-list" aria-live="polite"></div>
+      <div id="reminderList" class="rem-list" aria-live="polite"></div>
     </section>
   </main>
 
@@ -1604,8 +1602,8 @@
 
   <script src="assets/app.js?v=price-catalog-1"></script>
   <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=reminders-subnav-1"></script>
-  <script src="assets/dashboard.js?v=reminders-2"></script>
+  <script src="assets/intake.js?v=parts-status-1"></script>
+  <script src="assets/dashboard.js?v=reminders-3"></script>
   <script src="assets/appointments.js?v=completed-search-1"></script>
   <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script src="assets/parts-checker.js?v=parts-checker-12"></script>

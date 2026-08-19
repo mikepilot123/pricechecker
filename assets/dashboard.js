@@ -21,7 +21,14 @@
     { title: "Review repairs waiting more than 5 days", status: "todo", notes: "Move each ticket to its next clear step." },
     { title: "Check low-stock repair parts before closing", status: "done", notes: "Confirm parts needed for tomorrow." },
   ];
-  const ACTIVE_STATUSES = new Set(["Received", "Diagnosing", "Waiting for Parts", "In Progress"]);
+  const ACTIVE_STATUSES = new Set([
+    "Received",
+    "Diagnosing",
+    "Waiting for Parts",
+    "Part to be Ordered",
+    "Part Ordered",
+    "In Progress",
+  ]);
   const FINAL_STATUSES = new Set(["Picked Up", "Cancelled"]);
   const $ = (id) => document.getElementById(id);
 
@@ -1033,7 +1040,9 @@
       if (!chip) return;
       reminderFilter = chip.dataset.reminderFilter;
       document.querySelectorAll("#reminderFilterChips [data-reminder-filter]").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.reminderFilter === reminderFilter);
+        const active = btn.dataset.reminderFilter === reminderFilter;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
       });
       renderReminders();
     });
@@ -1120,10 +1129,10 @@
   }
 
   async function handleReminderListClick(event) {
+    const doneBox = event.target.closest("[data-reminder-toggle]");
     const editBtn = event.target.closest("[data-reminder-edit]");
     const deleteBtn = event.target.closest("[data-reminder-delete]");
-    const doneBox = event.target.closest("[data-reminder-toggle]");
-    if (editBtn) {
+    if (editBtn && !doneBox) {
       editReminder(REMINDERS.find((item) => item.id === editBtn.dataset.reminderEdit));
       return;
     }
@@ -1231,17 +1240,17 @@
 
   function reminderEmptyStateHtml() {
     if (reminderFilter === "done") {
-      return emptyStateHtml("i-clock", "Nothing completed yet", "Reminders you mark done will show up here.");
+      return emptyStateHtml("i-clock", "Nothing completed yet", "Reminders you tick off show up here.");
     }
     if (!REMINDERS.length) {
-      return emptyStateHtml("i-alert", "No reminders yet", "Add one to keep the team on track.");
+      return emptyStateHtml("i-clock", "No reminders yet", "Add one to keep the team on track.");
     }
     return emptyStateHtml("i-check", "All caught up", "No open reminders right now.");
   }
 
   function emptyStateHtml(icon, title, sub) {
-    return `<div class="empty-state">
-      <div class="empty-icon"><svg class="icon"><use href="#${icon}"></use></svg></div>
+    return `<div class="empty-state rem-empty">
+      <div class="empty-icon rem-empty-icon"><svg class="icon"><use href="#${icon}"></use></svg></div>
       <p class="empty-title">${esc(title)}</p>
       <p class="empty-sub">${esc(sub)}</p>
     </div>`;
@@ -1253,19 +1262,20 @@
       ? reminderCompletedLabel(item.doneAt, now)
       : (item.dueAt ? reminderDueLabel(item.dueAt, now) : "");
     return `
-        <article class="ops-row reminder-row${item.done ? " is-done" : ""}${overdue ? " is-overdue" : ""}">
-          <label class="reminder-checkbox">
-            <input type="checkbox" data-reminder-toggle="${esc(item.id)}" ${item.done ? "checked" : ""} aria-label="Mark reminder done" />
-          </label>
-          <div class="reminder-row-body">
-            <strong>${esc(item.title)}</strong>
-            ${dueLabel ? `<p class="reminder-due">${esc(dueLabel)}</p>` : ""}
-            ${item.notes ? `<small>${esc(item.notes)}</small>` : ""}
-          </div>
-          <div class="ops-row-actions">
-            <button type="button" data-reminder-edit="${esc(item.id)}">Edit</button>
-            <button type="button" class="danger-text" data-reminder-delete="${esc(item.id)}">Delete</button>
-          </div>
+        <article class="rem-item${item.done ? " is-done" : ""}${overdue ? " is-overdue" : ""}">
+          <button type="button" class="rem-check" data-reminder-toggle="${esc(item.id)}"
+            role="checkbox" aria-checked="${item.done ? "true" : "false"}"
+            aria-label="${item.done ? "Mark not done" : "Mark done"}: ${esc(item.title)}">
+            <svg class="icon rem-check-mark" aria-hidden="true"><use href="#i-check"></use></svg>
+          </button>
+          <button type="button" class="rem-body" data-reminder-edit="${esc(item.id)}" aria-label="Edit ${esc(item.title)}">
+            <span class="rem-title">${esc(item.title)}</span>
+            ${item.notes ? `<span class="rem-notes">${esc(item.notes)}</span>` : ""}
+            ${dueLabel ? `<span class="rem-due">${esc(dueLabel)}</span>` : ""}
+          </button>
+          <button type="button" class="rem-delete" data-reminder-delete="${esc(item.id)}" aria-label="Delete ${esc(item.title)}">
+            <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
+          </button>
         </article>`;
   }
 
@@ -1286,11 +1296,8 @@
     updateReminderFilterChips({ open: openCount, done: reminders.length - openCount, all: reminders.length });
 
     const visible = filteredReminders(reminders);
-    if (count) {
-      count.textContent = reminders.length
-        ? `${visible.length} of ${reminders.length} reminder${reminders.length === 1 ? "" : "s"}`
-        : "";
-    }
+    // Apple-style: a single count beside the list title, not a sentence.
+    if (count) count.textContent = visible.length ? String(visible.length) : "";
     if (!list) return;
 
     if (!visible.length) {
@@ -1299,7 +1306,7 @@
     }
 
     if (reminderFilter === "done") {
-      list.innerHTML = visible.map((item) => reminderRowHtml(item, now)).join("");
+      list.innerHTML = `<div class="rem-group-items">${visible.map((item) => reminderRowHtml(item, now)).join("")}</div>`;
       return;
     }
 
@@ -1313,10 +1320,11 @@
 
     list.innerHTML = order
       .filter((key) => buckets[key].length)
-      .map((key) => {
-        const heading = `<p class="reminder-section-heading">${esc(REMINDER_SECTION_LABELS[key])} <span class="reminder-section-count">(${buckets[key].length})</span></p>`;
-        return heading + buckets[key].map((item) => reminderRowHtml(item, now)).join("");
-      })
+      .map((key) => `
+        <section class="rem-group${key === "overdue" ? " is-overdue-group" : ""}">
+          <h3 class="rem-group-title">${esc(REMINDER_SECTION_LABELS[key])}<span class="rem-group-count">${buckets[key].length}</span></h3>
+          <div class="rem-group-items">${buckets[key].map((item) => reminderRowHtml(item, now)).join("")}</div>
+        </section>`)
       .join("");
   }
 
