@@ -2707,7 +2707,7 @@
 
   function currentList() {
     const q = $("intakeSearch").value.trim().toLowerCase();
-    return TICKETS.filter((t) => {
+    const list = TICKETS.filter((t) => {
       if (t.status === "Picked Up" || t.status === "No Fix") return false; // moved to the Completed Repairs tab
       if (statusFilter === "__active") {
         if (!ACTIVE_REPAIR_STATUSES.has(t.status)) return false;
@@ -2719,6 +2719,11 @@
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
+    // Newest logged device first — TICKETS itself comes from the API sorted
+    // by updated_at, which would otherwise bump a device to the top just for
+    // getting a status change, not for being new.
+    list.sort((a, b) => (new Date(b.created).getTime() || 0) - (new Date(a.created).getTime() || 0));
+    return list;
   }
 
   // "Completed" shows Picked Up tickets (alongside completed appointments);
