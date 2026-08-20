@@ -4098,6 +4098,29 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   color: var(--accent);
   outline: none;
 }
+.ticket-due-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 190px;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ticket-due-pill .icon { width: 13px; height: 13px; flex: none; }
+.ticket-due-pill.is-alert {
+  border-color: #f2c6c0;
+  background: #fff5f5;
+  color: var(--danger);
+}
 .ticket-edit-btn { margin-top: 12px; }
 .ticket-client-btn { margin-top: 12px; margin-left: 8px; }
 .ticket-delete-btn { margin-top: 12px; margin-left: 8px; color: var(--danger); }
@@ -4128,7 +4151,8 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .ticket-parts-btn.is-ordered:hover,
 .ticket-parts-btn.is-ordered:focus-visible { border-color: #047857; background: #ddf7ec; }
 
-.ticket-parts-alert {
+.ticket-parts-alert,
+.ticket-repair-alert {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4139,8 +4163,10 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   font-size: 0.85rem;
   font-weight: 500;
 }
-.ticket-parts-alert .icon { width: 16px; height: 16px; flex: none; }
-.ticket-parts-alert span { flex: 1; min-width: 0; }
+.ticket-parts-alert .icon,
+.ticket-repair-alert .icon { width: 16px; height: 16px; flex: none; }
+.ticket-parts-alert span,
+.ticket-repair-alert span { flex: 1; min-width: 0; }
 .ticket-parts-alert-btn {
   flex: none;
   border: 1px solid #f2c6c0;
@@ -4155,7 +4181,8 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .ticket-parts-alert-btn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
 /* Draw the card's left border in red (overriding its status color) while a
    parts reminder is showing, so it stands out at a glance in the list. */
-.ticket.has-parts-alert { --status-dot: var(--danger); }
+.ticket.has-parts-alert,
+.ticket.has-repair-alert { --status-dot: var(--danger); }
 
 /* ---------- Grouped check-in card (one client, several devices) ----------
    Devices dropped off together are saved as separate tickets but share one
@@ -4184,7 +4211,8 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   border-top: 1px solid var(--border);
   border-left: 4px solid var(--status-dot, var(--border));
 }
-.ticket-group-item.has-parts-alert { --status-dot: var(--danger); }
+.ticket-group-item.has-parts-alert,
+.ticket-group-item.has-repair-alert { --status-dot: var(--danger); }
 .ticket-head-compact { min-height: 88px; }
 @media (max-width: 559px) {
   .ticket-group-head { padding: 14px; }
@@ -4492,6 +4520,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .ticket-detail-value { min-width: 0; text-align: right; font-weight: 500; overflow-wrap: anywhere; }
 .ticket-detail-value.money-positive { color: var(--price); }
 .ticket-detail-value.money-due { color: var(--danger); }
+.ticket-detail-value.repair-due-alert-text { color: var(--danger); }
 .ticket-detail-value .ticket-tel { font-size: inherit; }
 .ticket-detail-edit-btn { width: 28px; height: 28px; padding: 0; flex: none; }
 .ticket-detail-edit-btn .icon { width: 14px; height: 14px; }

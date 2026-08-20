@@ -978,6 +978,7 @@
     phone: { type: "tel", required: false },
     email: { type: "email", required: false },
     device: { type: "text", required: true },
+    repairDueDate: { type: "date", required: false },
     repairCost: { type: "number", required: false },
     amountPaid: { type: "number", required: false },
   };
@@ -988,6 +989,7 @@
       case "phone": return ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—";
       case "email": return ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—";
       case "device": return esc(ticket.device || "—");
+      case "repairDueDate": return esc(repairDueDateLabel(ticket.repairDueDate));
       case "repairCost": return formatMoney(ticket.repairCost);
       case "amountPaid": return formatMoney(ticket.amountPaid);
       default: return "—";
@@ -1018,6 +1020,7 @@
         ${detailRow("i-mail", "Email", fieldDisplayHtml("email", ticket), "", "email")}
         ${detailRow("i-device", "Device", fieldDisplayHtml("device", ticket), "", "device")}
         ${detailRow("i-user", "Technician", esc(technician))}
+        ${detailRow("i-calendar", "Due date", fieldDisplayHtml("repairDueDate", ticket), repairCheckAlertReason(ticket) ? "repair-due-alert-text" : "", "repairDueDate")}
         ${detailRow("i-tools", "Stock used", esc(ticket.inventoryItemLabel || "No stock item used"))}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
@@ -1104,7 +1107,11 @@
   function renderDetailRowStatic(rowEl, field) {
     if (!rowEl || !currentModalTicket) return;
     rowEl.querySelector(".ticket-detail-value")?.remove();
-    const valueClass = field === "repairCost" || field === "amountPaid" ? "money-positive" : "";
+    const valueClass = field === "repairCost" || field === "amountPaid"
+      ? "money-positive"
+      : field === "repairDueDate" && repairCheckAlertReason(currentModalTicket)
+        ? "repair-due-alert-text"
+        : "";
     rowEl.insertAdjacentHTML("beforeend", detailValueHtml(fieldDisplayHtml(field, currentModalTicket), valueClass, field));
     // Balance due has no pencil of its own — it's derived from these two
     // fields, so it must be recomputed whenever either one saves, or it's
@@ -1131,6 +1138,7 @@
     phone: "Phone",
     email: "Email",
     device: "Device",
+    repairDueDate: "Due date",
     repairCost: "Repair cost",
     amountPaid: "Amount paid",
   };
@@ -1701,6 +1709,7 @@
       status: $("fStatus").value,
       inventoryItemKey: $("fInventoryItem").value,
       inventoryItemLabel: $("fInventoryItem").value && inventoryOption ? inventoryOption.textContent : "",
+      repairDueDate: $("fRepairDueDate").value,
       notes: $("fNotes").value.trim(),
       media: pendingFormMedia.slice(),
       repairCost: "",
@@ -1711,6 +1720,7 @@
     // moved to the device entry above) so staff can fill in the next device.
     $("fDevice").value = "";
     $("fStatus").value = "Received";
+    $("fRepairDueDate").value = "";
     $("fNotes").value = "";
     setIssueTags("");
     pendingFormMedia = [];
@@ -1741,6 +1751,7 @@
       $("fAmountPaid").value.trim() ||
       pendingFormMedia.length ||
       $("fStatus").value !== "Received"
+      || $("fRepairDueDate").value
     );
   }
 
@@ -1770,6 +1781,7 @@
     resetPendingFormMedia();
     $("fDevice").value = previous.device || "";
     $("fStatus").value = previous.status || "Received";
+    $("fRepairDueDate").value = previous.repairDueDate || "";
     $("fNotes").value = previous.notes || "";
     $("fRepairCost").value = previous.repairCost || "";
     $("fAmountPaid").value = previous.amountPaid || "";
@@ -1845,6 +1857,7 @@
     $("fEmail").value = ticket ? ticket.email || "" : "";
     $("fDevice").value = ticket ? ticket.device || "" : "";
     $("fStatus").value = ticket ? ticket.status || "Received" : "Received";
+    $("fRepairDueDate").value = ticket ? ticket.repairDueDate || "" : "";
     $("fNotes").value = ticket ? ticket.notes || "" : "";
     $("fRepairCost").value = ticket ? ticket.repairCost ?? "" : "";
     $("fAmountPaid").value = ticket ? ticket.amountPaid ?? "" : "";
@@ -2360,6 +2373,7 @@
         issues: currentIssuesStr,
         issue: currentIssuesStr,
         status: $("fStatus").value,
+        repairDueDate: $("fRepairDueDate").value,
         notes: $("fNotes").value.trim(),
         repairCost: $("fRepairCost").value.trim(),
         amountPaid: $("fAmountPaid").value.trim(),
@@ -2399,6 +2413,7 @@
       issues: d.issues,
       status: d.status,
       inventoryItemKey: d.inventoryItemKey,
+      repairDueDate: d.repairDueDate || "",
       notes: d.notes,
       media: d.media || [],
       repairCost: ($("devRepairCost_" + i)?.value ?? d.repairCost ?? "").toString().trim(),
@@ -2409,6 +2424,7 @@
         device: currentDeviceValue,
         issues: currentIssuesStr,
         status: $("fStatus").value,
+        repairDueDate: $("fRepairDueDate").value,
         inventoryItemKey: $("fInventoryItem").value,
         notes: $("fNotes").value.trim(),
         media: pendingFormMedia.slice(),
@@ -2443,6 +2459,7 @@
           issues: dev.issues,
           issue: dev.issues,
           status: dev.status,
+          repairDueDate: dev.repairDueDate,
           notes: [invoiceNote, dev.notes].filter(Boolean).join("\n"),
           repairCost: dev.repairCost,
           amountPaid: dev.amountPaid,
@@ -2792,6 +2809,40 @@
     return Math.floor((Date.now() - then) / 86400000);
   }
 
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function repairDueDateLabel(value) {
+    if (!value) return "No due date";
+    const d = new Date(value + "T12:00:00");
+    if (isNaN(d)) return value;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function isActiveRepair(ticket) {
+    return ACTIVE_REPAIR_STATUSES.has(ticket.status);
+  }
+
+  function isRepairDueDatePast(ticket) {
+    return isActiveRepair(ticket) && !!ticket.repairDueDate && ticket.repairDueDate < todayKey();
+  }
+
+  function repairCheckAlertReason(ticket) {
+    if (!isActiveRepair(ticket)) return "";
+    if (isRepairDueDatePast(ticket)) return "due";
+    return daysSince(ticket.created) >= 1 ? "age" : "";
+  }
+
+  function repairDuePillHtml(ticket) {
+    if (!ticket.repairDueDate) return "";
+    const alert = !!repairCheckAlertReason(ticket);
+    return `<span class="ticket-due-pill${alert ? " is-alert" : ""}">
+      <svg class="icon"><use href="#i-calendar"></use></svg>${esc(repairDueDateLabel(ticket.repairDueDate))}
+    </span>`;
+  }
+
   const PARTS_ALERT_DAYS = 3;
 
   function ticketPhoneLineHtml(t) {
@@ -2845,6 +2896,21 @@
     return alert;
   }
 
+  function repairCheckAlertEl(t) {
+    const reason = repairCheckAlertReason(t);
+    if (!reason) return null;
+    const openDays = daysSince(t.created);
+    const alert = document.createElement("div");
+    alert.className = "ticket-repair-alert";
+    const text = reason === "due"
+      ? `Repair due date passed (${repairDueDateLabel(t.repairDueDate)}) — reminder added to check it out.`
+      : `Open for ${openDays} day${openDays === 1 ? "" : "s"} — reminder added to check it out.`;
+    alert.innerHTML = `
+      <svg class="icon"><use href="#i-alert"></use></svg>
+      <span>${esc(text)}</span>`;
+    return alert;
+  }
+
   // Builds one ticket's clickable head row, with every control wired up.
   // `compact` drops the customer name and phone and leads with the device
   // instead — used for the device rows of a grouped check-in card, where the
@@ -2860,6 +2926,7 @@
     const phoneLine = ticketPhoneLineHtml(t);
     const deviceIcon = deviceTypeIcon(t.device);
     const partsPending = needsPartsOrdered(t);
+    const duePill = repairDuePillHtml(t);
     const partsBtnHtml = PARTS_STATUSES.has(t.status)
       ? `<button type="button" class="ticket-parts-btn${partsPending ? "" : " is-ordered"}" data-parts-toggle aria-pressed="${partsPending ? "false" : "true"}">
           <svg class="icon"><use href="#${partsPending ? "i-tools" : "i-check"}"></use></svg>${partsPending ? "Mark parts ordered" : "Parts ordered"}
@@ -2890,6 +2957,7 @@
       <div class="ticket-status">
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
         ${partsBtnHtml}
+        ${duePill}
         <button type="button" class="ticket-tech-btn" aria-label="${esc(technicianLabel)}">${esc(technicianLabel)}</button>
       </div>
       <div class="ticket-activity">
@@ -2948,7 +3016,10 @@
     const el = document.createElement("div");
     el.className = `ticket ${STATUS_CLASS[t.status] || "st-received"}`;
     if (showsPartsAlert(t)) el.classList.add("has-parts-alert");
+    if (repairCheckAlertReason(t)) el.classList.add("has-repair-alert");
     el.appendChild(ticketHead(t));
+    const repairAlert = repairCheckAlertEl(t);
+    if (repairAlert) el.appendChild(repairAlert);
     const alert = partsAlertEl(t);
     if (alert) el.appendChild(alert);
     return el;
@@ -2980,7 +3051,10 @@
       const row = document.createElement("div");
       row.className = `ticket-group-item ${STATUS_CLASS[t.status] || "st-received"}`;
       if (showsPartsAlert(t)) row.classList.add("has-parts-alert");
+      if (repairCheckAlertReason(t)) row.classList.add("has-repair-alert");
       row.appendChild(ticketHead(t, { compact: true }));
+      const repairAlert = repairCheckAlertEl(t);
+      if (repairAlert) row.appendChild(repairAlert);
       const alert = partsAlertEl(t);
       if (alert) row.appendChild(alert);
       rows.appendChild(row);
@@ -3172,6 +3246,7 @@
       repairCost: ticket.repairCost ?? ticket.cost ?? "",
       amountPaid: ticket.amountPaid ?? ticket.paid ?? "",
       technician: ticket.technician || "",
+      repairDueDate: ticket.repairDueDate || "",
       inventoryItemKey: ticket.inventoryItemKey || "",
       inventoryItemLabel: ticket.inventoryItemLabel || "",
       inventorySection: ticket.inventorySection || "",
