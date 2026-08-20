@@ -3015,6 +3015,17 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   margin: 0 6px 6px 0;
 }
 .issue-chip.muted { color: var(--text-dim); font-weight: 500; background: none; border-style: dashed; }
+.issue-notes-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--accent, #2b52b8);
+  border-color: var(--border);
+}
+.issue-notes-btn .icon { width: 12px; height: 12px; flex: none; }
+.issue-notes-btn:hover,
+.issue-notes-btn:focus-visible { background: var(--bg-soft); outline: none; }
 
 /* ---------- Setup card ---------- */
 .setup-card {

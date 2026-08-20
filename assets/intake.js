@@ -911,7 +911,11 @@
   }
 
   function activityLogCount(ticket) {
-    return parseHistoryEntries(ticket.history).length + (ticket.notes ? 1 : 0);
+    return (
+      parseHistoryEntries(ticket.history).length +
+      (ticket.notes ? 1 : 0) +
+      splitIssueParts(ticket.issues).long.length
+    );
   }
 
   function activityLogBtnHtml(ticket, id) {
@@ -939,6 +943,13 @@
 
   function activityLogBodyHtml(ticket) {
     const sections = [];
+    const longIssueParts = splitIssueParts(ticket.issues).long;
+    if (longIssueParts.length) {
+      sections.push(`<section class="activity-log-section">
+        <p class="field-label">Issue details</p>
+        ${longIssueParts.map((p) => `<p class="ticket-detail-notes activity-log-note">${esc(p)}</p>`).join("")}
+      </section>`);
+    }
     if (ticket.notes) {
       sections.push(`<section class="activity-log-section">
         <p class="field-label">Notes</p>
@@ -2834,6 +2845,35 @@
     return (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean).join(", ");
   }
 
+  // Preset issue tags (see ISSUES above) are all short labels; anything
+  // longer is free text typed into "Other" — too long to sit as a chip on
+  // the card, so the read-only card row hides it behind a "View notes"
+  // button instead and surfaces it in the activity log modal.
+  const ISSUE_CHIP_MAX_LEN = 30;
+
+  function splitIssueParts(issuesStr) {
+    const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+    return {
+      short: parts.filter((p) => p.length <= ISSUE_CHIP_MAX_LEN),
+      long: parts.filter((p) => p.length > ISSUE_CHIP_MAX_LEN),
+    };
+  }
+
+  // Compact chip row for a ticket card: short preset issues render as chips
+  // as before; any long free-text issue collapses into a "View notes"
+  // button instead of sprawling across the card.
+  function ticketRepairChipsHtml(t) {
+    const { short, long } = splitIssueParts(t.issues);
+    const chips = short.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
+    const notesBtn = long.length
+      ? `<button type="button" class="issue-chip issue-notes-btn" data-view-notes>
+          <svg class="icon"><use href="#i-note"></use></svg>View notes
+        </button>`
+      : "";
+    if (!chips && !notesBtn) return `<span class="issue-chip muted">No issues recorded</span>`;
+    return chips + notesBtn;
+  }
+
   // Full days elapsed since an ISO timestamp (0 if missing/invalid).
   function daysSince(iso) {
     if (!iso) return 0;
@@ -2994,7 +3034,7 @@
       ${identityHtml}
       <div class="ticket-repair">
         <span class="ticket-repair-label">Repair</span>
-        <div class="issue-tags issue-tags-readonly">${issueTagsHtml(t.issues)}</div>
+        <div class="issue-tags issue-tags-readonly">${ticketRepairChipsHtml(t)}</div>
       </div>
       <div class="ticket-status">
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
@@ -3034,6 +3074,14 @@
       techBtn.onkeydown = (e) => e.stopPropagation();
     }
     bindActivityLogBtn(head.querySelector(".activity-log-btn"), t);
+    const notesBtn = head.querySelector("[data-view-notes]");
+    if (notesBtn) {
+      notesBtn.onclick = (e) => {
+        e.stopPropagation();
+        openActivityLogModal(t);
+      };
+      notesBtn.onkeydown = (e) => e.stopPropagation();
+    }
     const thumb = head.querySelector(".ticket-device-thumb");
     const thumbImg = head.querySelector(".ticket-device-thumb img");
     if (thumbImg) {
