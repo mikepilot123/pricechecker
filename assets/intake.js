@@ -67,8 +67,12 @@
   // Every status where the repair is blocked on a part — keep in sync with
   // lib/tickets.js PARTS_STATUSES.
   const PARTS_STATUSES = new Set(["Waiting for Parts", "Part to be Ordered", "Part Ordered"]);
-  // Keep in sync with lib/tickets.js REPAIR_CHECK_REMINDER_START.
-  const REPAIR_CHECK_REMINDER_START = Date.parse("2026-08-20T01:00:00.000Z");
+  // Repair-check "open for N days" alert only applies to tickets stuck in
+  // one of these statuses — keep in sync with lib/tickets.js REPAIR_CHECK_STATUSES.
+  const REPAIR_CHECK_ALERT_STATUSES = new Set(["Received", "Waiting for Parts"]);
+  // "Stuck" means more than this many days since being logged — keep in
+  // sync with lib/tickets.js REPAIR_CHECK_MIN_DAYS.
+  const REPAIR_CHECK_ALERT_MIN_DAYS = 2;
 
   // Common issue presets — "Other" reveals a free-text field.
   const ISSUES = [
@@ -2682,15 +2686,15 @@
   });
 
   function renderStatusChips() {
-    const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up");
-    const counts = { all: TICKETS.filter((t) => t.status !== "Picked Up").length };
+    const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up" && s !== "No Fix");
+    const counts = { all: TICKETS.filter((t) => t.status !== "Picked Up" && t.status !== "No Fix").length };
     filterableStatuses.forEach((s) => (counts[s] = TICKETS.filter((t) => t.status === s).length));
     const select = $("statusFilterSelect");
     if (!select) return;
     // Cross-status shortcut: every repair still waiting on someone to place
     // the order, whether it's on the explicit "Part to be Ordered" status or
     // an older "Waiting for Parts" ticket whose flag was never set.
-    const partsToOrder = TICKETS.filter((t) => t.status !== "Picked Up" && needsPartsOrdered(t)).length;
+    const partsToOrder = TICKETS.filter((t) => t.status !== "Picked Up" && t.status !== "No Fix" && needsPartsOrdered(t)).length;
     const options = [{ key: "all", label: `All (${counts.all})` }]
       .concat([{ key: "__parts_needed", label: `⚠ Parts to order (${partsToOrder})` }])
       .concat(filterableStatuses.map((status) => ({ key: status, label: `${status} (${counts[status]})` })));
@@ -2704,7 +2708,7 @@
   function currentList() {
     const q = $("intakeSearch").value.trim().toLowerCase();
     return TICKETS.filter((t) => {
-      if (t.status === "Picked Up") return false; // moved to the Completed Repairs tab
+      if (t.status === "Picked Up" || t.status === "No Fix") return false; // moved to the Completed Repairs tab
       if (statusFilter === "__active") {
         if (!ACTIVE_REPAIR_STATUSES.has(t.status)) return false;
       } else if (statusFilter === "__parts_needed") {
@@ -2717,18 +2721,38 @@
     });
   }
 
+  // "Completed" shows Picked Up tickets (alongside completed appointments);
+  // "No Fix Repairs" is check-in-only, since appointments have no No Fix status.
+  let completedTab = "picked-up";
+
+  $("completedTabChips")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-completed-tab]");
+    if (!btn) return;
+    completedTab = btn.dataset.completedTab;
+    $("completedTabChips").querySelectorAll("[data-completed-tab]").forEach((b) => {
+      const active = b === btn;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    const appts = $("completedAppointmentsList");
+    if (appts) appts.hidden = completedTab !== "picked-up";
+    renderCompletedTickets();
+  });
+
   function renderCompletedTickets() {
     const list = $("completedTicketsList");
     if (!list) return;
     const q = ($("completedSearch")?.value || "").trim().toLowerCase();
-    const completed = TICKETS.filter((t) => t.status === "Picked Up").filter((t) => {
+    const wantStatus = completedTab === "no-fix" ? "No Fix" : "Picked Up";
+    const completed = TICKETS.filter((t) => t.status === wantStatus).filter((t) => {
       if (!q) return true;
       return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
     const countEl = $("completedTicketsCount");
-    if (countEl) countEl.textContent = completed.length ? `${completed.length} completed check-in${completed.length === 1 ? "" : "s"}` : "";
+    const noun = completedTab === "no-fix" ? "no fix repair" : "completed check-in";
+    if (countEl) countEl.textContent = completed.length ? `${completed.length} ${noun}${completed.length === 1 ? "" : "s"}` : "";
     list.innerHTML = "";
     const frag = document.createDocumentFragment();
     for (const group of groupTicketsByCheckin(completed)) {
@@ -2751,7 +2775,7 @@
     const emptyEl = $("completedRepairsEmpty");
     if (!emptyEl) return;
     const hasTickets = ($("completedTicketsList")?.children.length || 0) > 0;
-    const hasAppointments = ($("completedAppointmentsList")?.children.length || 0) > 0;
+    const hasAppointments = completedTab === "picked-up" && ($("completedAppointmentsList")?.children.length || 0) > 0;
     const searching = !!($("completedSearch")?.value || "").trim();
     emptyEl.textContent = searching ? "No completed repairs match your search." : "No completed repairs yet.";
     emptyEl.hidden = hasTickets || hasAppointments;
@@ -2831,17 +2855,14 @@
     return isActiveRepair(ticket) && !!ticket.repairDueDate && ticket.repairDueDate < todayKey();
   }
 
-  function isUntouchedNewReceivedRepair(ticket) {
-    if (!ticket || ticket.status !== "Received") return false;
-    if (Number(ticket.currentVersion || 1) !== 1) return false;
-    const created = new Date(ticket.created || "").getTime();
-    return !isNaN(created) && created >= REPAIR_CHECK_REMINDER_START;
+  function isRepairCheckEligible(ticket) {
+    return !!ticket && REPAIR_CHECK_ALERT_STATUSES.has(ticket.status);
   }
 
   function repairCheckAlertReason(ticket) {
-    if (!isUntouchedNewReceivedRepair(ticket)) return "";
+    if (!isRepairCheckEligible(ticket)) return "";
     if (isRepairDueDatePast(ticket)) return "due";
-    return daysSince(ticket.created) >= 1 ? "age" : "";
+    return daysSince(ticket.created) > REPAIR_CHECK_ALERT_MIN_DAYS ? "age" : "";
   }
 
   function repairDuePillHtml(ticket) {

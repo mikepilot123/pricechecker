@@ -66,6 +66,22 @@
     renderSaveBar();
   }
 
+  // Brand edits ride the same per-model dirty bag as price cells, under a
+  // key ("__brand") that can never collide with a real repair-type column
+  // name — save() below splits it back out before building the payload.
+  function brandValueFor(model) {
+    const edit = dirty.get(model.name);
+    if (edit && Object.prototype.hasOwnProperty.call(edit, "__brand")) return edit.__brand;
+    return model.brand || "";
+  }
+
+  function setBrand(name, value) {
+    const edit = dirty.get(name) || {};
+    edit.__brand = value;
+    dirty.set(name, edit);
+    renderSaveBar();
+  }
+
   function draftById(id) {
     return pending.find((row) => row.draftId === id);
   }
@@ -189,7 +205,9 @@
           <td class="price-admin-brand-col">
             ${draft
               ? `<input class="price-admin-text-cell" type="text" value="${esc(model.brand || "")}" data-draft-id="${esc(model.draftId)}" data-draft-field="brand" placeholder="Brand" aria-label="New model brand" />`
-              : `<span class="price-admin-brand">${esc(model.brand || "—")}</span>`}
+              : `<input class="price-admin-text-cell price-admin-brand-cell${dirty.get(model.name)?.__brand != null ? " dirty" : ""}" type="text"
+                  value="${esc(brandValueFor(model))}" data-model="${esc(model.name)}" data-brand-field placeholder="Brand"
+                  aria-label="Brand for ${esc(model.name)}" />`}
           </td>
           ${cells}
           <td class="price-admin-actions-col">
@@ -218,6 +236,13 @@
       input.addEventListener("input", () => {
         input.classList.add("dirty");
         updateDraftField(input.dataset.draftId, input.dataset.draftField, input.value);
+      });
+      input.addEventListener("keydown", handleCellKeydown);
+    });
+    grid.querySelectorAll("[data-brand-field]").forEach((input) => {
+      input.addEventListener("input", () => {
+        input.classList.add("dirty");
+        setBrand(input.dataset.model, input.value.trim());
       });
       input.addEventListener("keydown", handleCellKeydown);
     });
@@ -345,11 +370,14 @@
     showError("");
 
     const byName = new Map(allModels().map((m) => [m.name, m]));
-    const payload = [...dirty.entries()].map(([name, entries]) => ({
-      name,
-      brand: byName.get(name)?.brand || "",
-      entries: Object.entries(entries).map(([type, value]) => ({ type, value })),
-    }));
+    const payload = [...dirty.entries()].map(([name, entries]) => {
+      const { __brand, ...prices } = entries;
+      return {
+        name,
+        brand: __brand != null ? __brand : byName.get(name)?.brand || "",
+        entries: Object.entries(prices).map(([type, value]) => ({ type, value })),
+      };
+    });
     const liveNames = new Set((Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : []).map((m) => m.name.toLowerCase()));
     const draftNames = new Set();
     for (const row of pending) {
