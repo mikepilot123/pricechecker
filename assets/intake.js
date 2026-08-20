@@ -67,6 +67,8 @@
   // Every status where the repair is blocked on a part — keep in sync with
   // lib/tickets.js PARTS_STATUSES.
   const PARTS_STATUSES = new Set(["Waiting for Parts", "Part to be Ordered", "Part Ordered"]);
+  // Keep in sync with lib/tickets.js REPAIR_CHECK_REMINDER_START.
+  const REPAIR_CHECK_REMINDER_START = Date.parse("2026-08-20T01:00:00.000Z");
 
   // Common issue presets — "Other" reveals a free-text field.
   const ISSUES = [
@@ -2829,8 +2831,15 @@
     return isActiveRepair(ticket) && !!ticket.repairDueDate && ticket.repairDueDate < todayKey();
   }
 
+  function isUntouchedNewReceivedRepair(ticket) {
+    if (!ticket || ticket.status !== "Received") return false;
+    if (Number(ticket.currentVersion || 1) !== 1) return false;
+    const created = new Date(ticket.created || "").getTime();
+    return !isNaN(created) && created >= REPAIR_CHECK_REMINDER_START;
+  }
+
   function repairCheckAlertReason(ticket) {
-    if (!isActiveRepair(ticket)) return "";
+    if (!isUntouchedNewReceivedRepair(ticket)) return "";
     if (isRepairDueDatePast(ticket)) return "due";
     return daysSince(ticket.created) >= 1 ? "age" : "";
   }
