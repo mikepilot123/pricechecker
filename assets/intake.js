@@ -2964,7 +2964,12 @@
     const deviceIcon = deviceTypeIcon(t.device);
     const partsPending = needsPartsOrdered(t);
     const duePill = repairDuePillHtml(t);
-    const partsBtnHtml = PARTS_STATUSES.has(t.status)
+    // Skip the pill once status is explicitly "Part Ordered" — the status
+    // badge above already says exactly that, so the pill would just repeat
+    // it. It still earns its place on "Waiting for Parts" (whose badge text
+    // doesn't reveal the ordered flag) and "Part to be Ordered" (where it's
+    // the action to advance the status).
+    const partsBtnHtml = PARTS_STATUSES.has(t.status) && t.status !== "Part Ordered"
       ? `<button type="button" class="ticket-parts-btn${partsPending ? "" : " is-ordered"}" data-parts-toggle aria-pressed="${partsPending ? "false" : "true"}">
           <svg class="icon"><use href="#${partsPending ? "i-tools" : "i-check"}"></use></svg>${partsPending ? "Mark parts ordered" : "Parts ordered"}
         </button>`
