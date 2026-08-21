@@ -148,7 +148,11 @@
   function render() {
     renderBrandFilter();
     const models = visibleModels();
-    const columns = columnsFor(models);
+    // Columns come from every model, not just the ones the search/brand
+    // filter is currently showing — otherwise filtering down to a model
+    // that has no "Battery" price yet (say) makes the Battery column vanish
+    // entirely, with no way to add one for it.
+    const columns = columnsFor(allModels());
     const total = allModels().length;
 
     const countEl = $("priceAdminCount");
