@@ -3039,7 +3039,12 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .setup-title { margin: 0 0 6px; font-family: var(--font-display); font-size: 1.1rem; }
 .setup-sub { margin: 0 0 16px; font-size: 0.85rem; color: var(--text-dim); }
 .setup-card .field-label { margin-top: 12px; }
-.setup-card .primary-btn { width: 100%; margin-top: 16px; }
+/* Scoped to the id, not ".setup-card .primary-btn" — the whole Settings
+   UI (incl. the price grid's "Save changes" button) lives nested inside
+   this same .setup-card section, so a descendant selector here stretched
+   "Save changes" to full width too and threw off its size next to
+   "Discard" in the price grid's save bar. */
+#cfgSave.primary-btn { width: 100%; margin-top: 16px; }
 .settings-maintenance { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .settings-help { margin: 5px 0 12px; color: var(--text-dim); font-size: 0.82rem; line-height: 1.45; }
 .settings-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
