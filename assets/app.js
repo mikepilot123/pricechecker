@@ -1083,6 +1083,32 @@ function showSkeleton() {
     .join("");
 }
 
+// Paint the last known prices before the network is consulted at all.
+//
+// The price sheet lives on docs.google.com, which 302s every CSV request off
+// to googleusercontent.com — so each of the three tabs costs two full
+// DNS+TCP+TLS handshakes before any data moves. Over wifi that's invisible;
+// on mobile data it's seconds, and loadData() only ever reached for the cache
+// from its catch block, so a *slow* (rather than failed) request left the
+// user watching skeletons with a perfectly good copy sitting in localStorage.
+//
+// Rendering it up front makes the app usable immediately and lets the fetch
+// become a background refresh: loadData() overwrites MODELS and flips the
+// status dot to "live" when the real data lands. The "stale" status is what
+// updateTimestamp() renders as "Saved prices · updated …", so the header is
+// honest about showing a cached copy in the meantime.
+function paintCachedPricesOrSkeleton() {
+  if (!restoreCache()) {
+    showSkeleton();
+    return;
+  }
+  publishModels();
+  renderInfo();
+  buildChips();
+  render();
+  setStatus("stale");
+}
+
 // --- Wire up events ---------------------------------------------------------
 if (els.closePricesSetupModal) els.closePricesSetupModal.addEventListener("click", () => { els.pricesSetupModal.hidden = true; });
 if (els.pricesSetupSave) els.pricesSetupSave.addEventListener("click", savePricesSetup);
@@ -1293,7 +1319,7 @@ window.RPC_DELETE_PRICE_MODEL = async (name, pin) => {
 };
 
 // --- Go ---------------------------------------------------------------------
-showSkeleton();
+paintCachedPricesOrSkeleton();
 startAutoSync();
 startPriceUpdateSocket();
 loadData({ reason: "initial" });
