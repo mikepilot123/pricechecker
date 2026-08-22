@@ -1597,7 +1597,12 @@
     render({});
   });
 
-  loadDashboard();
+  // Dashboard and Expenses both start hidden (Prices is the default view), so
+  // their data is fetched lazily by the "rpc-enter-*" listeners above rather
+  // than at boot — eagerly loading tickets, monthly sales and inventory here
+  // put three requests on the critical path for a tab the user usually isn't
+  // looking at, which is what made the first paint slow on mobile. The
+  // last-view restore in intake.js goes through navigateTo(), so it still
+  // fires rpc-enter-dashboard when Dashboard *is* the tab being reopened.
   renderGoalEditor({ goal: monthlyGoal() });
-  initExpenses();
 })();

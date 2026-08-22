@@ -15,7 +15,15 @@
   <link rel="apple-touch-icon" href="assets/branding/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Loaded non-blocking: a stylesheet on a third-party host holds up the
+       first paint, and on a phone that request is the slowest thing in the
+       <head>. media="print" makes the browser fetch it at low priority
+       without blocking render, then onload flips it to "all" to apply it.
+       The URL already carries display=swap, so text paints immediately in
+       the fallback face and re-renders in Lexend when it lands. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
+        media="print" onload="this.media='all';this.onload=null" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
   <link rel="stylesheet" href="assets/style.css?v=savebar-btn-fix-1" />
 </head>
 <body>
@@ -1691,14 +1699,22 @@
     </div>
   </div>
 
-  <script src="assets/app.js?v=add-price-device-1"></script>
-  <script src="assets/inventory.js?v=synced-data-1"></script>
-  <script src="assets/intake.js?v=view-notes-1"></script>
-  <script src="assets/dashboard.js?v=no-fix-status-1"></script>
-  <script src="assets/appointments.js?v=completed-search-1"></script>
-  <script src="assets/leads.js?v=lead-issue-prefill-1"></script>
-  <script src="assets/parts-checker.js?v=parts-checker-12"></script>
-  <script src="assets/diagnostics.js?v=diagnostics-design-1"></script>
-  <script src="assets/prices-admin.js?v=all-columns-1"></script>
+  <!-- `defer` on all of these: they download in parallel while the HTML is
+       still parsing, then run in order once it's done, so ~700KB of JS no
+       longer holds up the first paint on a phone. Order still matters
+       (app.js publishes the globals prices-admin.js reads, and every module
+       must register its "rpc-enter-*" listener before intake.js's
+       DOMContentLoaded restore runs), and defer preserves it — deferred
+       scripts execute in document order, all of them before
+       DOMContentLoaded fires. -->
+  <script defer src="assets/app.js?v=add-price-device-1"></script>
+  <script defer src="assets/inventory.js?v=synced-data-1"></script>
+  <script defer src="assets/intake.js?v=view-notes-1"></script>
+  <script defer src="assets/dashboard.js?v=lazy-dashboard-1"></script>
+  <script defer src="assets/appointments.js?v=completed-search-1"></script>
+  <script defer src="assets/leads.js?v=lead-issue-prefill-1"></script>
+  <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
+  <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
+  <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
 </body>
 </html>
