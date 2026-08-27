@@ -6143,3 +6143,7 @@ video.media-viewer-media {
 .alert-prefs { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; max-width: 460px; }
 .expense-remind-btn { color: var(--accent); }
 .alert-voice-field { max-width: 460px; margin-bottom: 12px; }
+.rem-tag-appointment { background: #eff6ff; color: #2563eb; }
+.reminder-alert.is-appointment { border-left-color: #2563eb; }
+.reminder-alert.is-appointment .reminder-alert-icon { background: #eff6ff; color: #2563eb; }
+.reminder-alert.is-appointment .reminder-alert-due { color: #2563eb; }

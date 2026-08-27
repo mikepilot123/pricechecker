@@ -1641,7 +1641,7 @@
       list = list.filter((item) => item.assignee === reminderAssigneeFilterValue);
     }
     if (reminderSearchText) {
-      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority], item.kind === "cash_reclaim" ? "cash to collect" : ""]
+      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority], item.kind === "cash_reclaim" ? "cash to collect" : "", item.kind === "appointment" ? "appointment" : ""]
         .some((v) => String(v || "").toLowerCase().includes(reminderSearchText)));
     }
     return list;
@@ -1682,6 +1682,9 @@
     const tags = [];
     if (item.kind === "cash_reclaim") {
       tags.push(`<span class="rem-tag rem-tag-cash"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-cash"></use></svg>Cash to collect</span>`);
+    }
+    if (item.kind === "appointment") {
+      tags.push(`<span class="rem-tag rem-tag-appointment"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-calendar"></use></svg>Appointment</span>`);
     }
     if (item.priority && REMINDER_PRIORITIES[item.priority]) {
       tags.push(`<span class="rem-tag rem-tag-priority pr-${esc(item.priority)}">${esc(REMINDER_PRIORITIES[item.priority])}</span>`);
@@ -1960,7 +1963,9 @@
       const cents = Math.round((value - whole) * 100);
       return `${whole} dollar${whole === 1 ? "" : "s"}${cents ? ` and ${cents} cent${cents === 1 ? "" : "s"}` : ""}`;
     });
-    const lead = item.kind === "cash_reclaim" ? "Here's your reminder to collect cash" : "Here's your reminder";
+    const lead = item.kind === "cash_reclaim" ? "Here's your reminder to collect cash"
+      : item.kind === "appointment" ? "Here's your reminder about an upcoming appointment"
+      : "Here's your reminder";
     return `${lead}. ${spoken}.`;
   }
 
@@ -2090,17 +2095,21 @@
 
   function alertCardHtml(item, now) {
     const cash = item.kind === "cash_reclaim";
+    const appt = item.kind === "appointment";
     const overdueMs = now - new Date(item.dueAt).getTime();
     const late = overdueMs > 60000 ? reminderDueLabel(item.dueAt, new Date(now)) : "Due now";
     const meta = [];
     if (item.assignee) meta.push(esc(item.assignee));
     if (item.priority && REMINDER_PRIORITIES[item.priority]) meta.push(esc(REMINDER_PRIORITIES[item.priority]));
+    const icon = cash ? "i-cash" : appt ? "i-calendar" : "i-clock";
+    const eyebrow = cash ? "Cash to collect" : appt ? "Appointment coming up" : "Reminder";
+    const openLabel = cash ? "Expenses" : appt ? "Appointments" : "Open reminders";
     return `
-      <article class="reminder-alert${cash ? " is-cash" : ""}" data-alert-id="${esc(item.id)}">
+      <article class="reminder-alert${cash ? " is-cash" : ""}${appt ? " is-appointment" : ""}" data-alert-id="${esc(item.id)}">
         <div class="reminder-alert-head">
-          <span class="reminder-alert-icon"><svg class="icon" aria-hidden="true"><use href="#${cash ? "i-cash" : "i-clock"}"></use></svg></span>
+          <span class="reminder-alert-icon"><svg class="icon" aria-hidden="true"><use href="#${icon}"></use></svg></span>
           <div class="reminder-alert-heading">
-            <p class="reminder-alert-eyebrow">${cash ? "Cash to collect" : "Reminder"}${meta.length ? " · " + meta.join(" · ") : ""}</p>
+            <p class="reminder-alert-eyebrow">${eyebrow}${meta.length ? " · " + meta.join(" · ") : ""}</p>
             <h4 class="reminder-alert-title">${esc(item.title)}</h4>
             <p class="reminder-alert-due">${esc(late)}</p>
           </div>
@@ -2112,7 +2121,7 @@
         <div class="reminder-alert-actions">
           <button type="button" class="primary-btn reminder-alert-done" data-alert-done="1">${cash ? "Collected" : "Mark done"}</button>
           ${item.ticketId ? `<button type="button" class="ghost-btn" data-alert-ticket="${esc(item.ticketId)}">Open repair</button>` : ""}
-          <button type="button" class="ghost-btn" data-alert-open="1">${cash ? "Expenses" : "Open reminders"}</button>
+          <button type="button" class="ghost-btn" data-alert-open="1">${openLabel}</button>
         </div>
         <div class="reminder-alert-snooze">
           <span>Snooze</span>
@@ -2190,7 +2199,7 @@
       return;
     }
     if (openBtn) {
-      const target = item && item.kind === "cash_reclaim" ? "expenses" : "reminders";
+      const target = item && item.kind === "cash_reclaim" ? "expenses" : item && item.kind === "appointment" ? "appointments" : "reminders";
       if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW(target);
       return;
     }
