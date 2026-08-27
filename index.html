@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=reminder-alerts-4" />
+  <link rel="stylesheet" href="assets/style.css?v=offline-swr-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -1015,6 +1015,15 @@
             <button id="testReminderAlertBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-play"></use></svg>Test reminder</button>
           </div>
           <p id="alertPrefsNote" class="settings-help" hidden></p>
+
+          <hr class="settings-divider" />
+
+          <p class="field-label">Offline access</p>
+          <p class="settings-help">The app saves itself to this device so it opens with no data or internet. Prices, repairs and reminders show their last synced copy until you're back online.</p>
+          <div class="settings-actions">
+            <button id="saveOfflineBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-download"></use></svg>Save app for offline</button>
+          </div>
+          <p id="offlineStatus" class="settings-help"></p>
         </section>
 
         <section class="appt-panel" data-settings-panel-section="technicians" hidden>
@@ -1787,7 +1796,7 @@
        DOMContentLoaded restore runs), and defer preserves it — deferred
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
-  <script defer src="assets/app.js?v=cached-first-paint-1"></script>
+  <script defer src="assets/app.js?v=offline-swr-2"></script>
   <script defer src="assets/inventory.js?v=synced-data-1"></script>
   <script defer src="assets/intake.js?v=view-notes-1"></script>
   <script defer src="assets/dashboard.js?v=reminder-alerts-4"></script>

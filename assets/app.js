@@ -1226,13 +1226,136 @@ function scheduleSocketReconnect() {
 }
 
 // --- Service worker (offline shell) -----------------------------------------
+// The exact asset URLs this page loaded, `?v=` strings and all. Handing these
+// to the service worker keeps the offline copy in sync with index.html
+// automatically — the sw.js SHELL list can't drift out of date and silently
+// leave a file uncached, which is how you end up "offline-ready" right up
+// until the one screen you needed doesn't open.
+function appAssetUrls() {
+  const urls = new Set();
+  document.querySelectorAll("script[src]").forEach((el) => urls.add(el.getAttribute("src")));
+  document.querySelectorAll('link[rel="stylesheet"][href]').forEach((el) => {
+    const href = el.getAttribute("href");
+    // Same-origin only; the Google Fonts stylesheet is the browser's problem.
+    if (href && !/^https?:\/\//i.test(href)) urls.add(href);
+  });
+  return Array.from(urls);
+}
+
+// reason distinguishes the automatic idle top-up from someone actually
+// pressing "Save app for offline". Only the latter should ever write status
+// text on screen — a background top-up that fails (because the device is
+// offline, which is exactly when it's most likely to run) must not tell the
+// user their offline copy is broken when it's sitting there working fine.
+function requestOfflinePrecache(reason = "manual") {
+  const worker = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (!worker) return false;
+  worker.postMessage({ type: "PRECACHE", reason, urls: appAssetUrls() });
+  return true;
+}
+window.RPC_PRECACHE_APP = requestOfflinePrecache;
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
-      .then((registration) => registration.update())
+      .then((registration) => {
+        registration.update().catch(() => {});
+        // Top up the offline copy once the page has settled. Deferred to an
+        // idle moment so it never competes with the first paint on the slow
+        // connections this whole mechanism exists for.
+        // Nothing to gain from a top-up with no connection; it would only
+        // burn a timeout per file and fail.
+        const topUp = () => { if (navigator.onLine !== false) requestOfflinePrecache("auto"); };
+        if (navigator.serviceWorker.controller) {
+          if ("requestIdleCallback" in window) requestIdleCallback(topUp, { timeout: 5000 });
+          else setTimeout(topUp, 3000);
+        } else {
+          // First ever visit: nothing is controlling the page yet, so wait
+          // for the worker to take over before asking it to cache anything.
+          navigator.serviceWorker.addEventListener("controllerchange", () => setTimeout(topUp, 1500), { once: true });
+        }
+      })
       .catch(() => {});
   });
 }
+
+// --- "Save app for offline" (Settings › General) -----------------------------
+(function () {
+  function setStatus(message) {
+    const el = document.getElementById("offlineStatus");
+    if (el) el.textContent = message;
+  }
+
+  function describeReadiness() {
+    if (!("serviceWorker" in navigator)) {
+      setStatus("This browser can't save the app for offline use.");
+      return;
+    }
+    if (!navigator.serviceWorker.controller) {
+      setStatus("Not saved yet on this device — tap the button above, or reload once while online.");
+      return;
+    }
+    setStatus("Saved on this device. It'll open without data or internet.");
+  }
+
+  function bind() {
+    const btn = document.getElementById("saveOfflineBtn");
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = "true";
+    describeReadiness();
+
+    navigator.serviceWorker?.addEventListener("message", (event) => {
+      if (event.data?.type !== "PRECACHE_DONE") return;
+      if (event.data.reason !== "manual") return; // silent background top-up
+      btn.disabled = false;
+      btn.textContent = "Save app for offline";
+      const { cached = 0, failed = 0 } = event.data;
+      setStatus(failed
+        ? `Saved ${cached} files — ${failed} couldn't be saved. Try again on a stronger connection.`
+        : `Saved ${cached} files. The app will open without data or internet.`);
+    });
+
+    btn.addEventListener("click", () => {
+      if (navigator.onLine === false) {
+        setStatus("You're offline right now — reconnect to refresh the saved copy.");
+        return;
+      }
+      if (!window.RPC_PRECACHE_APP || !window.RPC_PRECACHE_APP("manual")) {
+        setStatus("Still setting up — reload the page once, then try again.");
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Saving…";
+      setStatus("Saving the app to this device…");
+    });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
+  else bind();
+})();
+
+// --- Offline indicator -------------------------------------------------------
+// Staff need to know when what they're looking at is the saved copy, so a
+// stale price isn't quoted to a customer as a live one.
+(function () {
+  function render() {
+    const offline = navigator.onLine === false;
+    let pill = document.getElementById("offlinePill");
+    if (!offline) { pill?.remove(); return; }
+    if (!pill) {
+      pill = document.createElement("div");
+      pill.id = "offlinePill";
+      pill.className = "offline-pill";
+      pill.setAttribute("role", "status");
+      pill.innerHTML = '<span class="offline-dot"></span>Offline — showing saved copy';
+      document.body.appendChild(pill);
+    }
+  }
+  window.addEventListener("online", render);
+  window.addEventListener("offline", render);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", render);
+  else render();
+})();
 
 // --- Install app (PWA) -------------------------------------------------------
 // Chrome/Edge/Android fire `beforeinstallprompt` when the manifest + service

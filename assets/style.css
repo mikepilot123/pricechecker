@@ -6147,3 +6147,33 @@ video.media-viewer-media {
 .reminder-alert.is-appointment { border-left-color: #2563eb; }
 .reminder-alert.is-appointment .reminder-alert-icon { background: #eff6ff; color: #2563eb; }
 .reminder-alert.is-appointment .reminder-alert-due { color: #2563eb; }
+
+/* ---- Offline indicator -------------------------------------------------- */
+/* Sits above the toast stack's anchor but below modals, so staff always know
+   when a price on screen is the saved copy rather than a live one. */
+.offline-pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 4400;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.offline-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f0b429;
+  flex: none;
+}
