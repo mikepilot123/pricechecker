@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=savebar-btn-fix-1" />
+  <link rel="stylesheet" href="assets/style.css?v=reminder-alerts-3" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -436,6 +436,18 @@
 
       <div id="expenseBreakdown" class="expense-breakdown" aria-live="polite"></div>
 
+      <section id="expenseReclaimStrip" class="reclaim-strip" aria-labelledby="expenseReclaimStripTitle" hidden>
+        <div class="reclaim-strip-head">
+          <svg class="icon reclaim-strip-icon" aria-hidden="true"><use href="#i-cash"></use></svg>
+          <div>
+            <p class="dashboard-eyebrow" id="expenseReclaimStripTitle">Cash to collect back</p>
+            <strong id="expenseReclaimTotal">$0</strong>
+          </div>
+          <span class="reclaim-strip-count" id="expenseReclaimCount"></span>
+        </div>
+        <div id="expenseReclaimList" class="reclaim-strip-list"></div>
+      </section>
+
       <p id="expenseCount" class="result-count"></p>
       <div id="expenseList" class="ops-list expense-list" aria-live="polite"></div>
     </section>
@@ -478,6 +490,40 @@
             <div class="form-field form-field-full">
               <label class="field-label" for="expenseNotes">Notes</label>
               <textarea id="expenseNotes" class="text-input" rows="2" placeholder="Optional notes"></textarea>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="reclaim-toggle" for="expenseCashReclaim">
+                <input id="expenseCashReclaim" type="checkbox" />
+                <span>
+                  <strong>Paid in cash — collect this back</strong>
+                  <small>Adds a reminder to recover the money you fronted.</small>
+                </span>
+              </label>
+            </div>
+            <div class="form-field form-field-full reclaim-fields" id="expenseReclaimFields" hidden>
+              <div class="form-grid">
+                <div class="form-field form-field-full">
+                  <label class="field-label" for="expenseReclaimFrom">Collect back from</label>
+                  <input id="expenseReclaimFrom" class="text-input" list="expenseReclaimFromOptions" placeholder="e.g. JQ Electronics" />
+                  <datalist id="expenseReclaimFromOptions"></datalist>
+                </div>
+                <div class="form-field form-field-full">
+                  <label class="field-label" for="expenseReclaimDue">Remind me to collect by</label>
+                  <div class="reminder-due-presets" role="group" aria-label="Quick collect-by date">
+                    <button type="button" class="chip" data-reclaim-preset="tomorrow">Tomorrow</button>
+                    <button type="button" class="chip" data-reclaim-preset="week">Next week</button>
+                    <button type="button" class="chip" data-reclaim-preset="month">Next month</button>
+                    <button type="button" class="chip" data-reclaim-preset="none">No reminder</button>
+                  </div>
+                  <input id="expenseReclaimDue" class="text-input" type="datetime-local" />
+                </div>
+                <div class="form-field form-field-full" id="expenseReclaimedRow" hidden>
+                  <label class="reclaim-toggle" for="expenseReclaimed">
+                    <input id="expenseReclaimed" type="checkbox" />
+                    <span><strong>Already collected</strong><small>Ticks the reminder off too.</small></span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
           <p id="expenseMessage" class="field-error" hidden></p>
@@ -945,6 +991,30 @@
             <button id="restoreIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-restore"></use></svg>Restore</button>
             <button id="clearAllIntake" class="ghost-btn danger-btn" type="button"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
           </div>
+
+          <hr class="settings-divider" />
+
+          <p class="field-label">Reminder alerts</p>
+          <p class="settings-help">Reminders pop up on screen the moment they fall due, on whatever tab you have open. These settings are per device.</p>
+          <div class="alert-prefs">
+            <label class="reclaim-toggle" for="alertSoundToggle">
+              <input id="alertSoundToggle" type="checkbox" checked />
+              <span><strong>Play a chime</strong><small>A short tone when a reminder pops up.</small></span>
+            </label>
+            <label class="reclaim-toggle" for="alertSpeechToggle">
+              <input id="alertSpeechToggle" type="checkbox" />
+              <span><strong>Read it out loud</strong><small>Speaks the reminder so you hear it across the shop.</small></span>
+            </label>
+          </div>
+          <div class="form-field alert-voice-field" id="alertVoiceField" hidden>
+            <label class="field-label" for="alertVoiceSelect">Voice</label>
+            <select id="alertVoiceSelect" class="text-input select-input"></select>
+            <p class="settings-help" id="alertVoiceHelp"></p>
+          </div>
+          <div class="settings-actions">
+            <button id="testReminderAlertBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-play"></use></svg>Test reminder</button>
+          </div>
+          <p id="alertPrefsNote" class="settings-help" hidden></p>
         </section>
 
         <section class="appt-panel" data-settings-panel-section="technicians" hidden>
@@ -1720,7 +1790,7 @@
   <script defer src="assets/app.js?v=cached-first-paint-1"></script>
   <script defer src="assets/inventory.js?v=synced-data-1"></script>
   <script defer src="assets/intake.js?v=view-notes-1"></script>
-  <script defer src="assets/dashboard.js?v=lazy-dashboard-1"></script>
+  <script defer src="assets/dashboard.js?v=reminder-alerts-3"></script>
   <script defer src="assets/appointments.js?v=completed-search-1"></script>
   <script defer src="assets/leads.js?v=lead-issue-prefill-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>

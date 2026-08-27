@@ -5932,3 +5932,214 @@ video.media-viewer-media {
   .dg-saved-actions { width: 100%; }
   .dg-saved-actions .ghost-btn { flex: 1; justify-content: center; }
 }
+
+/* ---- On-screen reminder alerts ------------------------------------------ */
+/* Cards that interrupt whatever tab is open once a reminder falls due. Sits
+   below .modal-backdrop (5000) on purpose: an alert must never cover a form
+   someone is mid-way through filling in. */
+.reminder-alerts {
+  position: fixed;
+  /* Bottom-right, not top-right: every screen in this app puts its primary
+     action ("Add expense", "Add reminder", …) in the top-right corner, and an
+     alert that covers the button you were reaching for is worse than useless. */
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  right: 16px;
+  z-index: 4500;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100vh - var(--header-h) - 32px);
+  overflow-y: auto;
+}
+.reminder-alert {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+  padding: 12px 14px;
+  animation: reminder-alert-in 0.22s ease-out;
+}
+.reminder-alert.is-cash { border-left-color: var(--price); }
+@keyframes reminder-alert-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.reminder-alert-head { display: flex; align-items: flex-start; gap: 10px; }
+.reminder-alert-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: #fdf3e6;
+  color: var(--warn);
+}
+.reminder-alert.is-cash .reminder-alert-icon { background: #e7f6ef; color: var(--price); }
+.reminder-alert-heading { min-width: 0; flex: 1; }
+.reminder-alert-eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.reminder-alert-title { margin: 2px 0 0; font-size: 0.95rem; line-height: 1.3; }
+.reminder-alert-due { margin: 3px 0 0; font-size: 0.78rem; color: var(--warn); font-weight: 600; }
+.reminder-alert.is-cash .reminder-alert-due { color: var(--price); }
+.reminder-alert-close {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+.reminder-alert-close:hover { background: var(--bg-soft); color: var(--text); }
+.reminder-alert-notes {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.reminder-alert-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.reminder-alert-actions .primary-btn,
+.reminder-alert-actions .ghost-btn { padding: 6px 12px; font-size: 0.8rem; }
+.reminder-alert-snooze {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.reminder-alert-snooze .chip { padding: 3px 9px; font-size: 0.72rem; }
+.reminder-alert-more {
+  border: 1px dashed var(--border);
+  background: var(--card);
+  color: var(--text-dim);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.reminder-alert-more:hover { background: var(--card-hover); color: var(--text); }
+
+@media (max-width: 640px) {
+  .reminder-alerts {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: 70vh;
+  }
+}
+
+/* Due-count badge on the Reminders nav item. */
+.nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ---- Cash-reclaim expenses ---------------------------------------------- */
+.reclaim-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+  cursor: pointer;
+}
+.reclaim-toggle input { margin-top: 3px; flex: none; width: 16px; height: 16px; accent-color: var(--accent); }
+.reclaim-toggle span { display: block; }
+.reclaim-toggle strong { display: block; font-size: 0.86rem; }
+.reclaim-toggle small { display: block; color: var(--text-dim); font-size: 0.76rem; }
+.reclaim-fields {
+  border-left: 2px solid var(--price);
+  padding-left: 12px;
+}
+
+.reclaim-strip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  margin: 12px 0 4px;
+}
+.reclaim-strip-head { display: flex; align-items: center; gap: 12px; }
+.reclaim-strip-icon { width: 22px; height: 22px; color: var(--price); }
+.reclaim-strip-head strong { font-size: 1.35rem; color: var(--price); }
+.reclaim-strip-count { margin-left: auto; font-size: 0.78rem; color: var(--text-dim); }
+.reclaim-strip-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.reclaim-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+}
+.reclaim-strip-row.is-overdue { border-color: #e7b7b2; background: #fdf1f0; }
+.reclaim-strip-main { min-width: 0; }
+.reclaim-strip-main strong { font-size: 0.95rem; }
+.reclaim-strip-main span { font-size: 0.85rem; color: var(--text); margin-left: 6px; }
+.reclaim-strip-main small { display: block; font-size: 0.74rem; color: var(--text-dim); }
+.reclaim-collect-btn {
+  margin-left: auto;
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--price);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.reclaim-collect-btn:hover { background: #e7f6ef; border-color: #9ad9b8; }
+
+.reclaim-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fdf3e6;
+  color: var(--warn);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.reclaim-badge .icon { width: 12px; height: 12px; }
+.reclaim-badge.is-settled { background: #e7f6ef; color: var(--price); }
+.expense-row.is-owed { border-left: 3px solid var(--warn); }
+.rem-tag-cash { background: #e7f6ef; color: var(--price); }
+
+/* ---- Reminder alert preferences (Settings › General) -------------------- */
+.settings-divider { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.alert-prefs { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; max-width: 460px; }
+.expense-remind-btn { color: var(--accent); }
+.alert-voice-field { max-width: 460px; margin-bottom: 12px; }

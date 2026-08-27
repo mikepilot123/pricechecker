@@ -526,7 +526,13 @@
     });
 
     $("expenseList")?.addEventListener("click", handleExpenseListClick);
+    $("expenseReclaimList")?.addEventListener("click", handleExpenseListClick);
     $("expenseCategoryChips")?.addEventListener("click", handleExpenseChipClick);
+
+    $("expenseCashReclaim")?.addEventListener("change", syncReclaimFieldsVisibility);
+    form.querySelectorAll("[data-reclaim-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => applyReclaimPreset(btn.dataset.reclaimPreset));
+    });
   }
 
   function openNewExpenseForm() {
@@ -538,10 +544,25 @@
     $("expenseVendor").value = "";
     $("expenseAmount").value = "";
     $("expenseNotes").value = "";
+    if ($("expenseCashReclaim")) $("expenseCashReclaim").checked = false;
+    if ($("expenseReclaimFrom")) $("expenseReclaimFrom").value = lastReclaimFrom();
+    if ($("expenseReclaimDue")) $("expenseReclaimDue").value = "";
+    if ($("expenseReclaimed")) $("expenseReclaimed").checked = false;
+    renderReclaimFromOptions();
+    syncReclaimFieldsVisibility();
     const msg = $("expenseMessage");
     if (msg) { msg.hidden = true; msg.textContent = ""; }
     $("expenseFormModal").hidden = false;
     $("expenseVendor")?.focus();
+  }
+
+  // Pre-fill "collect back from" with whoever was last reclaimed from, since
+  // in practice that's the same other business nearly every time.
+  function lastReclaimFrom() {
+    const recent = readExpenses()
+      .filter((item) => item.cashReclaim && String(item.reclaimFrom || "").trim())
+      .sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
+    return recent.length ? recent[0].reclaimFrom : "";
   }
 
   function editExpense(expense) {
@@ -554,6 +575,12 @@
     $("expenseVendor").value = expense.vendor || "";
     $("expenseAmount").value = expense.amount || "";
     $("expenseNotes").value = expense.notes || "";
+    if ($("expenseCashReclaim")) $("expenseCashReclaim").checked = !!expense.cashReclaim;
+    if ($("expenseReclaimFrom")) $("expenseReclaimFrom").value = expense.reclaimFrom || "";
+    if ($("expenseReclaimDue")) $("expenseReclaimDue").value = expense.reclaimDueAt ? toDatetimeLocal(expense.reclaimDueAt) : "";
+    if ($("expenseReclaimed")) $("expenseReclaimed").checked = !!expense.reclaimedAt;
+    renderReclaimFromOptions();
+    syncReclaimFieldsVisibility();
     const msg = $("expenseMessage");
     if (msg) { msg.hidden = true; msg.textContent = ""; }
     $("expenseFormModal").hidden = false;
@@ -573,12 +600,18 @@
       if (msg) { msg.textContent = "Add a valid date and amount."; msg.hidden = false; }
       return;
     }
+    const cashReclaim = !!$("expenseCashReclaim")?.checked;
+    const reclaimDueLocal = $("expenseReclaimDue")?.value || "";
     const payload = {
       date,
       category: $("expenseCategory")?.value || "Other",
       vendor: ($("expenseVendor")?.value || "").trim(),
       amount,
       notes: ($("expenseNotes")?.value || "").trim(),
+      cashReclaim,
+      reclaimFrom: cashReclaim ? ($("expenseReclaimFrom")?.value || "").trim() : "",
+      reclaimDueAt: cashReclaim && reclaimDueLocal ? new Date(reclaimDueLocal).toISOString() : null,
+      reclaimed: cashReclaim ? !!$("expenseReclaimed")?.checked : false,
     };
     const submitBtn = $("expenseSubmit");
     const originalLabel = submitBtn?.textContent;
@@ -600,11 +633,24 @@
     }
     closeExpenseForm();
     renderExpenses();
+    // A cash-reclaim expense writes its reminder server-side; refresh so it
+    // appears in the Reminders tab (and can pop up) without a reload.
+    if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
   }
 
   async function handleExpenseListClick(event) {
     const editBtn = event.target.closest("[data-expense-edit]");
     const deleteBtn = event.target.closest("[data-expense-delete]");
+    const collectBtn = event.target.closest("[data-expense-collect]");
+    const remindBtn = event.target.closest("[data-expense-remind]");
+    if (remindBtn) {
+      openReminderForExpense(readExpenses().find((item) => item.id === remindBtn.dataset.expenseRemind));
+      return;
+    }
+    if (collectBtn) {
+      await setExpenseCollected(collectBtn.dataset.expenseCollect, collectBtn.dataset.collected !== "true");
+      return;
+    }
     if (editBtn) {
       editExpense(readExpenses().find((item) => item.id === editBtn.dataset.expenseEdit));
       return;
@@ -616,9 +662,91 @@
       await expensesApi({ action: "deleteExpense", id });
       setExpenses(EXPENSES.filter((item) => item.id !== id));
       renderExpenses();
+      if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
     } catch (err) {
       notifyExpenseError("Couldn't delete expense: " + err.message);
     }
+  }
+
+  // The "collect this back" block only matters once the box is ticked, and an
+  // expense already recorded as collected shouldn't offer a future reminder
+  // date it will never fire on — so that row only appears when relevant.
+  function syncReclaimFieldsVisibility() {
+    const on = !!$("expenseCashReclaim")?.checked;
+    const box = $("expenseReclaimFields");
+    if (box) box.hidden = !on;
+    const collectedRow = $("expenseReclaimedRow");
+    if (collectedRow) collectedRow.hidden = !on || !editingExpenseId;
+    if (on && !$("expenseReclaimDue")?.value && !editingExpenseId) applyReclaimPreset("week");
+  }
+
+  function applyReclaimPreset(preset) {
+    const input = $("expenseReclaimDue");
+    if (!input) return;
+    if (preset === "none") { input.value = ""; return; }
+    const d = new Date();
+    if (preset === "tomorrow") d.setDate(d.getDate() + 1);
+    else if (preset === "week") d.setDate(d.getDate() + 7);
+    else if (preset === "month") d.setMonth(d.getMonth() + 1);
+    d.setHours(9, 0, 0, 0);
+    input.value = toDatetimeLocal(d);
+  }
+
+  // Offer the places cash has been reclaimed from before — the owner's other
+  // business is usually the same name every time.
+  function renderReclaimFromOptions() {
+    const list = $("expenseReclaimFromOptions");
+    if (!list) return;
+    const names = Array.from(new Set(
+      readExpenses().map((item) => String(item.reclaimFrom || "").trim()).filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b));
+    list.innerHTML = names.map((name) => `<option value="${esc(name)}"></option>`).join("");
+  }
+
+  function outstandingReclaims(expenses) {
+    return expenses.filter((item) => item.cashReclaim && !item.reclaimedAt);
+  }
+
+  async function setExpenseCollected(id, collected) {
+    try {
+      const data = await expensesApi({ action: "updateExpense", id, reclaimed: collected });
+      setExpenses(EXPENSES.map((item) => (item.id === id ? data.expense : item)));
+      renderExpenses();
+      // The mirrored reminder flipped server-side; pull it so the Reminders
+      // tab and the alert popups agree with what the expense now says.
+      if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(collected ? "Marked as collected" : "Moved back to outstanding", { tone: "info", duration: 3000 });
+      }
+    } catch (err) {
+      notifyExpenseError("Couldn't update the expense: " + err.message);
+    }
+  }
+
+  // "Create reminder" on an expense row: opens the ordinary reminder form
+  // pre-filled from that expense, so the popup that fires later already says
+  // what the money was for. Money already flagged as owed gets a "collect"
+  // title; anything else gets a plain follow-up.
+  function openReminderForExpense(expense) {
+    if (!expense) return;
+    openNewReminderForm();
+    const owed = expense.cashReclaim && !expense.reclaimedAt;
+    const who = String(expense.reclaimFrom || "").trim();
+    const title = owed
+      ? `Collect ${money(expense.amount)} cash back${who ? " from " + who : ""}`
+      : `${expense.category || "Expense"} ${money(expense.amount)}${expense.vendor ? " — " + expense.vendor : ""}`;
+    const titleInput = $("reminderTitleInput");
+    if (titleInput) titleInput.value = title;
+    const notesInput = $("reminderNotes");
+    if (notesInput) {
+      notesInput.value = [`Expense from ${formatDate(expense.date)}.`, expense.notes].filter(Boolean).join(" ");
+    }
+    if (owed && $("reminderPriority")) $("reminderPriority").value = "urgent";
+    // Default to a time rather than leaving it blank — a reminder with no due
+    // time never pops up, which is the whole point of pressing this button.
+    applyReminderPreset("tomorrow");
+    checkReminderDuplicate();
+    $("reminderDue")?.focus();
   }
 
   function handleExpenseChipClick(event) {
@@ -671,6 +799,62 @@
       : "";
   }
 
+  function reclaimBadgeHtml(item) {
+    if (!item.cashReclaim) return "";
+    const who = item.reclaimFrom || "the other business";
+    if (item.reclaimedAt) {
+      return `<span class="reclaim-badge is-settled"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Collected from ${esc(who)}</span>`;
+    }
+    const due = item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : "";
+    return `<span class="reclaim-badge"><svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg>Owed by ${esc(who)}${due}</span>`;
+  }
+
+  function reclaimDueShort(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const diff = calendarDayDiff(d, new Date());
+    if (diff < 0) return `${Math.abs(diff)}d overdue`;
+    if (diff === 0) return "today";
+    if (diff === 1) return "tomorrow";
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+
+  // Running total of cash the shop has fronted and not yet got back. Sits
+  // above the expense list because it's the number the owner actually chases.
+  function renderReclaimStrip(expenses) {
+    const strip = $("expenseReclaimStrip");
+    if (!strip) return;
+    const owed = outstandingReclaims(expenses);
+    strip.hidden = !owed.length;
+    if (!owed.length) return;
+    const total = owed.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const totalEl = $("expenseReclaimTotal");
+    if (totalEl) totalEl.textContent = money(total);
+    const countEl = $("expenseReclaimCount");
+    if (countEl) countEl.textContent = `${owed.length} expense${owed.length === 1 ? "" : "s"}`;
+    const listEl = $("expenseReclaimList");
+    if (!listEl) return;
+    // Anything with a collect-by date first, soonest first; undated after.
+    const sorted = owed.slice().sort((a, b) => {
+      if (!a.reclaimDueAt && !b.reclaimDueAt) return String(b.date).localeCompare(String(a.date));
+      if (!a.reclaimDueAt) return 1;
+      if (!b.reclaimDueAt) return -1;
+      return new Date(a.reclaimDueAt) - new Date(b.reclaimDueAt);
+    });
+    listEl.innerHTML = sorted.map((item) => {
+      const overdue = item.reclaimDueAt && new Date(item.reclaimDueAt).getTime() < Date.now();
+      return `
+        <div class="reclaim-strip-row${overdue ? " is-overdue" : ""}">
+          <div class="reclaim-strip-main">
+            <strong>${money(item.amount)}</strong>
+            <span>from ${esc(item.reclaimFrom || "the other business")}</span>
+            <small>${esc(item.category)}${item.vendor ? " · " + esc(item.vendor) : ""} · ${esc(formatDate(item.date))}${item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : ""}</small>
+          </div>
+          <button type="button" class="reclaim-collect-btn" data-expense-collect="${esc(item.id)}" data-collected="false">Collected</button>
+        </div>`;
+    }).join("");
+  }
+
   function renderExpenses() {
     const list = $("expenseList");
     const total = $("expenseMonthTotal");
@@ -685,6 +869,8 @@
     const totals = categoryTotals(monthExpenses);
     renderExpenseChips(totals);
     renderExpenseBreakdown(totals);
+    renderReclaimStrip(expenses);
+    renderReclaimFromOptions();
 
     const visible = filteredExpenses(expenses);
     if (count) {
@@ -694,13 +880,16 @@
     }
     if (list) {
       list.innerHTML = visible.length ? visible.map((item) => `
-        <article class="ops-row expense-row">
+        <article class="ops-row expense-row${item.cashReclaim && !item.reclaimedAt ? " is-owed" : ""}">
           <div>
             <strong>${esc(item.category)} · ${money(item.amount)}</strong>
             <p>${esc(item.vendor || "No vendor")}</p>
             <small>${esc(formatDate(item.date))}${item.notes ? " · " + esc(item.notes) : ""}</small>
+            ${reclaimBadgeHtml(item)}
           </div>
           <div class="ops-row-actions">
+            ${item.cashReclaim ? `<button type="button" data-expense-collect="${esc(item.id)}" data-collected="${item.reclaimedAt ? "true" : "false"}">${item.reclaimedAt ? "Undo collected" : "Mark collected"}</button>` : ""}
+            <button type="button" class="expense-remind-btn" data-expense-remind="${esc(item.id)}">Create reminder</button>
             <button type="button" data-expense-edit="${esc(item.id)}">Edit</button>
             <button type="button" class="danger-text" data-expense-delete="${esc(item.id)}">Delete</button>
           </div>
@@ -1009,7 +1198,9 @@
   }
 
   let remindersLoadInFlight = null;
-  function loadReminders() {
+  // quiet: used by the background alert poll, which runs every minute — a
+  // dropped connection there shouldn't put a toast on screen 60 times an hour.
+  function loadReminders({ quiet = false } = {}) {
     if (remindersLoadInFlight) return remindersLoadInFlight;
     remindersLoadInFlight = (async () => {
       try {
@@ -1018,7 +1209,7 @@
         renderReminders();
       } catch (err) {
         console.warn("Couldn't sync reminders:", err);
-        notifyReminderError("Couldn't sync reminders — showing this device's last saved copy.");
+        if (!quiet) notifyReminderError("Couldn't sync reminders — showing this device's last saved copy.");
       } finally {
         remindersLoadInFlight = null;
       }
@@ -1450,7 +1641,7 @@
       list = list.filter((item) => item.assignee === reminderAssigneeFilterValue);
     }
     if (reminderSearchText) {
-      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority]]
+      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority], item.kind === "cash_reclaim" ? "cash to collect" : ""]
         .some((v) => String(v || "").toLowerCase().includes(reminderSearchText)));
     }
     return list;
@@ -1489,6 +1680,9 @@
       : (item.dueAt ? reminderDueLabel(item.dueAt, now) : "");
     const noteExpanded = expandedReminderNotes.has(item.id);
     const tags = [];
+    if (item.kind === "cash_reclaim") {
+      tags.push(`<span class="rem-tag rem-tag-cash"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-cash"></use></svg>Cash to collect</span>`);
+    }
     if (item.priority && REMINDER_PRIORITIES[item.priority]) {
       tags.push(`<span class="rem-tag rem-tag-priority pr-${esc(item.priority)}">${esc(REMINDER_PRIORITIES[item.priority])}</span>`);
     }
@@ -1576,6 +1770,502 @@
         </section>`)
       .join("");
   }
+
+  /* ---- On-screen reminder alerts ------------------------------------- */
+  // Reminders are only useful if they interrupt you. Once a reminder's due
+  // time passes, it pops up as a card over whatever tab is open — the
+  // Reminders tab itself is only where you go to manage the list. Snoozes are
+  // per-device (localStorage) on purpose: a snooze is "not now, on this
+  // screen", not a change to the shared reminder everyone else sees.
+  const ALERT_SNOOZE_KEY = "rpc_reminder_alert_snooze";
+  const ALERT_POLL_MS = 60000;
+  // Reminders load lazily so the first paint stays fast (see the note at the
+  // bottom of this file); the alert poller waits for the page to settle
+  // before making its first request for the same reason.
+  const ALERT_FIRST_RUN_MS = 4000;
+  const shownAlertIds = new Set();
+  // Cards from the Settings "Test reminder" button. Local to this tab and
+  // never written to the server — they exist only to prove the alert works.
+  const demoAlerts = [];
+  let alertPollTimer = null;
+
+  function readSnoozes() {
+    const raw = readJson(ALERT_SNOOZE_KEY, {});
+    return raw && typeof raw === "object" ? raw : {};
+  }
+
+  function snoozeAlert(id, untilMs, dueAt) {
+    const snoozes = readSnoozes();
+    snoozes[id] = { until: untilMs, due: dueAt || "" };
+    writeJson(ALERT_SNOOZE_KEY, snoozes);
+  }
+
+  // Drop snoozes for reminders that are gone or finished, so the store can't
+  // grow forever on a tablet that never clears its storage.
+  function pruneSnoozes() {
+    const snoozes = readSnoozes();
+    const live = new Set(REMINDERS.filter((item) => !item.done).map((item) => item.id));
+    let changed = false;
+    Object.keys(snoozes).forEach((id) => {
+      if (!live.has(id)) { delete snoozes[id]; changed = true; }
+    });
+    if (changed) writeJson(ALERT_SNOOZE_KEY, snoozes);
+  }
+
+  function alertIsSilenced(item, now) {
+    const entry = readSnoozes()[item.id];
+    if (!entry) return false;
+    // Re-scheduling a reminder is an explicit "chase me at this new time",
+    // which cancels any snooze taken against the old due time.
+    if ((entry.due || "") !== (item.dueAt || "")) return false;
+    return Number(entry.until || 0) > now;
+  }
+
+  function dueReminders(now) {
+    return demoAlerts.concat(REMINDERS).filter((item) => {
+      if (item.done || !item.dueAt) return false;
+      const due = new Date(item.dueAt).getTime();
+      if (isNaN(due) || due > now) return false;
+      return !alertIsSilenced(item, now);
+    });
+  }
+
+  function alertStack() {
+    let box = document.getElementById("reminderAlerts");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "reminderAlerts";
+      box.className = "reminder-alerts";
+      box.setAttribute("role", "alertdialog");
+      box.setAttribute("aria-label", "Reminders due now");
+      document.body.appendChild(box);
+      box.addEventListener("click", handleAlertClick);
+    }
+    return box;
+  }
+
+  /* ---- Alert chime + speech ------------------------------------------- */
+  // Per-device, because "read it out loud" is a decision about the room the
+  // screen is in, not about the shared reminder list.
+  const ALERT_SOUND_KEY = "rpc_reminder_alert_sound";
+  const ALERT_SPEECH_KEY = "rpc_reminder_alert_speech";
+  const ALERT_VOICE_KEY = "rpc_reminder_alert_voice";
+  let audioCtx = null;
+
+  function alertSoundOn() { return readJson(ALERT_SOUND_KEY, true) !== false; }
+  function alertSpeechOn() { return readJson(ALERT_SPEECH_KEY, false) === true; }
+
+  /* ---- Picking a Siri-ish voice ---------------------------------------- */
+  // Apple doesn't expose the actual Siri voices to web speech — the closest
+  // thing on a Mac or iPhone is Samantha, the American voice Siri was
+  // originally built from. Left alone, browsers pick their own default
+  // (Daniel, a British male, on macOS), which sounds nothing like Siri, so
+  // the voice is chosen deliberately here. Ranked by how close each one is;
+  // the "Siri" entries are first in case Apple ever does publish them.
+  const SIRI_VOICE_RANK = [
+    "siri",
+    "samantha",
+    "ava",
+    "allison",
+    "susan",
+    "zoe",
+    "nicky",
+    "karen",
+    "serena",
+    "moira",
+    "tessa",
+  ];
+
+  function englishVoices() {
+    if (!("speechSynthesis" in window)) return [];
+    return window.speechSynthesis.getVoices().filter((v) => /^en\b|^en-/i.test(v.lang));
+  }
+
+  // Novelty voices ship on every Mac ("Bubbles", "Zarvox", "Bad News", …) and
+  // would be absurd reading out a reminder about money owed. Only offer the
+  // ones that read as a person.
+  const NOVELTY_VOICES = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|junior|ralph|fred|kathy|grandma|grandpa)\b/i;
+
+  function selectableVoices() {
+    return englishVoices().filter((v) => !NOVELTY_VOICES.test(v.name));
+  }
+
+  function rankVoice(voice) {
+    const name = voice.name.toLowerCase();
+    const index = SIRI_VOICE_RANK.findIndex((candidate) => name.includes(candidate));
+    if (index >= 0) return index;
+    // Unknown name: still prefer a local US English voice over a remote or
+    // non-US one, which is the next best guess at the Siri register.
+    return SIRI_VOICE_RANK.length + (/^en-US/i.test(voice.lang) ? 0 : 1) + (voice.localService ? 0 : 2);
+  }
+
+  function alertVoice() {
+    const voices = selectableVoices();
+    if (!voices.length) return null;
+    const saved = readJson(ALERT_VOICE_KEY, "");
+    if (saved) {
+      const match = voices.find((v) => v.name === saved);
+      if (match) return match;
+    }
+    return voices.slice().sort((a, b) => rankVoice(a) - rankVoice(b))[0];
+  }
+
+  // A two-note rising tone in the shape of Siri's, rather than a sample file:
+  // nothing to download, nothing to 404 on a cached deploy, and it cuts
+  // through shop noise without startling. Each note gets a soft attack and a
+  // long tail so it rings rather than beeps.
+  const CHIME_LEAD_MS = 520;
+  function playAlertChime() {
+    if (!alertSoundOn()) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      // Browsers start the context suspended until the page has been
+      // interacted with; resume() is a no-op once that has happened.
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const start = audioCtx.currentTime;
+      // G5 then C6 — the rising fourth Siri opens on.
+      [[783.99, 0], [1046.5, 0.18]].forEach(([freq, offset]) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        // A touch of triangle over a pure sine gives it a glassy edge that
+        // carries across a room without getting shrill.
+        osc.type = "triangle";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, start + offset);
+        gain.gain.exponentialRampToValueAtTime(0.13, start + offset + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.55);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(start + offset);
+        osc.stop(start + offset + 0.6);
+      });
+    } catch (_) {
+      // Audio blocked or unavailable — the card on screen is still the alert.
+    }
+  }
+
+  // Siri leads with "Here's your reminder:" and reads the rest as one calm
+  // sentence, so the phrasing follows that rather than barking the title.
+  function alertSpeechText(item) {
+    // Trim punctuation the title already ends with, so the spoken sentence
+    // doesn't come out with a doubled full stop.
+    const title = String(item.title || "").replace(/[.!?\s]+$/, "");
+    // Money reads better spoken than written: "$210" would otherwise come out
+    // as "dollar two hundred and ten" in some voices.
+    const spoken = title.replace(/\$([\d,]+(?:\.\d{2})?)/g, (_, amount) => {
+      const value = Number(String(amount).replace(/,/g, ""));
+      if (!isFinite(value)) return amount;
+      const whole = Math.floor(value);
+      const cents = Math.round((value - whole) * 100);
+      return `${whole} dollar${whole === 1 ? "" : "s"}${cents ? ` and ${cents} cent${cents === 1 ? "" : "s"}` : ""}`;
+    });
+    const lead = item.kind === "cash_reclaim" ? "Here's your reminder to collect cash" : "Here's your reminder";
+    return `${lead}. ${spoken}.`;
+  }
+
+  function speakAlert(item, { immediate = false } = {}) {
+    if (!alertSpeechOn() || !("speechSynthesis" in window)) return;
+    const start = () => {
+      try {
+        const utterance = new SpeechSynthesisUtterance(alertSpeechText(item));
+        const voice = alertVoice();
+        if (voice) {
+          utterance.voice = voice;
+          utterance.lang = voice.lang;
+        }
+        // Siri's register: an even, unhurried pace at natural pitch. Slowing
+        // it down any further is what makes web speech sound robotic.
+        utterance.rate = 1.02;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        // Cancel anything still being read so two reminders falling due
+        // together don't talk over each other.
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      } catch (_) {}
+    };
+    // Let the chime ring out first, the way Siri's tone precedes her voice.
+    if (immediate || !alertSoundOn()) start();
+    else setTimeout(start, CHIME_LEAD_MS);
+  }
+
+  function announceAlert(item) {
+    playAlertChime();
+    speakAlert(item);
+  }
+
+  function bindAlertPrefsOnce() {
+    const soundBox = $("alertSoundToggle");
+    const speechBox = $("alertSpeechToggle");
+    const testBtn = $("testReminderAlertBtn");
+    if (soundBox && !soundBox.dataset.bound) {
+      soundBox.dataset.bound = "true";
+      soundBox.checked = alertSoundOn();
+      soundBox.addEventListener("change", () => {
+        writeJson(ALERT_SOUND_KEY, soundBox.checked);
+        if (soundBox.checked) playAlertChime();
+      });
+    }
+    if (speechBox && !speechBox.dataset.bound) {
+      speechBox.dataset.bound = "true";
+      speechBox.checked = alertSpeechOn();
+      speechBox.addEventListener("change", () => {
+        writeJson(ALERT_SPEECH_KEY, speechBox.checked);
+        renderVoiceOptions();
+        // Sample it straight away, and skip the chime lead-in — this is a
+        // preview of the voice, not a reminder going off.
+        if (speechBox.checked) speakAlert({ title: "Call the supplier about the screen order", kind: "" }, { immediate: true });
+      });
+    }
+    bindVoicePickerOnce();
+    if (testBtn && !testBtn.dataset.bound) {
+      testBtn.dataset.bound = "true";
+      testBtn.addEventListener("click", fireTestAlert);
+    }
+    const note = $("alertPrefsNote");
+    if (note && !("speechSynthesis" in window)) {
+      note.textContent = "This browser can't read reminders out loud — the chime and the on-screen card still work.";
+      note.hidden = false;
+    }
+  }
+
+  // Which voices exist differs by device and even by browser on the same
+  // device, so the auto-picked one is offered as a default rather than
+  // imposed — someone who prefers a different voice can say so.
+  function renderVoiceOptions() {
+    const field = $("alertVoiceField");
+    const select = $("alertVoiceSelect");
+    const help = $("alertVoiceHelp");
+    if (!field || !select) return;
+    const voices = selectableVoices();
+    field.hidden = !alertSpeechOn() || !voices.length;
+    if (field.hidden) return;
+    const best = voices.slice().sort((a, b) => rankVoice(a) - rankVoice(b))[0];
+    const saved = readJson(ALERT_VOICE_KEY, "");
+    select.innerHTML = `<option value="">Closest to Siri (${esc(best ? best.name : "automatic")})</option>` +
+      voices.slice().sort((a, b) => rankVoice(a) - rankVoice(b))
+        .map((v) => `<option value="${esc(v.name)}">${esc(v.name)} — ${esc(v.lang)}</option>`).join("");
+    select.value = saved && voices.some((v) => v.name === saved) ? saved : "";
+    if (help) {
+      help.textContent = "Apple keeps the real Siri voices off the web, so this picks the closest system voice available on this device.";
+    }
+  }
+
+  function bindVoicePickerOnce() {
+    const select = $("alertVoiceSelect");
+    if (!select || select.dataset.bound) return;
+    select.dataset.bound = "true";
+    select.addEventListener("change", () => {
+      writeJson(ALERT_VOICE_KEY, select.value);
+      speakAlert({ title: "Call the supplier about the screen order", kind: "" }, { immediate: true });
+    });
+    // getVoices() is empty until the browser has loaded its voice list, which
+    // on Chrome happens after first paint — rebuild the menu when it lands.
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.addEventListener("voiceschanged", renderVoiceOptions);
+    }
+    renderVoiceOptions();
+  }
+
+  // A real card, driven through the same render path as a genuine reminder,
+  // so the test proves the actual alert works rather than a mock of it.
+  function fireTestAlert() {
+    const demo = {
+      id: "DEMO:" + Date.now(),
+      title: "Test reminder — this is how an alert looks",
+      notes: "Dismiss it with the ✕, or tick it off. Nothing was saved to the shared list.",
+      dueAt: new Date(Date.now() - 1000).toISOString(),
+      done: false,
+      assignee: "",
+      priority: "",
+      ticketId: "",
+      kind: "",
+      amount: null,
+      expenseId: "",
+    };
+    demoAlerts.push(demo);
+    renderAlerts();
+  }
+
+  function alertCardHtml(item, now) {
+    const cash = item.kind === "cash_reclaim";
+    const overdueMs = now - new Date(item.dueAt).getTime();
+    const late = overdueMs > 60000 ? reminderDueLabel(item.dueAt, new Date(now)) : "Due now";
+    const meta = [];
+    if (item.assignee) meta.push(esc(item.assignee));
+    if (item.priority && REMINDER_PRIORITIES[item.priority]) meta.push(esc(REMINDER_PRIORITIES[item.priority]));
+    return `
+      <article class="reminder-alert${cash ? " is-cash" : ""}" data-alert-id="${esc(item.id)}">
+        <div class="reminder-alert-head">
+          <span class="reminder-alert-icon"><svg class="icon" aria-hidden="true"><use href="#${cash ? "i-cash" : "i-clock"}"></use></svg></span>
+          <div class="reminder-alert-heading">
+            <p class="reminder-alert-eyebrow">${cash ? "Cash to collect" : "Reminder"}${meta.length ? " · " + meta.join(" · ") : ""}</p>
+            <h4 class="reminder-alert-title">${esc(item.title)}</h4>
+            <p class="reminder-alert-due">${esc(late)}</p>
+          </div>
+          <button type="button" class="reminder-alert-close" data-alert-snooze="60" aria-label="Dismiss for an hour">
+            <svg class="icon" aria-hidden="true"><use href="#i-xmark"></use></svg>
+          </button>
+        </div>
+        ${item.notes ? `<p class="reminder-alert-notes">${esc(item.notes)}</p>` : ""}
+        <div class="reminder-alert-actions">
+          <button type="button" class="primary-btn reminder-alert-done" data-alert-done="1">${cash ? "Collected" : "Mark done"}</button>
+          ${item.ticketId ? `<button type="button" class="ghost-btn" data-alert-ticket="${esc(item.ticketId)}">Open repair</button>` : ""}
+          <button type="button" class="ghost-btn" data-alert-open="1">${cash ? "Expenses" : "Open reminders"}</button>
+        </div>
+        <div class="reminder-alert-snooze">
+          <span>Snooze</span>
+          <button type="button" class="chip" data-alert-snooze="15">15 min</button>
+          <button type="button" class="chip" data-alert-snooze="60">1 hour</button>
+          <button type="button" class="chip" data-alert-snooze="tomorrow">Tomorrow</button>
+        </div>
+      </article>`;
+  }
+
+  function renderAlerts() {
+    const now = Date.now();
+    const due = dueReminders(now).sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
+    const box = document.getElementById("reminderAlerts");
+    if (!due.length) {
+      shownAlertIds.clear();
+      if (box) { box.innerHTML = ""; box.dataset.signature = ""; box.hidden = true; }
+      updateReminderNavBadge(0);
+      return;
+    }
+    const stack = alertStack();
+    stack.hidden = false;
+    // Only a few at a time — a wall of cards is as easy to ignore as none,
+    // and on a phone two full-width cards already fill most of the screen.
+    const visible = due.slice(0, window.innerWidth < 640 ? 2 : 3);
+    const signature = visible.map((item) => item.id + ":" + item.dueAt).join("|");
+    if (stack.dataset.signature !== signature) {
+      stack.dataset.signature = signature;
+      stack.innerHTML = visible.map((item) => alertCardHtml(item, now)).join("") +
+        (due.length > visible.length ? `<button type="button" class="reminder-alert-more" data-alert-open="1">+${due.length - visible.length} more due</button>` : "");
+      // Only actually-new cards make a sound — a re-render because one card
+      // was snoozed must not re-announce the ones that were already showing.
+      const fresh = visible.filter((item) => !shownAlertIds.has(item.id));
+      visible.forEach((item) => shownAlertIds.add(item.id));
+      if (fresh.length) announceAlert(fresh[0]);
+    }
+    updateReminderNavBadge(due.length);
+  }
+
+  function updateReminderNavBadge(count) {
+    document.querySelectorAll('.nav-btn[data-target="reminders"]').forEach((btn) => {
+      let badge = btn.querySelector(".nav-badge");
+      if (!count) { badge?.remove(); return; }
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "nav-badge";
+        btn.appendChild(badge);
+      }
+      badge.textContent = count > 99 ? "99+" : String(count);
+      badge.setAttribute("aria-label", `${count} reminder${count === 1 ? "" : "s"} due`);
+    });
+  }
+
+  function isDemoAlert(id) {
+    return String(id || "").startsWith("DEMO:");
+  }
+
+  function dropDemoAlert(id) {
+    const index = demoAlerts.findIndex((item) => item.id === id);
+    if (index >= 0) demoAlerts.splice(index, 1);
+    shownAlertIds.delete(id);
+  }
+
+  async function handleAlertClick(event) {
+    const card = event.target.closest("[data-alert-id]");
+    const openBtn = event.target.closest("[data-alert-open]");
+    const ticketBtn = event.target.closest("[data-alert-ticket]");
+    const snoozeBtn = event.target.closest("[data-alert-snooze]");
+    const doneBtn = event.target.closest("[data-alert-done]");
+    const id = card?.dataset.alertId;
+    const item = id ? demoAlerts.concat(REMINDERS).find((r) => r.id === id) : null;
+
+    if (ticketBtn) {
+      if (typeof window.RPC_OPEN_TICKET_BY_ID === "function") window.RPC_OPEN_TICKET_BY_ID(ticketBtn.dataset.alertTicket);
+      return;
+    }
+    if (openBtn) {
+      const target = item && item.kind === "cash_reclaim" ? "expenses" : "reminders";
+      if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW(target);
+      return;
+    }
+    if (snoozeBtn) {
+      if (!item) return;
+      if (isDemoAlert(item.id)) { dropDemoAlert(item.id); renderAlerts(); return; }
+      const value = snoozeBtn.dataset.alertSnooze;
+      let until;
+      if (value === "tomorrow") {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        d.setHours(9, 0, 0, 0);
+        until = d.getTime();
+      } else {
+        until = Date.now() + Number(value) * 60000;
+      }
+      snoozeAlert(item.id, until, item.dueAt);
+      shownAlertIds.delete(item.id);
+      renderAlerts();
+      return;
+    }
+    if (!doneBtn || !item) return;
+    if (isDemoAlert(item.id)) { dropDemoAlert(item.id); renderAlerts(); return; }
+    doneBtn.disabled = true;
+    try {
+      const data = await remindersApi({ action: "updateReminder", id: item.id, done: true });
+      setReminders(REMINDERS.map((r) => (r.id === item.id ? data.reminder : r)));
+      renderReminders();
+      renderAlerts();
+      // A cash reclaim just settled its expense server-side.
+      if (item.kind === "cash_reclaim") loadExpenses();
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(item.kind === "cash_reclaim" ? "Cash marked as collected" : "Reminder done", { tone: "info", duration: 3000 });
+      }
+    } catch (err) {
+      doneBtn.disabled = false;
+      notifyReminderError("Couldn't update reminder: " + err.message);
+    }
+  }
+
+  // Poll rather than push: this app talks to a serverless API with no socket,
+  // and a minute of lag on a shop to-do is fine. Polling pauses while the tab
+  // is hidden and catches up the moment it comes back.
+  async function pollReminderAlerts() {
+    // Only the network side backs off while the tab is in the background —
+    // the render always runs, so a due card is already on screen the moment
+    // someone comes back, and an embedded/webview context that never reports
+    // itself visible still gets its alerts. No PIN means the API would reject
+    // us anyway; the cached list is rendered either way.
+    if (!document.hidden && pin()) await loadReminders({ quiet: true });
+    pruneSnoozes();
+    renderAlerts();
+  }
+
+  function startReminderAlerts() {
+    if (alertPollTimer) return;
+    bindAlertPrefsOnce();
+    setTimeout(() => { pollReminderAlerts(); }, ALERT_FIRST_RUN_MS);
+    alertPollTimer = setInterval(pollReminderAlerts, ALERT_POLL_MS);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) pollReminderAlerts();
+    });
+    // A due time can pass without any new data arriving, so re-render on a
+    // shorter beat than the network poll.
+    setInterval(renderAlerts, 15000);
+  }
+
+  // Lets the expense screens (and anything else that writes a reminder
+  // server-side) pull the list and re-evaluate what should be on screen.
+  window.RPC_REFRESH_REMINDERS = async () => {
+    await loadReminders();
+    renderAlerts();
+  };
+
+  startReminderAlerts();
 
   window.addEventListener("rpc-enter-reminders", initReminders);
 
