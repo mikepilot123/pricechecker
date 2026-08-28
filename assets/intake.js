@@ -723,9 +723,10 @@
   }
   $("clearAllIntake").addEventListener("click", openClearAllModal);
   $("closeClearAllModal").addEventListener("click", closeClearAllModal);
-  $("clearAllModal").addEventListener("click", (e) => {
-    if (e.target.id === "clearAllModal") closeClearAllModal();
-  });
+  // Backdrop clicks deliberately do NOT close modals: these are data-entry
+  // sheets used on a shop tablet, and one stray tap outside the panel used to
+  // throw away a half-filled form. Closing is always an explicit action — the
+  // X, Cancel/Done, or Escape.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("clearAllModal").hidden) closeClearAllModal();
   });
@@ -793,9 +794,6 @@
   function closeRestoreBackupModal() { $("restoreBackupModal").hidden = true; }
   $("restoreIntake").addEventListener("click", openRestoreBackupModal);
   $("closeRestoreBackupModal").addEventListener("click", closeRestoreBackupModal);
-  $("restoreBackupModal").addEventListener("click", (e) => {
-    if (e.target.id === "restoreBackupModal") closeRestoreBackupModal();
-  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("restoreBackupModal").hidden) closeRestoreBackupModal();
   });
@@ -890,9 +888,6 @@
   $("openIssueModal").addEventListener("click", openIssueModal);
   $("closeIssueModal").addEventListener("click", closeIssueModal);
   $("issueModalDone").addEventListener("click", closeIssueModal);
-  $("issueModal").addEventListener("click", (e) => {
-    if (e.target.id === "issueModal") closeIssueModal();
-  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("issueModal").hidden) closeIssueModal();
   });
@@ -1113,9 +1108,6 @@
   }
 
   $("closeActivityLogModal").addEventListener("click", closeActivityLogModal);
-  $("activityLogModal").addEventListener("click", (e) => {
-    if (e.target.id === "activityLogModal") closeActivityLogModal();
-  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("activityLogModal").hidden) closeActivityLogModal();
   });
@@ -1223,7 +1215,6 @@
     activeTicketMedia = [];
   }
   $("closeTicketModal").addEventListener("click", closeTicketModal);
-  $("ticketModal").addEventListener("click", (e) => { if (e.target.id === "ticketModal") closeTicketModal(); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && isMediaViewerOpen()) return;
     if (e.key === "Escape" && !$("ticketModal").hidden) closeTicketModal();
@@ -1407,9 +1398,6 @@
   }
 
   $("closeMediaViewer")?.addEventListener("click", closeMediaViewer);
-  $("mediaViewerModal")?.addEventListener("click", (e) => {
-    if (e.target.id === "mediaViewerModal") closeMediaViewer();
-  });
   $("mediaViewerPrev")?.addEventListener("click", () => stepMediaViewer(-1));
   $("mediaViewerNext")?.addEventListener("click", () => stepMediaViewer(1));
   document.addEventListener("keydown", (e) => {
@@ -2233,9 +2221,6 @@
   }
 
   $("closeClientModal").addEventListener("click", closeClientModal);
-  $("clientModal").addEventListener("click", (e) => {
-    if (e.target.id === "clientModal") closeClientModal();
-  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("clientModal").hidden) closeClientModal();
   });
@@ -2418,9 +2403,6 @@
   }
 
   $("closeTechnicianModal").addEventListener("click", closeTechnicianModal);
-  $("technicianModal").addEventListener("click", (e) => {
-    if (e.target.id === "technicianModal") closeTechnicianModal();
-  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("technicianModal").hidden) closeTechnicianModal();
   });
@@ -2755,9 +2737,6 @@
   }
 
   $("closeStatusModal")?.addEventListener("click", closeStatusModal);
-  $("statusModal")?.addEventListener("click", (e) => {
-    if (e.target.id === "statusModal") closeStatusModal();
-  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("statusModal")?.hidden) closeStatusModal();
   });

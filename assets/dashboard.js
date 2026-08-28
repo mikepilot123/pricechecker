@@ -508,9 +508,10 @@
     $("closeExpenseFormModal")?.addEventListener("click", closeExpenseForm);
     $("expenseCancelBtn")?.addEventListener("click", closeExpenseForm);
     $("expenseSubmit")?.addEventListener("click", saveExpenseForm);
-    $("expenseFormModal")?.addEventListener("click", (event) => {
-      if (event.target.id === "expenseFormModal") closeExpenseForm();
-    });
+    // Backdrop clicks deliberately do NOT close modals: these are data-entry
+    // sheets used on a shop tablet, and one stray tap outside the panel used to
+    // throw away a half-filled form. Closing is always an explicit action — the
+    // X, Cancel/Done, or Escape.
 
     $("expenseSearch")?.addEventListener("input", () => {
       expenseSearchQuery = ($("expenseSearch").value || "").trim().toLowerCase();
@@ -1273,9 +1274,6 @@
     $("closeReminderFormModal")?.addEventListener("click", closeReminderForm);
     $("reminderCancelBtn")?.addEventListener("click", closeReminderForm);
     $("reminderSubmit")?.addEventListener("click", saveReminderForm);
-    $("reminderFormModal")?.addEventListener("click", (event) => {
-      if (event.target.id === "reminderFormModal") closeReminderForm();
-    });
 
     form.querySelectorAll("[data-reminder-preset]").forEach((btn) => {
       btn.addEventListener("click", () => applyReminderPreset(btn.dataset.reminderPreset));

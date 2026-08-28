@@ -1114,9 +1114,10 @@ if (els.closePricesSetupModal) els.closePricesSetupModal.addEventListener("click
 if (els.pricesSetupSave) els.pricesSetupSave.addEventListener("click", savePricesSetup);
 els.addMissingPriceDevice?.addEventListener("click", openAddPriceDeviceModal);
 els.closeAddPriceDeviceModal?.addEventListener("click", closeAddPriceDeviceModal);
-els.addPriceDeviceModal?.addEventListener("click", (e) => {
-  if (e.target === els.addPriceDeviceModal) closeAddPriceDeviceModal();
-});
+// Backdrop clicks deliberately do NOT close modals: these are data-entry
+// sheets used on a shop tablet, and one stray tap outside the panel used to
+// throw away a half-filled form. Closing is always an explicit action — the
+// X, Cancel/Done, or Escape.
 els.addPriceDeviceSave?.addEventListener("click", saveAddedPriceDevice);
 els.addPriceDeviceModal?.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeAddPriceDeviceModal();

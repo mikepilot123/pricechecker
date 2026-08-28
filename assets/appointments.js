@@ -762,7 +762,10 @@
     $("apptDetailModal").hidden = true;
   }
   $("closeApptDetailModal")?.addEventListener("click", closeApptDetailModal);
-  $("apptDetailModal")?.addEventListener("click", (e) => { if (e.target.id === "apptDetailModal") closeApptDetailModal(); });
+  // Backdrop clicks deliberately do NOT close modals: these are data-entry
+  // sheets used on a shop tablet, and one stray tap outside the panel used to
+  // throw away a half-filled form. Closing is always an explicit action — the
+  // X, Cancel/Done, or Escape.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("apptDetailModal")?.hidden) closeApptDetailModal();
   });
@@ -838,7 +841,6 @@
     if (value) renderRescheduleSlots(value);
   });
   $("closeApptRescheduleModal")?.addEventListener("click", closeRescheduleModal);
-  $("apptRescheduleModal")?.addEventListener("click", (e) => { if (e.target.id === "apptRescheduleModal") closeRescheduleModal(); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("apptRescheduleModal")?.hidden) closeRescheduleModal();
   });
@@ -998,9 +1000,6 @@
     $("openApptIssueModal")?.addEventListener("click", openApptIssueModal);
     $("closeApptIssueModal")?.addEventListener("click", closeApptIssueModal);
     $("apptIssueModalDone")?.addEventListener("click", closeApptIssueModal);
-    $("apptIssueModal")?.addEventListener("click", (e) => {
-      if (e.target.id === "apptIssueModal") closeApptIssueModal();
-    });
     $("apptIssueOther")?.addEventListener("input", updateIssueSummary);
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !$("apptIssueModal")?.hidden) closeApptIssueModal();

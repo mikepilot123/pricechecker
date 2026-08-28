@@ -361,16 +361,14 @@
       setLeadStep(currentStep + 1);
     });
 
-    $("leadFormModal")?.addEventListener("click", (e) => {
-      if (e.target === $("leadFormModal")) closeAndReset();
-    });
+    // Backdrop clicks deliberately do NOT close modals: these are data-entry
+    // sheets used on a shop tablet, and one stray tap outside the panel used to
+    // throw away a half-filled form. Closing is always an explicit action — the
+    // X, Cancel/Done, or Escape.
 
     $("openLeadIssueModal")?.addEventListener("click", openLeadIssueModal);
     $("closeLeadIssueModal")?.addEventListener("click", closeLeadIssueModal);
     $("leadIssueModalDone")?.addEventListener("click", closeLeadIssueModal);
-    $("leadIssueModal")?.addEventListener("click", (e) => {
-      if (e.target === $("leadIssueModal")) closeLeadIssueModal();
-    });
     $("leadIssueOther")?.addEventListener("input", updateLeadIssueSummary);
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !$("leadIssueModal")?.hidden) closeLeadIssueModal();
@@ -624,7 +622,6 @@
     $("leadDetailModal").hidden = true;
   }
   $("closeLeadDetailModal")?.addEventListener("click", closeLeadDetailModal);
-  $("leadDetailModal")?.addEventListener("click", (e) => { if (e.target.id === "leadDetailModal") closeLeadDetailModal(); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("leadDetailModal")?.hidden) closeLeadDetailModal();
   });
@@ -687,7 +684,6 @@
     notesModalLead = null;
   }
   $("closeLeadNotesModal")?.addEventListener("click", closeLeadNotesModal);
-  $("leadNotesModal")?.addEventListener("click", (e) => { if (e.target.id === "leadNotesModal") closeLeadNotesModal(); });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("leadNotesModal")?.hidden) closeLeadNotesModal();
   });
