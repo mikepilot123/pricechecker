@@ -178,6 +178,19 @@ function notifyFailure_(detail) {
   }
 }
 
+// Puts a "Repair Hub Backup" menu in the Sheet's own menu bar. Running a
+// backup by hand shouldn't mean opening the script editor and hunting for the
+// right function in the Run dropdown — from here it's one click, which also
+// makes it easy to confirm the thing still works after any change.
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("Repair Hub Backup")
+    .addItem("Back up now", "runBackupNow")
+    .addSeparator()
+    .addItem("Reschedule nightly 9pm job", "installBackupTrigger")
+    .addToUi();
+}
+
 /** Run once, by hand, to schedule the nightly job. Safe to re-run. */
 function installBackupTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
