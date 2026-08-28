@@ -12,6 +12,7 @@ import {
   listMonthlySales,
   rebuildMonthlySales,
   listTicketNotes,
+  listAllTicketNotes,
   addTicketNote,
   deleteTicketNote,
 } from "../lib/tickets.js";
@@ -120,6 +121,9 @@ export default async function handler(req, res) {
     }
     if (action === "listTicketNotes") {
       return res.status(200).json({ ok: true, notes: await listTicketNotes(body.ticketId) });
+    }
+    if (action === "listAllTicketNotes") {
+      return res.status(200).json({ ok: true, notes: await listAllTicketNotes() });
     }
     if (action === "addTicketNote") {
       return res.status(200).json({ ok: true, notes: await addTicketNote(body) });
