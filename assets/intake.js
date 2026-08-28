@@ -910,10 +910,15 @@
       .reverse();
   }
 
+  // Internal note log, keyed by ticket id. Cached here so the badge count can
+  // include notes already fetched without refetching on every render.
+  const TICKET_NOTES = Object.create(null);
+
   function activityLogCount(ticket) {
     return (
       parseHistoryEntries(ticket.history).length +
       (ticket.notes ? 1 : 0) +
+      (TICKET_NOTES[ticket.id]?.length || 0) +
       splitIssueParts(ticket.issues).long.length
     );
   }
@@ -941,6 +946,39 @@
     btn.onkeydown = (e) => e.stopPropagation();
   }
 
+  function noteWhenLabel(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  }
+
+  function ticketNoteListHtml(ticket) {
+    const logged = TICKET_NOTES[ticket.id] || [];
+    const items = logged.map((n) => `
+      <div class="ticket-note-item" data-note-id="${esc(n.id)}">
+        <div class="ticket-note-body">
+          <p class="ticket-note-text">${esc(n.note)}</p>
+          <span class="ticket-note-when mono">${esc(noteWhenLabel(n.created))}</span>
+        </div>
+        <button type="button" class="ticket-note-delete" data-delete-note="${esc(n.id)}" aria-label="Delete note">
+          <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
+        </button>
+      </div>`);
+    // The check-in note isn't part of the log and can't be deleted from here —
+    // it belongs to the ticket form and prints on the invoice.
+    if (ticket.notes) {
+      items.push(`
+        <div class="ticket-note-item is-checkin">
+          <div class="ticket-note-body">
+            <p class="ticket-note-text">${esc(ticket.notes)}</p>
+            <span class="ticket-note-when">From check-in</span>
+          </div>
+        </div>`);
+    }
+    if (!items.length) return `<p class="ticket-note-empty">No notes yet.</p>`;
+    return items.join("");
+  }
+
   function activityLogBodyHtml(ticket) {
     const sections = [];
     const longIssueParts = splitIssueParts(ticket.issues).long;
@@ -950,12 +988,19 @@
         ${longIssueParts.map((p) => `<p class="ticket-detail-notes activity-log-note">${esc(p)}</p>`).join("")}
       </section>`);
     }
-    if (ticket.notes) {
-      sections.push(`<section class="activity-log-section">
-        <p class="field-label">Notes</p>
-        <p class="ticket-detail-notes activity-log-note">${esc(ticket.notes)}</p>
-      </section>`);
-    }
+    // Notes are editable in place: type and press Enter to append one. The
+    // list below is the internal log; ticket.notes (written at check-in and
+    // printed on the customer's invoice) is shown as the oldest entry so
+    // nothing that used to be visible here disappears.
+    sections.push(`<section class="activity-log-section">
+      <p class="field-label">Notes</p>
+      <form id="ticketNoteForm" class="ticket-note-form" autocomplete="off">
+        <input id="ticketNoteInput" class="text-input ticket-note-input"
+          placeholder="Add a note, then press Enter" aria-label="Add a note" />
+      </form>
+      <p id="ticketNoteError" class="field-error" hidden></p>
+      <div id="ticketNoteList" class="ticket-note-list">${ticketNoteListHtml(ticket)}</div>
+    </section>`);
     const entries = parseHistoryEntries(ticket.history);
     if (entries.length) {
       sections.push(`<section class="activity-log-section">
@@ -971,15 +1016,100 @@
     return sections.join("");
   }
 
+  let activityLogTicket = null;
+
   function openActivityLogModal(ticket) {
+    activityLogTicket = ticket;
     $("activityLogTitle").textContent = ticket.device || "Updates & notes";
     $("activityLogBody").innerHTML = activityLogBodyHtml(ticket);
     $("activityLogModal").hidden = false;
-    $("closeActivityLogModal").focus();
+    bindTicketNoteForm(ticket);
+    // Focus the note box rather than the close button — adding a note is what
+    // this modal is usually opened to do.
+    ($("ticketNoteInput") || $("closeActivityLogModal")).focus();
+    loadTicketNotes(ticket);
+  }
+
+  // Notes are fetched per ticket rather than shipped with the ticket list —
+  // the list is polled often and most tickets' notes are never looked at.
+  async function loadTicketNotes(ticket) {
+    try {
+      const data = await api({ action: "listTicketNotes", ticketId: ticket.id });
+      TICKET_NOTES[ticket.id] = data.notes || [];
+      if (activityLogTicket && activityLogTicket.id === ticket.id) refreshTicketNoteList(ticket);
+    } catch (_) {
+      // Offline or rejected — the check-in note still renders, and adding a
+      // note will surface its own error if that fails too.
+    }
+  }
+
+  function refreshTicketNoteList(ticket) {
+    const list = $("ticketNoteList");
+    if (list) list.innerHTML = ticketNoteListHtml(ticket);
+  }
+
+  function bindTicketNoteForm(ticket) {
+    const form = $("ticketNoteForm");
+    const input = $("ticketNoteInput");
+    const err = $("ticketNoteError");
+    const list = $("ticketNoteList");
+    if (!form || !input) return;
+
+    async function submitNote() {
+      const note = input.value.trim();
+      if (!note) return;
+      if (err) err.hidden = true;
+      input.disabled = true;
+      try {
+        const data = await api({ action: "addTicketNote", ticketId: ticket.id, note });
+        TICKET_NOTES[ticket.id] = data.notes || [];
+        input.value = "";
+        refreshTicketNoteList(ticket);
+      } catch (e) {
+        if (err) { err.textContent = "Couldn't add the note: " + e.message; err.hidden = false; }
+      } finally {
+        input.disabled = false;
+        input.focus();
+      }
+    }
+
+    // Enter is handled explicitly rather than relying on the form's implicit
+    // submission: this form has no submit button (by design — the whole point
+    // is type-and-press-Enter), and without one the browser doesn't reliably
+    // fire submit. Verified: it does not fire here.
+    input.onkeydown = (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      submitNote();
+    };
+    // Kept so the form still behaves if a submit control is ever added.
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      submitNote();
+    };
+
+    if (list) {
+      list.onclick = async (event) => {
+        const btn = event.target.closest("[data-delete-note]");
+        if (!btn) return;
+        if (!window.confirm("Delete this note?")) return;
+        btn.disabled = true;
+        try {
+          const data = await api({ action: "deleteTicketNote", ticketId: ticket.id, noteId: btn.dataset.deleteNote });
+          TICKET_NOTES[ticket.id] = data.notes || [];
+          refreshTicketNoteList(ticket);
+        } catch (e) {
+          btn.disabled = false;
+          if (err) { err.textContent = "Couldn't delete the note: " + e.message; err.hidden = false; }
+        }
+      };
+    }
   }
 
   function closeActivityLogModal() {
     $("activityLogModal").hidden = true;
+    activityLogTicket = null;
   }
 
   $("closeActivityLogModal").addEventListener("click", closeActivityLogModal);

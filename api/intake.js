@@ -11,6 +11,9 @@ import {
   deleteTechnician,
   listMonthlySales,
   rebuildMonthlySales,
+  listTicketNotes,
+  addTicketNote,
+  deleteTicketNote,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { listCustomers } from "../lib/customers.js";
@@ -114,6 +117,15 @@ export default async function handler(req, res) {
     }
     if (action === "deleteExpense") {
       return res.status(200).json({ ok: true, deletedId: await deleteExpense(body) });
+    }
+    if (action === "listTicketNotes") {
+      return res.status(200).json({ ok: true, notes: await listTicketNotes(body.ticketId) });
+    }
+    if (action === "addTicketNote") {
+      return res.status(200).json({ ok: true, notes: await addTicketNote(body) });
+    }
+    if (action === "deleteTicketNote") {
+      return res.status(200).json({ ok: true, notes: await deleteTicketNote(body) });
     }
     if (action === "listReminders") {
       return res.status(200).json({ ok: true, reminders: await listReminders() });

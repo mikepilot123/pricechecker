@@ -17,7 +17,7 @@
    The prices/intake API and Google Sheet are never touched here — those go
    straight to the network and have their own localStorage fallbacks. */
 
-const VERSION = "v67";
+const VERSION = "v68";
 const CACHE = `rpc-shell-${VERSION}`;
 
 // How long any single network request may take before we stop waiting and
@@ -86,13 +86,22 @@ async function pruneSupersededVersions(cache, request) {
   }));
 }
 
-// Exact match first, then ignoring the `?v=` string. The fallback matters on
-// the first load after a deploy bumps a version: the device has
-// style.css?v=3 cached and is now being asked for style.css?v=4 while
-// offline. Slightly stale beats a blank page.
+// Exact-URL match only. Deliberately strict: `?v=` is how a deploy says "this
+// file changed", so a request for style.css?v=4 must never be satisfied from
+// a cached style.css?v=3 while the network is available — that would silently
+// delay every deploy by a reload and make "I pushed a fix but nothing
+// changed" a routine occurrence.
 async function cacheLookup(request) {
   const cache = await caches.open(CACHE);
-  return (await cache.match(request)) || (await cache.match(request, { ignoreSearch: true }));
+  return cache.match(request);
+}
+
+// The version-agnostic fallback, used ONLY once the network has actually
+// failed. Offline on the first load after a deploy, a slightly stale
+// stylesheet beats a blank page.
+async function staleFallback(request) {
+  const cache = await caches.open(CACHE);
+  return cache.match(request, { ignoreSearch: true });
 }
 
 // Add each URL independently. cache.addAll() is all-or-nothing: one 404
@@ -167,6 +176,7 @@ self.addEventListener("fetch", (e) => {
         })
         .catch(async () =>
           (await cacheLookup(req)) ||
+          (await staleFallback(req)) ||
           (await caches.match("./index.html")) ||
           (await caches.match("./")) ||
           Response.error()
@@ -192,10 +202,12 @@ self.addEventListener("fetch", (e) => {
         return hit;
       }
 
-      // Nothing cached — we have to wait on the network. Never substitute
-      // index.html for a missing .js file: the browser would execute HTML as
-      // JavaScript and break the whole app.
-      return network.catch(() => Response.error());
+      // No exact copy — this is a freshly deployed `?v=` URL, so wait on the
+      // network to get the real thing. Only if that fails do we reach for a
+      // previous version of the same file. Never substitute index.html for a
+      // missing .js file: the browser would execute HTML as JavaScript and
+      // break the whole app.
+      return network.catch(async () => (await staleFallback(req)) || Response.error());
     })
   );
 });

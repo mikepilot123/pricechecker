@@ -6177,3 +6177,35 @@ video.media-viewer-media {
   background: #f0b429;
   flex: none;
 }
+
+/* ---- Ticket notes (timeline modal) -------------------------------------- */
+.ticket-note-form { margin: 0 0 8px; }
+.ticket-note-input { width: 100%; }
+.ticket-note-list { display: flex; flex-direction: column; gap: 6px; }
+.ticket-note-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+}
+/* The check-in note comes from the ticket form and prints on the customer's
+   invoice, so it reads as a quieter, non-removable entry. */
+.ticket-note-item.is-checkin { background: var(--card); border-style: dashed; }
+.ticket-note-body { flex: 1; min-width: 0; }
+.ticket-note-text { margin: 0; font-size: 0.86rem; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ticket-note-when { display: block; margin-top: 2px; font-size: 0.72rem; color: var(--text-dim); }
+.ticket-note-delete {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+.ticket-note-delete:hover { background: var(--card); color: var(--danger); }
+.ticket-note-delete .icon { width: 14px; height: 14px; }
+.ticket-note-empty { margin: 0; font-size: 0.82rem; color: var(--text-dim); }
