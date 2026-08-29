@@ -1457,6 +1457,7 @@
     renderDueTimeSelects();
     popup.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
+    trigger.closest(".modal-body")?.classList.add("due-popup-open");
     dueCalOutsideHandler = (event) => {
       if (!popup.contains(event.target) && event.target !== trigger && !trigger.contains(event.target)) {
         closeDuePopup();
@@ -1469,7 +1470,10 @@
     const popup = $("reminderDuePopup");
     const trigger = $("reminderDueDisplay");
     if (popup) popup.hidden = true;
-    if (trigger) trigger.setAttribute("aria-expanded", "false");
+    if (trigger) {
+      trigger.setAttribute("aria-expanded", "false");
+      trigger.closest(".modal-body")?.classList.remove("due-popup-open");
+    }
     if (dueCalOutsideHandler) {
       document.removeEventListener("mousedown", dueCalOutsideHandler);
       dueCalOutsideHandler = null;
