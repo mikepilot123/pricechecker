@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=due-date-popup-2" />
+  <link rel="stylesheet" href="assets/style.css?v=due-date-popup-3" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -621,27 +621,31 @@
                 </button>
                 <input type="hidden" id="reminderDue" />
                 <div class="due-popup" id="reminderDuePopup" role="dialog" aria-label="Choose due date and time" hidden>
-                  <div class="due-popup-header">
-                    <button type="button" class="due-popup-nav" id="dueCalPrev" aria-label="Previous month">
-                      <svg class="icon"><use href="#i-chevron-down"></use></svg>
-                    </button>
-                    <span id="dueCalMonthLabel" class="due-popup-month"></span>
-                    <button type="button" class="due-popup-nav" id="dueCalNext" aria-label="Next month">
-                      <svg class="icon"><use href="#i-chevron-down"></use></svg>
-                    </button>
-                  </div>
-                  <div class="due-popup-weekdays">
-                    <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
-                  </div>
-                  <div class="due-popup-days" id="dueCalDays"></div>
-                  <div class="due-popup-time">
-                    <select id="dueTimeHour" class="text-input select-input"></select>
-                    <span class="due-popup-time-sep">:</span>
-                    <select id="dueTimeMinute" class="text-input select-input"></select>
-                    <select id="dueTimeAmpm" class="text-input select-input">
-                      <option value="AM">AM</option>
-                      <option value="PM">PM</option>
-                    </select>
+                  <div class="due-popup-body">
+                    <div class="due-popup-calendar">
+                      <div class="due-popup-header">
+                        <button type="button" class="due-popup-nav" id="dueCalPrev" aria-label="Previous month">
+                          <svg class="icon"><use href="#i-chevron-down"></use></svg>
+                        </button>
+                        <span id="dueCalMonthLabel" class="due-popup-month"></span>
+                        <button type="button" class="due-popup-nav" id="dueCalNext" aria-label="Next month">
+                          <svg class="icon"><use href="#i-chevron-down"></use></svg>
+                        </button>
+                      </div>
+                      <div class="due-popup-weekdays">
+                        <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+                      </div>
+                      <div class="due-popup-days" id="dueCalDays"></div>
+                    </div>
+                    <div class="due-popup-time">
+                      <label class="due-popup-time-label" for="dueTimeHour">Time</label>
+                      <select id="dueTimeHour" class="text-input select-input"></select>
+                      <select id="dueTimeMinute" class="text-input select-input"></select>
+                      <select id="dueTimeAmpm" class="text-input select-input">
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
                   </div>
                   <div class="due-popup-footer">
                     <button type="button" class="ghost-btn" id="dueCalClear">Clear</button>
@@ -1833,7 +1837,7 @@
   <script defer src="assets/app.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/inventory.js?v=synced-data-1"></script>
   <script defer src="assets/intake.js?v=no-backdrop-close-1"></script>
-  <script defer src="assets/dashboard.js?v=due-date-popup-2"></script>
+  <script defer src="assets/dashboard.js?v=due-date-popup-3"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>

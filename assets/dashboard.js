@@ -1458,6 +1458,15 @@
     popup.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
     trigger.closest(".modal-body")?.classList.add("due-popup-open");
+
+    // Flip above the field instead of overflowing the bottom of the viewport
+    // when there isn't room below (e.g. the field sits low in a short window).
+    popup.classList.remove("due-popup-flip-up");
+    const rect = popup.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight) {
+      popup.classList.add("due-popup-flip-up");
+    }
+
     dueCalOutsideHandler = (event) => {
       if (!popup.contains(event.target) && event.target !== trigger && !trigger.contains(event.target)) {
         closeDuePopup();
