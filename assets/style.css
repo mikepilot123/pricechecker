@@ -2263,7 +2263,7 @@ body.nav-open .view-nav { transform: translateX(0); }
   top: calc(100% + 6px);
   left: 0;
   z-index: 40;
-  width: 336px;
+  width: 380px;
   max-width: calc(100vw - 32px);
   background: var(--card);
   border: 1px solid var(--border);
@@ -2306,11 +2306,11 @@ body.nav-open .view-nav { transform: translateX(0); }
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 27px;
+  height: 30px;
   border: none;
   background: transparent;
   border-radius: 50%;
-  font-size: 0.76rem;
+  font-size: 0.82rem;
   color: var(--text);
   cursor: pointer;
 }
