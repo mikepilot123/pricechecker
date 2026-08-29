@@ -607,14 +607,48 @@
               </select>
             </div>
             <div class="form-field form-field-full">
-              <label class="field-label" for="reminderDue">Due (optional)</label>
+              <label class="field-label" for="reminderDueDisplay">Due (optional)</label>
               <div class="reminder-due-presets" role="group" aria-label="Quick due date">
                 <button type="button" class="chip" data-reminder-preset="today">Today</button>
                 <button type="button" class="chip" data-reminder-preset="tomorrow">Tomorrow</button>
                 <button type="button" class="chip" data-reminder-preset="week">Next week</button>
                 <button type="button" class="chip" data-reminder-preset="none">No due date</button>
               </div>
-              <input id="reminderDue" class="text-input" type="datetime-local" />
+              <div class="due-picker" id="reminderDuePicker">
+                <button type="button" id="reminderDueDisplay" class="text-input due-picker-trigger" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="reminderDueDisplayText">No due date</span>
+                  <svg class="icon"><use href="#i-clock"></use></svg>
+                </button>
+                <input type="hidden" id="reminderDue" />
+                <div class="due-popup" id="reminderDuePopup" role="dialog" aria-label="Choose due date and time" hidden>
+                  <div class="due-popup-header">
+                    <button type="button" class="due-popup-nav" id="dueCalPrev" aria-label="Previous month">
+                      <svg class="icon"><use href="#i-chevron-down"></use></svg>
+                    </button>
+                    <span id="dueCalMonthLabel" class="due-popup-month"></span>
+                    <button type="button" class="due-popup-nav" id="dueCalNext" aria-label="Next month">
+                      <svg class="icon"><use href="#i-chevron-down"></use></svg>
+                    </button>
+                  </div>
+                  <div class="due-popup-weekdays">
+                    <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+                  </div>
+                  <div class="due-popup-days" id="dueCalDays"></div>
+                  <div class="due-popup-time">
+                    <select id="dueTimeHour" class="text-input select-input"></select>
+                    <span class="due-popup-time-sep">:</span>
+                    <select id="dueTimeMinute" class="text-input select-input"></select>
+                    <select id="dueTimeAmpm" class="text-input select-input">
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                  <div class="due-popup-footer">
+                    <button type="button" class="ghost-btn" id="dueCalClear">Clear</button>
+                    <button type="button" class="primary-btn" id="dueCalSave">Save</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="reminderTicketSearch">Link to a repair (optional)</label>

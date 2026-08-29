@@ -2246,6 +2246,80 @@ body.nav-open .view-nav { transform: translateX(0); }
 .reminder-due-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .reminder-due-presets .chip { padding: 6px 12px; font-size: 0.8rem; }
 
+/* Custom due date/time popup (replaces the native datetime-local picker so
+   we can put an in-popup Save button on it). */
+.due-picker { position: relative; }
+.due-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.due-picker-trigger .icon { width: 17px; height: 17px; color: var(--text-dim); flex-shrink: 0; }
+.due-popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: 280px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow), 0 12px 28px rgba(15, 23, 42, 0.14);
+  padding: 12px;
+}
+.due-popup[hidden] { display: none; }
+.due-popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.due-popup-month { font-weight: 600; font-size: 0.9rem; }
+.due-popup-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  cursor: pointer;
+  color: var(--text);
+}
+.due-popup-nav:hover { background: var(--bg-soft); }
+.due-popup-nav .icon { width: 14px; height: 14px; }
+.due-popup-nav#dueCalPrev .icon { transform: rotate(90deg); }
+.due-popup-nav#dueCalNext .icon { transform: rotate(-90deg); }
+.due-popup-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.due-popup-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 10px; }
+.due-popup-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.due-popup-day:hover { background: var(--bg-soft); }
+.due-popup-day.is-outside { color: var(--text-dim); opacity: 0.55; }
+.due-popup-day.is-today { font-weight: 600; }
+.due-popup-day.is-selected { background: var(--accent); color: #fff; }
+.due-popup-time { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.due-popup-time .select-input { flex: 1; padding: 7px 8px; font-size: 0.85rem; }
+.due-popup-time-sep { color: var(--text-dim); }
+.due-popup-footer { display: flex; justify-content: space-between; gap: 8px; }
+.due-popup-footer .ghost-btn, .due-popup-footer .primary-btn { padding: 7px 14px; font-size: 0.85rem; flex: 1; }
+
 .rem-toolbar { display: flex; gap: 10px; margin-bottom: 12px; }
 .rem-searchbar { flex: 1; min-height: 44px; }
 .rem-searchbar input { min-height: 40px; }

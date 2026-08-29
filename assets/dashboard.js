@@ -747,7 +747,7 @@
     // time never pops up, which is the whole point of pressing this button.
     applyReminderPreset("tomorrow");
     checkReminderDuplicate();
-    $("reminderDue")?.focus();
+    $("reminderDueDisplay")?.focus();
   }
 
   function handleExpenseChipClick(event) {
@@ -1279,6 +1279,8 @@
       btn.addEventListener("click", () => applyReminderPreset(btn.dataset.reminderPreset));
     });
 
+    bindDueDatePopup();
+
     $("reminderList")?.addEventListener("click", handleReminderListClick);
     $("reminderFilterChips")?.addEventListener("click", (event) => {
       const chip = event.target.closest("[data-reminder-filter]");
@@ -1406,12 +1408,199 @@
   function applyReminderPreset(preset) {
     const input = $("reminderDue");
     if (!input) return;
-    if (preset === "none") { input.value = ""; return; }
+    if (preset === "none") { input.value = ""; syncReminderDueDisplay(); return; }
     const d = new Date();
     if (preset === "today") d.setHours(17, 0, 0, 0);
     else if (preset === "tomorrow") { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
     else if (preset === "week") { d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); }
     input.value = toDatetimeLocal(d);
+    syncReminderDueDisplay();
+  }
+
+  function syncReminderDueDisplay() {
+    const hidden = $("reminderDue");
+    const text = $("reminderDueDisplayText");
+    if (!hidden || !text) return;
+    const d = hidden.value ? new Date(hidden.value) : null;
+    if (!d || isNaN(d)) { text.textContent = "No due date"; return; }
+    const pad = (n) => String(n).padStart(2, "0");
+    let hours = d.getHours();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    text.textContent = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}, ${hours}:${pad(d.getMinutes())} ${ampm}`;
+  }
+
+  // Custom popup that replaces the native datetime-local picker for the
+  // reminder due date, so there's an in-popup Save button instead of relying
+  // on the browser's own (buttonless) calendar UI.
+  let dueCalPendingDate = null; // Date being edited while the popup is open, or null
+  let dueCalViewYear = null;
+  let dueCalViewMonth = null;
+  let dueCalOutsideHandler = null;
+
+  function isDuePopupOpen() {
+    const popup = $("reminderDuePopup");
+    return !!popup && !popup.hidden;
+  }
+
+  function openDuePopup() {
+    const popup = $("reminderDuePopup");
+    const trigger = $("reminderDueDisplay");
+    const hidden = $("reminderDue");
+    if (!popup || !trigger || !hidden) return;
+    const existing = hidden.value ? new Date(hidden.value) : null;
+    dueCalPendingDate = existing && !isNaN(existing) ? existing : null;
+    const view = dueCalPendingDate || new Date();
+    dueCalViewYear = view.getFullYear();
+    dueCalViewMonth = view.getMonth();
+    renderDueCalendar();
+    renderDueTimeSelects();
+    popup.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    dueCalOutsideHandler = (event) => {
+      if (!popup.contains(event.target) && event.target !== trigger && !trigger.contains(event.target)) {
+        closeDuePopup();
+      }
+    };
+    document.addEventListener("mousedown", dueCalOutsideHandler);
+  }
+
+  function closeDuePopup() {
+    const popup = $("reminderDuePopup");
+    const trigger = $("reminderDueDisplay");
+    if (popup) popup.hidden = true;
+    if (trigger) trigger.setAttribute("aria-expanded", "false");
+    if (dueCalOutsideHandler) {
+      document.removeEventListener("mousedown", dueCalOutsideHandler);
+      dueCalOutsideHandler = null;
+    }
+  }
+
+  function renderDueCalendar() {
+    const monthLabel = $("dueCalMonthLabel");
+    const days = $("dueCalDays");
+    if (!monthLabel || !days) return;
+    const view = new Date(dueCalViewYear, dueCalViewMonth, 1);
+    monthLabel.textContent = view.toLocaleDateString([], { month: "long", year: "numeric" });
+
+    const today = new Date();
+    const firstWeekday = view.getDay();
+    const daysInMonth = new Date(dueCalViewYear, dueCalViewMonth + 1, 0).getDate();
+    const daysInPrevMonth = new Date(dueCalViewYear, dueCalViewMonth, 0).getDate();
+
+    const cells = [];
+    for (let i = 0; i < firstWeekday; i++) {
+      cells.push({ day: daysInPrevMonth - firstWeekday + 1 + i, outside: true, month: dueCalViewMonth - 1 });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ day: d, outside: false, month: dueCalViewMonth });
+    }
+    let nextMonthDay = 1;
+    while (cells.length < 42) {
+      cells.push({ day: nextMonthDay++, outside: true, month: dueCalViewMonth + 1 });
+    }
+
+    days.innerHTML = "";
+    cells.forEach((cell) => {
+      const cellDate = new Date(dueCalViewYear, cell.month, cell.day);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "due-popup-day";
+      btn.textContent = String(cell.day);
+      if (cell.outside) btn.classList.add("is-outside");
+      if (cellDate.toDateString() === today.toDateString()) btn.classList.add("is-today");
+      if (dueCalPendingDate && cellDate.toDateString() === dueCalPendingDate.toDateString()) {
+        btn.classList.add("is-selected");
+      }
+      btn.addEventListener("click", () => {
+        const base = dueCalPendingDate ? new Date(dueCalPendingDate) : new Date();
+        base.setFullYear(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+        if (!dueCalPendingDate) base.setHours(9, 0, 0, 0);
+        dueCalPendingDate = base;
+        if (cell.outside) {
+          dueCalViewYear = cellDate.getFullYear();
+          dueCalViewMonth = cellDate.getMonth();
+        }
+        renderDueCalendar();
+      });
+      days.appendChild(btn);
+    });
+  }
+
+  function renderDueTimeSelects() {
+    const hourSel = $("dueTimeHour");
+    const minSel = $("dueTimeMinute");
+    const ampmSel = $("dueTimeAmpm");
+    if (!hourSel || !minSel || !ampmSel) return;
+    if (!hourSel.dataset.filled) {
+      for (let h = 1; h <= 12; h++) {
+        const opt = document.createElement("option");
+        opt.value = String(h);
+        opt.textContent = String(h);
+        hourSel.appendChild(opt);
+      }
+      hourSel.dataset.filled = "true";
+    }
+    if (!minSel.dataset.filled) {
+      for (let m = 0; m < 60; m += 5) {
+        const opt = document.createElement("option");
+        opt.value = String(m);
+        opt.textContent = String(m).padStart(2, "0");
+        minSel.appendChild(opt);
+      }
+      minSel.dataset.filled = "true";
+    }
+    const source = dueCalPendingDate || (() => { const d = new Date(); d.setHours(9, 0, 0, 0); return d; })();
+    let hours = source.getHours();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    const roundedMinute = Math.round(source.getMinutes() / 5) * 5 % 60;
+    hourSel.value = String(hours);
+    minSel.value = String(roundedMinute);
+    ampmSel.value = ampm;
+  }
+
+  function saveDuePopup() {
+    const hidden = $("reminderDue");
+    const hourSel = $("dueTimeHour");
+    const minSel = $("dueTimeMinute");
+    const ampmSel = $("dueTimeAmpm");
+    if (!hidden) return;
+    const base = dueCalPendingDate ? new Date(dueCalPendingDate) : new Date();
+    let hours = parseInt(hourSel?.value || "9", 10) % 12;
+    if (ampmSel?.value === "PM") hours += 12;
+    base.setHours(hours, parseInt(minSel?.value || "0", 10), 0, 0);
+    hidden.value = toDatetimeLocal(base);
+    syncReminderDueDisplay();
+    closeDuePopup();
+  }
+
+  function clearDuePopup() {
+    const hidden = $("reminderDue");
+    if (hidden) hidden.value = "";
+    syncReminderDueDisplay();
+    closeDuePopup();
+  }
+
+  function bindDueDatePopup() {
+    $("reminderDueDisplay")?.addEventListener("click", () => {
+      isDuePopupOpen() ? closeDuePopup() : openDuePopup();
+    });
+    $("dueCalPrev")?.addEventListener("click", () => {
+      dueCalViewMonth -= 1;
+      if (dueCalViewMonth < 0) { dueCalViewMonth = 11; dueCalViewYear -= 1; }
+      renderDueCalendar();
+    });
+    $("dueCalNext")?.addEventListener("click", () => {
+      dueCalViewMonth += 1;
+      if (dueCalViewMonth > 11) { dueCalViewMonth = 0; dueCalViewYear += 1; }
+      renderDueCalendar();
+    });
+    $("dueCalSave")?.addEventListener("click", saveDuePopup);
+    $("dueCalClear")?.addEventListener("click", clearDuePopup);
+    $("reminderDuePopup")?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeDuePopup();
+    });
   }
 
   function resetReminderTicketField(id, label) {
@@ -1436,6 +1625,7 @@
     $("reminderId").value = "";
     $("reminderTitleInput").value = "";
     $("reminderDue").value = "";
+    syncReminderDueDisplay();
     $("reminderNotes").value = "";
     if ($("reminderPriority")) $("reminderPriority").value = "";
     if ($("reminderAssignee")) $("reminderAssignee").value = "";
@@ -1457,6 +1647,7 @@
     $("reminderId").value = reminder.id;
     $("reminderTitleInput").value = reminder.title || "";
     $("reminderDue").value = reminder.dueAt ? toDatetimeLocal(reminder.dueAt) : "";
+    syncReminderDueDisplay();
     $("reminderNotes").value = reminder.notes || "";
     if ($("reminderPriority")) $("reminderPriority").value = reminder.priority || "";
     if ($("reminderAssignee")) $("reminderAssignee").value = reminder.assignee || "";
