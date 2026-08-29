@@ -5089,7 +5089,9 @@ video.media-viewer-media {
 .completed-repairs-topbar {
   position: sticky;
   top: var(--header-h);
-  z-index: 18;
+  /* Stays under .app-header's z-index 10 — the nav drawer is nested inside the
+     header's stacking context, so anything above 10 here covers the drawer. */
+  z-index: 5;
   max-width: min(1060px, 100%);
   margin: 0 auto;
   padding: 12px 0;
