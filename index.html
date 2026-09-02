@@ -518,9 +518,12 @@
                   <input id="expenseReclaimDue" class="text-input" type="datetime-local" />
                 </div>
                 <div class="form-field form-field-full" id="expenseReclaimedRow" hidden>
+                  <label class="field-label" for="expenseReclaimedAmount">Collected so far</label>
+                  <input id="expenseReclaimedAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                  <small class="field-hint" id="expenseReclaimedHint">Leave at 0 if none of it is back yet. Matching the full amount marks it collected.</small>
                   <label class="reclaim-toggle" for="expenseReclaimed">
                     <input id="expenseReclaimed" type="checkbox" />
-                    <span><strong>Already collected</strong><small>Ticks the reminder off too.</small></span>
+                    <span><strong>Collected in full</strong><small>Ticks the reminder off too.</small></span>
                   </label>
                 </div>
               </div>

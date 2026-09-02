@@ -531,6 +531,20 @@
     $("expenseCategoryChips")?.addEventListener("click", handleExpenseChipClick);
 
     $("expenseCashReclaim")?.addEventListener("change", syncReclaimFieldsVisibility);
+    // Keep "collected in full" and the running total honest about each other,
+    // so the form never shows a ticked box next to a part-payment.
+    $("expenseReclaimed")?.addEventListener("change", () => {
+      const field = $("expenseReclaimedAmount");
+      if (!field) return;
+      if ($("expenseReclaimed").checked) field.value = $("expenseAmount")?.value || "";
+      else if (Number(field.value || 0) >= Number($("expenseAmount")?.value || 0)) field.value = "";
+    });
+    $("expenseReclaimedAmount")?.addEventListener("input", () => {
+      const box = $("expenseReclaimed");
+      if (!box) return;
+      const total = Number($("expenseAmount")?.value || 0);
+      box.checked = total > 0 && Number($("expenseReclaimedAmount").value || 0) >= total;
+    });
     form.querySelectorAll("[data-reclaim-preset]").forEach((btn) => {
       btn.addEventListener("click", () => applyReclaimPreset(btn.dataset.reclaimPreset));
     });
@@ -549,6 +563,7 @@
     if ($("expenseReclaimFrom")) $("expenseReclaimFrom").value = lastReclaimFrom();
     if ($("expenseReclaimDue")) $("expenseReclaimDue").value = "";
     if ($("expenseReclaimed")) $("expenseReclaimed").checked = false;
+    if ($("expenseReclaimedAmount")) $("expenseReclaimedAmount").value = "";
     renderReclaimFromOptions();
     syncReclaimFieldsVisibility();
     const msg = $("expenseMessage");
@@ -580,6 +595,10 @@
     if ($("expenseReclaimFrom")) $("expenseReclaimFrom").value = expense.reclaimFrom || "";
     if ($("expenseReclaimDue")) $("expenseReclaimDue").value = expense.reclaimDueAt ? toDatetimeLocal(expense.reclaimDueAt) : "";
     if ($("expenseReclaimed")) $("expenseReclaimed").checked = !!expense.reclaimedAt;
+    if ($("expenseReclaimedAmount")) {
+      const collected = reclaimedSoFar(expense);
+      $("expenseReclaimedAmount").value = collected ? String(collected) : "";
+    }
     renderReclaimFromOptions();
     syncReclaimFieldsVisibility();
     const msg = $("expenseMessage");
@@ -612,7 +631,14 @@
       cashReclaim,
       reclaimFrom: cashReclaim ? ($("expenseReclaimFrom")?.value || "").trim() : "",
       reclaimDueAt: cashReclaim && reclaimDueLocal ? new Date(reclaimDueLocal).toISOString() : null,
-      reclaimed: cashReclaim ? !!$("expenseReclaimed")?.checked : false,
+      // Send the collected total outright rather than the old boolean: "in
+      // full" is just the whole amount, so the server has one rule to apply
+      // and the two controls can't contradict each other.
+      reclaimedAmount: !cashReclaim
+        ? 0
+        : ($("expenseReclaimed")?.checked
+            ? amount
+            : Math.min(Number($("expenseReclaimedAmount")?.value || 0) || 0, amount)),
     };
     const submitBtn = $("expenseSubmit");
     const originalLabel = submitBtn?.textContent;
@@ -643,9 +669,14 @@
     const editBtn = event.target.closest("[data-expense-edit]");
     const deleteBtn = event.target.closest("[data-expense-delete]");
     const collectBtn = event.target.closest("[data-expense-collect]");
+    const partBtn = event.target.closest("[data-expense-part]");
     const remindBtn = event.target.closest("[data-expense-remind]");
     if (remindBtn) {
       openReminderForExpense(readExpenses().find((item) => item.id === remindBtn.dataset.expenseRemind));
+      return;
+    }
+    if (partBtn) {
+      await collectPartOfExpense(partBtn.dataset.expensePart);
       return;
     }
     if (collectBtn) {
@@ -706,6 +737,63 @@
 
   function outstandingReclaims(expenses) {
     return expenses.filter((item) => item.cashReclaim && !item.reclaimedAt);
+  }
+
+  // Cash can come back in instalments, so what's still owed on an expense is
+  // the amount minus whatever has already been handed over.
+  function reclaimedSoFar(item) {
+    return Math.max(0, Math.min(Number(item.reclaimedAmount || 0), Number(item.amount || 0)));
+  }
+
+  function reclaimOutstanding(item) {
+    return Math.max(0, Number(item.amount || 0) - reclaimedSoFar(item));
+  }
+
+  // "Part paid": the other business handed over some of it. Asks for the cash
+  // received this time (not the running total) since that's the number in the
+  // owner's hand, and adds it to whatever was already collected. Paying off
+  // the remainder settles the expense — the server does that promotion, so the
+  // reminder and the expense can't disagree about it.
+  async function collectPartOfExpense(id) {
+    const expense = readExpenses().find((item) => item.id === id);
+    if (!expense) return;
+    const outstanding = reclaimOutstanding(expense);
+    const already = reclaimedSoFar(expense);
+    if (outstanding <= 0) {
+      await setExpenseCollected(id, true);
+      return;
+    }
+    const asked = window.prompt(
+      [
+        `How much cash came back from ${expense.reclaimFrom || "the other business"}?`,
+        already > 0
+          ? `${money(already)} of ${money(expense.amount)} already collected — ${money(outstanding)} still owing.`
+          : `${money(outstanding)} owing.`,
+      ].join("\n"),
+      String(outstanding.toFixed(2))
+    );
+    if (asked == null) return;
+    const received = Number(String(asked).replace(/[^0-9.]/g, ""));
+    if (!isFinite(received) || received <= 0) {
+      notifyExpenseError("Enter a collected amount greater than zero.");
+      return;
+    }
+    const total = Math.min(already + received, Number(expense.amount || 0));
+    try {
+      const data = await expensesApi({ action: "updateExpense", id, reclaimedAmount: total });
+      setExpenses(EXPENSES.map((item) => (item.id === id ? data.expense : item)));
+      renderExpenses();
+      if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
+      if (typeof window.RPC_TOAST === "function") {
+        const left = reclaimOutstanding(data.expense);
+        window.RPC_TOAST(
+          left > 0 ? `Recorded ${money(received)} — ${money(left)} still to collect` : "Fully collected",
+          { tone: "info", duration: 3000 }
+        );
+      }
+    } catch (err) {
+      notifyExpenseError("Couldn't update the expense: " + err.message);
+    }
   }
 
   async function setExpenseCollected(id, collected) {
@@ -807,6 +895,10 @@
       return `<span class="reclaim-badge is-settled"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Collected from ${esc(who)}</span>`;
     }
     const due = item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : "";
+    const collected = reclaimedSoFar(item);
+    if (collected > 0) {
+      return `<span class="reclaim-badge is-partial"><svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg>${money(collected)} of ${money(item.amount)} collected · ${money(reclaimOutstanding(item))} left from ${esc(who)}${due}</span>`;
+    }
     return `<span class="reclaim-badge"><svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg>Owed by ${esc(who)}${due}</span>`;
   }
 
@@ -827,8 +919,16 @@
     if (!strip) return;
     const owed = outstandingReclaims(expenses);
     strip.hidden = !owed.length;
-    if (!owed.length) return;
-    const total = owed.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    if (!owed.length) {
+      // Clear rather than just hide: otherwise the settled rows stay in the
+      // DOM with live "Part paid"/"Collected" buttons behind the hidden strip.
+      const stale = $("expenseReclaimList");
+      if (stale) stale.innerHTML = "";
+      return;
+    }
+    // What's left to chase, not what was originally fronted — a $140 expense
+    // with $60 already back counts as $80 here.
+    const total = owed.reduce((sum, item) => sum + reclaimOutstanding(item), 0);
     const totalEl = $("expenseReclaimTotal");
     if (totalEl) totalEl.textContent = money(total);
     const countEl = $("expenseReclaimCount");
@@ -844,14 +944,21 @@
     });
     listEl.innerHTML = sorted.map((item) => {
       const overdue = item.reclaimDueAt && new Date(item.reclaimDueAt).getTime() < Date.now();
+      const collected = reclaimedSoFar(item);
+      const part = collected > 0
+        ? ` · ${money(collected)} of ${money(item.amount)} already in`
+        : "";
       return `
         <div class="reclaim-strip-row${overdue ? " is-overdue" : ""}">
           <div class="reclaim-strip-main">
-            <strong>${money(item.amount)}</strong>
+            <strong>${money(reclaimOutstanding(item))}</strong>
             <span>from ${esc(item.reclaimFrom || "the other business")}</span>
-            <small>${esc(item.category)}${item.vendor ? " · " + esc(item.vendor) : ""} · ${esc(formatDate(item.date))}${item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : ""}</small>
+            <small>${esc(item.category)}${item.vendor ? " · " + esc(item.vendor) : ""} · ${esc(formatDate(item.date))}${item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : ""}${part}</small>
           </div>
-          <button type="button" class="reclaim-collect-btn" data-expense-collect="${esc(item.id)}" data-collected="false">Collected</button>
+          <div class="reclaim-strip-actions">
+            <button type="button" class="reclaim-part-btn" data-expense-part="${esc(item.id)}">Part paid</button>
+            <button type="button" class="reclaim-collect-btn" data-expense-collect="${esc(item.id)}" data-collected="false">Collected</button>
+          </div>
         </div>`;
     }).join("");
   }
@@ -881,7 +988,7 @@
     }
     if (list) {
       list.innerHTML = visible.length ? visible.map((item) => `
-        <article class="ops-row expense-row${item.cashReclaim && !item.reclaimedAt ? " is-owed" : ""}">
+        <article class="ops-row expense-row${item.cashReclaim && !item.reclaimedAt ? " is-owed" : ""}${item.cashReclaim && !item.reclaimedAt && reclaimedSoFar(item) > 0 ? " is-part-paid" : ""}">
           <div>
             <strong>${esc(item.category)} · ${money(item.amount)}</strong>
             <p>${esc(item.vendor || "No vendor")}</p>
@@ -889,6 +996,7 @@
             ${reclaimBadgeHtml(item)}
           </div>
           <div class="ops-row-actions">
+            ${item.cashReclaim && !item.reclaimedAt ? `<button type="button" data-expense-part="${esc(item.id)}">Part paid</button>` : ""}
             ${item.cashReclaim ? `<button type="button" data-expense-collect="${esc(item.id)}" data-collected="${item.reclaimedAt ? "true" : "false"}">${item.reclaimedAt ? "Undo collected" : "Mark collected"}</button>` : ""}
             <button type="button" class="expense-remind-btn" data-expense-remind="${esc(item.id)}">Create reminder</button>
             <button type="button" data-expense-edit="${esc(item.id)}">Edit</button>
