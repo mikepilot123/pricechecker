@@ -6201,8 +6201,9 @@ video.media-viewer-media {
 .reclaim-strip-main strong { font-size: 0.95rem; }
 .reclaim-strip-main span { font-size: 0.85rem; color: var(--text); margin-left: 6px; }
 .reclaim-strip-main small { display: block; font-size: 0.74rem; color: var(--text-dim); }
+.reclaim-strip-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
+.reclaim-part-btn,
 .reclaim-collect-btn {
-  margin-left: auto;
   flex: none;
   border: 1px solid var(--border);
   background: var(--card);
@@ -6214,6 +6215,8 @@ video.media-viewer-media {
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
+.reclaim-part-btn { color: var(--warn); }
+.reclaim-part-btn:hover { background: #fdf3e6; border-color: #e8c79a; }
 .reclaim-collect-btn:hover { background: #e7f6ef; border-color: #9ad9b8; }
 
 .reclaim-badge {
@@ -6230,6 +6233,9 @@ video.media-viewer-media {
 }
 .reclaim-badge .icon { width: 12px; height: 12px; }
 .reclaim-badge.is-settled { background: #e7f6ef; color: var(--price); }
+/* Part-paid sits between owed and settled: still chase it, but it's moving. */
+.reclaim-badge.is-partial { background: #eaf1fb; color: #1d4ed8; }
+.expense-row.is-part-paid { border-left-color: #1d4ed8; }
 .expense-row.is-owed { border-left: 3px solid var(--warn); }
 .rem-tag-cash { background: #e7f6ef; color: var(--price); }
 
