@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=repairs-search-zindex-1" />
+  <link rel="stylesheet" href="assets/style.css?v=account-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -134,7 +134,13 @@
         <button type="button" class="appt-subnav-btn active" data-targets-panel="progress" aria-selected="true">Progress</button>
         <button type="button" class="appt-subnav-btn" data-targets-panel="goals" aria-selected="false">Goals &amp; actions</button>
       </div>
-      <button class="nav-btn" data-target="expenses" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Expenses</button>
+      <button class="nav-btn" data-target="account" role="tab" aria-selected="false"><svg class="icon"><use href="#i-cash"></use></svg>Account</button>
+      <div class="appt-sidebar-subnav" role="group" aria-label="Account sections">
+        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" aria-selected="true">Overview</button>
+        <button type="button" class="appt-subnav-btn" data-account-panel="payments" aria-selected="false">Card payments</button>
+        <button type="button" class="appt-subnav-btn" data-account-panel="payouts" aria-selected="false">Payouts</button>
+        <button type="button" class="appt-subnav-btn" data-account-panel="expenses" aria-selected="false">Expenses</button>
+      </div>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Settings sections">
         <button type="button" class="appt-subnav-btn active" data-settings-panel="general" aria-selected="true">General</button>
@@ -410,10 +416,121 @@
     </section>
   </main>
 
-  <!-- ============ EXPENSES VIEW ============ -->
-  <main class="container view" id="view-expenses" hidden>
-    <p class="info-banner">Track shop expenses locally for quick monthly visibility.</p>
+  <!-- ============ ACCOUNT VIEW ============ -->
+  <!-- Money in and money out. "Card payments" tracks takings held by whoever
+       the card machine is registered to until they transfer them across;
+       "Expenses" is the long-standing spend tracker, moved in here unchanged
+       so both halves of "who owes what" live in one place. -->
+  <main class="container view" id="view-account" hidden>
+    <div class="appt-subnav account-content-subnav" role="tablist" aria-label="Account sections">
+      <button type="button" class="appt-subnav-btn active" data-account-panel="overview" role="tab" aria-selected="true">Overview</button>
+      <button type="button" class="appt-subnav-btn" data-account-panel="payments" role="tab" aria-selected="false">Card payments</button>
+      <button type="button" class="appt-subnav-btn" data-account-panel="payouts" role="tab" aria-selected="false">Payouts</button>
+      <button type="button" class="appt-subnav-btn" data-account-panel="expenses" role="tab" aria-selected="false">Expenses</button>
+    </div>
 
+    <!-- ---------- Overview ---------- -->
+    <section class="appt-panel" data-account-panel-section="overview">
+      <div class="leads-heading-row">
+        <div>
+          <p class="dashboard-eyebrow">Card machine</p>
+          <h2 id="acctOverviewTitle">Where the money is</h2>
+        </div>
+        <div class="acct-overview-actions">
+          <button type="button" id="acctExportBtn" class="ghost-btn"><svg class="icon"><use href="#i-download"></use></svg>Export month</button>
+          <button type="button" id="acctPayoutBtn" class="primary-btn"><svg class="icon"><use href="#i-cash"></use></svg>Record payout</button>
+        </div>
+      </div>
+
+      <p id="acctOverdueBanner" class="info-banner acct-overdue" hidden></p>
+
+      <div class="acct-tiles">
+        <article class="acct-tile acct-tile-owed">
+          <p class="dashboard-eyebrow">Settled &mdash; owed to you</p>
+          <strong id="acctOwed">$0</strong>
+          <small id="acctOwedSub">Nothing waiting</small>
+          <small id="acctOwedSplit" hidden></small>
+        </article>
+        <article class="acct-tile acct-tile-pending">
+          <p class="dashboard-eyebrow">Awaiting settlement</p>
+          <strong id="acctPending">$0</strong>
+          <small id="acctPendingSub">Nothing in flight</small>
+        </article>
+        <article class="acct-tile">
+          <p class="dashboard-eyebrow">Collected this month</p>
+          <strong id="acctCollected">$0</strong>
+          <small id="acctCollectedSub">&nbsp;</small>
+        </article>
+        <article class="acct-tile">
+          <p class="dashboard-eyebrow">Machine fees this month</p>
+          <strong id="acctFees">$0</strong>
+          <small id="acctFeesSub">&nbsp;</small>
+        </article>
+      </div>
+
+      <section class="acct-section" id="acctHeldSection" hidden>
+        <div class="leads-heading-row">
+          <div>
+            <p class="dashboard-eyebrow">Oldest first</p>
+            <h3 id="acctHeldTitle">Waiting to be collected</h3>
+          </div>
+        </div>
+        <div id="acctHeldList" class="ops-list" aria-live="polite"></div>
+      </section>
+
+      <section class="acct-section">
+        <div class="leads-heading-row">
+          <div>
+            <p class="dashboard-eyebrow">The other side of the ledger</p>
+            <h3>Cash fronted on expenses</h3>
+          </div>
+          <div class="expense-total"><span>To collect back</span><strong id="acctReclaimTotal">$0</strong></div>
+        </div>
+        <p class="result-count" id="acctReclaimSub">Nothing outstanding.</p>
+      </section>
+    </section>
+
+    <!-- ---------- Card payments ---------- -->
+    <section class="appt-panel" data-account-panel-section="payments" hidden>
+      <div class="leads-topbar expenses-topbar">
+        <div class="leads-searchbar">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input id="cardPaySearch" type="search" inputmode="search" autocomplete="off" placeholder="Search customer, receipt no., ticket&hellip;" aria-label="Search card payments" />
+          <button id="clearCardPaySearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+        </div>
+        <button type="button" id="cardPayNewBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Log a card payment</button>
+      </div>
+
+      <div id="cardPayStateChips" class="filter-chips" role="tablist" aria-label="Filter by state"></div>
+
+      <div class="leads-heading-row expenses-heading-row">
+        <div>
+          <p class="dashboard-eyebrow">Card payments</p>
+          <h2 id="cardPayTitle">Every swipe</h2>
+        </div>
+        <div class="expense-total"><span>Net shown</span><strong id="cardPayTotal">$0</strong></div>
+      </div>
+
+      <p id="cardPayCount" class="result-count"></p>
+      <div id="cardPayList" class="ops-list" aria-live="polite"></div>
+    </section>
+
+    <!-- ---------- Payouts ---------- -->
+    <section class="appt-panel" data-account-panel-section="payouts" hidden>
+      <div class="leads-heading-row expenses-heading-row">
+        <div>
+          <p class="dashboard-eyebrow">Payouts</p>
+          <h2>Transfers received</h2>
+        </div>
+        <button type="button" id="acctPayoutBtn2" class="primary-btn"><svg class="icon"><use href="#i-cash"></use></svg>Record payout</button>
+      </div>
+      <p id="payoutCount" class="result-count"></p>
+      <div id="payoutList" class="ops-list" aria-live="polite"></div>
+    </section>
+
+    <!-- ---------- Expenses (unchanged, just rehoused) ---------- -->
+    <section class="appt-panel" data-account-panel-section="expenses" hidden>
+      <p class="info-banner">Track shop expenses locally for quick monthly visibility.</p>
     <section class="expenses-workspace" aria-labelledby="expensesTitle">
       <div class="leads-topbar expenses-topbar">
         <div class="leads-searchbar">
@@ -450,6 +567,7 @@
 
       <p id="expenseCount" class="result-count"></p>
       <div id="expenseList" class="ops-list expense-list" aria-live="polite"></div>
+    </section>
     </section>
   </main>
 
@@ -533,6 +651,175 @@
         <div class="form-actions">
           <button type="button" id="expenseCancelBtn" class="ghost-btn">Cancel</button>
           <button type="button" id="expenseSubmit" class="primary-btn">Save expense</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card payment form modal -->
+  <div id="cardPayFormModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="cardPayFormTitle">
+      <div class="modal-header">
+        <h3 id="cardPayFormTitle">Log a card payment</h3>
+        <button type="button" id="closeCardPayFormModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="cardPayForm" autocomplete="off">
+          <input id="cardPayId" type="hidden" />
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="cardPayTakenAt">When it was swiped</label>
+              <input id="cardPayTakenAt" class="text-input" type="datetime-local" required />
+              <small class="field-hint" id="cardPaySettlesHint">Settles the next business day.</small>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label">Card type</label>
+              <div class="filter-chips" role="group" aria-label="Card type">
+                <button type="button" class="chip active" data-card-type="debit">Debit</button>
+                <button type="button" class="chip" data-card-type="credit">Credit</button>
+              </div>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="cardPayGross">Amount the customer paid</label>
+              <input id="cardPayGross" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" required />
+            </div>
+            <div class="form-field form-field-full">
+              <div class="acct-fee-row">
+                <div>
+                  <p class="dashboard-eyebrow">Machine fee</p>
+                  <strong id="cardPayFeePreview">$0.00</strong>
+                </div>
+                <div>
+                  <p class="dashboard-eyebrow">You are owed</p>
+                  <strong id="cardPayNetPreview" class="money-positive">$0.00</strong>
+                </div>
+              </div>
+              <label class="reclaim-toggle" for="cardPayFeeOverride">
+                <input id="cardPayFeeOverride" type="checkbox" />
+                <span><strong>The machine charged something else</strong><small>Enter the fee by hand instead.</small></span>
+              </label>
+              <input id="cardPayFee" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" hidden />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="cardPayBusiness">Business</label>
+              <select id="cardPayBusiness" class="text-input select-input">
+                <option value="jq">JQ Electronics</option>
+                <option value="hj">Hidden Jewels</option>
+              </select>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="cardPayCustomer">Customer</label>
+              <input id="cardPayCustomer" class="text-input" placeholder="Who paid" />
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="cardPayReceipt">Receipt no.</label>
+              <input id="cardPayReceipt" class="text-input" placeholder="From the machine slip" />
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="cardPayLast4">Card last 4</label>
+              <input id="cardPayLast4" class="text-input" inputmode="numeric" maxlength="4" placeholder="1234" />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="cardPayNotes">Notes</label>
+              <textarea id="cardPayNotes" class="text-input" rows="2" placeholder="Optional notes"></textarea>
+            </div>
+          </div>
+          <p id="cardPayMessage" class="field-error" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="cardPayCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="cardPaySubmit" class="primary-btn">Save payment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record payout modal. Everything settled is ticked by default, because the
+       normal case is "he sent this morning's batch" — untick the exceptions. -->
+  <div id="payoutFormModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="payoutFormTitle">
+      <div class="modal-header">
+        <h3 id="payoutFormTitle">Record payout</h3>
+        <button type="button" id="closePayoutFormModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="payoutForm" autocomplete="off">
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="payoutPaidAt">Date received</label>
+              <input id="payoutPaidAt" class="text-input" type="date" required />
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="payoutMethod">How it came</label>
+              <select id="payoutMethod" class="text-input select-input">
+                <option value="Bank transfer">Bank transfer</option>
+                <option value="Cash">Cash</option>
+                <option value="Linx">Linx</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="payoutReference">Bank reference</label>
+              <input id="payoutReference" class="text-input" placeholder="Optional" />
+            </div>
+            <div class="form-field form-field-full">
+              <div class="leads-heading-row">
+                <div>
+                  <p class="dashboard-eyebrow">Payments this covers</p>
+                  <h4 id="payoutPickTitle">Settled and not yet collected</h4>
+                </div>
+                <div class="acct-payout-actions">
+                  <button type="button" class="chip" id="payoutSelectAll">All</button>
+                  <button type="button" class="chip" id="payoutSelectNone">None</button>
+                </div>
+              </div>
+              <div id="payoutPickList" class="acct-pick-list" aria-live="polite"></div>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="payoutNotes">Notes</label>
+              <textarea id="payoutNotes" class="text-input" rows="2" placeholder="Optional notes"></textarea>
+            </div>
+          </div>
+          <p id="payoutMessage" class="field-error" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="acct-payout-total">
+          <span>Transfer total</span>
+          <strong id="payoutTotal">$0.00</strong>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="payoutCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="payoutSubmit" class="primary-btn">Record payout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Void modal, shared by payments and payouts: a reason is required so the
+       ledger explains itself later. -->
+  <div id="acctVoidModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="acctVoidTitle">
+      <div class="modal-header">
+        <h3 id="acctVoidTitle">Void</h3>
+        <button type="button" id="closeAcctVoidModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="acctVoidBlurb" class="result-count"></p>
+        <div class="form-grid">
+          <div class="form-field form-field-full">
+            <label class="field-label" for="acctVoidReason">Why?</label>
+            <input id="acctVoidReason" class="text-input" placeholder="e.g. Customer refunded" />
+          </div>
+        </div>
+        <p id="acctVoidMessage" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="acctVoidCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="acctVoidConfirmBtn" class="primary-btn danger-btn">Void it</button>
         </div>
       </div>
     </div>
@@ -1029,6 +1316,33 @@
             <button id="restoreIntake" class="ghost-btn" type="button"><svg class="icon"><use href="#i-restore"></use></svg>Restore</button>
             <button id="clearAllIntake" class="ghost-btn danger-btn" type="button"><svg class="icon"><use href="#i-trash"></use></svg>Clear all</button>
           </div>
+
+          <hr class="settings-divider" />
+
+          <p class="field-label">Card machine</p>
+          <p class="settings-help">What the machine charges, and who holds the money until it's transferred across. Shared by every device — changing a rate only affects payments logged from now on.</p>
+          <div class="form-grid acct-settings-grid">
+            <div class="form-field">
+              <label class="field-label" for="acctDebitFee">Debit fee (flat)</label>
+              <input id="acctDebitFee" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.75" />
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="acctCreditFeePct">Credit fee (%)</label>
+              <input id="acctCreditFeePct" class="text-input" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="4" />
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="acctHolderName">Money is held by</label>
+              <input id="acctHolderName" class="text-input" placeholder="e.g. Kevin" />
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="acctHoldAlertDays">Chase after (days)</label>
+              <input id="acctHoldAlertDays" class="text-input" type="number" min="0" max="60" step="1" inputmode="numeric" placeholder="2" />
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button id="acctSettingsSave" class="ghost-btn" type="button"><svg class="icon"><use href="#i-check"></use></svg>Save card machine settings</button>
+          </div>
+          <p id="acctSettingsMessage" class="field-error" hidden></p>
 
           <hr class="settings-divider" />
 
@@ -1836,12 +2150,13 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/inventory.js?v=synced-data-1"></script>
-  <script defer src="assets/intake.js?v=no-backdrop-close-1"></script>
-  <script defer src="assets/dashboard.js?v=repairs-search-zindex-1"></script>
+  <script defer src="assets/intake.js?v=account-1"></script>
+  <script defer src="assets/dashboard.js?v=account-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
+  <script defer src="assets/account.js?v=card-takings-1"></script>
 </body>
 </html>

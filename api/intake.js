@@ -21,6 +21,17 @@ import { listCustomers } from "../lib/customers.js";
 import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../lib/appointments.js";
 import { listExpenses, addExpense, updateExpense, deleteExpense } from "../lib/expenses.js";
 import { listReminders, addReminder, updateReminder, deleteReminder } from "../lib/reminders.js";
+import {
+  listCardPayments,
+  listCollectable,
+  accountSummary,
+  addCardPayment,
+  updateCardPayment,
+  voidCardPayment,
+  syncTakingsReminder,
+} from "../lib/card-payments.js";
+import { listPayouts, addPayout, voidPayout } from "../lib/payouts.js";
+import { getAccountSettings, saveAccountSettings } from "../lib/settings.js";
 import { ensureSchema } from "../lib/db.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
@@ -142,6 +153,44 @@ export default async function handler(req, res) {
     }
     if (action === "deleteReminder") {
       return res.status(200).json({ ok: true, deletedId: await deleteReminder(body) });
+    }
+    if (action === "listCardPayments") {
+      return res.status(200).json({ ok: true, payments: await listCardPayments(body) });
+    }
+    if (action === "listCollectable") {
+      return res.status(200).json({ ok: true, payments: await listCollectable() });
+    }
+    if (action === "accountSummary") {
+      return res.status(200).json({ ok: true, summary: await accountSummary() });
+    }
+    if (action === "addCardPayment") {
+      return res.status(200).json({ ok: true, payment: await addCardPayment(body) });
+    }
+    if (action === "updateCardPayment") {
+      return res.status(200).json({ ok: true, payment: await updateCardPayment(body) });
+    }
+    if (action === "voidCardPayment") {
+      return res.status(200).json({ ok: true, payment: await voidCardPayment(body) });
+    }
+    if (action === "listPayouts") {
+      return res.status(200).json({ ok: true, payouts: await listPayouts() });
+    }
+    if (action === "addPayout") {
+      return res.status(200).json({ ok: true, payout: await addPayout(body) });
+    }
+    if (action === "voidPayout") {
+      return res.status(200).json({ ok: true, payout: await voidPayout(body) });
+    }
+    if (action === "getAccountSettings") {
+      return res.status(200).json({ ok: true, settings: await getAccountSettings() });
+    }
+    if (action === "saveAccountSettings") {
+      const settings = await saveAccountSettings(body.settings || body);
+      // The takings reminder quotes the holder's name and is only otherwise
+      // rewritten when the ledger moves, so refresh it here or a rename sits
+      // unapplied until the next payment.
+      await syncTakingsReminder();
+      return res.status(200).json({ ok: true, settings });
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {

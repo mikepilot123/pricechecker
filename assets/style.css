@@ -6304,3 +6304,155 @@ video.media-viewer-media {
 .ticket-note-delete:hover { background: var(--card); color: var(--danger); }
 .ticket-note-delete .icon { width: 14px; height: 14px; }
 .ticket-note-empty { margin: 0; font-size: 0.82rem; color: var(--text-dim); }
+
+/* ============ ACCOUNT — card takings ledger ============
+   Money that has been taken but is sitting in someone else's account until
+   they transfer it across. The three states each get their own hue so the
+   answer to "what's actually owed to us" is readable without stopping to
+   read numbers: amber = still in flight, teal = landed and owed, green =
+   collected. Deliberately separate from the accent so a payment's state
+   never reads as "selected". */
+.acct-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 16px 0 4px;
+}
+.acct-tile {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.acct-tile strong {
+  font: 600 1.5rem/1.15 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.acct-tile small { color: var(--text-dim); font-size: 0.76rem; }
+/* Only the two tiles that answer "where is the money" carry a rail; giving
+   every tile one would flatten them back into a uniform row. */
+.acct-tile-owed { border-left: 3px solid #0f7285; }
+.acct-tile-owed strong { color: #0f7285; }
+.acct-tile-pending { border-left: 3px solid var(--warn); }
+.acct-tile-pending strong { color: var(--warn); }
+
+.acct-section { margin-top: 28px; }
+.acct-overdue {
+  border-color: var(--warn);
+  background: #fdf6ec;
+  color: #7c4409;
+}
+
+.acct-pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font: 600 0.72rem var(--font-display);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.acct-pill-pending { background: #fbf1dd; color: #8a5a10; }
+.acct-pill-settled { background: #ddf0f4; color: #0f7285; }
+.acct-pill-collected { background: #e2f2e7; color: var(--price); }
+.acct-pill-void { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+
+.acct-row { align-items: flex-start; }
+.acct-row small { display: block; color: var(--text-dim); font-size: 0.76rem; }
+.acct-row small:empty { display: none; }
+.acct-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: none;
+}
+.acct-row.is-void > div:first-child > strong,
+.acct-row.is-void > div:first-child > p { text-decoration: line-through; opacity: 0.65; }
+.acct-void-note { color: var(--danger) !important; }
+.acct-cardtype {
+  font: 500 0.7rem var(--font-display);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 4px;
+}
+
+/* Fee and net, side by side in the payment form: the customer's number and
+   the shop's number are different, and the form should say so before saving. */
+.acct-fee-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: var(--bg-soft);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.acct-fee-row strong {
+  font: 600 1.15rem var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Payout picker: a checklist that arrives pre-ticked, because the usual case
+   is "he sent the whole batch". */
+.acct-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 42vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+.acct-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  cursor: pointer;
+  background: var(--card);
+}
+.acct-pick.is-picked { border-color: var(--accent); background: var(--accent-soft); }
+.acct-pick input { margin-top: 3px; flex: none; }
+.acct-pick-body { display: flex; flex-direction: column; gap: 1px; }
+.acct-pick-body strong { font-variant-numeric: tabular-nums; }
+.acct-pick-body small { color: var(--text-dim); font-size: 0.76rem; }
+.acct-payout-actions { display: flex; gap: 6px; }
+.acct-payout-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.acct-payout-total span { color: var(--text-dim); font-size: 0.82rem; }
+.acct-payout-total strong {
+  font: 600 1.35rem var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--price);
+}
+.chip-count {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+.chip.active .chip-count { background: rgba(255, 255, 255, 0.25); }
+
+@media (max-width: 560px) {
+  .acct-fee-row { grid-template-columns: 1fr; gap: 6px; }
+  .acct-row-side { align-items: flex-start; }
+}
+.ticket-card-hint { color: var(--text-dim); font-weight: 400; font-size: 0.82em; }
+.acct-settings-grid { max-width: 560px; margin-bottom: 12px; }
+.acct-overview-actions { display: flex; gap: 8px; flex-wrap: wrap; }

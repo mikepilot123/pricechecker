@@ -168,7 +168,7 @@
     "parts-checker": $("view-parts-checker"),
     intake: $("view-intake"),
     inventory: $("view-inventory"),
-    expenses: $("view-expenses"),
+    account: $("view-account"),
     reminders: $("view-reminders"),
   };
   function setActiveNav(target) {
@@ -184,6 +184,14 @@
   }
   const LS_LAST_VIEW = "rpc_last_view";
   function navigateTo(target) {
+    // Expenses used to be a top-level tab and is now a panel under Account.
+    // Keep the old name working: it's stored in localStorage as the last view
+    // on every device that has used the app so far.
+    if (target === "expenses") {
+      navigateTo("account");
+      setAccountPanel("expenses");
+      return;
+    }
     setActiveNav(target);
     showView(target);
     try { localStorage.setItem(LS_LAST_VIEW, target); } catch (_) {}
@@ -195,7 +203,7 @@
     if (target === "parts-checker") window.dispatchEvent(new Event("rpc-enter-parts-checker"));
     if (target === "intake") enterIntake();
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
-    if (target === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
+    if (target === "account") window.dispatchEvent(new Event("rpc-enter-account"));
     if (target === "reminders") window.dispatchEvent(new Event("rpc-enter-reminders"));
   }
   window.RPC_SHOW_VIEW = navigateTo;
@@ -264,6 +272,34 @@
   }
   document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
     btn.addEventListener("click", () => setSettingsPanel(btn.dataset.settingsPanel));
+  });
+
+  // ---- Account sub-tabs ------------------------------------------------------
+  // Overview / Card payments / Payouts / Expenses. Expenses was its own
+  // top-level tab until the card takings ledger arrived and gave it siblings —
+  // its markup moved in here untouched, so assets/dashboard.js still drives it
+  // by the same element ids.
+  function setAccountPanel(panel) {
+    document.querySelectorAll("[data-account-panel-section]").forEach((section) => {
+      section.hidden = section.dataset.accountPanelSection !== panel;
+    });
+    document.querySelectorAll(".appt-subnav-btn[data-account-panel]").forEach((btn) => {
+      const active = btn.dataset.accountPanel === panel;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    // Expenses loads on the event it has always loaded on; the card-takings
+    // panels get their own so assets/account.js can refresh what's on screen.
+    if (panel === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
+    else window.dispatchEvent(new CustomEvent("rpc-account-panel", { detail: { panel } }));
+  }
+  window.RPC_ACCOUNT_PANEL = setAccountPanel;
+  document.querySelectorAll(".appt-subnav-btn[data-account-panel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      navigateTo("account");
+      setAccountPanel(btn.dataset.accountPanel);
+      closeNavDrawer();
+    });
   });
 
   // ---- Repairs sub-tabs -------------------------------------------------------
@@ -1122,7 +1158,34 @@
     repairDueDate: { type: "date", required: false },
     repairCost: { type: "number", required: false },
     amountPaid: { type: "number", required: false },
+    // Method and card type are one choice to staff ("how did they pay?") but
+    // two fields to the server, so the option value carries both and
+    // saveInlineEdit splits it back apart on the way out.
+    paymentMethod: {
+      type: "select",
+      required: false,
+      options: [
+        { value: "", label: "Not recorded" },
+        { value: "cash", label: "Cash" },
+        { value: "card:debit", label: "Card — Debit" },
+        { value: "card:credit", label: "Card — Credit" },
+        { value: "transfer", label: "Bank transfer" },
+      ],
+    },
   };
+
+  const PAYMENT_METHOD_LABELS = {
+    "": "Not recorded",
+    cash: "Cash",
+    "card:debit": "Card — Debit",
+    "card:credit": "Card — Credit",
+    transfer: "Bank transfer",
+  };
+  /** The single value the picker works in, from the ticket's two fields. */
+  function paymentMethodValue(ticket) {
+    if (ticket.paymentMethod !== "card") return ticket.paymentMethod || "";
+    return "card:" + (ticket.cardType === "credit" ? "credit" : "debit");
+  }
 
   function fieldDisplayHtml(field, ticket) {
     switch (field) {
@@ -1133,6 +1196,14 @@
       case "repairDueDate": return esc(repairDueDateLabel(ticket.repairDueDate));
       case "repairCost": return formatMoney(ticket.repairCost);
       case "amountPaid": return formatMoney(ticket.amountPaid);
+      case "paymentMethod": {
+        const label = PAYMENT_METHOD_LABELS[paymentMethodValue(ticket)] || "Not recorded";
+        // A card payment isn't in the shop's hands yet, so say so here rather
+        // than letting "paid" read as "collected".
+        return ticket.paymentMethod === "card"
+          ? `${esc(label)} <span class="ticket-card-hint">· in the card takings ledger</span>`
+          : esc(label);
+      }
       default: return "—";
     }
   }
@@ -1168,6 +1239,7 @@
         ${detailRow("i-cash", "Repair cost", fieldDisplayHtml("repairCost", ticket), "money-positive", "repairCost")}
         ${detailRow("i-cash", "Amount paid", fieldDisplayHtml("amountPaid", ticket), "money-positive", "amountPaid")}
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
+        ${detailRow("i-cash", "Paid by", fieldDisplayHtml("paymentMethod", ticket), "", "paymentMethod")}
       </div></section>
       <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
       <section class="ticket-detail-section"><p class="field-label">Photos & videos</p>
@@ -1234,9 +1306,13 @@
     const cfg = INLINE_EDIT_FIELDS[field];
     if (!cfg) return;
     const currentValue = currentModalTicket[field] == null ? "" : currentModalTicket[field];
+    const control = cfg.type === "select"
+      ? `<select class="text-input select-input ticket-inline-input">${cfg.options.map((opt) =>
+          `<option value="${esc(opt.value)}"${opt.value === paymentMethodValue(currentModalTicket) ? " selected" : ""}>${esc(opt.label)}</option>`).join("")}</select>`
+      : `<input type="${cfg.type}" class="text-input ticket-inline-input" value="${esc(currentValue)}" ${cfg.type === "number" ? 'min="0" step="0.01"' : ""} />`;
     rowEl.querySelector(".ticket-detail-value").outerHTML = `
       <span class="ticket-detail-value ticket-detail-editing">
-        <input type="${cfg.type}" class="text-input ticket-inline-input" value="${esc(currentValue)}" ${cfg.type === "number" ? 'min="0" step="0.01"' : ""} />
+        ${control}
         <button type="button" class="icon-btn ghost-btn" data-save-field="${field}" aria-label="Save"><svg class="icon"><use href="#i-check"></use></svg></button>
         <button type="button" class="icon-btn ghost-btn" data-cancel-field="${field}" aria-label="Cancel"><svg class="icon"><use href="#i-xmark"></use></svg></button>
       </span>`;
@@ -1281,6 +1357,7 @@
     repairDueDate: "Due date",
     repairCost: "Repair cost",
     amountPaid: "Amount paid",
+    paymentMethod: "Payment method",
   };
 
   async function saveInlineEdit(rowEl, field) {
@@ -1306,13 +1383,23 @@
     const value = cfg.type === "number" ? (raw === "" ? null : Number(raw)) : raw;
     const saveBtn = rowEl.querySelector("[data-save-field]");
     if (saveBtn) saveBtn.disabled = true;
+    // "card:credit" is one choice on screen but paymentMethod + cardType to
+    // the API, which is what drives the card takings ledger.
+    const payload = field === "paymentMethod"
+      ? { paymentMethod: raw.startsWith("card") ? "card" : raw, cardType: raw.startsWith("card") ? raw.split(":")[1] : "" }
+      : { [field]: value };
     try {
-      const res = await api({ action: "update", id: currentModalTicket.id, [field]: value });
+      const res = await api(Object.assign({ action: "update", id: currentModalTicket.id }, payload));
       if (!res.ok) throw new Error(res.error || "Save failed");
       mergeTicket(res.ticket);
       currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
       renderDetailRowStatic(rowEl, field);
       render();
+      // A card payment (or a change to one) has just moved money in the
+      // takings ledger, so don't leave the Account tab showing a stale balance.
+      if (field === "paymentMethod" || field === "amountPaid") {
+        if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
+      }
       toast(`${FIELD_LABELS[field] || "Change"} saved.`, { tone: "info", duration: 2500 });
     } catch (err) {
       if (saveBtn) saveBtn.disabled = false;

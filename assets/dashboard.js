@@ -35,6 +35,9 @@
   let tickets = [];
   let inventoryItems = [];
   let monthlySales = []; // [{monthKey, totalSales, ticketCount}, ...] desc by month
+  // Card takings summary from lib/card-payments.js — money already paid by
+  // customers that hasn't reached the shop's own account yet.
+  let cardTakings = null;
   let lastUpdated = null;
   let loadInFlight = null;
   let goalFormBound = false;
@@ -70,7 +73,9 @@
       const ticketPromise = hasPin ? loadTickets() : Promise.resolve({ tickets: [], noPin: true });
       const inventoryPromise = loadInventory();
       const monthlySalesPromise = hasPin ? loadMonthlySales() : Promise.resolve({ months: [] });
-      const [ticketData, inventoryData, monthlySalesData] = await Promise.allSettled([ticketPromise, inventoryPromise, monthlySalesPromise]);
+      const cardTakingsPromise = hasPin ? loadCardTakings() : Promise.resolve(null);
+      const [ticketData, inventoryData, monthlySalesData, cardTakingsData] = await Promise.allSettled([ticketPromise, inventoryPromise, monthlySalesPromise, cardTakingsPromise]);
+      if (cardTakingsData.status === "fulfilled") cardTakings = cardTakingsData.value;
 
       if (ticketData.status === "fulfilled") tickets = ticketData.value.tickets || [];
       if (inventoryData.status === "fulfilled") inventoryItems = inventoryData.value.items || [];
@@ -91,6 +96,15 @@
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "Couldn't load check-ins");
     return { tickets: (data.tickets || []).map(normalizeTicket) };
+  }
+
+  async function loadCardTakings() {
+    const q = new URLSearchParams({ action: "accountSummary", pin: pin(), _: Date.now() });
+    const res = await fetch(INTAKE_URL + "?" + q.toString(), { method: "GET" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Rejected");
+    return data.summary;
   }
 
   async function loadMonthlySales() {
@@ -983,6 +997,20 @@
       },
     ];
 
+    // Card takings sit outside every figure above: the customer has paid, the
+    // repair is done, but the money is in the card-machine holder's account.
+    // Only shown once there's actually something being held.
+    if (cardTakings && cardTakings.owed > 0) {
+      cards.push({
+        title: "Held by card machine",
+        value: money(cardTakings.owed),
+        sub: `${cardTakings.owedCount} settled payment${cardTakings.owedCount === 1 ? "" : "s"} to collect`,
+        icon: "i-cash",
+        action: "card-takings",
+        tone: cardTakings.overdue ? "urgent" : "",
+      });
+    }
+
     box.innerHTML = cards.map(cardHtml).join("");
     box.querySelectorAll("[data-dashboard-action]").forEach((card) => {
       card.addEventListener("click", () => runAction(card.dataset.dashboardAction));
@@ -1067,6 +1095,11 @@
   }
 
   function runAction(action) {
+    if (action === "card-takings") {
+      if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("account");
+      if (typeof window.RPC_ACCOUNT_PANEL === "function") window.RPC_ACCOUNT_PANEL("overview");
+      return;
+    }
     if (action === "active-repairs") {
       window.dispatchEvent(new CustomEvent("rpc-filter-intake", { detail: { filter: "active" } }));
     } else if (action === "ready-pickup") {
@@ -1731,6 +1764,11 @@
     const deleteBtn = event.target.closest("[data-reminder-delete]");
     const ticketBtn = event.target.closest("[data-reminder-open-ticket]");
     const noteBtn = event.target.closest("[data-reminder-note-toggle]");
+    const payoutBtn = event.target.closest("[data-reminder-payout]");
+    if (payoutBtn) {
+      if (typeof window.RPC_RECORD_PAYOUT === "function") window.RPC_RECORD_PAYOUT();
+      return;
+    }
     if (noteBtn) {
       const id = noteBtn.dataset.reminderNoteToggle;
       if (expandedReminderNotes.has(id)) expandedReminderNotes.delete(id);
@@ -1751,6 +1789,12 @@
       const id = doneBox.dataset.reminderToggle;
       const current = REMINDERS.find((item) => item.id === id);
       if (!current) return;
+      // Ticking a card-takings reminder would be undone by the next ledger
+      // change, so send it to the thing that actually settles the balance.
+      if (current.kind === "card_takings") {
+        if (typeof window.RPC_RECORD_PAYOUT === "function") window.RPC_RECORD_PAYOUT();
+        return;
+      }
       try {
         const data = await remindersApi({ action: "updateReminder", id, done: !current.done });
         setReminders(REMINDERS.map((item) => (item.id === id ? data.reminder : item)));
@@ -1843,7 +1887,7 @@
       list = list.filter((item) => item.assignee === reminderAssigneeFilterValue);
     }
     if (reminderSearchText) {
-      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority], item.kind === "cash_reclaim" ? "cash to collect" : "", item.kind === "appointment" ? "appointment" : ""]
+      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority], item.kind === "cash_reclaim" ? "cash to collect" : "", item.kind === "card_takings" ? "card takings to collect" : "", item.kind === "appointment" ? "appointment" : ""]
         .some((v) => String(v || "").toLowerCase().includes(reminderSearchText)));
     }
     return list;
@@ -1887,6 +1931,14 @@
     }
     if (item.kind === "appointment") {
       tags.push(`<span class="rem-tag rem-tag-appointment"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-calendar"></use></svg>Appointment</span>`);
+    }
+    // Card takings can't be ticked off: the balance is derived from the ledger,
+    // so the only thing that clears it is recording the transfer that arrived.
+    // The card gets that action instead of relying on the checkbox.
+    if (item.kind === "card_takings") {
+      tags.push(`<button type="button" class="rem-tag rem-tag-cash" data-reminder-payout="1">
+        <svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-cash"></use></svg>Record payout
+      </button>`);
     }
     if (item.priority && REMINDER_PRIORITIES[item.priority]) {
       tags.push(`<span class="rem-tag rem-tag-priority pr-${esc(item.priority)}">${esc(REMINDER_PRIORITIES[item.priority])}</span>`);
@@ -2165,7 +2217,8 @@
       const cents = Math.round((value - whole) * 100);
       return `${whole} dollar${whole === 1 ? "" : "s"}${cents ? ` and ${cents} cent${cents === 1 ? "" : "s"}` : ""}`;
     });
-    const lead = item.kind === "cash_reclaim" ? "Here's your reminder to collect cash"
+    const lead = item.kind === "card_takings" ? "Here's your reminder to collect the card takings"
+      : item.kind === "cash_reclaim" ? "Here's your reminder to collect cash"
       : item.kind === "appointment" ? "Here's your reminder about an upcoming appointment"
       : "Here's your reminder";
     return `${lead}. ${spoken}.`;
@@ -2296,7 +2349,7 @@
   }
 
   function alertCardHtml(item, now) {
-    const cash = item.kind === "cash_reclaim";
+    const cash = item.kind === "cash_reclaim" || item.kind === "card_takings";
     const appt = item.kind === "appointment";
     const overdueMs = now - new Date(item.dueAt).getTime();
     const late = overdueMs > 60000 ? reminderDueLabel(item.dueAt, new Date(now)) : "Due now";
@@ -2304,8 +2357,10 @@
     if (item.assignee) meta.push(esc(item.assignee));
     if (item.priority && REMINDER_PRIORITIES[item.priority]) meta.push(esc(REMINDER_PRIORITIES[item.priority]));
     const icon = cash ? "i-cash" : appt ? "i-calendar" : "i-clock";
-    const eyebrow = cash ? "Cash to collect" : appt ? "Appointment coming up" : "Reminder";
-    const openLabel = cash ? "Expenses" : appt ? "Appointments" : "Open reminders";
+    const eyebrow = item.kind === "card_takings" ? "Card takings to collect"
+      : cash ? "Cash to collect" : appt ? "Appointment coming up" : "Reminder";
+    const openLabel = item.kind === "card_takings" ? "Account"
+      : cash ? "Expenses" : appt ? "Appointments" : "Open reminders";
     return `
       <article class="reminder-alert${cash ? " is-cash" : ""}${appt ? " is-appointment" : ""}" data-alert-id="${esc(item.id)}">
         <div class="reminder-alert-head">
@@ -2401,7 +2456,9 @@
       return;
     }
     if (openBtn) {
-      const target = item && item.kind === "cash_reclaim" ? "expenses" : item && item.kind === "appointment" ? "appointments" : "reminders";
+      const target = item && item.kind === "card_takings" ? "account"
+        : item && item.kind === "cash_reclaim" ? "expenses"
+        : item && item.kind === "appointment" ? "appointments" : "reminders";
       if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW(target);
       return;
     }
