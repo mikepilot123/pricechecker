@@ -6389,7 +6389,6 @@ video.media-viewer-media {
   background: var(--bg-soft);
   border-radius: var(--radius-md);
   padding: 10px 14px;
-  margin-bottom: 10px;
 }
 .acct-fee-row strong {
   font: 600 1.15rem var(--font-display);
@@ -6450,9 +6449,29 @@ video.media-viewer-media {
 .chip.active .chip-count { background: rgba(255, 255, 255, 0.25); }
 
 @media (max-width: 560px) {
-  .acct-fee-row { grid-template-columns: 1fr; gap: 6px; }
   .acct-row-side { align-items: flex-start; }
+}
+/* "$0.75" and "$0.00" side by side need almost no width, and this row sits
+   inside a modal that is narrower than the viewport — stacking it at 560px
+   spent ~50px of height for nothing and pushed the form's last field out of
+   view. Only stack it where the two figures genuinely collide. */
+@media (max-width: 330px) {
+  .acct-fee-row { grid-template-columns: 1fr; gap: 6px; }
+}
+/* This form is filled in on a phone at the counter, so it has to fit without
+   scrolling past "Save". The shared grid drops to one column under 460px,
+   which stacks all seven fields and pushes the button off screen; these four
+   are short enough to stay paired on a 360px phone. */
+@media (max-width: 460px) {
+  #cardPayForm .form-grid { grid-template-columns: 1fr 1fr; }
 }
 .ticket-card-hint { color: var(--text-dim); font-weight: 400; font-size: 0.82em; }
 .acct-settings-grid { max-width: 560px; margin-bottom: 12px; }
 .acct-overview-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* The card payment form is the one modal staff fill in at the counter with a
+   customer waiting, so it earns more of the screen than the shared 82vh/640px
+   allowance gives it — scrolling to reach "Save" while someone stands there is
+   the whole complaint. Scoped rather than raising the global cap, which every
+   other modal is sized against. */
+#cardPayFormModal .modal-panel { max-height: min(92vh, 720px); }

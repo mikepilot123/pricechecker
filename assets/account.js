@@ -362,9 +362,12 @@
     $("cardPayNetPreview").textContent = money(Math.max(0, gross - fee));
     const hint = $("cardPaySettlesHint");
     if (hint) {
+      // Kept to one line: it wrapped on a phone and pushed Save off screen, and
+      // "Debit cards cost" only repeated the chip already lit up beside it and
+      // the machine fee shown right below.
       hint.textContent = cardType === "credit"
-        ? `Credit cards cost ${SETTINGS.creditFeePct}%. Settles the next business day.`
-        : `Debit cards cost ${money(SETTINGS.debitFee)} flat. Settles the next business day.`;
+        ? `${SETTINGS.creditFeePct}% · settles the next business day`
+        : `${money(SETTINGS.debitFee)} flat · settles the next business day`;
     }
   }
 

@@ -672,14 +672,14 @@
               <input id="cardPayTakenAt" class="text-input" type="datetime-local" required />
               <small class="field-hint" id="cardPaySettlesHint">Settles the next business day.</small>
             </div>
-            <div class="form-field form-field-full">
+            <div class="form-field">
               <label class="field-label">Card type</label>
               <div class="filter-chips" role="group" aria-label="Card type">
                 <button type="button" class="chip active" data-card-type="debit">Debit</button>
                 <button type="button" class="chip" data-card-type="credit">Credit</button>
               </div>
             </div>
-            <div class="form-field form-field-full">
+            <div class="form-field">
               <label class="field-label" for="cardPayGross">Amount the customer paid</label>
               <input id="cardPayGross" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" required />
             </div>
@@ -694,21 +694,18 @@
                   <strong id="cardPayNetPreview" class="money-positive">$0.00</strong>
                 </div>
               </div>
-
             </div>
-            <div class="form-field form-field-full">
+            <div class="form-field">
               <label class="field-label" for="cardPayBusiness">Business</label>
               <select id="cardPayBusiness" class="text-input select-input">
                 <option value="jq">JQ Electronics</option>
                 <option value="hj">Hidden Jewels</option>
               </select>
             </div>
-            <div class="form-field form-field-full">
+            <div class="form-field">
               <label class="field-label" for="cardPayCustomer">Customer</label>
               <input id="cardPayCustomer" class="text-input" placeholder="Who paid" />
             </div>
-
-
             <div class="form-field form-field-full">
               <label class="field-label" for="cardPayNotes">Notes</label>
               <textarea id="cardPayNotes" class="text-input" rows="2" placeholder="Optional notes"></textarea>
