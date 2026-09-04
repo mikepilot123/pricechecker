@@ -357,9 +357,7 @@
 
   function refreshFeePreview() {
     const gross = Number($("cardPayGross").value || 0);
-    const override = $("cardPayFeeOverride").checked;
-    const fee = override ? Number($("cardPayFee").value || 0) : computeFee(cardType, gross);
-    if (!override) $("cardPayFee").value = fee ? fee.toFixed(2) : "";
+    const fee = computeFee(cardType, gross);
     $("cardPayFeePreview").textContent = money(fee);
     $("cardPayNetPreview").textContent = money(Math.max(0, gross - fee));
     const hint = $("cardPaySettlesHint");
@@ -387,17 +385,7 @@
     $("cardPayGross").value = payment ? Number(payment.gross).toFixed(2) : "";
     $("cardPayBusiness").value = payment ? payment.business : "jq";
     $("cardPayCustomer").value = payment ? payment.customer : "";
-    $("cardPayReceipt").value = payment ? payment.receiptRef : "";
-    $("cardPayLast4").value = payment ? payment.last4 : "";
     $("cardPayNotes").value = payment ? payment.notes : "";
-    // Only pre-tick the override when the stored fee genuinely differs from
-    // what the rates would produce — otherwise editing an ordinary payment
-    // would look like it had a manual fee all along.
-    const standard = payment ? computeFee(payment.cardType, payment.gross) : 0;
-    const overridden = !!payment && Math.abs(Number(payment.fee) - standard) > 0.005;
-    $("cardPayFeeOverride").checked = overridden;
-    $("cardPayFee").hidden = !overridden;
-    $("cardPayFee").value = payment ? Number(payment.fee).toFixed(2) : "";
     setCardType(payment ? payment.cardType : "debit");
     setMessage("cardPayMessage", "");
     $("cardPayFormModal").hidden = false;
@@ -421,7 +409,6 @@
     if (!gross || gross <= 0) return setMessage("cardPayMessage", "Enter the amount the customer paid.");
     const takenAt = $("cardPayTakenAt").value;
     if (!takenAt) return setMessage("cardPayMessage", "Enter when the payment was taken.");
-    const override = $("cardPayFeeOverride").checked;
     const payload = {
       action: editingId ? "updateCardPayment" : "addCardPayment",
       id: editingId || undefined,
@@ -430,12 +417,11 @@
       cardType,
       business: $("cardPayBusiness").value,
       customer: $("cardPayCustomer").value.trim(),
-      receiptRef: $("cardPayReceipt").value.trim(),
-      last4: $("cardPayLast4").value.trim(),
       notes: $("cardPayNotes").value.trim(),
-      // Sending "" lets the server recompute from its own rates, which keeps
-      // the two sides from disagreeing about what the machine charged.
-      fee: override ? Number($("cardPayFee").value || 0) : "",
+      // fee, receiptRef and last4 are deliberately absent. The server treats a
+      // missing key as "leave it alone", so editing an older payment keeps the
+      // receipt number it was logged with, and the fee is always recomputed
+      // from the current rates rather than echoed back from the form.
     };
     const btn = $("cardPaySubmit");
     btn.disabled = true;
@@ -660,11 +646,6 @@
     $("cardPaySubmit")?.addEventListener("click", submitPayment);
     $("cardPayForm")?.addEventListener("submit", (e) => { e.preventDefault(); submitPayment(); });
     $("cardPayGross")?.addEventListener("input", refreshFeePreview);
-    $("cardPayFee")?.addEventListener("input", refreshFeePreview);
-    $("cardPayFeeOverride")?.addEventListener("change", (e) => {
-      $("cardPayFee").hidden = !e.target.checked;
-      refreshFeePreview();
-    });
     document.querySelectorAll("[data-card-type]").forEach((btn) => {
       btn.addEventListener("click", () => setCardType(btn.dataset.cardType));
     });
