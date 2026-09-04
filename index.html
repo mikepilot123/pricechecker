@@ -134,7 +134,7 @@
         <button type="button" class="appt-subnav-btn active" data-targets-panel="progress" aria-selected="true">Progress</button>
         <button type="button" class="appt-subnav-btn" data-targets-panel="goals" aria-selected="false">Goals &amp; actions</button>
       </div>
-      <button class="nav-btn" data-target="account" role="tab" aria-selected="false"><svg class="icon"><use href="#i-cash"></use></svg>Account</button>
+      <button class="nav-btn" data-target="account" role="tab" aria-selected="false"><svg class="icon"><use href="#i-cash"></use></svg>Accounting</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Account sections">
         <button type="button" class="appt-subnav-btn active" data-account-panel="overview" aria-selected="true">Overview</button>
         <button type="button" class="appt-subnav-btn" data-account-panel="payments" aria-selected="false">Card payments</button>
@@ -694,11 +694,7 @@
                   <strong id="cardPayNetPreview" class="money-positive">$0.00</strong>
                 </div>
               </div>
-              <label class="reclaim-toggle" for="cardPayFeeOverride">
-                <input id="cardPayFeeOverride" type="checkbox" />
-                <span><strong>The machine charged something else</strong><small>Enter the fee by hand instead.</small></span>
-              </label>
-              <input id="cardPayFee" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" hidden />
+
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="cardPayBusiness">Business</label>
@@ -711,14 +707,8 @@
               <label class="field-label" for="cardPayCustomer">Customer</label>
               <input id="cardPayCustomer" class="text-input" placeholder="Who paid" />
             </div>
-            <div class="form-field">
-              <label class="field-label" for="cardPayReceipt">Receipt no.</label>
-              <input id="cardPayReceipt" class="text-input" placeholder="From the machine slip" />
-            </div>
-            <div class="form-field">
-              <label class="field-label" for="cardPayLast4">Card last 4</label>
-              <input id="cardPayLast4" class="text-input" inputmode="numeric" maxlength="4" placeholder="1234" />
-            </div>
+
+
             <div class="form-field form-field-full">
               <label class="field-label" for="cardPayNotes">Notes</label>
               <textarea id="cardPayNotes" class="text-input" rows="2" placeholder="Optional notes"></textarea>
