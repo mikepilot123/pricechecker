@@ -442,6 +442,38 @@
   let collectionRequestId = null;
   let collectionBusy = false;
   let collectionTrigger = null;
+  const savingCollections = new Set();
+
+  function collectionButtons(expense) {
+    const id = esc(expense.id);
+    if (remainingAmount(expense) <= 0) {
+      return `<button type="button" data-expense-settle="${id}" data-undo="true">Undo collected</button>`;
+    }
+    return `<button type="button" class="reclaim-collect-btn" data-expense-settle="${id}">Fully collected</button>
+      <button type="button" class="reclaim-collect-btn" data-expense-collect="${id}">Partial collection</button>`;
+  }
+
+  async function settleExpenseFromList(id, undo) {
+    if (savingCollections.has(id)) return;
+    savingCollections.add(id);
+    const buttons = [...document.querySelectorAll("[data-expense-settle], [data-expense-collect]")]
+      .filter((button) => (button.dataset.expenseSettle || button.dataset.expenseCollect) === id);
+    buttons.forEach((button) => { button.disabled = true; });
+    try {
+      const data = await expensesApi({ action: "updateExpense", id, reclaimed: !undo });
+      setExpenses(EXPENSES.map((item) => item.id === id ? data.expense : item));
+      renderExpenses();
+      refreshExpenseDependents();
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(undo ? "Last collection undone" : "Fully collected", { tone: "info", duration: 3000 });
+      }
+    } catch (err) {
+      notifyExpenseError("Couldn't update collection: " + err.message);
+    } finally {
+      savingCollections.delete(id);
+      buttons.forEach((button) => { button.disabled = false; });
+    }
+  }
 
   function expenseMoney(value) {
     return "$" + Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -777,6 +809,11 @@
     const editBtn = event.target.closest("[data-expense-edit]");
     const deleteBtn = event.target.closest("[data-expense-delete]");
     const collectBtn = event.target.closest("[data-expense-collect]");
+    const settleBtn = event.target.closest("[data-expense-settle]");
+    if (settleBtn) {
+      await settleExpenseFromList(settleBtn.dataset.expenseSettle, settleBtn.dataset.undo === "true");
+      return;
+    }
     const remindBtn = event.target.closest("[data-expense-remind]");
     if (remindBtn) {
       openReminderForExpense(readExpenses().find((item) => item.id === remindBtn.dataset.expenseRemind));
@@ -920,7 +957,7 @@
     if (!item.cashReclaim) return "";
     const who = item.reclaimFrom || "the other business";
     if (item.reclaimedAt) {
-      return `<span class="reclaim-badge is-settled"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Collected from ${esc(who)}</span>`;
+      return `<span class="reclaim-badge is-settled"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Fully collected from ${esc(who)}</span>`;
     }
     const due = item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : "";
     return `<span class="reclaim-badge"><svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg>${expenseMoney(collectedAmount(item))} collected · ${expenseMoney(remainingAmount(item))} owed by ${esc(who)}${due}</span>`;
@@ -967,7 +1004,7 @@
             <span>from ${esc(item.reclaimFrom || "the other business")}</span>
             <small>${expenseMoney(collectedAmount(item))} collected of ${expenseMoney(item.amount)} · ${esc(item.category)}${item.vendor ? " · " + esc(item.vendor) : ""} · ${esc(formatDate(item.date))}${item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : ""}</small>
           </div>
-          <button type="button" class="reclaim-collect-btn" data-expense-collect="${esc(item.id)}">Record collection</button>
+          <div class="reclaim-collection-actions">${collectionButtons(item)}</div>
         </div>`;
     }).join("");
   }
@@ -1005,7 +1042,7 @@
             ${reclaimBadgeHtml(item)}
           </div>
           <div class="ops-row-actions">
-            ${item.cashReclaim ? `<button type="button" data-expense-collect="${esc(item.id)}" data-collected="${item.reclaimedAt ? "true" : "false"}">${item.reclaimedAt ? "View collections" : "Record collection"}</button>` : ""}
+            ${item.cashReclaim ? collectionButtons(item) : ""}
             <button type="button" class="expense-remind-btn" data-expense-remind="${esc(item.id)}">Create reminder</button>
             <button type="button" data-expense-edit="${esc(item.id)}">Edit</button>
             <button type="button" class="danger-text" data-expense-delete="${esc(item.id)}">Delete</button>

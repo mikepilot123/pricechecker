@@ -6213,6 +6213,9 @@ video.media-viewer-media {
   cursor: pointer;
 }
 .reclaim-collect-btn:hover { background: #e7f6ef; border-color: #9ad9b8; }
+.reclaim-collection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; flex-shrink: 0; }
+.reclaim-collection-actions .reclaim-collect-btn { margin-left: 0; }
+.reclaim-collect-btn:disabled { opacity: 0.6; cursor: wait; }
 
 .reclaim-badge {
   display: inline-flex;
