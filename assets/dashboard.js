@@ -2184,6 +2184,10 @@
   // never written to the server — they exist only to prove the alert works.
   const demoAlerts = [];
   let alertPollTimer = null;
+  // Which alert card (if any) currently has its custom snooze date/time
+  // picker expanded. Only one at a time — closing one card's picker when
+  // another opens keeps the stack from getting tall on a phone.
+  let customSnoozeOpenId = null;
 
   function readSnoozes() {
     const raw = readJson(ALERT_SNOOZE_KEY, {});
@@ -2524,8 +2528,21 @@
           <button type="button" class="chip" data-alert-snooze="15">15 min</button>
           <button type="button" class="chip" data-alert-snooze="60">1 hour</button>
           <button type="button" class="chip" data-alert-snooze="tomorrow">Tomorrow</button>
+          <button type="button" class="chip${customSnoozeOpenId === item.id ? " active" : ""}" data-alert-snooze="custom">Custom…</button>
         </div>
+        ${customSnoozeOpenId === item.id ? `
+        <div class="reminder-alert-custom-snooze">
+          <input type="datetime-local" class="text-input" data-alert-custom-input value="${esc(defaultCustomSnoozeValue(now))}" min="${esc(toDatetimeLocal(new Date(now)))}" />
+          <button type="button" class="ghost-btn" data-alert-snooze-custom-set="1">Set</button>
+          <button type="button" class="ghost-btn" data-alert-snooze-custom-cancel="1">Cancel</button>
+        </div>` : ""}
       </article>`;
+  }
+
+  // Default the custom snooze picker an hour out — close enough to "later
+  // today" for most uses, and every field stays editable from there.
+  function defaultCustomSnoozeValue(now) {
+    return toDatetimeLocal(new Date(now + 60 * 60000));
   }
 
   function renderAlerts() {
@@ -2543,7 +2560,9 @@
     // Only a few at a time — a wall of cards is as easy to ignore as none,
     // and on a phone two full-width cards already fill most of the screen.
     const visible = due.slice(0, window.innerWidth < 640 ? 2 : 3);
-    const signature = visible.map((item) => item.id + ":" + item.dueAt).join("|");
+    // Include the open custom-picker id so toggling it forces a re-render
+    // even though it doesn't change which reminders are due.
+    const signature = visible.map((item) => item.id + ":" + item.dueAt).join("|") + "|custom:" + customSnoozeOpenId;
     if (stack.dataset.signature !== signature) {
       stack.dataset.signature = signature;
       stack.innerHTML = visible.map((item) => alertCardHtml(item, now)).join("") +
@@ -2586,6 +2605,8 @@
     const openBtn = event.target.closest("[data-alert-open]");
     const ticketBtn = event.target.closest("[data-alert-ticket]");
     const snoozeBtn = event.target.closest("[data-alert-snooze]");
+    const customSetBtn = event.target.closest("[data-alert-snooze-custom-set]");
+    const customCancelBtn = event.target.closest("[data-alert-snooze-custom-cancel]");
     const doneBtn = event.target.closest("[data-alert-done]");
     const id = card?.dataset.alertId;
     const item = id ? demoAlerts.concat(REMINDERS).find((r) => r.id === id) : null;
@@ -2601,10 +2622,31 @@
       if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW(target);
       return;
     }
+    if (customCancelBtn) {
+      customSnoozeOpenId = null;
+      renderAlerts();
+      return;
+    }
+    if (customSetBtn) {
+      if (!item) return;
+      const input = card?.querySelector("[data-alert-custom-input]");
+      const until = input?.value ? new Date(input.value).getTime() : NaN;
+      if (!input || isNaN(until)) { input?.reportValidity(); return; }
+      snoozeAlert(item.id, until, item.dueAt);
+      shownAlertIds.delete(item.id);
+      customSnoozeOpenId = null;
+      renderAlerts();
+      return;
+    }
     if (snoozeBtn) {
       if (!item) return;
       if (isDemoAlert(item.id)) { dropDemoAlert(item.id); renderAlerts(); return; }
       const value = snoozeBtn.dataset.alertSnooze;
+      if (value === "custom") {
+        customSnoozeOpenId = item.id;
+        renderAlerts();
+        return;
+      }
       let until;
       if (value === "tomorrow") {
         const d = new Date();
@@ -2620,6 +2662,7 @@
       return;
     }
     if (!doneBtn || !item) return;
+    if (customSnoozeOpenId === item.id) customSnoozeOpenId = null;
     if (isDemoAlert(item.id)) { dropDemoAlert(item.id); renderAlerts(); return; }
     doneBtn.disabled = true;
     try {

@@ -6116,6 +6116,13 @@ video.media-viewer-media {
   color: var(--text-dim);
 }
 .reminder-alert-snooze .chip { padding: 3px 9px; font-size: 0.72rem; }
+.reminder-alert-custom-snooze { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.reminder-alert-custom-snooze input[type="datetime-local"] {
+  flex: 1 1 100%;
+  padding: 7px 9px;
+  font-size: 0.82rem;
+}
+.reminder-alert-custom-snooze .ghost-btn { flex: 1; padding: 6px 10px; font-size: 0.8rem; }
 .reminder-alert-more {
   border: 1px dashed var(--border);
   background: var(--card);
