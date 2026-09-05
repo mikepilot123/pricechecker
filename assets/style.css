@@ -5216,9 +5216,7 @@ video.media-viewer-media {
 }
 
 @media (min-width: 900px) {
-  .nav-btn[data-target="appointments"]:not(.active) + .appt-sidebar-subnav,
-  .nav-btn[data-target="targets"]:not(.active) + .appt-sidebar-subnav,
-  .nav-btn[data-target="intake"]:not(.active) + .appt-sidebar-subnav,
+  .nav-btn:not(.active) + .appt-sidebar-subnav,
   .settings-nav-btn:not(.active) + .appt-sidebar-subnav {
     display: none;
   }
