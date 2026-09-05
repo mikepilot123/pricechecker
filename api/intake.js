@@ -19,7 +19,7 @@ import {
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { listCustomers } from "../lib/customers.js";
 import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../lib/appointments.js";
-import { listExpenses, addExpense, updateExpense, deleteExpense } from "../lib/expenses.js";
+import { listExpenses, addExpense, updateExpense, deleteExpense, addExpenseCollection, undoExpenseCollection } from "../lib/expenses.js";
 import { listReminders, addReminder, updateReminder, deleteReminder } from "../lib/reminders.js";
 import {
   listCardPayments,
@@ -126,6 +126,12 @@ export default async function handler(req, res) {
     }
     if (action === "updateExpense") {
       return res.status(200).json({ ok: true, expense: await updateExpense(body) });
+    }
+    if (action === "addExpenseCollection") {
+      return res.status(200).json({ ok: true, expense: await addExpenseCollection(body) });
+    }
+    if (action === "undoExpenseCollection") {
+      return res.status(200).json({ ok: true, expense: await undoExpenseCollection(body) });
     }
     if (action === "deleteExpense") {
       return res.status(200).json({ ok: true, deletedId: await deleteExpense(body) });

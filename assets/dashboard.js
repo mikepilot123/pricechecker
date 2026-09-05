@@ -438,6 +438,111 @@
   let expenseSearchQuery = "";
   let expenseCategoryFilter = "all";
   let editingExpenseId = null;
+  let collectionExpenseId = null;
+  let collectionRequestId = null;
+  let collectionBusy = false;
+  let collectionTrigger = null;
+
+  function expenseMoney(value) {
+    return "$" + Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function collectedAmount(expense) {
+    return Number(expense.collectedAmount ?? (expense.reclaimedAt ? expense.amount : 0));
+  }
+
+  function remainingAmount(expense) {
+    return Math.max(0, Math.round(Number(expense.amount || 0) * 100) - Math.round(collectedAmount(expense) * 100)) / 100;
+  }
+
+  function refreshExpenseDependents() {
+    if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
+    if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
+  }
+
+  function openExpenseCollections(expense) {
+    if (!expense) return;
+    collectionTrigger = document.activeElement;
+    collectionExpenseId = expense.id;
+    collectionRequestId = "EC" + crypto.randomUUID();
+    $("expenseCollectionAmount").value = "";
+    $("expenseCollectionDate").value = toDatetimeLocal(new Date().toISOString());
+    $("expenseCollectionNotes").value = "";
+    $("expenseCollectionMessage").hidden = true;
+    renderExpenseCollections(expense);
+    $("expenseCollectionModal").hidden = false;
+    (remainingAmount(expense) > 0 ? $("expenseCollectionAmount") : $("closeExpenseCollectionModal")).focus();
+  }
+
+  function closeExpenseCollections() {
+    if (collectionBusy) return;
+    $("expenseCollectionModal").hidden = true;
+    collectionExpenseId = null;
+    if (collectionTrigger?.isConnected) collectionTrigger.focus();
+    else $("expenseNewBtn")?.focus();
+  }
+
+  function renderExpenseCollections(expense) {
+    const remaining = remainingAmount(expense);
+    $("expenseCollectionContext").textContent = `${expense.category} · ${expense.vendor || "No vendor"} · ${formatDate(expense.date)} · From ${expense.reclaimFrom || "the other business"}`;
+    $("expenseCollectionOriginal").textContent = expenseMoney(expense.amount);
+    $("expenseCollectionReceived").textContent = expenseMoney(collectedAmount(expense));
+    $("expenseCollectionRemaining").textContent = expenseMoney(remaining);
+    $("expenseCollectionForm").hidden = !expense.cashReclaim || remaining <= 0;
+    $("expenseCollectionSubmit").hidden = !expense.cashReclaim || remaining <= 0;
+    $("expenseCollectionAmount").max = remaining.toFixed(2);
+    $("expenseCollectionStatus").textContent = remaining <= 0 ? "Fully collected" : "Record the amount received this time. The rest stays outstanding.";
+    const history = expense.collections || [];
+    $("expenseCollectionHistory").innerHTML = history.length ? history.slice().reverse().map((entry) => `
+      <div class="collection-history-row${entry.voidedAt ? " is-voided" : ""}">
+        <div><strong>${expenseMoney(entry.amount)}${entry.voidedAt ? " · Undone" : ""}</strong>
+          <small>${esc(new Date(entry.collectedAt).toLocaleString())}${entry.notes ? " · " + esc(entry.notes) : ""}</small></div>
+        ${entry.voidedAt ? "" : `<button type="button" class="ghost-btn" data-collection-undo="${esc(entry.id)}" aria-label="Undo collection of ${esc(expenseMoney(entry.amount))}">Undo</button>`}
+      </div>`).join("") : `<p class="ops-empty">${collectedAmount(expense) > 0 ? "Previously marked collected." : "No collections recorded yet."}</p>`;
+  }
+
+  async function saveExpenseCollection(event) {
+    event?.preventDefault();
+    if (collectionBusy || !collectionExpenseId) return;
+    const form = $("expenseCollectionForm");
+    if (!form.reportValidity()) return;
+    await changeExpenseCollection({
+      action: "addExpenseCollection", id: collectionExpenseId, collectionId: collectionRequestId,
+      amount: $("expenseCollectionAmount").value,
+      collectedAt: new Date($("expenseCollectionDate").value).toISOString(),
+      notes: $("expenseCollectionNotes").value.trim(),
+    });
+  }
+
+  async function changeExpenseCollection(payload) {
+    if (collectionBusy) return;
+    collectionBusy = true;
+    const controls = $("expenseCollectionModal").querySelectorAll("button, input, textarea");
+    controls.forEach((control) => { control.disabled = true; });
+    const message = $("expenseCollectionMessage");
+    message.hidden = true;
+    try {
+      const data = await expensesApi(payload);
+      setExpenses(EXPENSES.map((item) => item.id === data.expense.id ? data.expense : item));
+      renderExpenses();
+      renderExpenseCollections(data.expense);
+      collectionRequestId = "EC" + crypto.randomUUID();
+      $("expenseCollectionAmount").value = "";
+      $("expenseCollectionNotes").value = "";
+      $("expenseCollectionDate").value = toDatetimeLocal(new Date().toISOString());
+      refreshExpenseDependents();
+      $("expenseCollectionStatus").textContent = `${payload.action === "undoExpenseCollection" ? "Collection undone" : "Collection recorded"} · ${expenseMoney(remainingAmount(data.expense))} remaining`;
+    } catch (err) {
+      message.textContent = err.message;
+      message.hidden = false;
+      // Keep the same request ID after a network error: retrying a saved
+      // collection must never add it to the balance twice.
+    } finally {
+      collectionBusy = false;
+      controls.forEach((control) => { control.disabled = false; });
+    }
+  }
+
 
   // In-memory expense list, refreshed from the server (shared across
   // devices, like tickets/leads). readExpenses() stays synchronous for the
@@ -522,6 +627,26 @@
     $("closeExpenseFormModal")?.addEventListener("click", closeExpenseForm);
     $("expenseCancelBtn")?.addEventListener("click", closeExpenseForm);
     $("expenseSubmit")?.addEventListener("click", saveExpenseForm);
+    $("expenseCollectionForm")?.addEventListener("submit", saveExpenseCollection);
+    $("closeExpenseCollectionModal")?.addEventListener("click", closeExpenseCollections);
+    $("expenseCollectionDone")?.addEventListener("click", closeExpenseCollections);
+    $("expenseCollectionFill")?.addEventListener("click", () => {
+      const expense = EXPENSES.find((item) => item.id === collectionExpenseId);
+      if (expense) $("expenseCollectionAmount").value = remainingAmount(expense).toFixed(2);
+    });
+    $("expenseCollectionHistory")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-collection-undo]");
+      if (!button || collectionBusy) return;
+      changeExpenseCollection({ action: "undoExpenseCollection", id: collectionExpenseId, collectionId: button.dataset.collectionUndo });
+    });
+    $("expenseCollectionModal")?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { event.preventDefault(); closeExpenseCollections(); }
+      if (event.key !== "Tab") return;
+      const focusable = [...$("expenseCollectionModal").querySelectorAll("button, input, textarea")].filter((el) => !el.disabled && el.getClientRects().length);
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    });
     // Backdrop clicks deliberately do NOT close modals: these are data-entry
     // sheets used on a shop tablet, and one stray tap outside the panel used to
     // throw away a half-filled form. Closing is always an explicit action — the
@@ -562,7 +687,6 @@
     if ($("expenseCashReclaim")) $("expenseCashReclaim").checked = false;
     if ($("expenseReclaimFrom")) $("expenseReclaimFrom").value = lastReclaimFrom();
     if ($("expenseReclaimDue")) $("expenseReclaimDue").value = "";
-    if ($("expenseReclaimed")) $("expenseReclaimed").checked = false;
     renderReclaimFromOptions();
     syncReclaimFieldsVisibility();
     const msg = $("expenseMessage");
@@ -593,7 +717,6 @@
     if ($("expenseCashReclaim")) $("expenseCashReclaim").checked = !!expense.cashReclaim;
     if ($("expenseReclaimFrom")) $("expenseReclaimFrom").value = expense.reclaimFrom || "";
     if ($("expenseReclaimDue")) $("expenseReclaimDue").value = expense.reclaimDueAt ? toDatetimeLocal(expense.reclaimDueAt) : "";
-    if ($("expenseReclaimed")) $("expenseReclaimed").checked = !!expense.reclaimedAt;
     renderReclaimFromOptions();
     syncReclaimFieldsVisibility();
     const msg = $("expenseMessage");
@@ -626,7 +749,6 @@
       cashReclaim,
       reclaimFrom: cashReclaim ? ($("expenseReclaimFrom")?.value || "").trim() : "",
       reclaimDueAt: cashReclaim && reclaimDueLocal ? new Date(reclaimDueLocal).toISOString() : null,
-      reclaimed: cashReclaim ? !!$("expenseReclaimed")?.checked : false,
     };
     const submitBtn = $("expenseSubmit");
     const originalLabel = submitBtn?.textContent;
@@ -648,9 +770,7 @@
     }
     closeExpenseForm();
     renderExpenses();
-    // A cash-reclaim expense writes its reminder server-side; refresh so it
-    // appears in the Reminders tab (and can pop up) without a reload.
-    if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
+    refreshExpenseDependents();
   }
 
   async function handleExpenseListClick(event) {
@@ -663,7 +783,7 @@
       return;
     }
     if (collectBtn) {
-      await setExpenseCollected(collectBtn.dataset.expenseCollect, collectBtn.dataset.collected !== "true");
+      openExpenseCollections(readExpenses().find((item) => item.id === collectBtn.dataset.expenseCollect));
       return;
     }
     if (editBtn) {
@@ -690,8 +810,6 @@
     const on = !!$("expenseCashReclaim")?.checked;
     const box = $("expenseReclaimFields");
     if (box) box.hidden = !on;
-    const collectedRow = $("expenseReclaimedRow");
-    if (collectedRow) collectedRow.hidden = !on || !editingExpenseId;
     if (on && !$("expenseReclaimDue")?.value && !editingExpenseId) applyReclaimPreset("week");
   }
 
@@ -719,23 +837,7 @@
   }
 
   function outstandingReclaims(expenses) {
-    return expenses.filter((item) => item.cashReclaim && !item.reclaimedAt);
-  }
-
-  async function setExpenseCollected(id, collected) {
-    try {
-      const data = await expensesApi({ action: "updateExpense", id, reclaimed: collected });
-      setExpenses(EXPENSES.map((item) => (item.id === id ? data.expense : item)));
-      renderExpenses();
-      // The mirrored reminder flipped server-side; pull it so the Reminders
-      // tab and the alert popups agree with what the expense now says.
-      if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
-      if (typeof window.RPC_TOAST === "function") {
-        window.RPC_TOAST(collected ? "Marked as collected" : "Moved back to outstanding", { tone: "info", duration: 3000 });
-      }
-    } catch (err) {
-      notifyExpenseError("Couldn't update the expense: " + err.message);
-    }
+    return expenses.filter((item) => item.cashReclaim && remainingAmount(item) > 0);
   }
 
   // "Create reminder" on an expense row: opens the ordinary reminder form
@@ -745,10 +847,10 @@
   function openReminderForExpense(expense) {
     if (!expense) return;
     openNewReminderForm();
-    const owed = expense.cashReclaim && !expense.reclaimedAt;
+    const owed = expense.cashReclaim && remainingAmount(expense) > 0;
     const who = String(expense.reclaimFrom || "").trim();
     const title = owed
-      ? `Collect ${money(expense.amount)} cash back${who ? " from " + who : ""}`
+      ? `Collect ${expenseMoney(remainingAmount(expense))} cash back${who ? " from " + who : ""}`
       : `${expense.category || "Expense"} ${money(expense.amount)}${expense.vendor ? " — " + expense.vendor : ""}`;
     const titleInput = $("reminderTitleInput");
     if (titleInput) titleInput.value = title;
@@ -821,7 +923,7 @@
       return `<span class="reclaim-badge is-settled"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Collected from ${esc(who)}</span>`;
     }
     const due = item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : "";
-    return `<span class="reclaim-badge"><svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg>Owed by ${esc(who)}${due}</span>`;
+    return `<span class="reclaim-badge"><svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg>${expenseMoney(collectedAmount(item))} collected · ${expenseMoney(remainingAmount(item))} owed by ${esc(who)}${due}</span>`;
   }
 
   function reclaimDueShort(iso) {
@@ -842,9 +944,9 @@
     const owed = outstandingReclaims(expenses);
     strip.hidden = !owed.length;
     if (!owed.length) return;
-    const total = owed.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const total = owed.reduce((sum, item) => sum + remainingAmount(item), 0);
     const totalEl = $("expenseReclaimTotal");
-    if (totalEl) totalEl.textContent = money(total);
+    if (totalEl) totalEl.textContent = expenseMoney(total);
     const countEl = $("expenseReclaimCount");
     if (countEl) countEl.textContent = `${owed.length} expense${owed.length === 1 ? "" : "s"}`;
     const listEl = $("expenseReclaimList");
@@ -861,11 +963,11 @@
       return `
         <div class="reclaim-strip-row${overdue ? " is-overdue" : ""}">
           <div class="reclaim-strip-main">
-            <strong>${money(item.amount)}</strong>
+            <strong>${expenseMoney(remainingAmount(item))} remaining</strong>
             <span>from ${esc(item.reclaimFrom || "the other business")}</span>
-            <small>${esc(item.category)}${item.vendor ? " · " + esc(item.vendor) : ""} · ${esc(formatDate(item.date))}${item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : ""}</small>
+            <small>${expenseMoney(collectedAmount(item))} collected of ${expenseMoney(item.amount)} · ${esc(item.category)}${item.vendor ? " · " + esc(item.vendor) : ""} · ${esc(formatDate(item.date))}${item.reclaimDueAt ? " · due " + esc(reclaimDueShort(item.reclaimDueAt)) : ""}</small>
           </div>
-          <button type="button" class="reclaim-collect-btn" data-expense-collect="${esc(item.id)}" data-collected="false">Collected</button>
+          <button type="button" class="reclaim-collect-btn" data-expense-collect="${esc(item.id)}">Record collection</button>
         </div>`;
     }).join("");
   }
@@ -879,7 +981,7 @@
     const currentMonth = monthKey(new Date());
     const monthExpenses = expenses.filter((item) => monthKey(new Date(item.date || Date.now())) === currentMonth);
     const monthTotal = monthExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    if (total) total.textContent = money(monthTotal);
+    if (total) total.textContent = expenseMoney(monthTotal);
 
     const totals = categoryTotals(monthExpenses);
     renderExpenseChips(totals);
@@ -897,13 +999,13 @@
       list.innerHTML = visible.length ? visible.map((item) => `
         <article class="ops-row expense-row${item.cashReclaim && !item.reclaimedAt ? " is-owed" : ""}">
           <div>
-            <strong>${esc(item.category)} · ${money(item.amount)}</strong>
+            <strong>${esc(item.category)} · ${expenseMoney(item.amount)}</strong>
             <p>${esc(item.vendor || "No vendor")}</p>
             <small>${esc(formatDate(item.date))}${item.notes ? " · " + esc(item.notes) : ""}</small>
             ${reclaimBadgeHtml(item)}
           </div>
           <div class="ops-row-actions">
-            ${item.cashReclaim ? `<button type="button" data-expense-collect="${esc(item.id)}" data-collected="${item.reclaimedAt ? "true" : "false"}">${item.reclaimedAt ? "Undo collected" : "Mark collected"}</button>` : ""}
+            ${item.cashReclaim ? `<button type="button" data-expense-collect="${esc(item.id)}" data-collected="${item.reclaimedAt ? "true" : "false"}">${item.reclaimedAt ? "View collections" : "Record collection"}</button>` : ""}
             <button type="button" class="expense-remind-btn" data-expense-remind="${esc(item.id)}">Create reminder</button>
             <button type="button" data-expense-edit="${esc(item.id)}">Edit</button>
             <button type="button" class="danger-text" data-expense-delete="${esc(item.id)}">Delete</button>

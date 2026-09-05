@@ -30,17 +30,14 @@ function query(strings, ...params) {
   };
 }
 
+// PGlite's transaction queue keeps concurrent HTTP requests isolated, like
+// separate Neon transactions, rather than interleaving manual BEGIN calls.
 query.transaction = async function transaction(queries) {
-  await db.query("BEGIN");
-  try {
+  return db.transaction(async (tx) => {
     const results = [];
-    for (const q of queries) results.push((await db.query(q.text, q.params)).rows);
-    await db.query("COMMIT");
+    for (const q of queries) results.push((await tx.query(q.text, q.params)).rows);
     return results;
-  } catch (err) {
-    await db.query("ROLLBACK");
-    throw err;
-  }
+  });
 };
 
 export function neon() {

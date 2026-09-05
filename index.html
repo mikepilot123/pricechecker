@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=account-1" />
+  <link rel="stylesheet" href="assets/style.css?v=expense-collections-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -635,12 +635,7 @@
                   </div>
                   <input id="expenseReclaimDue" class="text-input" type="datetime-local" />
                 </div>
-                <div class="form-field form-field-full" id="expenseReclaimedRow" hidden>
-                  <label class="reclaim-toggle" for="expenseReclaimed">
-                    <input id="expenseReclaimed" type="checkbox" />
-                    <span><strong>Already collected</strong><small>Ticks the reminder off too.</small></span>
-                  </label>
-                </div>
+                <p class="hint">Save the expense, then use Record collection to enter money received in full or in parts.</p>
               </div>
             </div>
           </div>
@@ -653,6 +648,49 @@
           <button type="button" id="expenseSubmit" class="primary-btn">Save expense</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Expense cash collections -->
+  <div id="expenseCollectionModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="expenseCollectionTitle">
+      <div class="modal-header">
+        <h3 id="expenseCollectionTitle">Cash collections</h3>
+        <button type="button" id="closeExpenseCollectionModal" class="icon-btn" aria-label="Close cash collections">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="expenseCollectionContext" class="hint"></p>
+        <div class="collection-totals">
+          <div><span>Expense amount</span><strong id="expenseCollectionOriginal"></strong></div>
+          <div><span>Collected</span><strong id="expenseCollectionReceived"></strong></div>
+          <div><span>Remaining</span><strong id="expenseCollectionRemaining"></strong></div>
+        </div>
+        <p id="expenseCollectionStatus" role="status"></p>
+        <form id="expenseCollectionForm" autocomplete="off">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label" for="expenseCollectionAmount">Amount received (TTD)</label>
+              <input id="expenseCollectionAmount" class="text-input" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required />
+              <button id="expenseCollectionFill" type="button" class="ghost-btn">Use remaining balance</button>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="expenseCollectionDate">Collected on</label>
+              <input id="expenseCollectionDate" class="text-input" type="datetime-local" required />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="expenseCollectionNotes">Note / reference (optional)</label>
+              <input id="expenseCollectionNotes" class="text-input" placeholder="e.g. Cash received at the shop" />
+            </div>
+          </div>
+        </form>
+        <p id="expenseCollectionMessage" class="field-error" role="alert" hidden></p>
+        <h4>Collection history</h4>
+        <div id="expenseCollectionHistory"></div>
+      </div>
+      <div class="modal-footer"><div class="form-actions">
+        <button type="button" id="expenseCollectionDone" class="ghost-btn">Done</button>
+        <button type="submit" form="expenseCollectionForm" id="expenseCollectionSubmit" class="primary-btn">Record collection</button>
+      </div></div>
     </div>
   </div>
 
@@ -2138,7 +2176,7 @@
   <script defer src="assets/app.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/inventory.js?v=synced-data-1"></script>
   <script defer src="assets/intake.js?v=account-1"></script>
-  <script defer src="assets/dashboard.js?v=account-1"></script>
+  <script defer src="assets/dashboard.js?v=expense-collections-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>

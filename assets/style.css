@@ -6475,3 +6475,19 @@ video.media-viewer-media {
    the whole complaint. Scoped rather than raising the global cap, which every
    other modal is sized against. */
 #cardPayFormModal .modal-panel { max-height: min(92vh, 720px); }
+
+/* Partial cash collections keep the original expense and remaining debt visible. */
+.collection-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.collection-totals > div { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; }
+.collection-totals span, .collection-history-row small { display: block; color: var(--text-dim); font-size: 0.78rem; }
+.collection-totals strong { display: block; margin-top: 4px; overflow-wrap: anywhere; }
+.collection-history-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding: 12px 0; }
+.collection-history-row > div { min-width: 0; overflow-wrap: anywhere; }
+.collection-history-row.is-voided { color: var(--text-dim); }
+#expenseCollectionStatus { font-size: 0.85rem; }
+#expenseCollectionFill { margin-top: 6px; }
+@media (max-width: 480px) {
+  .collection-totals { gap: 6px; }
+  .collection-totals > div { padding: 8px; }
+  .reclaim-strip-row { flex-wrap: wrap; }
+}
