@@ -17,7 +17,7 @@ has a free tier suitable for low-volume shop use.
 To enable it, create a Gemini API key in Google AI Studio and add it to the
 Vercel project as `GEMINI_API_KEY` for Production, Preview, and Development.
 Optionally set `GEMINI_MODEL` to a compatible Gemini model; the default is
-`gemini-2.5-flash`. Uploaded PDFs are still reviewed and edited before any
+`gemini-3.8-flash`. Uploaded PDFs are still reviewed and edited before any
 parts are saved.
 
 ---
