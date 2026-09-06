@@ -63,6 +63,51 @@ export async function restockInventoryItem(itemKey, ticketId) {
   return adjustInventoryItem(itemKey, 1, { reason: ticketId ? `Ticket ${ticketId} deleted` : "Ticket deleted" });
 }
 
+// Adds a brand-new row to an existing section rather than just adjusting an
+// existing row's quantity. Inserts right after that section's last item (so
+// the sheet's visual grouping by section is preserved) and only fills the
+// columns that section's own header row defines — sections without a
+// quality/type column (e.g. TOOLS) never get one added.
+export async function addInventoryItem({ section, item, quality, quantity }) {
+  const sectionName = String(section || "").trim().toUpperCase();
+  const name = String(item || "").trim();
+  const qty = Number(quantity);
+  if (!sectionName) throw new Error("Section is required");
+  if (!name) throw new Error("Item name is required");
+  if (!Number.isInteger(qty) || qty < 0) throw new Error("Starting quantity must be a whole number, 0 or more");
+
+  const inventory = await listInventory();
+  const fields = (inventory.sectionFields || []).find((entry) => entry.section === sectionName);
+  if (!fields) throw new Error("Unknown inventory section: " + sectionName);
+
+  const trimmedQuality = String(quality || "").trim();
+  if (trimmedQuality && !fields.qualityCol) {
+    throw new Error(`${sectionName} doesn't have a quality/type column`);
+  }
+
+  const duplicate = inventory.items.find((candidate) =>
+    candidate.section === sectionName &&
+    candidate.item.toLowerCase() === name.toLowerCase() &&
+    (candidate.quality || "").toLowerCase() === trimmedQuality.toLowerCase()
+  );
+  if (duplicate) throw new Error(`${name}${trimmedQuality ? " · " + trimmedQuality : ""} already exists in ${sectionName} — adjust its quantity instead`);
+
+  const insertRowNumber = fields.lastRowNumber + 1;
+  const token = await googleAccessToken();
+  const title = await inventorySheetTitle(token);
+
+  await insertSheetRow(token, insertRowNumber);
+
+  const writes = [
+    { col: fields.nameCol, value: name },
+    { col: fields.quantityCol, value: qty },
+  ];
+  if (fields.qualityCol && trimmedQuality) writes.push({ col: fields.qualityCol, value: trimmedQuality });
+  await writeInventoryRow(token, title, insertRowNumber, writes);
+
+  return listInventory();
+}
+
 export function inventoryLabelFromKey(itemKey) {
   if (!itemKey) return "";
   const parts = itemKey.split("|").map(decodeKeyPart);
@@ -76,6 +121,10 @@ function parseInventoryRows(rows) {
   const items = [];
   let section = "";
   let headers = [];
+  // One entry per section, keyed by name — lets addInventoryItem() find
+  // which columns to write into and which row a new item belongs after,
+  // without re-parsing the sheet from scratch.
+  const sectionFields = new Map();
 
   rows.forEach((row, index) => {
     const rowNumber = index + 1;
@@ -92,6 +141,19 @@ function parseInventoryRows(rows) {
 
     if (section && looksLikeHeader(cells)) {
       headers = cells.map(normalizeHeader);
+      const quantityCol = findHeader(headers, ["quantity", "qty"]);
+      const deviceCol = findHeader(headers, ["device", "item", "name"]);
+      const qualityCol = findHeader(headers, ["quality", "type"]);
+      if (quantityCol >= 0 && deviceCol >= 0) {
+        sectionFields.set(section, {
+          section,
+          headerRowNumber: rowNumber,
+          lastRowNumber: rowNumber,
+          nameCol: deviceCol + 1,
+          qualityCol: qualityCol >= 0 ? qualityCol + 1 : null,
+          quantityCol: quantityCol + 1,
+        });
+      }
       return;
     }
 
@@ -130,11 +192,15 @@ function parseInventoryRows(rows) {
       quantityCell: `${columnName(quantityCol + 1)}${rowNumber}`,
       status: quantity <= 0 ? "out" : quantity <= 1 ? "low" : "ok",
     });
+
+    const fields = sectionFields.get(section);
+    if (fields) fields.lastRowNumber = rowNumber;
   });
 
   return {
     updatedAt: new Date().toISOString(),
     sections: [...new Set(items.map((item) => item.section))],
+    sectionFields: [...sectionFields.values()],
     items,
   };
 }
@@ -195,6 +261,51 @@ async function writeInventoryQuantity(cell, quantity) {
     body: JSON.stringify({ range, majorDimension: "ROWS", values: [[quantity]] }),
   });
   if (!res.ok) throw new Error(`Couldn't update inventory sheet: ${await res.text()}`);
+}
+
+// Inserts one blank row at rowNumber (1-indexed), shifting that row and
+// everything below it down by one — this is what keeps a new item grouped
+// under the right section instead of landing at the bottom of the sheet.
+async function insertSheetRow(token, rowNumber) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${INVENTORY_SHEET_ID}:batchUpdate`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      requests: [{
+        insertDimension: {
+          range: { sheetId: Number(INVENTORY_SHEET_GID), dimension: "ROWS", startIndex: rowNumber - 1, endIndex: rowNumber },
+          inheritFromBefore: true,
+        },
+      }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Couldn't insert an inventory row: ${await res.text()}`);
+}
+
+// Writes several non-contiguous cells on one row in a single call — the
+// name/quality/quantity columns aren't guaranteed to be adjacent, since
+// each section's header row is free to lay them out differently.
+async function writeInventoryRow(token, title, rowNumber, writes) {
+  const sheetTitle = title.replace(/'/g, "''");
+  const data = writes.map(({ col, value }) => ({
+    range: `'${sheetTitle}'!${columnName(col)}${rowNumber}`,
+    majorDimension: "ROWS",
+    values: [[value]],
+  }));
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${INVENTORY_SHEET_ID}/values:batchUpdate`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ valueInputOption: "USER_ENTERED", data }),
+  });
+  if (!res.ok) throw new Error(`Couldn't write the new inventory row: ${await res.text()}`);
 }
 
 async function inventorySheetTitle(token) {

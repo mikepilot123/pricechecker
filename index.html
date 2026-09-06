@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=custom-snooze-1" />
+  <link rel="stylesheet" href="assets/style.css?v=add-item-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -1257,6 +1257,9 @@
       <span id="inventoryStatusDot" class="status-dot"></span>
       <span id="inventoryUpdated">Loading inventory…</span>
     </p>
+    <div class="inventory-add-row">
+      <button type="button" id="inventoryAddBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add item</button>
+    </div>
     <div class="inventory-summary" id="inventorySummary" aria-live="polite"></div>
     <section class="inventory-table-shell">
       <div class="inventory-table-toolbar">
@@ -1310,6 +1313,46 @@
       <p class="empty-sub" id="inventoryErrorSub">Check the connection and try again.</p>
     </div>
   </main>
+
+  <!-- Add inventory item modal -->
+  <div id="inventoryAddModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="inventoryAddTitle">
+      <div class="modal-header">
+        <h3 id="inventoryAddTitle">Add inventory item</h3>
+        <button type="button" id="closeInventoryAddModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="inventoryAddForm" autocomplete="off">
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="inventoryAddSection">Section</label>
+              <select id="inventoryAddSection" class="text-input select-input" required></select>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="inventoryAddItem">Item name</label>
+              <input id="inventoryAddItem" class="text-input" placeholder="e.g. iPhone 16 Pro Max" required />
+            </div>
+            <div class="form-field form-field-full" id="inventoryAddQualityField">
+              <label class="field-label" for="inventoryAddQuality">Quality / type</label>
+              <input id="inventoryAddQuality" class="text-input" list="inventoryAddQualityOptions" placeholder="e.g. Soft, Hard, Incell" />
+              <datalist id="inventoryAddQualityOptions"></datalist>
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="inventoryAddQuantity">Starting quantity</label>
+              <input id="inventoryAddQuantity" class="text-input" type="number" min="0" step="1" placeholder="0" required />
+            </div>
+          </div>
+          <p id="inventoryAddMessage" class="field-error" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="inventoryAddCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="inventoryAddSubmit" class="primary-btn">Add item</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ============ INTAKE VIEW ============ -->
   <main class="container view" id="view-intake" hidden>
@@ -2174,7 +2217,7 @@
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=no-backdrop-close-1"></script>
-  <script defer src="assets/inventory.js?v=synced-data-1"></script>
+  <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/intake.js?v=account-1"></script>
   <script defer src="assets/dashboard.js?v=custom-snooze-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>

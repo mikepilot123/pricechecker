@@ -11,11 +11,13 @@
 
   let ITEMS = [];
   let sections = [];
+  let sectionFields = [];
   let activeSection = "all";
   let activeStock = "all";
   let lastUpdated = null;
   let loadedOnce = false;
   let loadInFlight = null;
+  let addItemBusy = false;
   const pendingAdjustments = new Map();
 
   function publishInventory() {
@@ -65,6 +67,7 @@
       .filter((item) => item.section !== "TOOLS");
     sections = data.sections || [...new Set(ITEMS.map((item) => item.section))];
     sections = sections.filter((section) => section !== "TOOLS" && ITEMS.some((item) => item.section === section));
+    sectionFields = (data.sectionFields || []).filter((entry) => sections.includes(entry.section));
   }
 
   function normalizeItem(item) {
@@ -311,6 +314,96 @@
     render();
   }
 
+  /* ---- Add inventory item ------------------------------------------- */
+  function openInventoryAddModal() {
+    const modal = $("inventoryAddModal");
+    if (!modal) return;
+    $("inventoryAddMessage").hidden = true;
+    $("inventoryAddItem").value = "";
+    $("inventoryAddQuality").value = "";
+    $("inventoryAddQuantity").value = "";
+    const select = $("inventoryAddSection");
+    select.innerHTML = sections.map((section) =>
+      `<option value="${esc(section)}">${esc(titleCase(section))}</option>`
+    ).join("");
+    syncQualityField();
+    modal.hidden = false;
+    (sections.length ? $("inventoryAddItem") : select).focus();
+  }
+
+  function closeInventoryAddModal() {
+    if (addItemBusy) return;
+    $("inventoryAddModal").hidden = true;
+  }
+
+  // Sections without a quality/type column in the sheet (e.g. bare parts
+  // lists) shouldn't offer a field that has nowhere to be saved.
+  function syncQualityField() {
+    const section = $("inventoryAddSection").value;
+    const fields = sectionFields.find((entry) => entry.section === section);
+    const hasQuality = !!(fields && fields.qualityCol);
+    $("inventoryAddQualityField").hidden = !hasQuality;
+    const options = hasQuality
+      ? [...new Set(ITEMS.filter((item) => item.section === section && item.quality).map((item) => item.quality))]
+      : [];
+    $("inventoryAddQualityOptions").innerHTML = options.map((q) => `<option value="${esc(q)}"></option>`).join("");
+  }
+
+  async function submitInventoryAdd(event) {
+    event?.preventDefault();
+    if (addItemBusy) return;
+    const form = $("inventoryAddForm");
+    if (!form.reportValidity()) return;
+    const pin = safeLocalStorageGet(LS_PIN);
+    const message = $("inventoryAddMessage");
+    if (!pin) {
+      message.textContent = "Enter Check In PIN first.";
+      message.hidden = false;
+      return;
+    }
+    const payload = {
+      action: "addItem",
+      pin,
+      section: $("inventoryAddSection").value,
+      item: $("inventoryAddItem").value.trim(),
+      quality: $("inventoryAddQualityField").hidden ? "" : $("inventoryAddQuality").value.trim(),
+      quantity: $("inventoryAddQuantity").value,
+    };
+    addItemBusy = true;
+    message.hidden = true;
+    const submitBtn = $("inventoryAddSubmit");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Adding…";
+    try {
+      const res = await fetch(INVENTORY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Couldn't add the item");
+      setInventoryData(data);
+      lastUpdated = Date.now();
+      loadedOnce = true;
+      publishInventory();
+      render();
+      setStatus("live");
+      $("inventoryError").hidden = true;
+      $("inventoryAddModal").hidden = true;
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(`Added ${payload.item} to ${titleCase(payload.section)}`, { tone: "info", duration: 3000 });
+      }
+    } catch (err) {
+      message.textContent = err.message;
+      message.hidden = false;
+    } finally {
+      addItemBusy = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Add item";
+    }
+  }
+
   function safeLocalStorageGet(key) {
     try {
       return localStorage.getItem(key) || "";
@@ -332,6 +425,13 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+
+  $("inventoryAddBtn")?.addEventListener("click", openInventoryAddModal);
+  $("closeInventoryAddModal")?.addEventListener("click", closeInventoryAddModal);
+  $("inventoryAddCancelBtn")?.addEventListener("click", closeInventoryAddModal);
+  $("inventoryAddSection")?.addEventListener("change", syncQualityField);
+  $("inventoryAddForm")?.addEventListener("submit", submitInventoryAdd);
+  $("inventoryAddSubmit")?.addEventListener("click", submitInventoryAdd);
 
   $("inventorySearch")?.addEventListener("input", render);
   $("inventorySectionFilter")?.addEventListener("change", () => {

@@ -996,6 +996,7 @@ body.nav-open .nav-backdrop { opacity: 1; }
 }
 
 /* ---------- Inventory ---------- */
+.inventory-add-row { display: flex; justify-content: flex-end; margin-top: 10px; }
 .inventory-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

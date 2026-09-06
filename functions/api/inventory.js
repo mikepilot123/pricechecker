@@ -1,4 +1,4 @@
-import { adjustInventoryItem, listInventory } from "../_lib/inventory.js";
+import { addInventoryItem, adjustInventoryItem, listInventory } from "../_lib/inventory.js";
 import { checkPin, jsonResponse, preflightResponse } from "../_lib/security.js";
 
 export async function onRequest(context) {
@@ -14,6 +14,12 @@ export async function onRequest(context) {
       const denied = checkPin(request, body.pin, env);
       if (denied) {
         return jsonResponse({ ok: false, error: denied.error }, request, denied.status);
+      }
+      if (body.action === "addItem") {
+        const inventory = await addInventoryItem({
+          section: body.section, item: body.item, quality: body.quality, quantity: body.quantity,
+        });
+        return jsonResponse({ ok: true, ...inventory }, request);
       }
       if (body.action !== "adjust") {
         return jsonResponse({ ok: false, error: "Unknown action: " + (body.action || "") }, request);

@@ -1,4 +1,4 @@
-import { adjustInventoryItem, listInventory } from "../lib/inventory.js";
+import { addInventoryItem, adjustInventoryItem, listInventory } from "../lib/inventory.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
@@ -14,6 +14,12 @@ export default async function handler(req, res) {
       const denied = checkPin(req, body.pin);
       if (denied) {
         return res.status(denied.status).json({ ok: false, error: denied.error });
+      }
+      if (body.action === "addItem") {
+        const inventory = await addInventoryItem({
+          section: body.section, item: body.item, quality: body.quality, quantity: body.quantity,
+        });
+        return res.status(200).json({ ok: true, ...inventory });
       }
       if (body.action !== "adjust") {
         return res.status(200).json({ ok: false, error: "Unknown action: " + (body.action || "") });
