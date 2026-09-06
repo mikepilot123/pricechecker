@@ -291,6 +291,7 @@
     // Expenses loads on the event it has always loaded on; the card-takings
     // panels get their own so assets/account.js can refresh what's on screen.
     if (panel === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
+    else if (panel === "partsOrders") window.dispatchEvent(new Event("rpc-enter-parts-orders"));
     else window.dispatchEvent(new CustomEvent("rpc-account-panel", { detail: { panel } }));
   }
   window.RPC_ACCOUNT_PANEL = setAccountPanel;

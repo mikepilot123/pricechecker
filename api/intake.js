@@ -32,6 +32,8 @@ import {
 } from "../lib/card-payments.js";
 import { listPayouts, addPayout, voidPayout } from "../lib/payouts.js";
 import { getAccountSettings, saveAccountSettings } from "../lib/settings.js";
+import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder } from "../lib/parts-orders.js";
+import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
@@ -135,6 +137,27 @@ export default async function handler(req, res) {
     }
     if (action === "deleteExpense") {
       return res.status(200).json({ ok: true, deletedId: await deleteExpense(body) });
+    }
+    if (action === "listPartsOrders") {
+      return res.status(200).json({ ok: true, partsOrders: await listPartsOrders() });
+    }
+    if (action === "addPartsOrder") {
+      return res.status(200).json({ ok: true, partsOrder: await addPartsOrder(body) });
+    }
+    if (action === "updatePartsOrder") {
+      return res.status(200).json({ ok: true, partsOrder: await updatePartsOrder(body) });
+    }
+    if (action === "deletePartsOrder") {
+      return res.status(200).json({ ok: true, deletedId: await deletePartsOrder(body) });
+    }
+    if (action === "extractPartsOrderPdf") {
+      const url = String(body.url || "").trim();
+      if (!url) return res.status(200).json({ ok: false, error: "PDF URL is required" });
+      const pdfRes = await fetch(url);
+      if (!pdfRes.ok) return res.status(200).json({ ok: false, error: `Couldn't fetch the uploaded PDF (HTTP ${pdfRes.status})` });
+      const pdfBase64 = Buffer.from(await pdfRes.arrayBuffer()).toString("base64");
+      const extracted = await extractPartsFromPdf(pdfBase64);
+      return res.status(200).json({ ok: true, ...extracted });
     }
     if (action === "listTicketNotes") {
       return res.status(200).json({ ok: true, notes: await listTicketNotes(body.ticketId) });

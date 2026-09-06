@@ -6242,6 +6242,48 @@ video.media-viewer-media {
 .expense-row.is-owed { border-left: 3px solid var(--warn); }
 .rem-tag-cash { background: #e7f6ef; color: var(--price); }
 
+/* ---- Parts orders (Accounting tab) -------------------------------------- */
+.parts-order-topbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.parts-order-status-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+}
+.parts-order-status-ordered { background: #fdf3e6; color: var(--warn); }
+.parts-order-status-backordered { background: #fdecea; color: var(--danger); }
+.parts-order-status-arrived { background: #e7f6ef; color: var(--price); }
+.parts-order-status-cancelled { background: var(--bg-soft); color: var(--text-dim); }
+.parts-order-arrived-btn { color: var(--price) !important; border-color: #9ad9b8 !important; }
+.parts-order-arrived-btn:hover { background: #e7f6ef; }
+.parts-order-pdf-link {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+.parts-order-pdf-link:hover { text-decoration: underline; }
+.parts-order-review-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 90px auto;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.parts-order-review-row .text-input { padding: 8px 10px; }
+@media (max-width: 480px) {
+  .parts-order-review-row { grid-template-columns: 1fr 1fr; grid-template-areas: "part part" "qty cost" "remove remove"; }
+  .parts-order-review-row input[data-review-field="part"] { grid-area: part; }
+  .parts-order-review-row input[data-review-field="quantity"] { grid-area: qty; }
+  .parts-order-review-row input[data-review-field="unitCost"] { grid-area: cost; }
+  .parts-order-review-row button { grid-area: remove; justify-self: end; }
+}
+
 /* ---- Reminder alert preferences (Settings › General) -------------------- */
 .settings-divider { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 .alert-prefs { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; max-width: 460px; }

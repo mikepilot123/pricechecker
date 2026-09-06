@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
-    "test": "node scripts/test-card-payments.mjs && node scripts/test-expense-collections.mjs"
+    "test": "node scripts/test-card-payments.mjs && node scripts/test-expense-collections.mjs && node scripts/test-parts-orders.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17"
