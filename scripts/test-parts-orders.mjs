@@ -87,10 +87,10 @@ await test("API actions require the PIN and round-trip through addPartsOrder/lis
   const listed = await api({ pin: "0000", action: "listPartsOrders" });
   assert.ok(listed.payload.partsOrders.some((p) => p.id === "part-api"));
 });
-await test("extractPartsOrderPdf requires a url", async () => {
+await test("extractPartsOrderPdf requires PDF data", async () => {
   const res = await api({ pin: "0000", action: "extractPartsOrderPdf" });
   assert.equal(res.payload.ok, false);
-  assert.match(res.payload.error, /URL is required/);
+  assert.match(res.payload.error, /PDF data is required/);
 });
 
 await test("PDF extraction sends the PDF to Gemini and reads its structured JSON", async () => {
@@ -115,6 +115,11 @@ await test("PDF extraction sends the PDF to Gemini and reads its structured JSON
     assert.equal(body.contents[0].parts[0].inlineData.data, "cGRmLWJ5dGVz");
     assert.equal(body.generationConfig.responseMimeType, "application/json");
     assert.deepEqual(extracted, { vendor: "MobileSentrix", parts: [{ part: "Pixel screen", quantity: 2, unitCost: 50 }] });
+
+    const viaApi = await api({ pin: "0000", action: "extractPartsOrderPdf", pdfBase64: "cGRmLWJ5dGVz" });
+    assert.equal(viaApi.payload.ok, true);
+    assert.equal(viaApi.payload.vendor, "MobileSentrix");
+    assert.equal(viaApi.payload.parts[0].part, "Pixel screen");
   } finally {
     globalThis.fetch = originalFetch;
     delete process.env.GEMINI_API_KEY;

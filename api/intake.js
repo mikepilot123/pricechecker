@@ -151,11 +151,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, deletedId: await deletePartsOrder(body) });
     }
     if (action === "extractPartsOrderPdf") {
-      const url = String(body.url || "").trim();
-      if (!url) return res.status(200).json({ ok: false, error: "PDF URL is required" });
-      const pdfRes = await fetch(url);
-      if (!pdfRes.ok) return res.status(200).json({ ok: false, error: `Couldn't fetch the uploaded PDF (HTTP ${pdfRes.status})` });
-      const pdfBase64 = Buffer.from(await pdfRes.arrayBuffer()).toString("base64");
+      const pdfBase64 = String(body.pdfBase64 || "").trim();
+      if (!pdfBase64) return res.status(200).json({ ok: false, error: "PDF data is required" });
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(pdfBase64)) {
+        return res.status(200).json({ ok: false, error: "PDF data is invalid" });
+      }
+      if (Buffer.byteLength(pdfBase64, "base64") > 2.5 * 1024 * 1024) {
+        return res.status(200).json({ ok: false, error: "That PDF is over 2.5MB — compress or split it." });
+      }
       const extracted = await extractPartsFromPdf(pdfBase64);
       return res.status(200).json({ ok: true, ...extracted });
     }

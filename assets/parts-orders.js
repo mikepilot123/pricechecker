@@ -6,8 +6,8 @@
    ============================================================ */
 (function () {
   const INTAKE_URL = "https://pricechecker-cyan.vercel.app/api/intake";
-  const PARTS_ORDER_UPLOAD_URL = "https://pricechecker-cyan.vercel.app/api/parts-order-upload";
   const LS_PIN = "rpc_intake_pin";
+  const MAX_INLINE_PDF_BYTES = 2.5 * 1024 * 1024;
   const $ = (id) => document.getElementById(id);
 
   const STATUS_LABELS = { ordered: "Ordered", backordered: "Backordered", arrived: "Arrived", cancelled: "Cancelled" };
@@ -62,6 +62,20 @@
   function notifyError(message) {
     if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message);
     else console.warn(message);
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Couldn't read the selected PDF"));
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const comma = result.indexOf(",");
+        if (comma < 0) return reject(new Error("Couldn't read the selected PDF"));
+        resolve(result.slice(comma + 1));
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   async function loadPartsOrders() {
@@ -301,9 +315,8 @@
   }
 
   /* ---- PDF upload + AI-extraction review -------------------------------
-     Upload flow mirrors the ticket-media pattern: a presigned R2 PUT URL
-     keeps the PDF bytes off this app's Vercel functions, then a second
-     call (extractPartsOrderPdf) has Claude read it. Nothing is saved to
+     Supplier PDFs are small, so they travel to the server in the existing
+     PIN-protected request and Gemini reads them there. Nothing is saved to
      parts_orders until the reviewed rows are explicitly confirmed here. */
   function resetReviewState() {
     reviewRows = [];
@@ -364,6 +377,10 @@
       notifyError("Please choose a PDF file.");
       return;
     }
+    if (file.size > MAX_INLINE_PDF_BYTES) {
+      notifyError("That PDF is over 2.5MB. Compress or split it, then try again.");
+      return;
+    }
     const p = pin();
     if (!p) {
       notifyError("Enter Check In PIN first.");
@@ -371,22 +388,11 @@
     }
     resetReviewState();
     openReviewModal();
-    $("partsOrderReviewStatus").textContent = "Uploading…";
+    $("partsOrderReviewStatus").textContent = "Reading the PDF…";
     try {
       reviewBatchId = "PO" + crypto.randomUUID();
-      const presignRes = await fetch(PARTS_ORDER_UPLOAD_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: p, batchId: reviewBatchId, filename: file.name, contentType: file.type, size: file.size }),
-      });
-      const presign = await presignRes.json();
-      if (!presign.ok) throw new Error(presign.error || "Couldn't start the upload");
-      const putRes = await fetch(presign.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!putRes.ok) throw new Error("Upload to storage failed");
-      reviewUploadUrl = presign.url;
-
-      $("partsOrderReviewStatus").textContent = "Reading the PDF…";
-      const extracted = await partsOrderApi({ action: "extractPartsOrderPdf", url: reviewUploadUrl });
+      const pdfBase64 = await readFileAsBase64(file);
+      const extracted = await partsOrderApi({ action: "extractPartsOrderPdf", pdfBase64, filename: file.name });
       reviewRows = (extracted.parts || []).map((p) => ({ part: p.part, quantity: p.quantity, unitCost: p.unitCost }));
       $("partsOrderReviewVendor").value = extracted.vendor || "";
       if (!reviewRows.length) reviewRows.push({ part: "", quantity: 1, unitCost: 0 });
