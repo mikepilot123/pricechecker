@@ -7,6 +7,19 @@ a published Google Sheet; inventory pulls from a Google Sheet.
 
 **Live app:** https://mikepilot123.github.io/pricechecker/
 
+## Supplier PDF extraction
+
+The Parts Orders panel can read a supplier order-confirmation PDF into an
+editable list of parts. It uses the Gemini Developer API from the Vercel API
+route, so the API key is never sent to the browser. The Gemini Developer API
+has a free tier suitable for low-volume shop use.
+
+To enable it, create a Gemini API key in Google AI Studio and add it to the
+Vercel project as `GEMINI_API_KEY` for Production, Preview, and Development.
+Optionally set `GEMINI_MODEL` to a compatible Gemini model; the default is
+`gemini-2.5-flash`. Uploaded PDFs are still reviewed and edited before any
+parts are saved.
+
 ---
 
 ## Prices — how the team uses it

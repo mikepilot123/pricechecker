@@ -19,7 +19,7 @@ await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
 const { addPartsOrder, updatePartsOrder, listPartsOrders, deletePartsOrder } = await import("../lib/parts-orders.js");
 const { listCustomers } = await import("../lib/customers.js");
-const { parseExtractionResult } = await import("../lib/parts-order-extraction.js");
+const { extractPartsFromPdf, parseExtractionResult } = await import("../lib/parts-order-extraction.js");
 const { default: handler } = await import("../api/intake.js");
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log("  ok  " + name); }
@@ -91,6 +91,34 @@ await test("extractPartsOrderPdf requires a url", async () => {
   const res = await api({ pin: "0000", action: "extractPartsOrderPdf" });
   assert.equal(res.payload.ok, false);
   assert.match(res.payload.error, /URL is required/);
+});
+
+await test("PDF extraction sends the PDF to Gemini and reads its structured JSON", async () => {
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  let request;
+  globalThis.fetch = async (url, options) => {
+    request = { url: String(url), options };
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify({
+        vendor: "MobileSentrix",
+        parts: [{ part: "Pixel screen", quantity: 2, unitCost: 50 }],
+      }) }] } }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const extracted = await extractPartsFromPdf("cGRmLWJ5dGVz");
+    assert.match(request.url, /generativelanguage\.googleapis\.com/);
+    assert.match(request.url, /key=test-key/);
+    const body = JSON.parse(request.options.body);
+    assert.equal(body.contents[0].parts[0].inlineData.mimeType, "application/pdf");
+    assert.equal(body.contents[0].parts[0].inlineData.data, "cGRmLWJ5dGVz");
+    assert.equal(body.generationConfig.responseMimeType, "application/json");
+    assert.deepEqual(extracted, { vendor: "MobileSentrix", parts: [{ part: "Pixel screen", quantity: 2, unitCost: 50 }] });
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.GEMINI_API_KEY;
+  }
 });
 
 // ---- PDF-extraction response parsing (no network, no real PDF) ----
