@@ -104,14 +104,64 @@
       acc[item.status] = (acc[item.status] || 0) + 1;
       return acc;
     }, {});
-    const chips = [{ key: "all", label: `All (${PARTS_ORDERS.length})` }].concat(
+    const chips = [{ key: "all", label: "All", count: PARTS_ORDERS.length }].concat(
       Object.keys(STATUS_LABELS)
         .filter((key) => counts[key])
-        .map((key) => ({ key, label: `${STATUS_LABELS[key]} (${counts[key]})` }))
+        .map((key) => ({ key, label: STATUS_LABELS[key], count: counts[key] }))
     );
-    box.innerHTML = chips.map((c) =>
-      `<button type="button" class="chip${statusFilter === c.key ? " active" : ""}" data-parts-status-filter="${esc(c.key)}">${esc(c.label)}</button>`
-    ).join("");
+    box.innerHTML = chips.map((c) => `
+      <button type="button" class="inventory-stock-filter inventory-stock-filter-${esc(c.key)}${statusFilter === c.key ? " active" : ""}"
+        data-parts-status-filter="${esc(c.key)}" role="tab" aria-selected="${statusFilter === c.key ? "true" : "false"}">
+        <span class="inventory-stock-dot" aria-hidden="true"></span>${esc(c.label)} (${c.count})
+      </button>
+    `).join("");
+  }
+
+  function renderSummary() {
+    const box = $("partsOrderSummary");
+    if (!box) return;
+    const openStatuses = new Set(["ordered", "backordered"]);
+    const open = PARTS_ORDERS.filter((item) => openStatuses.has(item.status));
+    const openTotal = open.reduce((sum, item) => sum + item.totalCost, 0);
+    const arrived = PARTS_ORDERS.filter((item) => item.status === "arrived").length;
+    box.innerHTML = [
+      summaryTile("Orders", PARTS_ORDERS.length),
+      summaryTile("Open cost", money(openTotal)),
+      summaryTile("Pending", open.length, open.length ? "warn" : ""),
+      summaryTile("Arrived", arrived),
+    ].join("");
+  }
+
+  function summaryTile(label, value, tone = "") {
+    return `<div class="inventory-summary-tile ${tone ? "is-" + tone : ""}">
+      <span>${esc(label)}</span>
+      <strong>${esc(String(value))}</strong>
+    </div>`;
+  }
+
+  // ---- Repair matching: suggest a link to an in-progress repair whose
+  // device name shows up in the ordered part's description, e.g. "OLED
+  // Assembly ... For Google Pixel 6 Pro" -> a ticket with device "Google
+  // Pixel 6 Pro". Only offered while a part isn't already linked. ----
+  const CLOSED_TICKET_STATUSES = new Set([
+    "Repaired", "Checked Out - Waiting on Client", "No Fix", "Picked Up", "Cancelled",
+  ]);
+
+  function normalizeMatchText(s) {
+    return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  function findMatchingTickets(item) {
+    const partNorm = normalizeMatchText(item.part);
+    if (!partNorm) return [];
+    return tickets
+      .filter((t) => t.device && !CLOSED_TICKET_STATUSES.has(t.status))
+      .map((t) => ({ ticket: t, device: normalizeMatchText(t.device) }))
+      .filter((m) => m.device.length >= 3 && partNorm.includes(m.device))
+      .sort((a, b) => b.device.length - a.device.length)
+      .map((m) => m.ticket)
+      .filter((t, i, arr) => arr.findIndex((other) => other.id === t.id) === i)
+      .slice(0, 3);
   }
 
   // ---- Ticket link display/lookup (tickets come from the app-wide
@@ -125,44 +175,79 @@
     return ticketLabel(tickets.find((t) => t.id === id));
   }
 
+  function linkedCellHtml(item) {
+    if (item.ticketId) {
+      const label = ticketLabelById(item.ticketId) || item.customerName || "Linked repair";
+      return `<button type="button" class="parts-order-link-chip" data-parts-open-ticket="${esc(item.ticketId)}">
+        <svg class="icon"><use href="#i-device"></use></svg>${esc(label)}
+      </button>`;
+    }
+    if (item.customerName) {
+      return `<span class="parts-order-customer-text">${esc(item.customerName)}</span>`;
+    }
+    const matches = findMatchingTickets(item);
+    if (matches.length) {
+      return `<div class="parts-order-match-list">
+        ${matches.map((t) => `
+          <button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(t.id)}">
+            <svg class="icon"><use href="#i-check"></use></svg>Link to ${esc(ticketLabel(t))}
+          </button>
+        `).join("")}
+      </div>`;
+    }
+    return `<span class="parts-order-empty-cell">—</span>`;
+  }
+
   function partsOrderRowHtml(item) {
-    const who = item.customerName || (item.ticketId ? ticketLabelById(item.ticketId) : "");
     const canAdvance = item.status !== "arrived" && item.status !== "cancelled";
-    return `<article class="ops-row parts-order-row is-${esc(item.status)}">
-      <div>
-        <strong>${esc(item.part)}</strong>
-        <span class="parts-order-status-badge parts-order-status-${esc(item.status)}">${esc(STATUS_LABELS[item.status] || item.status)}</span>
-        <p>${item.vendor ? esc(item.vendor) + " · " : ""}${item.quantity} × ${money(item.unitCost)} = ${money(item.totalCost)}</p>
-        <small>${esc(formatDate(item.orderedAt))}${who ? " · " + esc(who) : ""}${item.notes ? " · " + esc(item.notes) : ""}</small>
-        ${item.sourceDocumentUrl ? `<a class="parts-order-pdf-link" href="${esc(item.sourceDocumentUrl)}" target="_blank" rel="noopener">View order PDF</a>` : ""}
-      </div>
-      <div class="ops-row-actions">
-        ${canAdvance ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrived="${esc(item.id)}">Mark arrived</button>` : ""}
-        <button type="button" data-parts-edit="${esc(item.id)}">Edit</button>
-        <button type="button" class="danger-text" data-parts-delete="${esc(item.id)}">Delete</button>
-      </div>
-    </article>`;
+    return `<tr class="inventory-row parts-order-row is-${esc(item.status)}">
+      <td data-label="Part">
+        <div class="inventory-product">
+          <span class="inventory-thumb"><svg class="icon"><use href="#i-device"></use></svg></span>
+          <span class="inventory-product-text">
+            <strong>${esc(item.part)}</strong>
+            ${item.notes ? `<span class="inventory-product-meta"><span class="inventory-note">${esc(item.notes)}</span></span>` : ""}
+          </span>
+        </div>
+      </td>
+      <td data-label="Vendor">${esc(item.vendor) || "—"}</td>
+      <td data-label="Status"><span class="parts-order-status-badge parts-order-status-${esc(item.status)}">${esc(STATUS_LABELS[item.status] || item.status)}</span></td>
+      <td data-label="Linked to">${linkedCellHtml(item)}</td>
+      <td class="num" data-label="Cost">
+        <strong>${money(item.totalCost)}</strong>
+        <span class="parts-order-cost-sub">${item.quantity} × ${money(item.unitCost)}</span>
+      </td>
+      <td data-label="Ordered">${esc(formatDate(item.orderedAt))}</td>
+      <td data-label="Actions">
+        <div class="parts-order-actions">
+          ${canAdvance ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrived="${esc(item.id)}">Mark arrived</button>` : ""}
+          ${item.sourceDocumentUrl ? `<a class="icon-btn ghost-btn" href="${esc(item.sourceDocumentUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
+          <button type="button" class="icon-btn ghost-btn" data-parts-edit="${esc(item.id)}" title="Edit" aria-label="Edit"><svg class="icon"><use href="#i-pencil"></use></svg></button>
+          <button type="button" class="icon-btn ghost-btn danger-btn" data-parts-delete="${esc(item.id)}" title="Delete" aria-label="Delete"><svg class="icon"><use href="#i-trash"></use></svg></button>
+        </div>
+      </td>
+    </tr>`;
   }
 
   function renderPartsOrders() {
     const list = $("partsOrderList");
     if (!list) return;
     renderStatusChips();
+    renderSummary();
     const visible = filteredPartsOrders();
     const count = $("partsOrderCount");
     if (count) {
       count.textContent = PARTS_ORDERS.length
         ? `${visible.length} of ${PARTS_ORDERS.length} order${PARTS_ORDERS.length === 1 ? "" : "s"}`
-        : "No parts ordered yet";
+        : "";
     }
-    const openTotal = PARTS_ORDERS
-      .filter((item) => item.status === "ordered" || item.status === "backordered")
-      .reduce((sum, item) => sum + item.totalCost, 0);
-    const totalEl = $("partsOrderOpenTotal");
-    if (totalEl) totalEl.textContent = money(openTotal);
-    list.innerHTML = visible.length
-      ? visible.map(partsOrderRowHtml).join("")
-      : `<p class="ops-empty">${PARTS_ORDERS.length ? "No parts match the current filters." : "No parts ordered yet — upload an order PDF or add one by hand."}</p>`;
+    list.innerHTML = visible.map(partsOrderRowHtml).join("");
+    const empty = $("partsOrderEmpty");
+    if (empty) {
+      empty.hidden = visible.length > 0;
+      const title = $("partsOrderEmptyTitle");
+      if (title) title.textContent = PARTS_ORDERS.length ? "No parts match the current filters" : "No parts ordered yet";
+    }
   }
 
   /* ---- Manual add/edit modal ------------------------------------------ */
@@ -254,13 +339,31 @@
     }
   }
 
+  async function linkPartsOrderToTicket(id, ticketId) {
+    try {
+      const data = await partsOrderApi({ action: "updatePartsOrder", id, ticketId });
+      PARTS_ORDERS = PARTS_ORDERS.map((item) => (item.id === id ? data.partsOrder : item));
+      renderPartsOrders();
+      if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Linked to repair", { tone: "info", duration: 2500 });
+    } catch (err) {
+      notifyError("Couldn't link that part: " + err.message);
+    }
+  }
+
   function handlePartsOrderListClick(event) {
     const arrivedBtn = event.target.closest("[data-parts-arrived]");
     const editBtn = event.target.closest("[data-parts-edit]");
     const deleteBtn = event.target.closest("[data-parts-delete]");
+    const linkBtn = event.target.closest("[data-parts-link]");
+    const openTicketBtn = event.target.closest("[data-parts-open-ticket]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
+    if (linkBtn) { linkPartsOrderToTicket(linkBtn.dataset.partsLink, linkBtn.dataset.ticketId); return; }
+    if (openTicketBtn) {
+      if (typeof window.RPC_OPEN_TICKET_BY_ID === "function") window.RPC_OPEN_TICKET_BY_ID(openTicketBtn.dataset.partsOpenTicket);
+      return;
+    }
   }
 
   // ---- Reusable "link to a repair" search combobox, same pattern as the
@@ -361,6 +464,22 @@
     renderReviewRows();
   }
 
+  // Guesses which in-progress repair these extracted lines are for, by
+  // running the same device-name match used in the table's "Linked to"
+  // column across every row and taking the ticket that comes up most.
+  function suggestReviewTicket() {
+    const scores = new Map();
+    for (const row of reviewRows) {
+      const matches = findMatchingTickets({ part: row.part });
+      matches.forEach((t, i) => scores.set(t.id, (scores.get(t.id) || 0) + (matches.length - i)));
+    }
+    let best = null, bestScore = 0;
+    for (const [id, score] of scores) {
+      if (score > bestScore) { bestScore = score; best = id; }
+    }
+    return best ? tickets.find((t) => t.id === best) || null : null;
+  }
+
   function openReviewModal() {
     $("partsOrderReviewModal").hidden = false;
   }
@@ -397,6 +516,13 @@
       $("partsOrderReviewVendor").value = extracted.vendor || "";
       if (!reviewRows.length) reviewRows.push({ part: "", quantity: 1, unitCost: 0 });
       renderReviewRows();
+      const suggested = suggestReviewTicket();
+      if (suggested) {
+        reviewTicketCombobox?.set(suggested.id, ticketLabel(suggested));
+        if (typeof window.RPC_TOAST === "function") {
+          window.RPC_TOAST(`Auto-linked to ${ticketLabel(suggested)} — change below if that's wrong`, { tone: "info", duration: 4000 });
+        }
+      }
       $("partsOrderReviewStatus").hidden = true;
       $("partsOrderReviewForm").hidden = false;
       $("partsOrderReviewSaveBtn").disabled = false;

@@ -1105,6 +1105,10 @@ body.nav-open .nav-backdrop { opacity: 1; }
 .inventory-stock-filter-ok { --stock-filter-color: var(--price); }
 .inventory-stock-filter-low,
 .inventory-stock-filter-out { --stock-filter-color: var(--danger); }
+.inventory-stock-filter-ordered { --stock-filter-color: var(--warn); }
+.inventory-stock-filter-backordered { --stock-filter-color: var(--danger); }
+.inventory-stock-filter-arrived { --stock-filter-color: var(--price); }
+.inventory-stock-filter-cancelled { --stock-filter-color: var(--text-dim); }
 .inventory-stock-dot {
   width: 7px;
   height: 7px;
@@ -1415,10 +1419,14 @@ body.nav-open .nav-backdrop { opacity: 1; }
   }
   .inventory-table td:first-child::before { display: none; }
   .inventory-table td.num { text-align: right; }
-  .inventory-table td[data-label="Update"] {
+  .inventory-table td[data-label="Update"],
+  .inventory-table td[data-label="Linked to"],
+  .inventory-table td[data-label="Actions"] {
     display: block;
   }
-  .inventory-table td[data-label="Update"]::before {
+  .inventory-table td[data-label="Update"]::before,
+  .inventory-table td[data-label="Linked to"]::before,
+  .inventory-table td[data-label="Actions"]::before {
     display: block;
     margin-bottom: 8px;
   }
@@ -6246,28 +6254,80 @@ video.media-viewer-media {
 .parts-order-topbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .parts-order-status-badge {
   display: inline-block;
-  margin-left: 8px;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 600;
   background: var(--bg-soft);
   color: var(--text-dim);
+  white-space: nowrap;
 }
 .parts-order-status-ordered { background: #fdf3e6; color: var(--warn); }
 .parts-order-status-backordered { background: #fdecea; color: var(--danger); }
 .parts-order-status-arrived { background: #e7f6ef; color: var(--price); }
 .parts-order-status-cancelled { background: var(--bg-soft); color: var(--text-dim); }
-.parts-order-arrived-btn { color: var(--price) !important; border-color: #9ad9b8 !important; }
-.parts-order-arrived-btn:hover { background: #e7f6ef; }
-.parts-order-pdf-link {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.78rem;
-  color: var(--accent);
-  text-decoration: none;
+.parts-order-row.is-cancelled { opacity: 0.65; }
+.parts-order-arrived-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #9ad9b8;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--price);
+  font: 500 0.82rem var(--font-display);
+  cursor: pointer;
+  white-space: nowrap;
 }
-.parts-order-pdf-link:hover { text-decoration: underline; }
+.parts-order-arrived-btn:hover { background: #e7f6ef; }
+.parts-order-cost-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+.parts-order-empty-cell { color: var(--text-dim); }
+.parts-order-customer-text { color: var(--text); }
+.parts-order-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--accent);
+  font: 500 0.82rem var(--font-display);
+  cursor: pointer;
+  max-width: 100%;
+}
+.parts-order-link-chip:hover { border-color: var(--accent); }
+.parts-order-link-chip .icon { width: 14px; height: 14px; flex: none; }
+.parts-order-match-list { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.parts-order-match {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px dashed rgba(31, 95, 191, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: 500 0.76rem var(--font-display);
+  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+}
+.parts-order-match:hover { background: rgba(31, 95, 191, 0.08); }
+.parts-order-match .icon { width: 12px; height: 12px; flex: none; }
+.parts-order-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .parts-order-review-row {
   display: grid;
   grid-template-columns: 1fr 70px 90px auto;
