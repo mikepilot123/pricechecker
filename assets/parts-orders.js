@@ -6,6 +6,7 @@
    ============================================================ */
 (function () {
   const INTAKE_URL = "https://pricechecker-cyan.vercel.app/api/intake";
+  const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
   const LS_PIN = "rpc_intake_pin";
   const MAX_INLINE_PDF_BYTES = 2.5 * 1024 * 1024;
   const $ = (id) => document.getElementById(id);
@@ -24,6 +25,8 @@
   let searchQuery = "";
   let editingId = null;
   let saving = false;
+  let inventorySaving = false;
+  let inventoryTargetId = null;
   let bound = false;
 
   let reviewBatchId = null;
@@ -232,32 +235,53 @@
   }
 
   function linkedCellHtml(item) {
+    if (item.inventoryStockState === "stocked") {
+      const label = item.inventoryItemLabel || "Inventory item";
+      const quantity = item.inventoryStockedQuantity || item.quantity;
+      return `<span class="parts-order-inventory-chip" title="Added ${esc(quantity)} to ${esc(label)}">
+        <svg class="icon"><use href="#i-inventory-flow"></use></svg><span class="parts-order-chip-label">In inventory · ${esc(label)}</span>
+      </span>`;
+    }
     if (item.ticketId) {
       const label = ticketLabelById(item.ticketId) || item.customerName || "Linked repair";
       return `<span class="parts-order-link-chip" title="${esc(label)}">
         <svg class="icon"><use href="#i-device"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
       </span>`;
     }
-    if (item.customerName) {
-      return `<span class="parts-order-customer-text" title="${esc(item.customerName)}">${esc(item.customerName)}</span>`;
+    if (item.status === "cancelled") {
+      return item.customerName
+        ? `<span class="parts-order-customer-text" title="${esc(item.customerName)}">${esc(item.customerName)}</span>`
+        : `<span class="parts-order-empty-cell">—</span>`;
     }
     const matches = findMatchingTickets(item);
+    let repairButton;
+    let nextButton = "";
     if (matches.length) {
       const index = (matchIndexByPart.get(item.id) || 0) % matches.length;
       const match = matches[index];
       const label = `Link to ${ticketLabel(match)}`;
       const next = matches[(index + 1) % matches.length];
-      return `<div class="parts-order-match-list">
-        <button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(match.id)}" title="${esc(label)}">
-          <svg class="icon"><use href="#i-check"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
-        </button>
-        ${matches.length > 1 ? `<button type="button" class="parts-order-next-match" data-parts-next-match="${esc(item.id)}"
+      repairButton = `<button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(match.id)}" title="${esc(label)}">
+        <svg class="icon"><use href="#i-link"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
+      </button>`;
+      nextButton = matches.length > 1 ? `<button type="button" class="parts-order-next-match" data-parts-next-match="${esc(item.id)}"
           title="${esc(`Show next match: ${ticketLabel(next)}`)}" aria-label="${esc(`Show next matching repair: ${ticketLabel(next)}`)}">
           <svg class="icon"><use href="#i-link"></use></svg><span>+${matches.length - 1}</span>
-        </button>` : ""}
-      </div>`;
+        </button>` : "";
+    } else {
+      repairButton = `<button type="button" class="parts-order-match parts-order-choose-repair" data-parts-choose-repair="${esc(item.id)}" title="Choose a repair">
+        <svg class="icon"><use href="#i-link"></use></svg><span class="parts-order-chip-label">Repair</span>
+      </button>`;
     }
-    return `<span class="parts-order-empty-cell">—</span>`;
+    return `<div class="parts-order-destination-cell">
+      ${item.customerName ? `<span class="parts-order-customer-text" title="${esc(item.customerName)}">${esc(item.customerName)}</span>` : ""}
+      <div class="parts-order-match-list">
+        ${repairButton}${nextButton}
+        <button type="button" class="parts-order-inventory-option" data-parts-inventory="${esc(item.id)}" title="Add this order to inventory">
+          <svg class="icon"><use href="#i-inventory-flow"></use></svg><span>Inventory</span>
+        </button>
+      </div>
+    </div>`;
   }
 
   function partsOrderRowHtml(item, { grouped = false } = {}) {
@@ -274,7 +298,7 @@
       </td>
       <td data-label="Vendor">${esc(item.vendor) || "—"}</td>
       <td data-label="Status"><span class="parts-order-status-badge parts-order-status-${esc(item.status)}">${esc(STATUS_LABELS[item.status] || item.status)}</span></td>
-      <td data-label="Linked to">${linkedCellHtml(item)}</td>
+      <td data-label="Destination">${linkedCellHtml(item)}</td>
       <td class="num" data-label="Qty">${item.quantity}</td>
       <td class="num" data-label="Cost">
         <strong>${money(item.totalCost)}</strong>
@@ -399,6 +423,124 @@
   function closePartsOrderForm() {
     if (saving) return;
     $("partsOrderFormModal").hidden = true;
+  }
+
+  function openRepairPicker(id) {
+    const item = PARTS_ORDERS.find((part) => part.id === id);
+    if (!item) return;
+    openPartsOrderForm(item);
+    requestAnimationFrame(() => $("partsOrderTicketSearch")?.focus());
+  }
+
+  function inventoryOptionHtml(item) {
+    return `<option value="${esc(item.key)}">${esc(item.label || item.item)} — ${esc(item.section)} (in stock: ${Number(item.quantity || 0)})</option>`;
+  }
+
+  function syncInventoryMode() {
+    const isNew = $("partsOrderInventoryMode")?.value === "new";
+    $("partsOrderInventoryExistingFields").hidden = isNew;
+    $("partsOrderInventoryNewFields").hidden = !isNew;
+    $("partsOrderInventoryItem").required = !isNew;
+    $("partsOrderInventorySection").required = isNew;
+    $("partsOrderInventoryNewItem").required = isNew;
+  }
+
+  async function openInventoryModal(id) {
+    const item = PARTS_ORDERS.find((part) => part.id === id);
+    if (!item || item.ticketId || item.inventoryStockState === "stocked") return;
+    inventoryTargetId = id;
+    $("partsOrderInventoryTitle").textContent = "Add ordered part to inventory";
+    $("partsOrderInventoryContext").textContent = `${item.quantity} × ${item.part} will be added to stock and marked arrived.`;
+    $("partsOrderInventoryMode").value = "existing";
+    $("partsOrderInventoryNewItem").value = item.part;
+    $("partsOrderInventoryQuality").value = "";
+    $("partsOrderInventoryMessage").hidden = true;
+    $("partsOrderInventoryModal").hidden = false;
+    syncInventoryMode();
+
+    const select = $("partsOrderInventoryItem");
+    const sectionSelect = $("partsOrderInventorySection");
+    select.disabled = true;
+    select.innerHTML = `<option value="">Loading inventory…</option>`;
+    try {
+      const data = typeof window.RPC_LOAD_INVENTORY === "function"
+        ? await window.RPC_LOAD_INVENTORY({ force: true })
+        : { items: window.RPC_INVENTORY_ITEMS || [], sections: [] };
+      const inventoryChoices = (data.items || window.RPC_INVENTORY_ITEMS || []).filter((candidate) => candidate.key);
+      const inventorySections = (data.sections || [...new Set(inventoryChoices.map((candidate) => candidate.section))]).filter(Boolean);
+      const grouped = new Map();
+      inventoryChoices.forEach((candidate) => {
+        if (!grouped.has(candidate.section)) grouped.set(candidate.section, []);
+        grouped.get(candidate.section).push(candidate);
+      });
+      select.innerHTML = `<option value="">Choose an inventory item…</option>` + [...grouped.entries()].map(([section, choices]) =>
+        `<optgroup label="${esc(section)}">${choices.sort((a, b) => String(a.label).localeCompare(String(b.label))).map(inventoryOptionHtml).join("")}</optgroup>`
+      ).join("");
+      sectionSelect.innerHTML = `<option value="">Choose a section…</option>` + inventorySections.map((section) =>
+        `<option value="${esc(section)}">${esc(section)}</option>`).join("");
+      select.disabled = false;
+      if (!inventoryChoices.length && !inventorySections.length) {
+        throw new Error("No inventory sections are available");
+      }
+      select.focus();
+    } catch (err) {
+      select.disabled = true;
+      $("partsOrderInventoryMessage").textContent = "Couldn't load inventory: " + err.message;
+      $("partsOrderInventoryMessage").hidden = false;
+    }
+  }
+
+  function closeInventoryModal() {
+    if (inventorySaving) return;
+    $("partsOrderInventoryModal").hidden = true;
+    inventoryTargetId = null;
+  }
+
+  async function stockPartsOrder(event) {
+    event?.preventDefault();
+    if (inventorySaving || !inventoryTargetId) return;
+    const form = $("partsOrderInventoryForm");
+    if (!form.reportValidity()) return;
+    const isNew = $("partsOrderInventoryMode").value === "new";
+    const payload = { action: "stockPartsOrder", pin: pin(), partsOrderId: inventoryTargetId };
+    if (isNew) {
+      payload.section = $("partsOrderInventorySection").value;
+      payload.item = $("partsOrderInventoryNewItem").value.trim();
+      payload.quality = $("partsOrderInventoryQuality").value.trim();
+    } else {
+      payload.itemKey = $("partsOrderInventoryItem").value;
+    }
+    inventorySaving = true;
+    const submit = $("partsOrderInventorySubmit");
+    const original = submit.textContent;
+    submit.disabled = true;
+    submit.textContent = "Adding…";
+    $("partsOrderInventoryMessage").hidden = true;
+    try {
+      const res = await fetch(INVENTORY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Rejected");
+      PARTS_ORDERS = PARTS_ORDERS.map((part) => part.id === data.partsOrder.id ? data.partsOrder : part);
+      renderPartsOrders();
+      $("partsOrderInventoryModal").hidden = true;
+      inventoryTargetId = null;
+      if (typeof window.RPC_LOAD_INVENTORY === "function") window.RPC_LOAD_INVENTORY({ force: true });
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(`Added ${data.partsOrder.inventoryStockedQuantity} to inventory`, { tone: "info", duration: 3000 });
+      }
+    } catch (err) {
+      $("partsOrderInventoryMessage").textContent = err.message;
+      $("partsOrderInventoryMessage").hidden = false;
+    } finally {
+      inventorySaving = false;
+      submit.disabled = false;
+      submit.textContent = original;
+    }
   }
 
   async function savePartsOrderForm(event) {
@@ -533,6 +675,8 @@
     const deleteBtn = event.target.closest("[data-parts-delete]");
     const linkBtn = event.target.closest("[data-parts-link]");
     const nextMatchBtn = event.target.closest("[data-parts-next-match]");
+    const chooseRepairBtn = event.target.closest("[data-parts-choose-repair]");
+    const inventoryBtn = event.target.closest("[data-parts-inventory]");
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
     const toggleBtn = event.target.closest("[data-parts-toggle-shipment]");
     const renameShipmentBtn = event.target.closest("[data-parts-rename-shipment]");
@@ -543,6 +687,8 @@
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
     if (nextMatchBtn) { showNextTicketMatch(nextMatchBtn.dataset.partsNextMatch); return; }
+    if (chooseRepairBtn) { openRepairPicker(chooseRepairBtn.dataset.partsChooseRepair); return; }
+    if (inventoryBtn) { openInventoryModal(inventoryBtn.dataset.partsInventory); return; }
     if (linkBtn) { linkPartsOrderToTicket(linkBtn.dataset.partsLink, linkBtn.dataset.ticketId); return; }
   }
 
@@ -810,6 +956,11 @@
     $("partsOrderForm")?.addEventListener("submit", savePartsOrderForm);
     $("partsOrderSubmit")?.addEventListener("click", savePartsOrderForm);
     $("partsOrderList")?.addEventListener("click", handlePartsOrderListClick);
+    $("closePartsOrderInventoryModal")?.addEventListener("click", closeInventoryModal);
+    $("partsOrderInventoryCancelBtn")?.addEventListener("click", closeInventoryModal);
+    $("partsOrderInventoryForm")?.addEventListener("submit", stockPartsOrder);
+    $("partsOrderInventorySubmit")?.addEventListener("click", stockPartsOrder);
+    $("partsOrderInventoryMode")?.addEventListener("change", syncInventoryMode);
 
     $("partsOrderSearch")?.addEventListener("input", () => {
       searchQuery = ($("partsOrderSearch").value || "").trim().toLowerCase();
@@ -861,6 +1012,7 @@
     document.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
       if (!$("partsOrderFormModal")?.hidden) closePartsOrderForm();
+      if (!$("partsOrderInventoryModal")?.hidden) closeInventoryModal();
       if (!$("partsOrderReviewModal")?.hidden) closeReviewModal();
     });
   }

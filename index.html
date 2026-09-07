@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=shipment-collapse-3" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-destinations-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -584,7 +584,7 @@
        Accounting sub-panel) so tracking shipments doesn't require going
        through Accounting first. ---------- -->
   <main class="container view" id="view-partsOrders" hidden>
-    <p class="info-banner">Track parts ordered from suppliers, and link them to a customer or repair.</p>
+    <p class="info-banner">Track parts ordered from suppliers, then assign them to a repair or add them to inventory.</p>
     <div class="inventory-add-row">
       <button type="button" id="partsOrderUploadBtn" class="ghost-btn"><svg class="icon"><use href="#i-upload"></use></svg>Upload order PDF</button>
       <button type="button" id="partsOrderNewBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add part</button>
@@ -607,7 +607,7 @@
               <th>Part</th>
               <th>Vendor</th>
               <th>Status</th>
-              <th>Linked to</th>
+              <th>Destination</th>
               <th class="num">Qty</th>
               <th class="num">Cost</th>
               <th>Ordered</th>
@@ -818,6 +818,62 @@
         <div class="form-actions">
           <button type="button" id="partsOrderCancelBtn" class="ghost-btn">Cancel</button>
           <button type="button" id="partsOrderSubmit" class="primary-btn">Add part</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receive an ordered part into inventory -->
+  <div id="partsOrderInventoryModal" class="modal-backdrop" hidden>
+    <div class="modal-panel modal-panel-sm" role="dialog" aria-modal="true" aria-labelledby="partsOrderInventoryTitle">
+      <div class="modal-header">
+        <h3 id="partsOrderInventoryTitle">Add ordered part to inventory</h3>
+        <button type="button" id="closePartsOrderInventoryModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="partsOrderInventoryContext" class="hint"></p>
+        <form id="partsOrderInventoryForm" autocomplete="off">
+          <div class="form-grid">
+            <div class="form-field form-field-full">
+              <label class="field-label" for="partsOrderInventoryMode">Inventory destination</label>
+              <select id="partsOrderInventoryMode" class="text-input select-input">
+                <option value="existing">Existing inventory item</option>
+                <option value="new">Create a new inventory item</option>
+              </select>
+            </div>
+            <div id="partsOrderInventoryExistingFields" class="form-field form-field-full">
+              <label class="field-label" for="partsOrderInventoryItem">Add stock to</label>
+              <select id="partsOrderInventoryItem" class="text-input select-input" required>
+                <option value="">Choose an inventory item…</option>
+              </select>
+            </div>
+            <div id="partsOrderInventoryNewFields" class="parts-order-inventory-new-fields form-field form-field-full" hidden>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label class="field-label" for="partsOrderInventorySection">Section</label>
+                  <select id="partsOrderInventorySection" class="text-input select-input">
+                    <option value="">Choose a section…</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label class="field-label" for="partsOrderInventoryQuality">Quality (optional)</label>
+                  <input id="partsOrderInventoryQuality" class="text-input" placeholder="e.g. Premium" />
+                </div>
+                <div class="form-field form-field-full">
+                  <label class="field-label" for="partsOrderInventoryNewItem">Item name</label>
+                  <input id="partsOrderInventoryNewItem" class="text-input" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="hint parts-order-inventory-note">This adds the full ordered quantity to stock and marks the part arrived. It can’t also be linked to a repair.</p>
+          <p id="partsOrderInventoryMessage" class="field-error" role="alert" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="partsOrderInventoryCancelBtn" class="ghost-btn">Cancel</button>
+          <button type="button" id="partsOrderInventorySubmit" class="primary-btn">Add to inventory</button>
         </div>
       </div>
     </div>
@@ -2409,6 +2465,6 @@
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
   <script defer src="assets/account.js?v=card-takings-1"></script>
-  <script defer src="assets/parts-orders.js?v=shipment-collapse-3"></script>
+  <script defer src="assets/parts-orders.js?v=parts-destinations-1"></script>
 </body>
 </html>
