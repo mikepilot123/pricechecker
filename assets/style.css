@@ -6315,7 +6315,7 @@ video.media-viewer-media {
   max-width: 220px;
 }
 .parts-order-link-chip .icon { width: 14px; height: 14px; flex: none; }
-.parts-order-match-list { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.parts-order-match-list { display: flex; gap: 6px; align-items: center; }
 .parts-order-match {
   display: flex;
   align-items: center;
@@ -6333,6 +6333,24 @@ video.media-viewer-media {
 }
 .parts-order-match:hover { background: rgba(31, 95, 191, 0.08); }
 .parts-order-match .icon { width: 12px; height: 12px; flex: none; }
+.parts-order-next-match {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: none;
+  min-width: 36px;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid rgba(31, 95, 191, 0.28);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: 600 0.7rem var(--font-display);
+  cursor: pointer;
+}
+.parts-order-next-match:hover { background: rgba(31, 95, 191, 0.08); }
+.parts-order-next-match .icon { width: 13px; height: 13px; }
 .parts-order-chip-label {
   flex: 1;
   min-width: 0;
