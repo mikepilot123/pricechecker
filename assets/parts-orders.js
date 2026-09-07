@@ -14,6 +14,8 @@
 
   let PARTS_ORDERS = [];
   let tickets = [];
+  let CUSTOMERS = [];
+  let customersLoadStarted = false;
   let statusFilter = "all";
   let searchQuery = "";
   let editingId = null;
@@ -76,6 +78,21 @@
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  // Backs the "Customer" name fields' autosuggest below — same shared
+  // customer directory (lib/customers.js) the Log Device form uses, fetched
+  // independently here since this panel can be opened without Repairs ever
+  // having loaded it first.
+  async function ensureCustomersLoaded() {
+    if (customersLoadStarted) return;
+    customersLoadStarted = true;
+    try {
+      const data = await partsOrderApi({ action: "listCustomers" });
+      CUSTOMERS = data.customers || [];
+    } catch (err) {
+      customersLoadStarted = false;
+    }
   }
 
   async function loadPartsOrders() {
@@ -317,6 +334,7 @@
     formTicketCombobox?.set(item?.ticketId || "", item?.ticketId ? ticketLabelById(item.ticketId) : "");
     $("partsOrderMessage").hidden = true;
     $("partsOrderFormModal").hidden = false;
+    ensureCustomersLoaded();
     $("partsOrderPart").focus();
   }
 
@@ -487,6 +505,50 @@
     return { set: select, reset: () => select("", "") };
   }
 
+  // ---- Customer name autosuggest — same shared directory (CUSTOMERS) the
+  // Log Device form uses; picking a match fills in the phone field too. ----
+  function createCustomerCombobox({ nameInputId, phoneInputId, dropdownId, comboboxId }) {
+    const input = $(nameInputId), dropdown = $(dropdownId), combobox = $(comboboxId), phoneInput = $(phoneInputId);
+    if (!input || !dropdown || !combobox) return null;
+
+    function close() {
+      dropdown.hidden = true;
+      combobox.classList.remove("open");
+      input.setAttribute("aria-expanded", "false");
+    }
+    function render() {
+      const q = input.value.trim().toLowerCase();
+      if (!q) { close(); return; }
+      const matches = CUSTOMERS.filter((c) =>
+        [c.name, c.phone].some((v) => String(v || "").toLowerCase().includes(q))
+      ).slice(0, 8);
+      if (!matches.length) { close(); return; }
+      dropdown.innerHTML = matches.map((c) => `
+        <button type="button" class="device-option" role="option" data-customer-id="${esc(c.id)}">
+          ${esc(c.name || "Unknown customer")} <span class="rem-notes">${esc(c.phone || "")}</span>
+        </button>
+      `).join("");
+      dropdown.hidden = false;
+      combobox.classList.add("open");
+      input.setAttribute("aria-expanded", "true");
+    }
+    dropdown.addEventListener("mousedown", (event) => {
+      const btn = event.target.closest("[data-customer-id]");
+      if (!btn) return;
+      event.preventDefault();
+      const customer = CUSTOMERS.find((c) => c.id === btn.dataset.customerId);
+      if (!customer) return;
+      input.value = customer.name || "";
+      if (phoneInput && customer.phone) phoneInput.value = customer.phone;
+      close();
+    });
+    input.addEventListener("input", render);
+    input.addEventListener("focus", render);
+    document.addEventListener("click", (event) => {
+      if (!combobox.contains(event.target)) close();
+    });
+  }
+
   /* ---- PDF upload + AI-extraction review -------------------------------
      Supplier PDFs are small, so they travel to the server in the existing
      PIN-protected request and Gemini reads them there. Nothing is saved to
@@ -577,6 +639,7 @@
     }
     resetReviewState();
     openReviewModal();
+    ensureCustomersLoaded();
     $("partsOrderReviewStatus").textContent = "Reading the PDF…";
     try {
       reviewBatchId = "PO" + crypto.randomUUID();
@@ -693,6 +756,14 @@
       inputId: "partsOrderReviewTicketSearch", dropdownId: "partsOrderReviewTicketDropdown",
       comboboxId: "partsOrderReviewTicketCombobox", clearBtnId: "clearPartsOrderReviewTicket", hiddenId: "partsOrderReviewTicketId",
     });
+    createCustomerCombobox({
+      nameInputId: "partsOrderCustomerName", phoneInputId: "partsOrderCustomerPhone",
+      dropdownId: "partsOrderCustomerDropdown", comboboxId: "partsOrderCustomerCombobox",
+    });
+    createCustomerCombobox({
+      nameInputId: "partsOrderReviewCustomerName", phoneInputId: "partsOrderReviewCustomerPhone",
+      dropdownId: "partsOrderReviewCustomerDropdown", comboboxId: "partsOrderReviewCustomerCombobox",
+    });
 
     document.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
@@ -704,6 +775,7 @@
   function initPartsOrders() {
     bind();
     loadPartsOrders();
+    ensureCustomersLoaded();
   }
 
   window.addEventListener("rpc-enter-parts-orders", initPartsOrders);

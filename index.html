@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=parts-orders-3" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-orders-4" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -780,7 +780,10 @@
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="partsOrderCustomerName">Customer (optional)</label>
-              <input id="partsOrderCustomerName" class="text-input" placeholder="e.g. Anita Singh" />
+              <div class="device-combobox" id="partsOrderCustomerCombobox">
+                <input id="partsOrderCustomerName" class="text-input" autocomplete="off" placeholder="e.g. Anita Singh" aria-autocomplete="list" aria-expanded="false" aria-controls="partsOrderCustomerDropdown" />
+                <div id="partsOrderCustomerDropdown" class="device-dropdown" role="listbox" hidden></div>
+              </div>
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="partsOrderCustomerPhone">Customer phone (optional)</label>
@@ -829,7 +832,10 @@
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="partsOrderReviewCustomerName">Link all parts to a customer (optional)</label>
-              <input id="partsOrderReviewCustomerName" class="text-input" placeholder="e.g. Anita Singh" />
+              <div class="device-combobox" id="partsOrderReviewCustomerCombobox">
+                <input id="partsOrderReviewCustomerName" class="text-input" autocomplete="off" placeholder="e.g. Anita Singh" aria-autocomplete="list" aria-expanded="false" aria-controls="partsOrderReviewCustomerDropdown" />
+                <div id="partsOrderReviewCustomerDropdown" class="device-dropdown" role="listbox" hidden></div>
+              </div>
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="partsOrderReviewCustomerPhone">Customer phone (optional)</label>
@@ -2387,7 +2393,7 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=parts-orders-3"></script>
+  <script defer src="assets/intake.js?v=parts-orders-4"></script>
   <script defer src="assets/dashboard.js?v=custom-snooze-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
@@ -2395,6 +2401,6 @@
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
   <script defer src="assets/account.js?v=card-takings-1"></script>
-  <script defer src="assets/parts-orders.js?v=parts-orders-3"></script>
+  <script defer src="assets/parts-orders.js?v=parts-orders-4"></script>
 </body>
 </html>
