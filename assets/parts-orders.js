@@ -105,6 +105,24 @@
     }
   }
 
+  // Tickets normally arrive via the "rpc-tickets" broadcast (see the bottom
+  // of this file) once assets/intake.js loads them for the Repairs tab —
+  // but Parts orders is its own top-level tab now, so a visit here can
+  // easily happen before Repairs ever has. Without this, an already-linked
+  // part has nothing to look its customer/device name up from and falls
+  // back to the generic "Linked repair" label, and match suggestions never
+  // find anything to suggest. Fetched fresh on every visit so it's never
+  // stale against a status change made elsewhere.
+  async function loadTicketsForMatching() {
+    try {
+      const data = await partsOrderApi({ action: "list" });
+      tickets = data.tickets || tickets;
+      renderPartsOrders();
+    } catch (err) {
+      // Non-fatal — labels/matching just fall back gracefully.
+    }
+  }
+
   function filteredPartsOrders() {
     return PARTS_ORDERS.filter((item) => {
       if (statusFilter !== "all" && item.status !== statusFilter) return false;
@@ -793,6 +811,7 @@
     bind();
     loadPartsOrders();
     ensureCustomersLoaded();
+    loadTicketsForMatching();
   }
 
   window.addEventListener("rpc-enter-parts-orders", initPartsOrders);
