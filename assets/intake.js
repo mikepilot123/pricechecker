@@ -107,6 +107,7 @@
   let TICKETS = [];
   let TECHNICIANS = [];
   let CUSTOMERS = [];
+  let customersLoadStarted = false;
   let statusFilter = "all";
   let editingId = null;
   let formStep = 1;
@@ -691,14 +692,23 @@
   // number, whenever a device is logged or edited. This just lists what's
   // already been saved — there's no separate "add customer" flow.
   async function loadCustomers() {
+    customersLoadStarted = true;
     try {
       const res = await api({ action: "listCustomers" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       CUSTOMERS = res.customers || [];
       renderCustomerSettings();
     } catch (e) {
+      customersLoadStarted = false;
       renderCustomerSettings("Couldn't load customers: " + e.message);
     }
+  }
+
+  // Fed to the Log Device form's name combobox — loaded lazily the first
+  // time that form opens (rather than only from the Settings › Customers
+  // panel) so a returning customer's phone/email can auto-fill.
+  function ensureCustomersLoaded() {
+    if (!customersLoadStarted) loadCustomers();
   }
 
   function renderCustomerSettings(message = "") {
@@ -2104,6 +2114,7 @@
     resetPendingFormMedia();
     setFormStep(1);
     $("intakeFormModal").hidden = false;
+    ensureCustomersLoaded();
     focusUnlessTouch($("fName"));
   }
   function closeForm() {
@@ -3520,6 +3531,65 @@
   }
 
   setupDeviceCombobox({ comboboxId: "fDeviceCombobox", inputId: "fDevice", dropdownId: "fDeviceDropdown", toggleId: "openFDeviceDropdown" });
+
+  // ---- Customer name autosuggest --------------------------------------
+  // Typing a name that matches a previous check-in offers it from the
+  // shared customer directory (lib/customers.js); picking one fills phone
+  // and email so a returning customer's details never need retyping.
+  function setupCustomerNameCombobox() {
+    const combobox = $("fNameCombobox");
+    const input = $("fName");
+    const dropdown = $("fNameDropdown");
+    if (!combobox || !input || !dropdown) return;
+
+    function matches() {
+      const q = input.value.trim().toLowerCase();
+      if (!q) return [];
+      return CUSTOMERS.filter((c) =>
+        [c.name, c.phone].some((v) => String(v || "").toLowerCase().includes(q))
+      ).slice(0, 8);
+    }
+
+    function render() {
+      const list = matches();
+      if (!list.length) { close(); return; }
+      dropdown.innerHTML = list.map((c) => `
+        <button type="button" class="device-option" role="option" data-customer-id="${esc(c.id)}">
+          ${esc(c.name || "Unknown customer")} <span class="rem-notes">${esc(c.phone || "")}</span>
+        </button>
+      `).join("");
+      dropdown.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      combobox.classList.add("open");
+    }
+
+    function close() {
+      dropdown.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      combobox.classList.remove("open");
+    }
+
+    function choose(customer) {
+      input.value = customer.name || "";
+      if (customer.phone) $("fPhone").value = customer.phone;
+      if (customer.email) $("fEmail").value = customer.email;
+      close();
+    }
+
+    input.addEventListener("input", render);
+    input.addEventListener("focus", render);
+    dropdown.addEventListener("mousedown", (e) => {
+      const btn = e.target.closest("[data-customer-id]");
+      if (!btn) return;
+      e.preventDefault();
+      const customer = CUSTOMERS.find((c) => c.id === btn.dataset.customerId);
+      if (customer) choose(customer);
+    });
+    document.addEventListener("click", (e) => {
+      if (!combobox.contains(e.target)) close();
+    });
+  }
+  setupCustomerNameCombobox();
 
   // ---- Helpers -------------------------------------------------------------
   // The original Apps Script API returned `client` and `issue`. The current

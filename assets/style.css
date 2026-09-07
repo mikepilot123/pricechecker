@@ -1430,6 +1430,10 @@ body.nav-open .nav-backdrop { opacity: 1; }
     display: block;
     margin-bottom: 8px;
   }
+  .parts-order-shipment-header td {
+    display: block !important;
+  }
+  .parts-order-shipment-item td:first-child { padding-left: 12px; }
   .inventory-adjust {
     justify-content: stretch;
   }
@@ -6323,11 +6327,42 @@ video.media-viewer-media {
 .parts-order-match .icon { width: 12px; height: 12px; flex: none; }
 .parts-order-actions {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
   gap: 6px;
 }
+.parts-order-icon-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.parts-order-shipment-header td {
+  padding: 0 !important;
+  border-bottom: 0 !important;
+}
+.parts-order-shipment-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--bg-soft);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.parts-order-shipment-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+}
+.parts-order-shipment-info .icon { width: 20px; height: 20px; flex: none; color: var(--text-dim); }
+.parts-order-shipment-info strong { display: block; }
+.parts-order-shipment-info small { display: block; color: var(--text-dim); font-size: 0.78rem; }
+.parts-order-shipment-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.parts-order-shipment-item td:first-child { padding-left: 30px; }
 .parts-order-review-row {
   display: grid;
   grid-template-columns: 1fr 70px 90px auto;

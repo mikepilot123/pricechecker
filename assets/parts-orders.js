@@ -198,9 +198,9 @@
     return `<span class="parts-order-empty-cell">—</span>`;
   }
 
-  function partsOrderRowHtml(item) {
-    const canAdvance = item.status !== "arrived" && item.status !== "cancelled";
-    return `<tr class="inventory-row parts-order-row is-${esc(item.status)}">
+  function partsOrderRowHtml(item, { grouped = false } = {}) {
+    const canAdvance = !grouped && item.status !== "arrived" && item.status !== "cancelled";
+    return `<tr class="inventory-row parts-order-row is-${esc(item.status)}${grouped ? " parts-order-shipment-item" : ""}">
       <td data-label="Part">
         <div class="inventory-product">
           <span class="inventory-thumb"><svg class="icon"><use href="#i-device"></use></svg></span>
@@ -213,17 +213,62 @@
       <td data-label="Vendor">${esc(item.vendor) || "—"}</td>
       <td data-label="Status"><span class="parts-order-status-badge parts-order-status-${esc(item.status)}">${esc(STATUS_LABELS[item.status] || item.status)}</span></td>
       <td data-label="Linked to">${linkedCellHtml(item)}</td>
+      <td class="num" data-label="Qty">${item.quantity}</td>
       <td class="num" data-label="Cost">
         <strong>${money(item.totalCost)}</strong>
-        <span class="parts-order-cost-sub">${item.quantity} × ${money(item.unitCost)}</span>
+        ${item.quantity > 1 ? `<span class="parts-order-cost-sub">${money(item.unitCost)} each</span>` : ""}
       </td>
       <td data-label="Ordered">${esc(formatDate(item.orderedAt))}</td>
       <td data-label="Actions">
         <div class="parts-order-actions">
           ${canAdvance ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrived="${esc(item.id)}">Mark arrived</button>` : ""}
-          ${item.sourceDocumentUrl ? `<a class="icon-btn ghost-btn" href="${esc(item.sourceDocumentUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
-          <button type="button" class="icon-btn ghost-btn" data-parts-edit="${esc(item.id)}" title="Edit" aria-label="Edit"><svg class="icon"><use href="#i-pencil"></use></svg></button>
-          <button type="button" class="icon-btn ghost-btn danger-btn" data-parts-delete="${esc(item.id)}" title="Delete" aria-label="Delete"><svg class="icon"><use href="#i-trash"></use></svg></button>
+          <div class="parts-order-icon-actions">
+            ${!grouped && item.sourceDocumentUrl ? `<a class="icon-btn ghost-btn" href="${esc(item.sourceDocumentUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
+            <button type="button" class="icon-btn ghost-btn" data-parts-edit="${esc(item.id)}" title="Edit" aria-label="Edit"><svg class="icon"><use href="#i-pencil"></use></svg></button>
+            <button type="button" class="icon-btn ghost-btn danger-btn" data-parts-delete="${esc(item.id)}" title="Delete" aria-label="Delete"><svg class="icon"><use href="#i-trash"></use></svg></button>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }
+
+  // ---- Shipments: every part saved from the same PDF upload shares a
+  // batchId (see saveReviewRows below); a manually-added part's batchId is
+  // just its own id, so it never groups with anything else. Grouping here
+  // is purely a render-time concern — nothing about batchId changes. ----
+  function groupOrdersByBatch(list) {
+    const order = [];
+    const groups = new Map();
+    for (const item of list) {
+      const key = item.batchId || item.id;
+      if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+      groups.get(key).push(item);
+    }
+    return order.map((key) => groups.get(key));
+  }
+
+  function shipmentHeaderRowHtml(group) {
+    const batchId = group[0].batchId || group[0].id;
+    const vendor = group.find((i) => i.vendor)?.vendor || "Shipment";
+    const total = group.reduce((sum, i) => sum + i.totalCost, 0);
+    const pdfUrl = group.find((i) => i.sourceDocumentUrl)?.sourceDocumentUrl || null;
+    const pending = group.filter((i) => i.status !== "arrived" && i.status !== "cancelled");
+    return `<tr class="parts-order-shipment-header">
+      <td colspan="8">
+        <div class="parts-order-shipment-bar">
+          <div class="parts-order-shipment-info">
+            <svg class="icon"><use href="#i-receipt"></use></svg>
+            <span>
+              <strong>${esc(vendor)}</strong>
+              <small>${group.length} part${group.length === 1 ? "" : "s"} · ${money(total)} · ${esc(formatDate(group[0].orderedAt))}</small>
+            </span>
+          </div>
+          <div class="parts-order-shipment-actions">
+            ${pdfUrl ? `<a class="icon-btn ghost-btn" href="${esc(pdfUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
+            ${pending.length
+              ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrive-shipment="${esc(batchId)}">Mark shipment arrived</button>`
+              : `<span class="parts-order-status-badge parts-order-status-arrived">All arrived</span>`}
+          </div>
         </div>
       </td>
     </tr>`;
@@ -241,7 +286,12 @@
         ? `${visible.length} of ${PARTS_ORDERS.length} order${PARTS_ORDERS.length === 1 ? "" : "s"}`
         : "";
     }
-    list.innerHTML = visible.map(partsOrderRowHtml).join("");
+    list.innerHTML = groupOrdersByBatch(visible).map((group) => {
+      if (group.length > 1) {
+        return shipmentHeaderRowHtml(group) + group.map((item) => partsOrderRowHtml(item, { grouped: true })).join("");
+      }
+      return partsOrderRowHtml(group[0]);
+    }).join("");
     const empty = $("partsOrderEmpty");
     if (empty) {
       empty.hidden = visible.length > 0;
@@ -328,6 +378,24 @@
     }
   }
 
+  async function markShipmentArrived(batchId) {
+    const pending = PARTS_ORDERS.filter((item) =>
+      (item.batchId || item.id) === batchId && item.status !== "arrived" && item.status !== "cancelled");
+    if (!pending.length) return;
+    try {
+      for (const item of pending) {
+        const data = await partsOrderApi({ action: "updatePartsOrder", id: item.id, status: "arrived" });
+        PARTS_ORDERS = PARTS_ORDERS.map((p) => (p.id === item.id ? data.partsOrder : p));
+        renderPartsOrders();
+      }
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(`Marked ${pending.length} part${pending.length === 1 ? "" : "s"} arrived`, { tone: "info", duration: 2500 });
+      }
+    } catch (err) {
+      notifyError("Couldn't mark the whole shipment arrived: " + err.message);
+    }
+  }
+
   async function deletePartsOrderRow(id) {
     if (!window.confirm("Delete this parts order?")) return;
     try {
@@ -356,7 +424,9 @@
     const deleteBtn = event.target.closest("[data-parts-delete]");
     const linkBtn = event.target.closest("[data-parts-link]");
     const openTicketBtn = event.target.closest("[data-parts-open-ticket]");
+    const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
+    if (shipmentBtn) { markShipmentArrived(shipmentBtn.dataset.partsArriveShipment); return; }
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
     if (linkBtn) { linkPartsOrderToTicket(linkBtn.dataset.partsLink, linkBtn.dataset.ticketId); return; }
