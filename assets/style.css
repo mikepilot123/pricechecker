@@ -6370,6 +6370,28 @@ video.media-viewer-media {
   white-space: nowrap;
 }
 .parts-order-arrived-btn:hover { background: #e7f6ef; }
+.parts-order-payment-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  font: 500 0.82rem var(--font-display);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.parts-order-payment-btn.is-pending {
+  border: 1px solid #f3d9a7;
+  background: #fffbeb;
+  color: var(--warn);
+}
+.parts-order-payment-btn.is-pending:hover { background: #fdf3e6; }
+.parts-order-payment-btn.is-collected {
+  border: 1px solid #9ad9b8;
+  background: var(--card);
+  color: var(--price);
+}
+.parts-order-payment-btn.is-collected:hover { background: #e7f6ef; }
 .parts-order-cost-sub {
   display: block;
   margin-top: 2px;

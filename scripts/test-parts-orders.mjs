@@ -19,6 +19,7 @@ await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
 const {
   addPartsOrder, updatePartsOrder, listPartsOrders, deletePartsOrder, renamePartsShipment,
+  setPartsShipmentPaymentStatus,
   claimPartsOrderForInventory, completePartsOrderInventory, releasePartsOrderInventoryClaim,
 } = await import("../lib/parts-orders.js");
 const { listCustomers } = await import("../lib/customers.js");
@@ -64,6 +65,25 @@ await test("a shipment name applies to every part in its batch", async () => {
   const shipment = (await listPartsOrders()).filter((p) => p.batchId === "batch-rename");
   assert.equal(shipment.length, 2);
   assert.ok(shipment.every((p) => p.shipmentName === "Pixel 7 Pro order"));
+});
+
+await test("a new part defaults to pending payment, and a shipment's payment status applies to every part in its batch", async () => {
+  const p = await addPartsOrder({ id: "part-payment-default", part: "Screen", quantity: 1, unitCost: 20 });
+  assert.equal(p.paymentStatus, "pending");
+
+  await addPartsOrder({ id: "shipment-pay-a", batchId: "batch-payment", part: "Screen", quantity: 1, unitCost: 20 });
+  await addPartsOrder({ id: "shipment-pay-b", batchId: "batch-payment", part: "Adhesive", quantity: 1, unitCost: 2 });
+  const collected = await setPartsShipmentPaymentStatus({ batchId: "batch-payment", paymentStatus: "collected" });
+  assert.equal(collected.updatedCount, 2);
+  let shipment = (await listPartsOrders()).filter((x) => x.batchId === "batch-payment");
+  assert.ok(shipment.every((x) => x.paymentStatus === "collected"));
+
+  await setPartsShipmentPaymentStatus({ batchId: "batch-payment", paymentStatus: "pending" });
+  shipment = (await listPartsOrders()).filter((x) => x.batchId === "batch-payment");
+  assert.ok(shipment.every((x) => x.paymentStatus === "pending"));
+
+  await assert.rejects(setPartsShipmentPaymentStatus({ batchId: "batch-payment", paymentStatus: "bogus" }), /pending.*collected/i);
+  await assert.rejects(setPartsShipmentPaymentStatus({ batchId: "no-such-batch", paymentStatus: "collected" }), /Shipment not found/);
 });
 
 await test("inventory stocking claims are idempotent and mark the part arrived", async () => {

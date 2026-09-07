@@ -32,7 +32,7 @@ import {
 } from "../lib/card-payments.js";
 import { listPayouts, addPayout, voidPayout } from "../lib/payouts.js";
 import { getAccountSettings, saveAccountSettings } from "../lib/settings.js";
-import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment } from "../lib/parts-orders.js";
+import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
 import { applyCors, checkPin } from "../lib/security.js";
@@ -152,6 +152,9 @@ export default async function handler(req, res) {
     }
     if (action === "renamePartsShipment") {
       return res.status(200).json({ ok: true, shipment: await renamePartsShipment(body) });
+    }
+    if (action === "setPartsShipmentPaymentStatus") {
+      return res.status(200).json({ ok: true, shipment: await setPartsShipmentPaymentStatus(body) });
     }
     if (action === "extractPartsOrderPdf") {
       const pdfBase64 = String(body.pdfBase64 || "").trim();

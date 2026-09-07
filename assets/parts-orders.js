@@ -273,6 +273,13 @@
     </div>`;
   }
 
+  function paymentStatusButtonHtml(batchId, paymentStatus) {
+    const collected = paymentStatus === "collected";
+    return `<button type="button" class="parts-order-payment-btn ${collected ? "is-collected" : "is-pending"}" data-parts-toggle-payment="${esc(batchId)}" title="Click to mark ${collected ? "pending collection" : "payment collected"}">
+      ${collected ? "Payment collected" : "Pending collection"}
+    </button>`;
+  }
+
   function partsOrderRowHtml(item, { grouped = false } = {}) {
     const canAdvance = !grouped && item.status !== "arrived" && item.status !== "cancelled";
     return `<tr class="inventory-row parts-order-row is-${esc(item.status)}${grouped ? " parts-order-shipment-item" : ""}">
@@ -297,6 +304,7 @@
       <td data-label="Actions">
         <div class="parts-order-actions">
           ${canAdvance ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrived="${esc(item.id)}">Mark arrived</button>` : ""}
+          ${!grouped ? paymentStatusButtonHtml(item.batchId || item.id, item.paymentStatus) : ""}
           <div class="parts-order-icon-actions">
             ${!grouped && item.sourceDocumentUrl ? `<a class="icon-btn ghost-btn" href="${esc(item.sourceDocumentUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
             <button type="button" class="icon-btn ghost-btn" data-parts-edit="${esc(item.id)}" title="Edit" aria-label="Edit"><svg class="icon"><use href="#i-pencil"></use></svg></button>
@@ -348,6 +356,7 @@
             </span>
           </button>
           <div class="parts-order-shipment-actions">
+            ${paymentStatusButtonHtml(batchId, group[0].paymentStatus)}
             <button type="button" class="icon-btn ghost-btn" data-parts-rename-shipment="${esc(batchId)}" title="Rename shipment" aria-label="Rename shipment"><svg class="icon"><use href="#i-pencil"></use></svg></button>
             ${pdfUrl ? `<a class="icon-btn ghost-btn" href="${esc(pdfUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
             ${pending.length
@@ -677,6 +686,27 @@
     }
   }
 
+  // Whether the shop has paid the supplier for a shipment — separate from
+  // the part's own ordered/arrived/cancelled status. Applies to every part
+  // sharing a batchId, so it works the same for a single standalone part
+  // (whose batchId is just its own id) as for a multi-part PDF shipment.
+  async function togglePaymentStatus(batchId) {
+    const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
+    if (!group.length) return;
+    const paymentStatus = group[0].paymentStatus === "collected" ? "pending" : "collected";
+    try {
+      await partsOrderApi({ action: "setPartsShipmentPaymentStatus", batchId, paymentStatus });
+      PARTS_ORDERS = PARTS_ORDERS.map((item) =>
+        (item.batchId || item.id) === batchId ? { ...item, paymentStatus } : item);
+      renderPartsOrders();
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(paymentStatus === "collected" ? "Payment marked collected" : "Marked pending collection", { tone: "info", duration: 2500 });
+      }
+    } catch (err) {
+      notifyError("Couldn't update payment status: " + err.message);
+    }
+  }
+
   async function deletePartsOrderRow(id) {
     if (!window.confirm("Delete this parts order?")) return;
     try {
@@ -710,10 +740,12 @@
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
     const toggleBtn = event.target.closest("[data-parts-toggle-shipment]");
     const renameShipmentBtn = event.target.closest("[data-parts-rename-shipment]");
+    const paymentBtn = event.target.closest("[data-parts-toggle-payment]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
     if (shipmentBtn) { markShipmentArrived(shipmentBtn.dataset.partsArriveShipment); return; }
     if (toggleBtn) { toggleShipment(toggleBtn.dataset.partsToggleShipment); return; }
     if (renameShipmentBtn) { renameShipment(renameShipmentBtn.dataset.partsRenameShipment); return; }
+    if (paymentBtn) { togglePaymentStatus(paymentBtn.dataset.partsTogglePayment); return; }
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
     if (chooseRepairBtn) { openLinkModal(chooseRepairBtn.dataset.partsChooseRepair); return; }
