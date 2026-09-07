@@ -6294,37 +6294,40 @@ video.media-viewer-media {
 .parts-order-empty-cell { color: var(--text-dim); }
 .parts-order-customer-text { color: var(--text); }
 .parts-order-link-chip {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 6px 11px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--bg-soft);
   color: var(--accent);
-  font: 500 0.82rem var(--font-display);
+  font: 500 0.82rem/1.35 var(--font-display);
   cursor: pointer;
-  max-width: 100%;
+  width: 100%;
+  max-width: 220px;
+  text-align: left;
 }
 .parts-order-link-chip:hover { border-color: var(--accent); }
-.parts-order-link-chip .icon { width: 14px; height: 14px; flex: none; }
-.parts-order-match-list { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.parts-order-link-chip .icon { width: 14px; height: 14px; flex: none; margin-top: 3px; }
+.parts-order-match-list { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
 .parts-order-match {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
   border: 1px dashed rgba(31, 95, 191, 0.4);
-  border-radius: 999px;
+  border-radius: 10px;
   background: transparent;
   color: var(--accent);
-  font: 500 0.76rem var(--font-display);
+  font: 500 0.76rem/1.35 var(--font-display);
   cursor: pointer;
-  max-width: 100%;
+  width: 100%;
+  max-width: 220px;
   text-align: left;
 }
 .parts-order-match:hover { background: rgba(31, 95, 191, 0.08); }
-.parts-order-match .icon { width: 12px; height: 12px; flex: none; }
+.parts-order-match .icon { width: 12px; height: 12px; flex: none; margin-top: 3px; }
 .parts-order-actions {
   display: flex;
   flex-direction: column;
