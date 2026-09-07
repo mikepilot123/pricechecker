@@ -6323,7 +6323,8 @@ video.media-viewer-media {
   max-width: 220px;
 }
 .parts-order-link-chip .icon { width: 14px; height: 14px; flex: none; }
-.parts-order-match-list { display: flex; gap: 6px; align-items: center; }
+.parts-order-destination-cell { display: flex; flex-direction: column; gap: 5px; }
+.parts-order-match-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .parts-order-match {
   display: flex;
   align-items: center;
@@ -6359,6 +6360,39 @@ video.media-viewer-media {
 }
 .parts-order-next-match:hover { background: rgba(31, 95, 191, 0.08); }
 .parts-order-next-match .icon { width: 13px; height: 13px; }
+.parts-order-inventory-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px dashed rgba(19, 126, 82, 0.44);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--price);
+  font: 600 0.72rem var(--font-display);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.parts-order-inventory-option:hover { background: rgba(19, 126, 82, 0.08); }
+.parts-order-inventory-option .icon { width: 13px; height: 13px; }
+.parts-order-inventory-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 230px;
+  padding: 6px 11px;
+  border: 1px solid rgba(19, 126, 82, 0.24);
+  border-radius: 8px;
+  background: rgba(19, 126, 82, 0.08);
+  color: var(--price);
+  font: 600 0.78rem var(--font-display);
+}
+.parts-order-inventory-chip .icon { width: 14px; height: 14px; flex: none; }
+.parts-order-inventory-new-fields > .form-grid { margin: 0; }
+.parts-order-inventory-note { margin: 14px 0 0; }
 .parts-order-chip-label {
   flex: 1;
   min-width: 0;

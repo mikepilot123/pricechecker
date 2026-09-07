@@ -1,4 +1,10 @@
 import { addInventoryItem, adjustInventoryItem, listInventory } from "../lib/inventory.js";
+import { ensureSchema } from "../lib/db.js";
+import {
+  claimPartsOrderForInventory,
+  completePartsOrderInventory,
+  releasePartsOrderInventoryClaim,
+} from "../lib/parts-orders.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
@@ -20,6 +26,45 @@ export default async function handler(req, res) {
           section: body.section, item: body.item, quality: body.quality, quantity: body.quantity,
         });
         return res.status(200).json({ ok: true, ...inventory });
+      }
+      if (body.action === "stockPartsOrder") {
+        await ensureSchema();
+        const partsOrderId = String(body.partsOrderId || "").trim();
+        const claim = await claimPartsOrderForInventory({ partsOrderId });
+        if (claim.alreadyStocked) {
+          return res.status(200).json({ ok: true, alreadyStocked: true, partsOrder: claim.partsOrder, ...await listInventory() });
+        }
+        try {
+          const quantity = claim.partsOrder.quantity;
+          let inventory;
+          let itemKey = String(body.itemKey || "").trim();
+          let itemLabel = "";
+          let movement = null;
+          if (itemKey) {
+            movement = await adjustInventoryItem(itemKey, quantity, { reason: `Parts order ${partsOrderId}` });
+            itemLabel = movement.label;
+            inventory = await listInventory();
+          } else {
+            const section = String(body.section || "").trim();
+            const item = String(body.item || "").trim();
+            const quality = String(body.quality || "").trim();
+            inventory = await addInventoryItem({ section, item, quality, quantity });
+            const created = inventory.items.find((candidate) =>
+              candidate.section === section.toUpperCase() &&
+              candidate.item.toLowerCase() === item.toLowerCase() &&
+              String(candidate.quality || "").toLowerCase() === quality.toLowerCase());
+            if (!created) throw new Error("The inventory item was added but couldn't be linked back to this order");
+            itemKey = created.key;
+            itemLabel = created.label;
+          }
+          const partsOrder = await completePartsOrderInventory({
+            partsOrderId, itemKey, itemLabel, quantity,
+          });
+          return res.status(200).json({ ok: true, movement, partsOrder, ...inventory });
+        } catch (err) {
+          await releasePartsOrderInventoryClaim({ partsOrderId });
+          throw err;
+        }
       }
       if (body.action !== "adjust") {
         return res.status(200).json({ ok: false, error: "Unknown action: " + (body.action || "") });

@@ -17,7 +17,10 @@ const files = readdirSync(migrations).filter((f) => f.endsWith(".sql")).sort();
 await db.exec(readFileSync(new URL(files[0], migrations), "utf8"));
 await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
-const { addPartsOrder, updatePartsOrder, listPartsOrders, deletePartsOrder, renamePartsShipment } = await import("../lib/parts-orders.js");
+const {
+  addPartsOrder, updatePartsOrder, listPartsOrders, deletePartsOrder, renamePartsShipment,
+  claimPartsOrderForInventory, completePartsOrderInventory, releasePartsOrderInventoryClaim,
+} = await import("../lib/parts-orders.js");
 const { listCustomers } = await import("../lib/customers.js");
 const { extractPartsFromPdf, parseExtractionResult } = await import("../lib/parts-order-extraction.js");
 const { default: handler } = await import("../api/intake.js");
@@ -61,6 +64,33 @@ await test("a shipment name applies to every part in its batch", async () => {
   const shipment = (await listPartsOrders()).filter((p) => p.batchId === "batch-rename");
   assert.equal(shipment.length, 2);
   assert.ok(shipment.every((p) => p.shipmentName === "Pixel 7 Pro order"));
+});
+
+await test("inventory stocking claims are idempotent and mark the part arrived", async () => {
+  await addPartsOrder({ id: "part-stock", part: "Pixel 8 screen", quantity: 3, unitCost: 40 });
+  const claim = await claimPartsOrderForInventory({ partsOrderId: "part-stock" });
+  assert.equal(claim.alreadyStocked, false);
+  assert.equal(claim.partsOrder.quantity, 3);
+  await assert.rejects(claimPartsOrderForInventory({ partsOrderId: "part-stock" }), /already being added/);
+  await releasePartsOrderInventoryClaim({ partsOrderId: "part-stock" });
+  await claimPartsOrderForInventory({ partsOrderId: "part-stock" });
+  const stocked = await completePartsOrderInventory({
+    partsOrderId: "part-stock", itemKey: "SCREENS|Pixel%208|OLED", itemLabel: "Pixel 8 · OLED", quantity: 3,
+  });
+  assert.equal(stocked.status, "arrived");
+  assert.equal(stocked.inventoryStockedQuantity, 3);
+  assert.equal(stocked.inventoryItemLabel, "Pixel 8 · OLED");
+  assert.ok(stocked.inventoryStockedAt);
+  const retry = await claimPartsOrderForInventory({ partsOrderId: "part-stock" });
+  assert.equal(retry.alreadyStocked, true);
+  await assert.rejects(updatePartsOrder({ id: "part-stock", quantity: 4 }), /can't be changed/);
+  await assert.rejects(updatePartsOrder({ id: "part-stock", ticketId: "TICKET-789" }), /already in inventory/);
+  await assert.rejects(updatePartsOrder({ id: "part-stock", status: "ordered" }), /must stay marked arrived/);
+});
+
+await test("cancelled orders cannot be added to inventory", async () => {
+  await addPartsOrder({ id: "part-cancelled-stock", part: "Cancelled screen", quantity: 1, status: "cancelled" });
+  await assert.rejects(claimPartsOrderForInventory({ partsOrderId: "part-cancelled-stock" }), /cancelled part order/);
 });
 
 await test("marking arrived stamps arrivedAt; reopening clears it", async () => {
