@@ -1430,18 +1430,6 @@ body.nav-open .nav-backdrop { opacity: 1; }
     display: block;
     margin-bottom: 8px;
   }
-  .parts-order-shipment-header td {
-    display: block !important;
-  }
-  .parts-order-shipment-item td:first-child { padding-left: 12px; }
-  /* Two flex items with min-width:0 never wrap onto their own lines — the
-     browser just crushes the label down to a sliver instead. Stack them so
-     the label gets a full line to itself before the actions row. */
-  .parts-order-shipment-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .parts-order-shipment-actions { justify-content: flex-start; }
   .inventory-adjust {
     justify-content: stretch;
   }
@@ -1455,6 +1443,87 @@ body.nav-open .nav-backdrop { opacity: 1; }
   }
   .inventory-row-error { text-align: left; }
   .inventory-product { align-items: flex-start; }
+}
+
+/* The parts-orders table has two extra columns (Destination, Ordered) over
+   Inventory's, so it needs more room before it fits as a real table — switch
+   it to stacked cards at a wider breakpoint than Inventory's 720px so it
+   never has to horizontally scroll at any realistic viewport width (the
+   sidebar nav alone eats 224px+ starting at 900px). Scoped to
+   .parts-order-table specifically so Inventory's table is untouched. */
+@media (max-width: 1100px) {
+  .inventory-table-scroll:has(.parts-order-table) { overflow: visible; }
+  .parts-order-table,
+  .parts-order-table tbody,
+  .parts-order-table tr,
+  .parts-order-table td { display: block; width: 100%; min-width: 0; }
+  .parts-order-table thead { display: none; }
+  .parts-order-table tr.inventory-row {
+    width: auto;
+  }
+  .parts-order-table .inventory-row {
+    margin: 10px;
+    border: 1px solid var(--border);
+    border-left-width: 5px;
+    border-radius: var(--radius-md);
+    background: var(--card);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.045);
+  }
+  .parts-order-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 12px;
+    border-bottom: 0;
+  }
+  .parts-order-table td::before {
+    content: attr(data-label);
+    color: var(--text-dim);
+    font-size: 0.74rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .parts-order-table td:first-child {
+    display: block;
+    padding-top: 12px;
+  }
+  .parts-order-table td:first-child::before { display: none; }
+  .parts-order-table td.num { text-align: right; }
+  .parts-order-table td[data-label="Destination"],
+  .parts-order-table td[data-label="Actions"] {
+    display: block;
+  }
+  .parts-order-table td[data-label="Destination"]::before,
+  .parts-order-table td[data-label="Actions"]::before {
+    display: block;
+    margin-bottom: 8px;
+  }
+  .parts-order-shipment-header td {
+    display: block !important;
+  }
+  .parts-order-shipment-item td:first-child { padding-left: 12px; }
+  /* Two flex items with min-width:0 never wrap onto their own lines — the
+     browser just crushes the label down to a sliver instead. Stack them so
+     the label gets a full line to itself before the actions row. */
+  .parts-order-shipment-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .parts-order-shipment-actions { justify-content: flex-start; }
+  .parts-order-table .inventory-adjust {
+    justify-content: stretch;
+  }
+  .parts-order-table .inventory-adjust-btn {
+    width: 44px;
+    min-height: 44px;
+  }
+  .parts-order-table .inventory-update-btn {
+    flex: 1;
+    min-height: 44px;
+  }
+  .parts-order-table .inventory-row-error { text-align: left; }
+  .parts-order-table .inventory-product { align-items: flex-start; }
 }
 
 /* ---------- States ---------- */
@@ -6342,24 +6411,15 @@ video.media-viewer-media {
 }
 .parts-order-match:hover { background: rgba(31, 95, 191, 0.08); }
 .parts-order-match .icon { width: 12px; height: 12px; flex: none; }
-.parts-order-next-match {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  flex: none;
-  min-width: 36px;
-  height: 30px;
-  padding: 0 7px;
-  border: 1px solid rgba(31, 95, 191, 0.28);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--accent);
-  font: 600 0.7rem var(--font-display);
-  cursor: pointer;
+.parts-order-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 14px;
+  max-height: 240px;
+  overflow-y: auto;
 }
-.parts-order-next-match:hover { background: rgba(31, 95, 191, 0.08); }
-.parts-order-next-match .icon { width: 13px; height: 13px; }
+.parts-order-link-list:empty { display: none; margin: 0; }
 .parts-order-inventory-option {
   display: inline-flex;
   align-items: center;

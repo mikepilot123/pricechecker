@@ -15,7 +15,6 @@
 
   let PARTS_ORDERS = [];
   let tickets = [];
-  const matchIndexByPart = new Map();
   let CUSTOMERS = [];
   let customersLoadStarted = false;
   // Which multi-part shipments are collapsed, keyed by batchId — expanded
@@ -27,6 +26,7 @@
   let saving = false;
   let inventorySaving = false;
   let inventoryTargetId = null;
+  let linkModalTargetId = null;
   let bound = false;
 
   let reviewBatchId = null;
@@ -258,29 +258,14 @@
         : `<span class="parts-order-empty-cell">—</span>`;
     }
     const matches = findMatchingTickets(item);
-    let repairButton;
-    let nextButton = "";
-    if (matches.length) {
-      const index = (matchIndexByPart.get(item.id) || 0) % matches.length;
-      const match = matches[index];
-      const label = `Link to ${ticketLabel(match)}`;
-      const next = matches[(index + 1) % matches.length];
-      repairButton = `<button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(match.id)}" title="${esc(label)}">
-        <svg class="icon"><use href="#i-link"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
-      </button>`;
-      nextButton = matches.length > 1 ? `<button type="button" class="parts-order-next-match" data-parts-next-match="${esc(item.id)}"
-          title="${esc(`Show next match: ${ticketLabel(next)}`)}" aria-label="${esc(`Show next matching repair: ${ticketLabel(next)}`)}">
-          <svg class="icon"><use href="#i-link"></use></svg><span>+${matches.length - 1}</span>
-        </button>` : "";
-    } else {
-      repairButton = `<button type="button" class="parts-order-match parts-order-choose-repair" data-parts-choose-repair="${esc(item.id)}" title="Choose a repair">
+    const label = matches.length ? `Link to ${ticketLabel(matches[0])}${matches.length > 1 ? ` (+${matches.length - 1} more)` : ""}` : "Choose a repair";
+    const repairButton = `<button type="button" class="parts-order-match parts-order-choose-repair" data-parts-choose-repair="${esc(item.id)}" title="${esc(label)}">
         <svg class="icon"><use href="#i-link"></use></svg><span class="parts-order-chip-label">Repair</span>
       </button>`;
-    }
     return `<div class="parts-order-destination-cell">
       ${item.customerName ? `<span class="parts-order-customer-text" title="${esc(item.customerName)}">${esc(item.customerName)}</span>` : ""}
       <div class="parts-order-match-list">
-        ${repairButton}${nextButton}
+        ${repairButton}
         <button type="button" class="parts-order-inventory-option" data-parts-inventory="${esc(item.id)}" title="Add this order to inventory">
           <svg class="icon"><use href="#i-inventory-flow"></use></svg><span>Inventory</span>
         </button>
@@ -429,11 +414,62 @@
     $("partsOrderFormModal").hidden = true;
   }
 
-  function openRepairPicker(id) {
+  /* ---- Link-to-repair modal: lists candidate repairs (from
+     findMatchingTickets) as clickable rows, plus a text search across all
+     tickets for when there are no candidates. Nothing here auto-links or
+     auto-advances — every link is a deliberate click. ---- */
+  function ticketRowHtml(t) {
+    return `<button type="button" class="device-option parts-order-link-row" data-ticket-id="${esc(t.id)}">
+      ${esc(ticketLabel(t))} <span class="rem-notes">#${esc(t.id)}</span>
+    </button>`;
+  }
+
+  function renderLinkSearchResults(query) {
+    const results = $("partsOrderLinkResults");
+    const empty = $("partsOrderLinkEmpty");
+    if (!results) return;
+    const q = query.trim().toLowerCase();
+    const matches = q
+      ? tickets
+          .filter((t) => [t.customerName, t.device, t.phone, t.id].some((v) => String(v || "").toLowerCase().includes(q)))
+          .slice(0, 20)
+      : [];
+    results.innerHTML = matches.map(ticketRowHtml).join("");
+    if (empty) empty.hidden = !q || matches.length > 0;
+  }
+
+  function openLinkModal(id) {
     const item = PARTS_ORDERS.find((part) => part.id === id);
     if (!item) return;
-    openPartsOrderForm(item);
-    requestAnimationFrame(() => $("partsOrderTicketSearch")?.focus());
+    linkModalTargetId = id;
+    const title = $("partsOrderLinkTitle");
+    if (title) title.textContent = `Link "${item.part}" to a repair`;
+    const matches = findMatchingTickets(item);
+    const suggested = $("partsOrderLinkSuggested");
+    if (suggested) suggested.innerHTML = matches.map(ticketRowHtml).join("");
+    const suggestedLabel = $("partsOrderLinkSuggestedLabel");
+    if (suggestedLabel) suggestedLabel.hidden = matches.length === 0;
+    const search = $("partsOrderLinkSearch");
+    if (search) search.value = "";
+    renderLinkSearchResults("");
+    $("partsOrderLinkModal").hidden = false;
+    requestAnimationFrame(() => {
+      if (!matches.length) search?.focus();
+    });
+  }
+
+  function closeLinkModal() {
+    $("partsOrderLinkModal").hidden = true;
+    linkModalTargetId = null;
+  }
+
+  function handleLinkModalClick(event) {
+    const row = event.target.closest("[data-ticket-id]");
+    if (!row || !linkModalTargetId) return;
+    const id = linkModalTargetId;
+    const ticketId = row.dataset.ticketId;
+    closeLinkModal();
+    linkPartsOrderToTicket(id, ticketId);
   }
 
   function inventoryOptionHtml(item) {
@@ -641,15 +677,6 @@
     }
   }
 
-  function showNextTicketMatch(id) {
-    const item = PARTS_ORDERS.find((part) => part.id === id);
-    if (!item) return;
-    const matches = findMatchingTickets(item);
-    if (matches.length < 2) return;
-    matchIndexByPart.set(id, ((matchIndexByPart.get(id) || 0) + 1) % matches.length);
-    renderPartsOrders();
-  }
-
   async function deletePartsOrderRow(id) {
     if (!window.confirm("Delete this parts order?")) return;
     try {
@@ -678,7 +705,6 @@
     const editBtn = event.target.closest("[data-parts-edit]");
     const deleteBtn = event.target.closest("[data-parts-delete]");
     const linkBtn = event.target.closest("[data-parts-link]");
-    const nextMatchBtn = event.target.closest("[data-parts-next-match]");
     const chooseRepairBtn = event.target.closest("[data-parts-choose-repair]");
     const inventoryBtn = event.target.closest("[data-parts-inventory]");
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
@@ -690,8 +716,7 @@
     if (renameShipmentBtn) { renameShipment(renameShipmentBtn.dataset.partsRenameShipment); return; }
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
-    if (nextMatchBtn) { showNextTicketMatch(nextMatchBtn.dataset.partsNextMatch); return; }
-    if (chooseRepairBtn) { openRepairPicker(chooseRepairBtn.dataset.partsChooseRepair); return; }
+    if (chooseRepairBtn) { openLinkModal(chooseRepairBtn.dataset.partsChooseRepair); return; }
     if (inventoryBtn) { openInventoryModal(inventoryBtn.dataset.partsInventory); return; }
     if (linkBtn) { linkPartsOrderToTicket(linkBtn.dataset.partsLink, linkBtn.dataset.ticketId); return; }
   }
@@ -966,6 +991,12 @@
     $("partsOrderInventorySubmit")?.addEventListener("click", stockPartsOrder);
     $("partsOrderInventoryMode")?.addEventListener("change", syncInventoryMode);
 
+    $("closePartsOrderLinkModal")?.addEventListener("click", closeLinkModal);
+    $("partsOrderLinkCancelBtn")?.addEventListener("click", closeLinkModal);
+    $("partsOrderLinkSuggested")?.addEventListener("click", handleLinkModalClick);
+    $("partsOrderLinkResults")?.addEventListener("click", handleLinkModalClick);
+    $("partsOrderLinkSearch")?.addEventListener("input", (event) => renderLinkSearchResults(event.target.value || ""));
+
     $("partsOrderSearch")?.addEventListener("input", () => {
       searchQuery = ($("partsOrderSearch").value || "").trim().toLowerCase();
       $("clearPartsOrderSearch").hidden = !searchQuery;
@@ -1018,6 +1049,7 @@
       if (!$("partsOrderFormModal")?.hidden) closePartsOrderForm();
       if (!$("partsOrderInventoryModal")?.hidden) closeInventoryModal();
       if (!$("partsOrderReviewModal")?.hidden) closeReviewModal();
+      if (!$("partsOrderLinkModal")?.hidden) closeLinkModal();
     });
   }
 

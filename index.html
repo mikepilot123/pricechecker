@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=parts-destinations-1" />
+  <link rel="stylesheet" href="assets/style.css?v=parts-link-modal-1788782616" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -874,6 +874,31 @@
         <div class="form-actions">
           <button type="button" id="partsOrderInventoryCancelBtn" class="ghost-btn">Cancel</button>
           <button type="button" id="partsOrderInventorySubmit" class="primary-btn">Add to inventory</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Link an ordered part to a repair -->
+  <div id="partsOrderLinkModal" class="modal-backdrop" hidden>
+    <div class="modal-panel modal-panel-sm" role="dialog" aria-modal="true" aria-labelledby="partsOrderLinkTitle">
+      <div class="modal-header">
+        <h3 id="partsOrderLinkTitle">Link to a repair</h3>
+        <button type="button" id="closePartsOrderLinkModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="partsOrderLinkSuggestedLabel" class="hint" hidden>Suggested repairs</p>
+        <div id="partsOrderLinkSuggested" class="parts-order-link-list"></div>
+        <div class="form-field form-field-full">
+          <label class="field-label" for="partsOrderLinkSearch">Search all repairs</label>
+          <input id="partsOrderLinkSearch" class="text-input" autocomplete="off" placeholder="Search customer, device, or ticket #" />
+        </div>
+        <div id="partsOrderLinkResults" class="parts-order-link-list"></div>
+        <p id="partsOrderLinkEmpty" class="hint" hidden>No matching repairs found.</p>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="partsOrderLinkCancelBtn" class="ghost-btn">Cancel</button>
         </div>
       </div>
     </div>
@@ -2465,6 +2490,6 @@
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
   <script defer src="assets/account.js?v=card-takings-1"></script>
-  <script defer src="assets/parts-orders.js?v=parts-destinations-2"></script>
+  <script defer src="assets/parts-orders.js?v=parts-link-modal-1788782616"></script>
 </body>
 </html>
