@@ -131,7 +131,11 @@
     return PARTS_ORDERS.filter((item) => {
       if (statusFilter !== "all" && item.status !== statusFilter) return false;
       if (!searchQuery) return true;
-      return [item.part, item.vendor, item.customerName, item.notes]
+      // A part linked to a repair usually has no customerName of its own —
+      // that lives on the ticket — so search that too, or "search by
+      // customer" would silently miss every linked part.
+      const ticket = item.ticketId ? tickets.find((t) => t.id === item.ticketId) : null;
+      return [item.part, item.vendor, item.customerName, item.notes, ticket?.customerName, ticket?.device, ticket?.phone]
         .some((v) => String(v || "").toLowerCase().includes(searchQuery));
     });
   }
