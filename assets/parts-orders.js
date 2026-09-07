@@ -14,6 +14,7 @@
 
   let PARTS_ORDERS = [];
   let tickets = [];
+  const matchIndexByPart = new Map();
   let CUSTOMERS = [];
   let customersLoadStarted = false;
   // Which multi-part shipments are collapsed, keyed by batchId — expanded
@@ -242,13 +243,18 @@
     }
     const matches = findMatchingTickets(item);
     if (matches.length) {
+      const index = (matchIndexByPart.get(item.id) || 0) % matches.length;
+      const match = matches[index];
+      const label = `Link to ${ticketLabel(match)}`;
+      const next = matches[(index + 1) % matches.length];
       return `<div class="parts-order-match-list">
-        ${matches.map((t) => {
-          const label = `Link to ${ticketLabel(t)}`;
-          return `<button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(t.id)}" title="${esc(label)}">
-            <svg class="icon"><use href="#i-check"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
-          </button>`;
-        }).join("")}
+        <button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(match.id)}" title="${esc(label)}">
+          <svg class="icon"><use href="#i-check"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
+        </button>
+        ${matches.length > 1 ? `<button type="button" class="parts-order-next-match" data-parts-next-match="${esc(item.id)}"
+          title="${esc(`Show next match: ${ticketLabel(next)}`)}" aria-label="${esc(`Show next matching repair: ${ticketLabel(next)}`)}">
+          <svg class="icon"><use href="#i-link"></use></svg><span>+${matches.length - 1}</span>
+        </button>` : ""}
       </div>`;
     }
     return `<span class="parts-order-empty-cell">—</span>`;
@@ -313,6 +319,7 @@
   function shipmentHeaderRowHtml(group, collapsed) {
     const batchId = group[0].batchId || group[0].id;
     const vendor = group.find((i) => i.vendor)?.vendor || "Shipment";
+    const shipmentName = group.find((i) => i.shipmentName)?.shipmentName || vendor;
     const total = group.reduce((sum, i) => sum + i.totalCost, 0);
     const pdfUrl = group.find((i) => i.sourceDocumentUrl)?.sourceDocumentUrl || null;
     const pending = group.filter((i) => i.status !== "arrived" && i.status !== "cancelled");
@@ -323,11 +330,12 @@
             <svg class="icon parts-order-shipment-chevron${collapsed ? " is-collapsed" : ""}"><use href="#i-chevron-down"></use></svg>
             <svg class="icon"><use href="#i-receipt"></use></svg>
             <span>
-              <strong>${esc(vendor)}</strong>
+              <strong>${esc(shipmentName)}</strong>
               <small>${group.length} part${group.length === 1 ? "" : "s"} · ${money(total)} · ${esc(formatDate(group[0].orderedAt))}</small>
             </span>
           </button>
           <div class="parts-order-shipment-actions">
+            <button type="button" class="icon-btn ghost-btn" data-parts-rename-shipment="${esc(batchId)}" title="Rename shipment" aria-label="Rename shipment"><svg class="icon"><use href="#i-pencil"></use></svg></button>
             ${pdfUrl ? `<a class="icon-btn ghost-btn" href="${esc(pdfUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
             ${pending.length
               ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrive-shipment="${esc(batchId)}">Mark shipment arrived</button>`
@@ -466,6 +474,36 @@
     }
   }
 
+  async function renameShipment(batchId) {
+    const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
+    if (!group.length) return;
+    const vendor = group.find((item) => item.vendor)?.vendor || "Shipment";
+    const currentName = group.find((item) => item.shipmentName)?.shipmentName || vendor;
+    const entered = window.prompt("Shipment name", currentName);
+    if (entered == null) return;
+    const shipmentName = entered.trim();
+    try {
+      await partsOrderApi({ action: "renamePartsShipment", batchId, shipmentName });
+      PARTS_ORDERS = PARTS_ORDERS.map((item) =>
+        (item.batchId || item.id) === batchId ? { ...item, shipmentName } : item);
+      renderPartsOrders();
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(shipmentName ? "Shipment renamed" : "Shipment name reset", { tone: "info", duration: 2500 });
+      }
+    } catch (err) {
+      notifyError("Couldn't rename that shipment: " + err.message);
+    }
+  }
+
+  function showNextTicketMatch(id) {
+    const item = PARTS_ORDERS.find((part) => part.id === id);
+    if (!item) return;
+    const matches = findMatchingTickets(item);
+    if (matches.length < 2) return;
+    matchIndexByPart.set(id, ((matchIndexByPart.get(id) || 0) + 1) % matches.length);
+    renderPartsOrders();
+  }
+
   async function deletePartsOrderRow(id) {
     if (!window.confirm("Delete this parts order?")) return;
     try {
@@ -494,13 +532,17 @@
     const editBtn = event.target.closest("[data-parts-edit]");
     const deleteBtn = event.target.closest("[data-parts-delete]");
     const linkBtn = event.target.closest("[data-parts-link]");
+    const nextMatchBtn = event.target.closest("[data-parts-next-match]");
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
     const toggleBtn = event.target.closest("[data-parts-toggle-shipment]");
+    const renameShipmentBtn = event.target.closest("[data-parts-rename-shipment]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
     if (shipmentBtn) { markShipmentArrived(shipmentBtn.dataset.partsArriveShipment); return; }
     if (toggleBtn) { toggleShipment(toggleBtn.dataset.partsToggleShipment); return; }
+    if (renameShipmentBtn) { renameShipment(renameShipmentBtn.dataset.partsRenameShipment); return; }
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
+    if (nextMatchBtn) { showNextTicketMatch(nextMatchBtn.dataset.partsNextMatch); return; }
     if (linkBtn) { linkPartsOrderToTicket(linkBtn.dataset.partsLink, linkBtn.dataset.ticketId); return; }
   }
 

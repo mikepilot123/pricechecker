@@ -17,7 +17,7 @@ const files = readdirSync(migrations).filter((f) => f.endsWith(".sql")).sort();
 await db.exec(readFileSync(new URL(files[0], migrations), "utf8"));
 await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
-const { addPartsOrder, updatePartsOrder, listPartsOrders, deletePartsOrder } = await import("../lib/parts-orders.js");
+const { addPartsOrder, updatePartsOrder, listPartsOrders, deletePartsOrder, renamePartsShipment } = await import("../lib/parts-orders.js");
 const { listCustomers } = await import("../lib/customers.js");
 const { extractPartsFromPdf, parseExtractionResult } = await import("../lib/parts-order-extraction.js");
 const { default: handler } = await import("../api/intake.js");
@@ -51,6 +51,16 @@ await test("a ticket link round-trips", async () => {
   assert.equal(p.ticketId, "TICKET-123");
   const updated = await updatePartsOrder({ id: "part-ticket", ticketId: "TICKET-456" });
   assert.equal(updated.ticketId, "TICKET-456");
+});
+
+await test("a shipment name applies to every part in its batch", async () => {
+  await addPartsOrder({ id: "shipment-a", batchId: "batch-rename", part: "Screen", quantity: 1, unitCost: 20 });
+  await addPartsOrder({ id: "shipment-b", batchId: "batch-rename", part: "Adhesive", quantity: 1, unitCost: 2 });
+  const renamed = await renamePartsShipment({ batchId: "batch-rename", shipmentName: "Pixel 7 Pro order" });
+  assert.equal(renamed.updatedCount, 2);
+  const shipment = (await listPartsOrders()).filter((p) => p.batchId === "batch-rename");
+  assert.equal(shipment.length, 2);
+  assert.ok(shipment.every((p) => p.shipmentName === "Pixel 7 Pro order"));
 });
 
 await test("marking arrived stamps arrivedAt; reopening clears it", async () => {
