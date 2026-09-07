@@ -1434,6 +1434,14 @@ body.nav-open .nav-backdrop { opacity: 1; }
     display: block !important;
   }
   .parts-order-shipment-item td:first-child { padding-left: 12px; }
+  /* Two flex items with min-width:0 never wrap onto their own lines — the
+     browser just crushes the label down to a sliver instead. Stack them so
+     the label gets a full line to itself before the actions row. */
+  .parts-order-shipment-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .parts-order-shipment-actions { justify-content: flex-start; }
   .inventory-adjust {
     justify-content: stretch;
   }
@@ -6371,9 +6379,23 @@ video.media-viewer-media {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 4px;
+  margin: -4px;
+  border-radius: var(--radius-sm);
   color: var(--text);
+  text-align: left;
+  cursor: pointer;
 }
+.parts-order-shipment-info:hover { background: rgba(15, 23, 42, 0.05); }
 .parts-order-shipment-info .icon { width: 20px; height: 20px; flex: none; color: var(--text-dim); }
+.parts-order-shipment-chevron {
+  transition: transform 0.15s ease;
+}
+.parts-order-shipment-chevron.is-collapsed { transform: rotate(-90deg); }
 .parts-order-shipment-info strong { display: block; }
 .parts-order-shipment-info small { display: block; color: var(--text-dim); font-size: 0.78rem; }
 .parts-order-shipment-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

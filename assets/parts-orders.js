@@ -16,6 +16,9 @@
   let tickets = [];
   let CUSTOMERS = [];
   let customersLoadStarted = false;
+  // Which multi-part shipments are collapsed, keyed by batchId — expanded
+  // by default, so a shipment only ends up here once someone hides it.
+  let collapsedShipments = new Set();
   let statusFilter = "all";
   let searchQuery = "";
   let editingId = null;
@@ -300,7 +303,14 @@
     return order.map((key) => groups.get(key));
   }
 
-  function shipmentHeaderRowHtml(group) {
+  function toggleShipment(batchId) {
+    if (!batchId) return;
+    if (collapsedShipments.has(batchId)) collapsedShipments.delete(batchId);
+    else collapsedShipments.add(batchId);
+    renderPartsOrders();
+  }
+
+  function shipmentHeaderRowHtml(group, collapsed) {
     const batchId = group[0].batchId || group[0].id;
     const vendor = group.find((i) => i.vendor)?.vendor || "Shipment";
     const total = group.reduce((sum, i) => sum + i.totalCost, 0);
@@ -309,13 +319,14 @@
     return `<tr class="parts-order-shipment-header">
       <td colspan="8">
         <div class="parts-order-shipment-bar">
-          <div class="parts-order-shipment-info">
+          <button type="button" class="parts-order-shipment-info" data-parts-toggle-shipment="${esc(batchId)}" aria-expanded="${collapsed ? "false" : "true"}">
+            <svg class="icon parts-order-shipment-chevron${collapsed ? " is-collapsed" : ""}"><use href="#i-chevron-down"></use></svg>
             <svg class="icon"><use href="#i-receipt"></use></svg>
             <span>
               <strong>${esc(vendor)}</strong>
               <small>${group.length} part${group.length === 1 ? "" : "s"} · ${money(total)} · ${esc(formatDate(group[0].orderedAt))}</small>
             </span>
-          </div>
+          </button>
           <div class="parts-order-shipment-actions">
             ${pdfUrl ? `<a class="icon-btn ghost-btn" href="${esc(pdfUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
             ${pending.length
@@ -341,7 +352,10 @@
     }
     list.innerHTML = groupOrdersByBatch(visible).map((group) => {
       if (group.length > 1) {
-        return shipmentHeaderRowHtml(group) + group.map((item) => partsOrderRowHtml(item, { grouped: true })).join("");
+        const batchId = group[0].batchId || group[0].id;
+        const collapsed = collapsedShipments.has(batchId);
+        const header = shipmentHeaderRowHtml(group, collapsed);
+        return collapsed ? header : header + group.map((item) => partsOrderRowHtml(item, { grouped: true })).join("");
       }
       return partsOrderRowHtml(group[0]);
     }).join("");
@@ -481,8 +495,10 @@
     const deleteBtn = event.target.closest("[data-parts-delete]");
     const linkBtn = event.target.closest("[data-parts-link]");
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
+    const toggleBtn = event.target.closest("[data-parts-toggle-shipment]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
     if (shipmentBtn) { markShipmentArrived(shipmentBtn.dataset.partsArriveShipment); return; }
+    if (toggleBtn) { toggleShipment(toggleBtn.dataset.partsToggleShipment); return; }
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
     if (linkBtn) { linkPartsOrderToTicket(linkBtn.dataset.partsLink, linkBtn.dataset.ticketId); return; }
