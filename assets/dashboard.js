@@ -2188,6 +2188,11 @@
   // picker expanded. Only one at a time — closing one card's picker when
   // another opens keeps the stack from getting tall on a phone.
   let customSnoozeOpenId = null;
+  // Minimize collapses the card stack down to a small pill without
+  // snoozing/silencing anything — unlike snooze, it doesn't stop a reminder
+  // from being "due", it just gets it off the screen until reopened. Resets
+  // the moment there's nothing due, so the next batch starts expanded.
+  let alertsMinimized = false;
 
   function readSnoozes() {
     const raw = readJson(ALERT_SNOOZE_KEY, {});
@@ -2513,6 +2518,9 @@
             <h4 class="reminder-alert-title">${esc(item.title)}</h4>
             <p class="reminder-alert-due">${esc(late)}</p>
           </div>
+          <button type="button" class="reminder-alert-minimize" data-alert-minimize="1" aria-label="Minimize">
+            <svg class="icon" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+          </button>
           <button type="button" class="reminder-alert-close" data-alert-snooze="60" aria-label="Dismiss for an hour">
             <svg class="icon" aria-hidden="true"><use href="#i-xmark"></use></svg>
           </button>
@@ -2545,27 +2553,38 @@
     return toDatetimeLocal(new Date(now + 60 * 60000));
   }
 
+  function minimizedPillHtml(count) {
+    return `<button type="button" class="reminder-alert-pill" data-alert-restore="1">
+      <svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg>
+      ${count} reminder${count === 1 ? "" : "s"} due
+      <svg class="icon reminder-alert-pill-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+    </button>`;
+  }
+
   function renderAlerts() {
     const now = Date.now();
     const due = dueReminders(now).sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
     const box = document.getElementById("reminderAlerts");
     if (!due.length) {
       shownAlertIds.clear();
-      if (box) { box.innerHTML = ""; box.dataset.signature = ""; box.hidden = true; }
+      alertsMinimized = false;
+      if (box) { box.innerHTML = ""; box.dataset.signature = ""; box.hidden = true; box.classList.remove("is-minimized"); }
       updateReminderNavBadge(0);
       return;
     }
     const stack = alertStack();
     stack.hidden = false;
+    stack.classList.toggle("is-minimized", alertsMinimized);
     // Only a few at a time — a wall of cards is as easy to ignore as none,
     // and on a phone two full-width cards already fill most of the screen.
     const visible = due.slice(0, window.innerWidth < 640 ? 2 : 3);
-    // Include the open custom-picker id so toggling it forces a re-render
-    // even though it doesn't change which reminders are due.
-    const signature = visible.map((item) => item.id + ":" + item.dueAt).join("|") + "|custom:" + customSnoozeOpenId;
+    // Include the open custom-picker id and minimized state so toggling
+    // either forces a re-render even though it doesn't change which
+    // reminders are due.
+    const signature = (alertsMinimized ? "min:" + due.length : visible.map((item) => item.id + ":" + item.dueAt).join("|") + "|custom:" + customSnoozeOpenId);
     if (stack.dataset.signature !== signature) {
       stack.dataset.signature = signature;
-      stack.innerHTML = visible.map((item) => alertCardHtml(item, now)).join("") +
+      stack.innerHTML = alertsMinimized ? minimizedPillHtml(due.length) : visible.map((item) => alertCardHtml(item, now)).join("") +
         (due.length > visible.length ? `<button type="button" class="reminder-alert-more" data-alert-open="1">+${due.length - visible.length} more due</button>` : "");
       // Only actually-new cards make a sound — a re-render because one card
       // was snoozed must not re-announce the ones that were already showing.
@@ -2608,9 +2627,21 @@
     const customSetBtn = event.target.closest("[data-alert-snooze-custom-set]");
     const customCancelBtn = event.target.closest("[data-alert-snooze-custom-cancel]");
     const doneBtn = event.target.closest("[data-alert-done]");
+    const minimizeBtn = event.target.closest("[data-alert-minimize]");
+    const restoreBtn = event.target.closest("[data-alert-restore]");
     const id = card?.dataset.alertId;
     const item = id ? demoAlerts.concat(REMINDERS).find((r) => r.id === id) : null;
 
+    if (minimizeBtn) {
+      alertsMinimized = true;
+      renderAlerts();
+      return;
+    }
+    if (restoreBtn) {
+      alertsMinimized = false;
+      renderAlerts();
+      return;
+    }
     if (ticketBtn) {
       if (typeof window.RPC_OPEN_TICKET_BY_ID === "function") window.RPC_OPEN_TICKET_BY_ID(ticketBtn.dataset.alertTicket);
       return;

@@ -6182,6 +6182,39 @@ video.media-viewer-media {
   border-radius: var(--radius-sm);
 }
 .reminder-alert-close:hover { background: var(--bg-soft); color: var(--text); }
+.reminder-alert-minimize {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+.reminder-alert-minimize:hover { background: var(--bg-soft); color: var(--text); }
+.reminder-alerts.is-minimized {
+  width: auto;
+  align-items: flex-end;
+}
+.reminder-alert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+  padding: 10px 16px;
+  font: 500 0.86rem var(--font-display);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  animation: reminder-alert-in 0.22s ease-out;
+}
+.reminder-alert-pill:hover { background: var(--bg-soft); }
+.reminder-alert-pill .icon { width: 17px; height: 17px; flex: none; color: var(--warn); }
+.reminder-alert-pill-chevron { transform: rotate(180deg); }
 .reminder-alert-notes {
   margin: 8px 0 0;
   font-size: 0.8rem;
