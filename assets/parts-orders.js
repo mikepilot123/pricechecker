@@ -192,6 +192,23 @@
     return ticketLabel(tickets.find((t) => t.id === id));
   }
 
+  // Linking a part to a repair means that repair is now blocked on a part
+  // arriving, so reflect that on the ticket itself instead of leaving staff
+  // to flip it by hand. Skipped for repairs already finished (or already
+  // marked ordered) so this never resurrects or downgrades a closed ticket.
+  async function markTicketPartOrdered(ticketId) {
+    if (!ticketId) return;
+    const ticket = tickets.find((t) => t.id === ticketId);
+    if (ticket && (CLOSED_TICKET_STATUSES.has(ticket.status) || ticket.status === "Part Ordered")) return;
+    try {
+      await partsOrderApi({ action: "update", id: ticketId, status: "Part Ordered" });
+      if (ticket) ticket.status = "Part Ordered";
+      if (typeof window.RPC_RELOAD_TICKETS === "function") window.RPC_RELOAD_TICKETS();
+    } catch (err) {
+      notifyError("Linked, but couldn't update the repair's status: " + err.message);
+    }
+  }
+
   function linkedCellHtml(item) {
     if (item.ticketId) {
       const label = ticketLabelById(item.ticketId) || item.customerName || "Linked repair";
@@ -348,6 +365,7 @@
     if (saving) return;
     const form = $("partsOrderForm");
     if (!form.reportValidity()) return;
+    const previousTicketId = editingId ? (PARTS_ORDERS.find((item) => item.id === editingId)?.ticketId || "") : "";
     const payload = {
       action: editingId ? "updatePartsOrder" : "addPartsOrder",
       id: editingId || undefined,
@@ -376,6 +394,7 @@
         : [saved].concat(PARTS_ORDERS);
       renderPartsOrders();
       $("partsOrderFormModal").hidden = true;
+      if (saved.ticketId && saved.ticketId !== previousTicketId) markTicketPartOrdered(saved.ticketId);
     } catch (err) {
       message.textContent = err.message;
       message.hidden = false;
@@ -431,6 +450,7 @@
       PARTS_ORDERS = PARTS_ORDERS.map((item) => (item.id === id ? data.partsOrder : item));
       renderPartsOrders();
       if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Linked to repair", { tone: "info", duration: 2500 });
+      markTicketPartOrdered(ticketId);
     } catch (err) {
       notifyError("Couldn't link that part: " + err.message);
     }
@@ -697,6 +717,7 @@
       if (typeof window.RPC_TOAST === "function") {
         window.RPC_TOAST(`Added ${saved.length} part${saved.length === 1 ? "" : "s"} from the PDF`, { tone: "info", duration: 3000 });
       }
+      if (ticketId) markTicketPartOrdered(ticketId);
     } catch (err) {
       message.textContent = "Some parts couldn't be saved: " + err.message;
       message.hidden = false;

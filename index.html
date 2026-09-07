@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=parts-orders-4" />
+  <link rel="stylesheet" href="assets/style.css?v=account-merge-2" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -138,9 +138,7 @@
       <button class="nav-btn" data-target="account" role="tab" aria-selected="false"><svg class="icon"><use href="#i-cash"></use></svg>Accounting</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Account sections">
         <button type="button" class="appt-subnav-btn" data-account-panel="expenses" aria-selected="false">Expenses</button>
-        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" aria-selected="true">Card P/O overview</button>
-        <button type="button" class="appt-subnav-btn" data-account-panel="payments" aria-selected="false">Card payments</button>
-        <button type="button" class="appt-subnav-btn" data-account-panel="payouts" aria-selected="false">Payouts</button>
+        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" data-account-panel-group="cardMachine" aria-selected="true">Card machine</button>
         <button type="button" class="appt-subnav-btn" data-account-panel="partsOrders" aria-selected="false">Parts orders</button>
       </div>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
@@ -426,11 +424,18 @@
   <main class="container view" id="view-account" hidden>
     <div class="appt-subnav account-content-subnav" role="tablist" aria-label="Account sections">
       <button type="button" class="appt-subnav-btn" data-account-panel="expenses" role="tab" aria-selected="false">Expenses</button>
-      <button type="button" class="appt-subnav-btn active" data-account-panel="overview" role="tab" aria-selected="true">Card P/O overview</button>
-      <button type="button" class="appt-subnav-btn" data-account-panel="payments" role="tab" aria-selected="false">Card payments</button>
-      <button type="button" class="appt-subnav-btn" data-account-panel="payouts" role="tab" aria-selected="false">Payouts</button>
+      <button type="button" class="appt-subnav-btn active" data-account-panel="overview" data-account-panel-group="cardMachine" role="tab" aria-selected="true">Card machine</button>
       <button type="button" class="appt-subnav-btn" data-account-panel="partsOrders" role="tab" aria-selected="false">Parts orders</button>
     </div>
+
+    <!-- ---------- Card machine: overview / card payments / payouts, grouped
+         under one outer tab so the subnav row doesn't run out of width. ---------- -->
+    <div data-account-panel-section-group="cardMachine">
+      <div class="appt-subnav account-content-subnav" role="tablist" aria-label="Card machine sections">
+        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" role="tab" aria-selected="true">Overview</button>
+        <button type="button" class="appt-subnav-btn" data-account-panel="payments" role="tab" aria-selected="false">Card payments</button>
+        <button type="button" class="appt-subnav-btn" data-account-panel="payouts" role="tab" aria-selected="false">Payouts</button>
+      </div>
 
     <!-- ---------- Overview ---------- -->
     <section class="appt-panel" data-account-panel-section="overview">
@@ -530,6 +535,7 @@
       <p id="payoutCount" class="result-count"></p>
       <div id="payoutList" class="ops-list" aria-live="polite"></div>
     </section>
+    </div>
 
     <!-- ---------- Expenses (unchanged, just rehoused) ---------- -->
     <section class="appt-panel" data-account-panel-section="expenses" hidden>
@@ -2393,7 +2399,7 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=parts-orders-4"></script>
+  <script defer src="assets/intake.js?v=account-merge-2"></script>
   <script defer src="assets/dashboard.js?v=custom-snooze-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
@@ -2401,6 +2407,6 @@
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
   <script defer src="assets/account.js?v=card-takings-1"></script>
-  <script defer src="assets/parts-orders.js?v=parts-orders-4"></script>
+  <script defer src="assets/parts-orders.js?v=account-merge-2"></script>
 </body>
 </html>

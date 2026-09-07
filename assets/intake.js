@@ -276,16 +276,30 @@
   });
 
   // ---- Account sub-tabs ------------------------------------------------------
-  // Overview / Card payments / Payouts / Expenses. Expenses was its own
-  // top-level tab until the card takings ledger arrived and gave it siblings —
-  // its markup moved in here untouched, so assets/dashboard.js still drives it
-  // by the same element ids.
+  // Overview / Card payments / Payouts / Expenses / Parts orders. Overview,
+  // Card payments, and Payouts are grouped under one outer "Card machine" tab
+  // (data-account-panel-group="cardMachine") so the subnav row doesn't run out
+  // of horizontal space — they still toggle individually via the same
+  // data-account-panel-section mechanism, just via a second subnav row nested
+  // inside the group's wrapper instead of the top-level one.
+  const CARD_MACHINE_PANELS = new Set(["overview", "payments", "payouts"]);
   function setAccountPanel(panel) {
     document.querySelectorAll("[data-account-panel-section]").forEach((section) => {
       section.hidden = section.dataset.accountPanelSection !== panel;
     });
+    document.querySelectorAll("[data-account-panel-section-group]").forEach((group) => {
+      group.hidden = !CARD_MACHINE_PANELS.has(panel);
+    });
     document.querySelectorAll(".appt-subnav-btn[data-account-panel]").forEach((btn) => {
       const active = btn.dataset.accountPanel === panel;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    // The outer "Card machine" tab has no single matching section of its own —
+    // it should read as active whenever any of the three grouped panels is
+    // showing, not only when panel is exactly "overview".
+    document.querySelectorAll(".appt-subnav-btn[data-account-panel-group]").forEach((btn) => {
+      const active = CARD_MACHINE_PANELS.has(panel);
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
@@ -1290,6 +1304,10 @@
     else if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Couldn't find that repair ticket — it may have been deleted.");
   }
   window.RPC_OPEN_TICKET_BY_ID = openTicketById;
+  // Lets other modules (e.g. assets/parts-orders.js, after it flips a
+  // linked repair's status to "Part Ordered") make sure this list isn't
+  // showing stale data next time it's viewed.
+  window.RPC_RELOAD_TICKETS = () => loadTickets();
 
   function closeTicketModal() {
     closeMediaViewer();
