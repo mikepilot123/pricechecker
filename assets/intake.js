@@ -165,7 +165,7 @@
     leads: $("view-leads"),
     appointments: $("view-appointments"),
     prices: $("view-prices"),
-    diagnostics: $("view-diagnostics"),
+    partsOrders: $("view-partsOrders"),
     "parts-checker": $("view-parts-checker"),
     intake: $("view-intake"),
     inventory: $("view-inventory"),
@@ -200,7 +200,7 @@
     if (target === "targets") window.dispatchEvent(new Event("rpc-enter-targets"));
     if (target === "leads") window.dispatchEvent(new Event("rpc-enter-leads"));
     if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
-    if (target === "diagnostics") window.dispatchEvent(new Event("rpc-enter-diagnostics"));
+    if (target === "partsOrders") window.dispatchEvent(new Event("rpc-enter-parts-orders"));
     if (target === "parts-checker") window.dispatchEvent(new Event("rpc-enter-parts-checker"));
     if (target === "intake") enterIntake();
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
@@ -276,7 +276,7 @@
   });
 
   // ---- Account sub-tabs ------------------------------------------------------
-  // Overview / Card payments / Payouts / Expenses / Parts orders. Overview,
+  // Overview / Card payments / Payouts / Expenses. Overview,
   // Card payments, and Payouts are grouped under one outer "Card machine" tab
   // (data-account-panel-group="cardMachine") so the subnav row doesn't run out
   // of horizontal space — they still toggle individually via the same
@@ -306,7 +306,6 @@
     // Expenses loads on the event it has always loaded on; the card-takings
     // panels get their own so assets/account.js can refresh what's on screen.
     if (panel === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
-    else if (panel === "partsOrders") window.dispatchEvent(new Event("rpc-enter-parts-orders"));
     else window.dispatchEvent(new CustomEvent("rpc-account-panel", { detail: { panel } }));
   }
   window.RPC_ACCOUNT_PANEL = setAccountPanel;

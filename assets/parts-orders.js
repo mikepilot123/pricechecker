@@ -1,8 +1,8 @@
 /* ============================================================
    Parts orders — tracks parts ordered from suppliers, optionally linked to
-   a customer and/or a repair ticket. Lives as a sub-panel of the Accounting
-   tab (see index.html's data-account-panel="partsOrders"), following the
-   same shape as the Expenses panel in assets/dashboard.js.
+   a customer and/or a repair ticket. Its own top-level tab (see index.html's
+   data-target="partsOrders" nav button and #view-partsOrders), entered via
+   the "rpc-enter-parts-orders" event assets/intake.js's navigateTo() fires.
    ============================================================ */
 (function () {
   const INTAKE_URL = "https://pricechecker-cyan.vercel.app/api/intake";
@@ -212,21 +212,22 @@
   function linkedCellHtml(item) {
     if (item.ticketId) {
       const label = ticketLabelById(item.ticketId) || item.customerName || "Linked repair";
-      return `<button type="button" class="parts-order-link-chip" data-parts-open-ticket="${esc(item.ticketId)}">
-        <svg class="icon"><use href="#i-device"></use></svg>${esc(label)}
-      </button>`;
+      return `<span class="parts-order-link-chip" title="${esc(label)}">
+        <svg class="icon"><use href="#i-device"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
+      </span>`;
     }
     if (item.customerName) {
-      return `<span class="parts-order-customer-text">${esc(item.customerName)}</span>`;
+      return `<span class="parts-order-customer-text" title="${esc(item.customerName)}">${esc(item.customerName)}</span>`;
     }
     const matches = findMatchingTickets(item);
     if (matches.length) {
       return `<div class="parts-order-match-list">
-        ${matches.map((t) => `
-          <button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(t.id)}">
-            <svg class="icon"><use href="#i-check"></use></svg>Link to ${esc(ticketLabel(t))}
-          </button>
-        `).join("")}
+        ${matches.map((t) => {
+          const label = `Link to ${ticketLabel(t)}`;
+          return `<button type="button" class="parts-order-match" data-parts-link="${esc(item.id)}" data-ticket-id="${esc(t.id)}" title="${esc(label)}">
+            <svg class="icon"><use href="#i-check"></use></svg><span class="parts-order-chip-label">${esc(label)}</span>
+          </button>`;
+        }).join("")}
       </div>`;
     }
     return `<span class="parts-order-empty-cell">—</span>`;
@@ -461,17 +462,12 @@
     const editBtn = event.target.closest("[data-parts-edit]");
     const deleteBtn = event.target.closest("[data-parts-delete]");
     const linkBtn = event.target.closest("[data-parts-link]");
-    const openTicketBtn = event.target.closest("[data-parts-open-ticket]");
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
     if (shipmentBtn) { markShipmentArrived(shipmentBtn.dataset.partsArriveShipment); return; }
     if (editBtn) { openPartsOrderForm(PARTS_ORDERS.find((item) => item.id === editBtn.dataset.partsEdit)); return; }
     if (deleteBtn) { deletePartsOrderRow(deleteBtn.dataset.partsDelete); return; }
     if (linkBtn) { linkPartsOrderToTicket(linkBtn.dataset.partsLink, linkBtn.dataset.ticketId); return; }
-    if (openTicketBtn) {
-      if (typeof window.RPC_OPEN_TICKET_BY_ID === "function") window.RPC_OPEN_TICKET_BY_ID(openTicketBtn.dataset.partsOpenTicket);
-      return;
-    }
   }
 
   // ---- Reusable "link to a repair" search combobox, same pattern as the
