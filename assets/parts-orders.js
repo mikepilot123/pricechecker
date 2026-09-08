@@ -20,6 +20,10 @@
   // Which multi-part shipments are collapsed, keyed by batchId — expanded
   // by default, so a shipment only ends up here once someone hides it.
   let collapsedShipments = new Set();
+  // Batches whose collect-back expense has already been synced this page
+  // load — avoids re-hitting the API for every still-pending shipment on
+  // every visit to this tab (see backfillPendingShipmentExpenses).
+  const expenseSyncedBatchIds = new Set();
   let statusFilter = "all";
   let searchQuery = "";
   let editingId = null;
@@ -107,8 +111,27 @@
       const data = await partsOrderApi({ action: "listPartsOrders" });
       PARTS_ORDERS = data.partsOrders || [];
       renderPartsOrders();
+      backfillPendingShipmentExpenses();
     } catch (err) {
       notifyError("Couldn't load parts orders: " + err.message);
+    }
+  }
+
+  // Shipments that were already sitting at "Pending collection" before this
+  // syncing existed (or created some other way that skipped it) never got
+  // their collect-back expense — the toggle only syncs on the click that
+  // changes it. Catches those up whenever the list loads, once per batch
+  // per page load so revisiting this tab doesn't keep re-hitting the API.
+  function backfillPendingShipmentExpenses() {
+    const pendingBatchIds = new Set(
+      PARTS_ORDERS
+        .filter((item) => (item.paymentStatus || "pending") === "pending")
+        .map((item) => item.batchId || item.id)
+    );
+    for (const batchId of pendingBatchIds) {
+      if (expenseSyncedBatchIds.has(batchId)) continue;
+      expenseSyncedBatchIds.add(batchId);
+      syncShipmentExpense(batchId);
     }
   }
 
@@ -723,6 +746,7 @@
   async function syncShipmentExpense(batchId) {
     const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
     if (!group.length) return;
+    expenseSyncedBatchIds.add(batchId);
     const expenseId = "EPO" + batchId;
     const paymentStatus = group[0].paymentStatus || "pending";
     try {
