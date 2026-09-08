@@ -4259,6 +4259,28 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   border-top: 1px solid var(--border);
 }
 .ticket.open .ticket-body { display: block; }
+.repairs-status-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 20px 0 8px;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  background: var(--status-bg, var(--bg-soft));
+  border-left: 4px solid var(--status-ink, var(--accent));
+}
+.repairs-status-section:first-child { margin-top: 0; }
+.repairs-status-section-title {
+  font: 600 0.92rem var(--font-display);
+  color: var(--status-ink, var(--text));
+}
+.repairs-status-section-count {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--status-ink, var(--text-dim));
+  opacity: 0.8;
+}
 .ticket-row {
   display: flex;
   justify-content: space-between;

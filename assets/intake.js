@@ -3025,26 +3025,57 @@
   }
   window.RPC_UPDATE_COMPLETED_EMPTY = updateCompletedEmptyState;
 
+  // With no single status picked from the filter, the list reads better
+  // broken into one section per status (workflow order, same as STATUSES)
+  // than as one undifferentiated scroll — "Part to be Ordered" all sits
+  // together, etc. Picking an actual status from the filter collapses back
+  // to a single flat section, since there's nothing left to separate.
+  function buildStatusSections(list) {
+    const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up" && s !== "No Fix");
+    return filterableStatuses
+      .map((status) => {
+        const statusList = list.filter((t) => t.status === status);
+        return { status, count: statusList.length, groups: groupTicketsByCheckin(statusList) };
+      })
+      .filter((section) => section.count > 0);
+  }
+
+  function statusSectionHeaderEl(status, count) {
+    const el = document.createElement("div");
+    el.className = `repairs-status-section ${STATUS_CLASS[status] || ""}`;
+    el.innerHTML = `<span class="repairs-status-section-title">${esc(status)}</span><span class="repairs-status-section-count">${count} device${count === 1 ? "" : "s"}</span>`;
+    return el;
+  }
+
   function render() {
     const list = currentList();
+    const sections = statusFilter === "all"
+      ? buildStatusSections(list)
+      : [{ status: null, groups: groupTicketsByCheckin(list) }];
     // Paginate by device count, but never split one client's check-in across
-    // the "View more" boundary.
-    const groups = groupTicketsByCheckin(list);
-    const visibleGroups = [];
-    let shownCount = 0;
-    for (const group of groups) {
-      if (shownCount >= visibleTicketCount) break;
-      visibleGroups.push(group);
-      shownCount += group.length;
-    }
+    // the "View more" boundary — a section header only prints once its first
+    // card actually makes the cut.
     $("intakeList").innerHTML = "";
     $("intakeEmpty").hidden = list.length > 0;
     $("intakeError").hidden = true;
+    const frag = document.createDocumentFragment();
+    let shownCount = 0;
+    for (const section of sections) {
+      if (shownCount >= visibleTicketCount) break;
+      let headerAdded = false;
+      for (const group of section.groups) {
+        if (shownCount >= visibleTicketCount) break;
+        if (section.status && !headerAdded) {
+          frag.appendChild(statusSectionHeaderEl(section.status, section.count));
+          headerAdded = true;
+        }
+        frag.appendChild(checkinCard(group));
+        shownCount += group.length;
+      }
+    }
     $("intakeCount").textContent = list.length
       ? `Showing ${shownCount} of ${list.length} device${list.length === 1 ? "" : "s"}`
       : "";
-    const frag = document.createDocumentFragment();
-    for (const group of visibleGroups) frag.appendChild(checkinCard(group));
     if (shownCount < list.length) {
       const more = document.createElement("button");
       const remaining = list.length - shownCount;
