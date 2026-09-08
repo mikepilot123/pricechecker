@@ -339,8 +339,11 @@
 
   function shipmentHeaderRowHtml(group, collapsed) {
     const batchId = group[0].batchId || group[0].id;
-    const vendor = group.find((i) => i.vendor)?.vendor || "Shipment";
-    const shipmentName = group.find((i) => i.shipmentName)?.shipmentName || vendor;
+    const vendor = group.find((i) => i.vendor)?.vendor || "";
+    // Nothing typed in for either at upload time: fall back to the first
+    // part's own description rather than a bare "Shipment" label, so there's
+    // still something to tell shipments apart by before anyone renames one.
+    const shipmentName = group.find((i) => i.shipmentName)?.shipmentName || vendor || group[0].part || "Shipment";
     const total = group.reduce((sum, i) => sum + i.totalCost, 0);
     const pdfUrl = group.find((i) => i.sourceDocumentUrl)?.sourceDocumentUrl || null;
     const pending = group.filter((i) => i.status !== "arrived" && i.status !== "cancelled");
@@ -380,14 +383,14 @@
         ? `${visible.length} of ${PARTS_ORDERS.length} order${PARTS_ORDERS.length === 1 ? "" : "s"}`
         : "";
     }
+    // Every batch — a single manually-added part included — gets the same
+    // collapsible header-with-chevron treatment, so the table reads
+    // consistently instead of some rows floating loose above named groups.
     list.innerHTML = groupOrdersByBatch(visible).map((group) => {
-      if (group.length > 1) {
-        const batchId = group[0].batchId || group[0].id;
-        const collapsed = collapsedShipments.has(batchId);
-        const header = shipmentHeaderRowHtml(group, collapsed);
-        return collapsed ? header : header + group.map((item) => partsOrderRowHtml(item, { grouped: true })).join("");
-      }
-      return partsOrderRowHtml(group[0]);
+      const batchId = group[0].batchId || group[0].id;
+      const collapsed = collapsedShipments.has(batchId);
+      const header = shipmentHeaderRowHtml(group, collapsed);
+      return collapsed ? header : header + group.map((item) => partsOrderRowHtml(item, { grouped: true })).join("");
     }).join("");
     const empty = $("partsOrderEmpty");
     if (empty) {
@@ -856,6 +859,7 @@
     reviewRows = [];
     reviewUploadUrl = null;
     $("partsOrderReviewVendor").value = "";
+    $("partsOrderReviewShipmentName").value = "";
     $("partsOrderReviewCustomerName").value = "";
     $("partsOrderReviewCustomerPhone").value = "";
     reviewTicketCombobox?.reset();
@@ -978,6 +982,7 @@
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving…";
     const vendor = $("partsOrderReviewVendor").value.trim();
+    const shipmentName = $("partsOrderReviewShipmentName").value.trim();
     const customerName = $("partsOrderReviewCustomerName").value.trim();
     const customerPhone = $("partsOrderReviewCustomerPhone").value.trim();
     const ticketId = $("partsOrderReviewTicketId").value || "";
@@ -985,7 +990,7 @@
       const saved = [];
       for (const row of rows) {
         const data = await partsOrderApi({
-          action: "addPartsOrder", batchId: reviewBatchId, vendor, part: row.part.trim(), quantity: row.quantity,
+          action: "addPartsOrder", batchId: reviewBatchId, vendor, shipmentName, part: row.part.trim(), quantity: row.quantity,
           unitCost: row.unitCost, customerName, customerPhone, ticketId, source: "pdf", sourceDocumentUrl: reviewUploadUrl,
         });
         saved.push(data.partsOrder);
