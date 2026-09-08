@@ -2174,6 +2174,7 @@
   // per-device (localStorage) on purpose: a snooze is "not now, on this
   // screen", not a change to the shared reminder everyone else sees.
   const ALERT_SNOOZE_KEY = "rpc_reminder_alert_snooze";
+  const ALERT_MINIMIZE_KEY = "rpc_reminder_alert_minimized";
   const ALERT_POLL_MS = 60000;
   // Reminders load lazily so the first paint stays fast (see the note at the
   // bottom of this file); the alert poller waits for the page to settle
@@ -2190,9 +2191,21 @@
   let customSnoozeOpenId = null;
   // Minimize collapses the card stack down to a small pill without
   // snoozing/silencing anything — unlike snooze, it doesn't stop a reminder
-  // from being "due", it just gets it off the screen until reopened. Resets
-  // the moment there's nothing due, so the next batch starts expanded.
-  let alertsMinimized = false;
+  // from being "due", it just gets it off the screen until reopened. Persisted
+  // (per-device) across reloads as the set of reminder ids that were on
+  // screen at the time, so refreshing the app doesn't pop it back open —
+  // only clicking the pill, or a reminder due now that wasn't in that set
+  // (a genuinely new one), expands it again.
+  let minimizedForIds = readMinimizedIds();
+
+  function readMinimizedIds() {
+    const raw = readJson(ALERT_MINIMIZE_KEY, null);
+    return raw && Array.isArray(raw.ids) ? new Set(raw.ids) : null;
+  }
+
+  function writeMinimizedIds(ids) {
+    writeJson(ALERT_MINIMIZE_KEY, ids ? { ids: Array.from(ids) } : null);
+  }
 
   function readSnoozes() {
     const raw = readJson(ALERT_SNOOZE_KEY, {});
@@ -2567,24 +2580,33 @@
     const box = document.getElementById("reminderAlerts");
     if (!due.length) {
       shownAlertIds.clear();
-      alertsMinimized = false;
+      if (minimizedForIds) { minimizedForIds = null; writeMinimizedIds(null); }
       if (box) { box.innerHTML = ""; box.dataset.signature = ""; box.hidden = true; box.classList.remove("is-minimized"); }
       updateReminderNavBadge(0);
       return;
     }
+    // A reminder due now that wasn't part of the set minimized last time is
+    // "a new reminder being shown" — that always breaks out of minimize,
+    // whether that happened seconds ago on this screen or the minimize was
+    // restored from a previous session.
+    if (minimizedForIds && !due.every((item) => minimizedForIds.has(item.id))) {
+      minimizedForIds = null;
+      writeMinimizedIds(null);
+    }
+    const isMinimized = !!minimizedForIds;
     const stack = alertStack();
     stack.hidden = false;
-    stack.classList.toggle("is-minimized", alertsMinimized);
+    stack.classList.toggle("is-minimized", isMinimized);
     // Only a few at a time — a wall of cards is as easy to ignore as none,
     // and on a phone two full-width cards already fill most of the screen.
     const visible = due.slice(0, window.innerWidth < 640 ? 2 : 3);
     // Include the open custom-picker id and minimized state so toggling
     // either forces a re-render even though it doesn't change which
     // reminders are due.
-    const signature = (alertsMinimized ? "min:" + due.length : visible.map((item) => item.id + ":" + item.dueAt).join("|") + "|custom:" + customSnoozeOpenId);
+    const signature = (isMinimized ? "min:" + due.length : visible.map((item) => item.id + ":" + item.dueAt).join("|") + "|custom:" + customSnoozeOpenId);
     if (stack.dataset.signature !== signature) {
       stack.dataset.signature = signature;
-      stack.innerHTML = alertsMinimized ? minimizedPillHtml(due.length) : visible.map((item) => alertCardHtml(item, now)).join("") +
+      stack.innerHTML = isMinimized ? minimizedPillHtml(due.length) : visible.map((item) => alertCardHtml(item, now)).join("") +
         (due.length > visible.length ? `<button type="button" class="reminder-alert-more" data-alert-open="1">+${due.length - visible.length} more due</button>` : "");
       // Only actually-new cards make a sound — a re-render because one card
       // was snoozed must not re-announce the ones that were already showing.
@@ -2633,12 +2655,14 @@
     const item = id ? demoAlerts.concat(REMINDERS).find((r) => r.id === id) : null;
 
     if (minimizeBtn) {
-      alertsMinimized = true;
+      minimizedForIds = new Set(dueReminders(Date.now()).map((item) => item.id));
+      writeMinimizedIds(minimizedForIds);
       renderAlerts();
       return;
     }
     if (restoreBtn) {
-      alertsMinimized = false;
+      minimizedForIds = null;
+      writeMinimizedIds(null);
       renderAlerts();
       return;
     }
