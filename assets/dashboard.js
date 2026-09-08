@@ -735,6 +735,10 @@
       .sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
     return recent.length ? recent[0].reclaimFrom : "";
   }
+  // Lets other modules (assets/parts-orders.js, auto-creating a cash-reclaim
+  // expense for a pending-collection shipment) default "collect back from"
+  // the same way the manual Add Expense form does.
+  window.RPC_LAST_RECLAIM_FROM = lastReclaimFrom;
 
   function editExpense(expense) {
     if (!expense) return;

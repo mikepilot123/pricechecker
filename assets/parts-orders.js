@@ -630,6 +630,7 @@
       renderPartsOrders();
       $("partsOrderFormModal").hidden = true;
       if (saved.ticketId && saved.ticketId !== previousTicketId) markTicketPartOrdered(saved.ticketId);
+      if (!editingId) syncShipmentExpense(saved.batchId || saved.id);
     } catch (err) {
       message.textContent = err.message;
       message.hidden = false;
@@ -705,8 +706,58 @@
       if (typeof window.RPC_TOAST === "function") {
         window.RPC_TOAST(paymentStatus === "collected" ? "Payment marked collected" : "Marked pending collection", { tone: "info", duration: 2500 });
       }
+      syncShipmentExpense(batchId);
     } catch (err) {
       notifyError("Couldn't update payment status: " + err.message);
+    }
+  }
+
+  // A shipment sitting at "pending collection" means real cash already went
+  // out the door for it, so it belongs in the shop's own books the same way
+  // any other cash-fronted cost does — as an Expenses entry with "collect
+  // back" tracking, which is also what generates the reminder to actually
+  // chase it. Keyed off the batchId so re-syncing (a cost correction, a
+  // second shipment on the same batch) always lands on the same expense
+  // instead of piling up duplicates; the linked reminder lives and dies with
+  // it via lib/expenses.js's own addExpense/updateExpense.
+  async function syncShipmentExpense(batchId) {
+    const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
+    if (!group.length) return;
+    const expenseId = "EPO" + batchId;
+    const paymentStatus = group[0].paymentStatus || "pending";
+    try {
+      if (paymentStatus === "collected") {
+        // Nothing to settle if it never had a pending expense in the first
+        // place (e.g. toggled straight to collected on a very old order) —
+        // that's fine, not an error.
+        try {
+          await partsOrderApi({ action: "updateExpense", id: expenseId, reclaimed: true });
+        } catch (err) {
+          if (!/not found/i.test(err.message)) throw err;
+        }
+        return;
+      }
+      const vendor = group.find((item) => item.vendor)?.vendor || "";
+      const shipmentName = group.find((item) => item.shipmentName)?.shipmentName || vendor || group[0].part || "Shipment";
+      const total = group.reduce((sum, item) => sum + item.totalCost, 0);
+      const date = (group[0].orderedAt || new Date().toISOString()).slice(0, 10);
+      const reclaimFrom = typeof window.RPC_LAST_RECLAIM_FROM === "function" ? window.RPC_LAST_RECLAIM_FROM() : "";
+      const payload = {
+        date, category: "Parts", vendor, amount: total, reclaimFrom,
+        notes: `Parts shipment: ${shipmentName}`, cashReclaim: true, reclaimed: false,
+      };
+      try {
+        await partsOrderApi({ action: "updateExpense", id: expenseId, ...payload });
+      } catch (err) {
+        await partsOrderApi({ action: "addExpense", id: expenseId, ...payload });
+      }
+    } catch (err) {
+      // Non-fatal — the shipment's own payment status already saved either
+      // way; the expense/reminder just fell out of sync and can be fixed
+      // from the Expenses tab directly.
+      notifyError("Payment status saved, but couldn't sync the collect-back expense: " + err.message);
+    } finally {
+      if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
     }
   }
 
@@ -1002,6 +1053,7 @@
         window.RPC_TOAST(`Added ${saved.length} part${saved.length === 1 ? "" : "s"} from the PDF`, { tone: "info", duration: 3000 });
       }
       if (ticketId) markTicketPartOrdered(ticketId);
+      syncShipmentExpense(reviewBatchId);
     } catch (err) {
       message.textContent = "Some parts couldn't be saved: " + err.message;
       message.hidden = false;
