@@ -122,6 +122,10 @@
   let quickLogMode = false;
   let loadedOnce = false;
   let visibleTicketCount = TICKET_PAGE_SIZE;
+  // Which status sections are collapsed on the Repairs list, keyed by
+  // status name — expanded by default, same as Parts Orders' shipment
+  // groups (collapsedShipments there).
+  const collapsedRepairStatuses = new Set();
   // If Check In is not configured yet, retain a price-row selection until the
   // user has manually connected the Check In tab.
   let pendingLogDevice = null;
@@ -3040,10 +3044,22 @@
       .filter((section) => section.count > 0);
   }
 
-  function statusSectionHeaderEl(status, count) {
-    const el = document.createElement("div");
+  function statusSectionHeaderEl(status, count, collapsed) {
+    const el = document.createElement("button");
+    el.type = "button";
     el.className = `repairs-status-section ${STATUS_CLASS[status] || ""}`;
-    el.innerHTML = `<span class="repairs-status-section-title">${esc(status)}</span><span class="repairs-status-section-count">${count} device${count === 1 ? "" : "s"}</span>`;
+    el.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    el.innerHTML = `
+      <span class="repairs-status-section-title">
+        <svg class="icon repairs-status-chevron${collapsed ? " is-collapsed" : ""}" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+        ${esc(status)}
+      </span>
+      <span class="repairs-status-section-count">${count} device${count === 1 ? "" : "s"}</span>`;
+    el.addEventListener("click", () => {
+      if (collapsedRepairStatuses.has(status)) collapsedRepairStatuses.delete(status);
+      else collapsedRepairStatuses.add(status);
+      render();
+    });
     return el;
   }
 
@@ -3063,13 +3079,14 @@
     for (const section of sections) {
       if (shownCount >= visibleTicketCount) break;
       let headerAdded = false;
+      const collapsed = !!(section.status && collapsedRepairStatuses.has(section.status));
       for (const group of section.groups) {
         if (shownCount >= visibleTicketCount) break;
         if (section.status && !headerAdded) {
-          frag.appendChild(statusSectionHeaderEl(section.status, section.count));
+          frag.appendChild(statusSectionHeaderEl(section.status, section.count, collapsed));
           headerAdded = true;
         }
-        frag.appendChild(checkinCard(group));
+        if (!collapsed) frag.appendChild(checkinCard(group));
         shownCount += group.length;
       }
     }

@@ -4264,17 +4264,33 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  width: 100%;
   margin: 20px 0 8px;
   padding: 9px 14px;
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--status-bg, var(--bg-soft));
   border-left: 4px solid var(--status-ink, var(--accent));
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
 }
+.repairs-status-section:hover { filter: brightness(0.97); }
 .repairs-status-section:first-child { margin-top: 0; }
 .repairs-status-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font: 600 0.92rem var(--font-display);
   color: var(--status-ink, var(--text));
 }
+.repairs-status-chevron {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  transition: transform 0.15s ease;
+}
+.repairs-status-chevron.is-collapsed { transform: rotate(-90deg); }
 .repairs-status-section-count {
   font-size: 0.78rem;
   font-weight: 500;
