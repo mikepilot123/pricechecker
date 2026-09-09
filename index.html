@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=repairs-status-collapse-1" />
+  <link rel="stylesheet" href="assets/style.css?v=bank-account-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -139,7 +139,7 @@
       <button class="nav-btn" data-target="account" role="tab" aria-selected="false"><svg class="icon"><use href="#i-cash"></use></svg>Accounting</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Account sections">
         <button type="button" class="appt-subnav-btn" data-account-panel="expenses" aria-selected="false">Expenses</button>
-        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" data-account-panel-group="cardMachine" aria-selected="true">Card machine</button>
+        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" data-account-panel-group="bankAccount" aria-selected="true">Bank account</button>
       </div>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Settings sections">
@@ -424,76 +424,76 @@
   <main class="container view" id="view-account" hidden>
     <div class="appt-subnav account-content-subnav" role="tablist" aria-label="Account sections">
       <button type="button" class="appt-subnav-btn" data-account-panel="expenses" role="tab" aria-selected="false">Expenses</button>
-      <button type="button" class="appt-subnav-btn active" data-account-panel="overview" data-account-panel-group="cardMachine" role="tab" aria-selected="true">Card machine</button>
+      <button type="button" class="appt-subnav-btn active" data-account-panel="overview" data-account-panel-group="bankAccount" role="tab" aria-selected="true">Bank account</button>
     </div>
 
-    <!-- ---------- Card machine: overview / card payments / payouts, grouped
-         under one outer tab so the subnav row doesn't run out of width. ---------- -->
-    <div data-account-panel-section-group="cardMachine">
-      <div class="appt-subnav account-content-subnav" role="tablist" aria-label="Card machine sections">
-        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" role="tab" aria-selected="true">Overview</button>
+    <!-- Bank funds plus the existing card settlement records. -->
+    <div data-account-panel-section-group="bankAccount">
+      <div class="appt-subnav account-content-subnav" role="tablist" aria-label="Bank account sections">
+        <button type="button" class="appt-subnav-btn active" data-account-panel="overview" role="tab" aria-selected="true">Balance</button>
         <button type="button" class="appt-subnav-btn" data-account-panel="payments" role="tab" aria-selected="false">Card payments</button>
         <button type="button" class="appt-subnav-btn" data-account-panel="payouts" role="tab" aria-selected="false">Payouts</button>
       </div>
 
-    <!-- ---------- Overview ---------- -->
+    <!-- ---------- Bank account balance ---------- -->
     <section class="appt-panel" data-account-panel-section="overview">
       <div class="leads-heading-row">
         <div>
-          <p class="dashboard-eyebrow">Card machine</p>
-          <h2 id="acctOverviewTitle">Where the money is</h2>
+          <p class="dashboard-eyebrow">Bank account</p>
+          <h2 id="acctOverviewTitle">Available funds</h2>
         </div>
         <div class="acct-overview-actions">
-          <button type="button" id="acctExportBtn" class="ghost-btn"><svg class="icon"><use href="#i-download"></use></svg>Export month</button>
-          <button type="button" id="acctPayoutBtn" class="primary-btn"><svg class="icon"><use href="#i-cash"></use></svg>Record payout</button>
+          <button type="button" id="bankWithdrawalBtn" class="ghost-btn">Record withdrawal</button>
+          <button type="button" id="bankDepositBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add deposit</button>
         </div>
       </div>
 
-      <p id="acctOverdueBanner" class="info-banner acct-overdue" hidden></p>
+      <p class="info-banner">Add your current balance as an opening deposit, then record money entering and leaving the account.</p>
 
       <div class="acct-tiles">
         <article class="acct-tile acct-tile-owed">
-          <p class="dashboard-eyebrow">Settled &mdash; owed to you</p>
-          <strong id="acctOwed">$0</strong>
-          <small id="acctOwedSub">Nothing waiting</small>
-          <small id="acctOwedSplit" hidden></small>
+          <p class="dashboard-eyebrow">Current balance</p>
+          <strong id="bankBalance">$0.00</strong>
+          <small id="bankBalanceSub">No activity yet</small>
         </article>
-        <article class="acct-tile acct-tile-pending">
-          <p class="dashboard-eyebrow">Awaiting settlement</p>
-          <strong id="acctPending">$0</strong>
-          <small id="acctPendingSub">Nothing in flight</small>
+        <article class="acct-tile bank-tile-deposit">
+          <p class="dashboard-eyebrow">Deposits this month</p>
+          <strong id="bankDeposits">$0.00</strong>
+          <small>Money in</small>
+        </article>
+        <article class="acct-tile bank-tile-withdrawal">
+          <p class="dashboard-eyebrow">Withdrawals this month</p>
+          <strong id="bankWithdrawals">$0.00</strong>
+          <small>Money out</small>
         </article>
         <article class="acct-tile">
-          <p class="dashboard-eyebrow">Collected this month</p>
-          <strong id="acctCollected">$0</strong>
-          <small id="acctCollectedSub">&nbsp;</small>
-        </article>
-        <article class="acct-tile">
-          <p class="dashboard-eyebrow">Machine fees this month</p>
-          <strong id="acctFees">$0</strong>
-          <small id="acctFeesSub">&nbsp;</small>
+          <p class="dashboard-eyebrow">Net change this month</p>
+          <strong id="bankNetChange">$0.00</strong>
+          <small>Deposits less withdrawals</small>
         </article>
       </div>
 
-      <section class="acct-section" id="acctHeldSection" hidden>
-        <div class="leads-heading-row">
-          <div>
-            <p class="dashboard-eyebrow">Oldest first</p>
-            <h3 id="acctHeldTitle">Waiting to be collected</h3>
-          </div>
-        </div>
-        <div id="acctHeldList" class="ops-list" aria-live="polite"></div>
-      </section>
-
       <section class="acct-section">
+        <div class="leads-topbar expenses-topbar">
+          <div class="leads-searchbar">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <input id="bankSearch" type="search" placeholder="Search category, reference, notes…" aria-label="Search bank transactions" />
+            <button id="clearBankSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div id="bankKindChips" class="filter-chips" role="tablist" aria-label="Filter bank transactions">
+            <button type="button" class="chip active" data-bank-kind="all">All</button>
+            <button type="button" class="chip" data-bank-kind="deposit">Deposits</button>
+            <button type="button" class="chip" data-bank-kind="withdrawal">Withdrawals</button>
+          </div>
+        </div>
         <div class="leads-heading-row">
           <div>
-            <p class="dashboard-eyebrow">The other side of the ledger</p>
-            <h3>Cash fronted on expenses</h3>
+            <p class="dashboard-eyebrow">Bank ledger</p>
+            <h3>Transaction history</h3>
           </div>
-          <div class="expense-total"><span>To collect back</span><strong id="acctReclaimTotal">$0</strong></div>
         </div>
-        <p class="result-count" id="acctReclaimSub">Nothing outstanding.</p>
+        <p id="bankTransactionCount" class="result-count"></p>
+        <div id="bankTransactionList" class="ops-list" aria-live="polite"></div>
       </section>
     </section>
 
@@ -954,6 +954,58 @@
         <div class="form-actions">
           <button type="button" id="partsOrderReviewCancelBtn" class="ghost-btn">Cancel</button>
           <button type="button" id="partsOrderReviewSaveBtn" class="primary-btn" disabled>Save parts</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bank transaction form modal -->
+  <div id="bankTransactionModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="bankTransactionTitle">
+      <div class="modal-header">
+        <h3 id="bankTransactionTitle">Add deposit</h3>
+        <button type="button" id="closeBankTransactionModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <form id="bankTransactionForm" autocomplete="off">
+          <input id="bankTransactionId" type="hidden" />
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label" for="bankTransactionKind">Type</label>
+              <select id="bankTransactionKind" class="text-input select-input">
+                <option value="deposit">Deposit</option>
+                <option value="withdrawal">Withdrawal</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="bankTransactionAmount">Amount (TTD)</label>
+              <input id="bankTransactionAmount" class="text-input" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="bankTransactionDate">Date</label>
+              <input id="bankTransactionDate" class="text-input" type="date" required />
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="bankTransactionCategory">Category</label>
+              <input id="bankTransactionCategory" class="text-input" list="bankCategoryOptions" placeholder="e.g. Sales, rent" />
+              <datalist id="bankCategoryOptions"><option value="Opening balance"><option value="Sales"><option value="Card payout"><option value="Inventory"><option value="Rent"><option value="Utilities"><option value="Payroll"><option value="Bank fee"></datalist>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="bankTransactionReference">Reference</label>
+              <input id="bankTransactionReference" class="text-input" placeholder="Bank or receipt reference" />
+            </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="bankTransactionNotes">Notes</label>
+              <textarea id="bankTransactionNotes" class="text-input" rows="2" placeholder="Optional details"></textarea>
+            </div>
+          </div>
+          <p id="bankTransactionMessage" class="field-error" hidden></p>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="bankTransactionCancel" class="ghost-btn">Cancel</button>
+          <button type="button" id="bankTransactionSubmit" class="primary-btn">Save deposit</button>
         </div>
       </div>
     </div>
@@ -2493,7 +2545,7 @@
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
-  <script defer src="assets/account.js?v=card-takings-1"></script>
+  <script defer src="assets/account.js?v=bank-account-1"></script>
   <script defer src="assets/parts-orders.js?v=usd-ttd-1"></script>
 </body>
 </html>

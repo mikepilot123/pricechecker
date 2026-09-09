@@ -280,30 +280,29 @@
   });
 
   // ---- Account sub-tabs ------------------------------------------------------
-  // Overview / Card payments / Payouts / Expenses. Overview,
-  // Card payments, and Payouts are grouped under one outer "Card machine" tab
-  // (data-account-panel-group="cardMachine") so the subnav row doesn't run out
+  // Balance / Card payments / Payouts / Expenses. The first three are grouped
+  // under one outer "Bank account" tab so the subnav row doesn't run out
   // of horizontal space — they still toggle individually via the same
   // data-account-panel-section mechanism, just via a second subnav row nested
   // inside the group's wrapper instead of the top-level one.
-  const CARD_MACHINE_PANELS = new Set(["overview", "payments", "payouts"]);
+  const BANK_ACCOUNT_PANELS = new Set(["overview", "payments", "payouts"]);
   function setAccountPanel(panel) {
     document.querySelectorAll("[data-account-panel-section]").forEach((section) => {
       section.hidden = section.dataset.accountPanelSection !== panel;
     });
     document.querySelectorAll("[data-account-panel-section-group]").forEach((group) => {
-      group.hidden = !CARD_MACHINE_PANELS.has(panel);
+      group.hidden = !BANK_ACCOUNT_PANELS.has(panel);
     });
     document.querySelectorAll(".appt-subnav-btn[data-account-panel]").forEach((btn) => {
       const active = btn.dataset.accountPanel === panel;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
-    // The outer "Card machine" tab has no single matching section of its own —
+    // The outer "Bank account" tab has no single matching section of its own —
     // it should read as active whenever any of the three grouped panels is
     // showing, not only when panel is exactly "overview".
     document.querySelectorAll(".appt-subnav-btn[data-account-panel-group]").forEach((btn) => {
-      const active = CARD_MACHINE_PANELS.has(panel);
+      const active = BANK_ACCOUNT_PANELS.has(panel);
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });

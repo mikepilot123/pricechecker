@@ -31,6 +31,7 @@ import {
   syncTakingsReminder,
 } from "../lib/card-payments.js";
 import { listPayouts, addPayout, voidPayout } from "../lib/payouts.js";
+import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction } from "../lib/bank-transactions.js";
 import { getAccountSettings, saveAccountSettings } from "../lib/settings.js";
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
@@ -194,6 +195,21 @@ export default async function handler(req, res) {
     }
     if (action === "listCardPayments") {
       return res.status(200).json({ ok: true, payments: await listCardPayments(body) });
+    }
+    if (action === "listBankTransactions") {
+      return res.status(200).json({ ok: true, transactions: await listBankTransactions() });
+    }
+    if (action === "bankAccountSummary") {
+      return res.status(200).json({ ok: true, summary: await bankAccountSummary() });
+    }
+    if (action === "addBankTransaction") {
+      return res.status(200).json({ ok: true, transaction: await addBankTransaction(body) });
+    }
+    if (action === "updateBankTransaction") {
+      return res.status(200).json({ ok: true, transaction: await updateBankTransaction(body) });
+    }
+    if (action === "deleteBankTransaction") {
+      return res.status(200).json({ ok: true, deletedId: await deleteBankTransaction(body) });
     }
     if (action === "listCollectable") {
       return res.status(200).json({ ok: true, payments: await listCollectable() });

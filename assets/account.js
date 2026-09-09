@@ -1,5 +1,5 @@
 /* ============================================================
-   Account — the card takings ledger.
+   Account — bank funds plus the card takings ledger.
 
    The shop's card machine is registered to the owner's brother, so
    every swipe is money that reaches HIS account the next business
@@ -23,6 +23,7 @@
   const PAYMENTS_CACHE_KEY = "rpc_card_payments_cache";
   const PAYOUTS_CACHE_KEY = "rpc_payouts_cache";
   const SETTINGS_CACHE_KEY = "rpc_account_settings_cache";
+  const BANK_CACHE_KEY = "rpc_bank_transactions_cache";
   const LS_LAST_PANEL = "rpc_account_panel";
   const LS_LAST_PAYOUT_METHOD = "rpc_last_payout_method";
 
@@ -51,6 +52,11 @@
   let PAYOUTS = readCache(PAYOUTS_CACHE_KEY);
   let SUMMARY = null;
   let SETTINGS = readCache(SETTINGS_CACHE_KEY, DEFAULT_SETTINGS);
+  let BANK_TRANSACTIONS = readCache(BANK_CACHE_KEY);
+  let BANK_SUMMARY = null;
+  let bankKindFilter = "all";
+  let bankSearchQuery = "";
+  let bankEditingId = null;
   let stateFilter = "all";
   let searchQuery = "";
   let editingId = null;
@@ -122,11 +128,13 @@
     if (loadInFlight) return loadInFlight;
     if (loadedOnce && !force) return Promise.resolve();
     loadInFlight = (async () => {
-      const [payments, payouts, summary, settings] = await Promise.allSettled([
+      const [payments, payouts, summary, settings, bankTransactions, bankSummary] = await Promise.allSettled([
         api({ action: "listCardPayments", includeVoided: true }),
         api({ action: "listPayouts" }),
         api({ action: "accountSummary" }),
         api({ action: "getAccountSettings" }),
+        api({ action: "listBankTransactions" }),
+        api({ action: "bankAccountSummary" }),
       ]);
       if (payments.status === "fulfilled") {
         PAYMENTS = payments.value.payments || [];
@@ -141,8 +149,13 @@
         SETTINGS = settings.value.settings || DEFAULT_SETTINGS;
         writeCache(SETTINGS_CACHE_KEY, SETTINGS);
       }
-      const failure = [payments, payouts, summary, settings].find((r) => r.status === "rejected");
-      if (failure && !PAYMENTS.length) toast("Couldn't load the account: " + failure.reason.message);
+      if (bankTransactions.status === "fulfilled") {
+        BANK_TRANSACTIONS = bankTransactions.value.transactions || [];
+        writeCache(BANK_CACHE_KEY, BANK_TRANSACTIONS);
+      }
+      if (bankSummary.status === "fulfilled") BANK_SUMMARY = bankSummary.value.summary;
+      const failure = [payments, payouts, summary, settings, bankTransactions, bankSummary].find((r) => r.status === "rejected");
+      if (failure && !PAYMENTS.length && !BANK_TRANSACTIONS.length) toast("Couldn't load the account: " + failure.reason.message);
       loadedOnce = true;
       fillSettingsForm();
       renderAll();
@@ -151,9 +164,134 @@
   }
 
   function renderAll() {
-    renderOverview();
+    renderBankAccount();
     renderPayments();
     renderPayouts();
+  }
+
+  // ---- Bank account -------------------------------------------------------
+  function bankSummaryFromCache() {
+    const month = new Date().toISOString().slice(0, 7);
+    const deposits = BANK_TRANSACTIONS.filter((item) => item.kind === "deposit" && String(item.occurredAt).slice(0, 7) === month)
+      .reduce((total, item) => total + Number(item.amount || 0), 0);
+    const withdrawals = BANK_TRANSACTIONS.filter((item) => item.kind === "withdrawal" && String(item.occurredAt).slice(0, 7) === month)
+      .reduce((total, item) => total + Number(item.amount || 0), 0);
+    return {
+      balance: BANK_TRANSACTIONS.reduce((total, item) => total + (item.kind === "deposit" ? 1 : -1) * Number(item.amount || 0), 0),
+      depositsThisMonth: deposits,
+      withdrawalsThisMonth: withdrawals,
+      netChangeThisMonth: deposits - withdrawals,
+      transactionCount: BANK_TRANSACTIONS.length,
+      lastActivity: BANK_TRANSACTIONS[0]?.occurredAt || null,
+    };
+  }
+
+  function renderBankAccount() {
+    const summary = BANK_SUMMARY || bankSummaryFromCache();
+    const setText = (id, value) => { const element = $(id); if (element) element.textContent = value; };
+    setText("bankBalance", money(summary.balance));
+    setText("bankDeposits", money(summary.depositsThisMonth));
+    setText("bankWithdrawals", money(summary.withdrawalsThisMonth));
+    setText("bankNetChange", money(summary.netChangeThisMonth));
+    setText("bankBalanceSub", summary.lastActivity ? `Last activity ${formatDay(summary.lastActivity)}` : "No activity yet");
+    $("bankBalance")?.classList.toggle("money-negative", Number(summary.balance) < 0);
+    $("bankNetChange")?.classList.toggle("money-negative", Number(summary.netChangeThisMonth) < 0);
+
+    document.querySelectorAll("[data-bank-kind]").forEach((button) => {
+      const active = button.dataset.bankKind === bankKindFilter;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    const query = bankSearchQuery.trim().toLowerCase();
+    const visible = BANK_TRANSACTIONS.filter((item) => {
+      if (bankKindFilter !== "all" && item.kind !== bankKindFilter) return false;
+      return !query || [item.category, item.reference, item.notes].some((value) => String(value || "").toLowerCase().includes(query));
+    });
+    setText("bankTransactionCount", BANK_TRANSACTIONS.length ? `${visible.length} of ${BANK_TRANSACTIONS.length} transaction${BANK_TRANSACTIONS.length === 1 ? "" : "s"}` : "No bank transactions yet");
+    const list = $("bankTransactionList");
+    if (!list) return;
+    if (!visible.length) {
+      list.innerHTML = `<p class="ops-empty">${BANK_TRANSACTIONS.length ? "No transactions match this filter." : "Add your current balance as an opening deposit to begin."}</p>`;
+      return;
+    }
+    list.innerHTML = visible.map((item) => `
+      <article class="ops-row acct-row bank-transaction-row">
+        <div>
+          <strong>${esc(item.category || (item.kind === "deposit" ? "Deposit" : "Withdrawal"))}</strong>
+          <p>${esc(formatDay(item.occurredAt))}${item.reference ? ` · ${esc(item.reference)}` : ""}</p>
+          ${item.notes ? `<small>${esc(item.notes)}</small>` : ""}
+        </div>
+        <div class="acct-row-side">
+          <strong class="bank-amount bank-amount-${item.kind}">${item.kind === "deposit" ? "+" : "−"}${money(item.amount)}</strong>
+          <span class="acct-pill bank-pill-${item.kind}">${item.kind === "deposit" ? "Deposit" : "Withdrawal"}</span>
+          <div class="ops-row-actions"><button type="button" data-bank-edit="${esc(item.id)}">Edit</button><button type="button" class="danger-text" data-bank-delete="${esc(item.id)}">Delete</button></div>
+        </div>
+      </article>`).join("");
+  }
+
+  function openBankTransactionModal(kind, transaction) {
+    bankEditingId = transaction?.id || null;
+    const selectedKind = transaction?.kind || (kind === "withdrawal" ? "withdrawal" : "deposit");
+    $("bankTransactionTitle").textContent = transaction ? "Edit bank transaction" : selectedKind === "deposit" ? "Add deposit" : "Record withdrawal";
+    $("bankTransactionSubmit").textContent = transaction ? "Save changes" : selectedKind === "deposit" ? "Save deposit" : "Save withdrawal";
+    $("bankTransactionId").value = bankEditingId || "";
+    $("bankTransactionKind").value = selectedKind;
+    $("bankTransactionAmount").value = transaction ? Number(transaction.amount).toFixed(2) : "";
+    $("bankTransactionDate").value = toDateInput(transaction?.occurredAt || new Date());
+    $("bankTransactionCategory").value = transaction?.category || (BANK_TRANSACTIONS.length ? "" : "Opening balance");
+    $("bankTransactionReference").value = transaction?.reference || "";
+    $("bankTransactionNotes").value = transaction?.notes || "";
+    setMessage("bankTransactionMessage", "");
+    $("bankTransactionModal").hidden = false;
+    setTimeout(() => $("bankTransactionAmount").focus(), 50);
+  }
+
+  function closeBankTransactionModal() {
+    $("bankTransactionModal").hidden = true;
+    bankEditingId = null;
+  }
+
+  async function submitBankTransaction() {
+    const amount = Number($("bankTransactionAmount").value || 0);
+    if (amount <= 0) return setMessage("bankTransactionMessage", "Enter an amount greater than zero.");
+    const date = $("bankTransactionDate").value;
+    if (!date) return setMessage("bankTransactionMessage", "Choose the transaction date.");
+    const wasEditing = !!bankEditingId;
+    const button = $("bankTransactionSubmit");
+    button.disabled = true;
+    try {
+      await api({
+        action: wasEditing ? "updateBankTransaction" : "addBankTransaction",
+        id: bankEditingId || undefined,
+        kind: $("bankTransactionKind").value,
+        amount,
+        occurredAt: new Date(`${date}T12:00:00`).toISOString(),
+        category: $("bankTransactionCategory").value.trim(),
+        reference: $("bankTransactionReference").value.trim(),
+        notes: $("bankTransactionNotes").value.trim(),
+      });
+      closeBankTransactionModal();
+      BANK_SUMMARY = null;
+      await loadAll(true);
+      toast(wasEditing ? "Bank transaction updated" : "Bank transaction saved");
+    } catch (error) {
+      setMessage("bankTransactionMessage", error.message);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function deleteBankTransaction(id) {
+    const transaction = BANK_TRANSACTIONS.find((item) => item.id === id);
+    if (!transaction || !window.confirm(`Delete this ${transaction.kind} of ${money(transaction.amount)}?`)) return;
+    try {
+      await api({ action: "deleteBankTransaction", id });
+      BANK_SUMMARY = null;
+      await loadAll(true);
+      toast("Bank transaction deleted");
+    } catch (error) {
+      toast(error.message);
+    }
   }
 
   // ---- Overview ------------------------------------------------------------
@@ -629,7 +767,7 @@
       SETTINGS = data.settings;
       writeCache(SETTINGS_CACHE_KEY, SETTINGS);
       fillSettingsForm();
-      renderOverview();
+      renderBankAccount();
       toast("Card machine settings saved");
     } catch (err) {
       setMessage("acctSettingsMessage", err.message);
@@ -642,6 +780,36 @@
   function bind() {
     if (bound) return;
     bound = true;
+
+    $("bankDepositBtn")?.addEventListener("click", () => openBankTransactionModal("deposit"));
+    $("bankWithdrawalBtn")?.addEventListener("click", () => openBankTransactionModal("withdrawal"));
+    $("closeBankTransactionModal")?.addEventListener("click", closeBankTransactionModal);
+    $("bankTransactionCancel")?.addEventListener("click", closeBankTransactionModal);
+    $("bankTransactionSubmit")?.addEventListener("click", submitBankTransaction);
+    $("bankTransactionForm")?.addEventListener("submit", (event) => { event.preventDefault(); submitBankTransaction(); });
+    $("bankKindChips")?.addEventListener("click", (event) => {
+      const kind = event.target.closest("[data-bank-kind]")?.dataset.bankKind;
+      if (!kind) return;
+      bankKindFilter = kind;
+      renderBankAccount();
+    });
+    $("bankSearch")?.addEventListener("input", (event) => {
+      bankSearchQuery = event.target.value;
+      $("clearBankSearch").hidden = !bankSearchQuery;
+      renderBankAccount();
+    });
+    $("clearBankSearch")?.addEventListener("click", () => {
+      bankSearchQuery = "";
+      $("bankSearch").value = "";
+      $("clearBankSearch").hidden = true;
+      renderBankAccount();
+    });
+    $("bankTransactionList")?.addEventListener("click", (event) => {
+      const editId = event.target.closest("[data-bank-edit]")?.dataset.bankEdit;
+      if (editId) return openBankTransactionModal(null, BANK_TRANSACTIONS.find((item) => item.id === editId));
+      const deleteId = event.target.closest("[data-bank-delete]")?.dataset.bankDelete;
+      if (deleteId) deleteBankTransaction(deleteId);
+    });
 
     $("cardPayNewBtn")?.addEventListener("click", () => openPaymentModal(null));
     $("closeCardPayFormModal")?.addEventListener("click", closePaymentModal);
@@ -711,7 +879,7 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      ["cardPayFormModal", "payoutFormModal", "acctVoidModal"].forEach((id) => {
+      ["bankTransactionModal", "cardPayFormModal", "payoutFormModal", "acctVoidModal"].forEach((id) => {
         const el = $(id);
         if (el && !el.hidden) el.hidden = true;
       });

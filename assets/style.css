@@ -6726,6 +6726,14 @@ video.media-viewer-media {
 .acct-tile-owed strong { color: #0f7285; }
 .acct-tile-pending { border-left: 3px solid var(--warn); }
 .acct-tile-pending strong { color: var(--warn); }
+.bank-tile-deposit { border-left: 3px solid var(--price); }
+.bank-tile-deposit strong, .bank-amount-deposit { color: var(--price); }
+.bank-tile-withdrawal { border-left: 3px solid var(--danger); }
+.bank-tile-withdrawal strong, .bank-amount-withdrawal, .money-negative { color: var(--danger) !important; }
+.bank-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bank-pill-deposit { background: #e2f2e7; color: var(--price); }
+.bank-pill-withdrawal { background: #fce8e6; color: var(--danger); }
+.bank-transaction-row > div:first-child { min-width: 0; }
 
 .acct-section { margin-top: 28px; }
 .acct-overdue {
@@ -6838,6 +6846,8 @@ video.media-viewer-media {
 
 @media (max-width: 560px) {
   .acct-row-side { align-items: flex-start; }
+  .bank-transaction-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .bank-transaction-row .acct-row-side { align-items: flex-end; }
 }
 /* "$0.75" and "$0.00" side by side need almost no width, and this row sits
    inside a modal that is narrower than the viewport — stacking it at 560px
