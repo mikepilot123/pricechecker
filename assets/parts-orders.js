@@ -9,6 +9,13 @@
   const INVENTORY_URL = "https://pricechecker-cyan.vercel.app/api/inventory";
   const LS_PIN = "rpc_intake_pin";
   const MAX_INLINE_PDF_BYTES = 2.5 * 1024 * 1024;
+  // Parts are ordered from suppliers who charge in USD (eBay, MobileSentrix,
+  // iFixit, ...), but every other dollar figure in this app — expenses,
+  // invoices, repair costs — is TTD (see index.html's "Prices in TTD"
+  // footer). The auto-created collect-back expense/reminder (see
+  // syncShipmentExpense) need to be in the same currency as the rest of the
+  // books, so the USD part cost is converted at this fixed rate.
+  const USD_TO_TTD_RATE = 7;
   const $ = (id) => document.getElementById(id);
 
   const STATUS_LABELS = { ordered: "Ordered", backordered: "Backordered", arrived: "Arrived", cancelled: "Cancelled" };
@@ -763,12 +770,13 @@
       }
       const vendor = group.find((item) => item.vendor)?.vendor || "";
       const shipmentName = group.find((item) => item.shipmentName)?.shipmentName || vendor || group[0].part || "Shipment";
-      const total = group.reduce((sum, item) => sum + item.totalCost, 0);
+      const totalUsd = group.reduce((sum, item) => sum + item.totalCost, 0);
+      const totalTtd = Math.round(totalUsd * USD_TO_TTD_RATE * 100) / 100;
       const date = (group[0].orderedAt || new Date().toISOString()).slice(0, 10);
       const reclaimFrom = typeof window.RPC_LAST_RECLAIM_FROM === "function" ? window.RPC_LAST_RECLAIM_FROM() : "";
       const payload = {
-        date, category: "Parts", vendor, amount: total, reclaimFrom,
-        notes: `Parts shipment: ${shipmentName}`, cashReclaim: true, reclaimed: false,
+        date, category: "Parts", vendor, amount: totalTtd, reclaimFrom,
+        notes: `Parts shipment: ${shipmentName} (${money(totalUsd)} USD × ${USD_TO_TTD_RATE})`, cashReclaim: true, reclaimed: false,
       };
       try {
         await partsOrderApi({ action: "updateExpense", id: expenseId, ...payload });
