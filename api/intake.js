@@ -36,7 +36,7 @@ import { getAccountSettings, saveAccountSettings } from "../lib/settings.js";
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
-import { applyCors, checkPin } from "../lib/security.js";
+import { applyCors, checkPin, createBrowserCredential } from "../lib/security.js";
 
 // Mirrors apps-script/Code.gs's handle(p) dispatch-by-action shape exactly,
 // so assets/intake.js needs no changes beyond pointing SCRIPT_URL at this
@@ -58,6 +58,11 @@ export default async function handler(req, res) {
 
   const action = body.action || "list";
   try {
+    if (action === "registerBrowser") {
+      const credential = createBrowserCredential(body.pin);
+      if (!credential) return res.status(200).json({ ok: false, error: "Invalid PIN" });
+      return res.status(200).json({ ok: true, credential });
+    }
     await ensureSchema();
     if (action === "list") {
       return res.status(200).json({ ok: true, tickets: await listTickets({ includeDeleted: !!body.includeDeleted }) });

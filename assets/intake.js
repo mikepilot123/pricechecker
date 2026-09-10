@@ -7,7 +7,8 @@
 
    The API URL is fixed below (it's not secret on its own — every
    request still requires the team PIN, checked server-side). Only the
-   PIN is entered once per device and stored in localStorage.
+   PIN is entered once per browser and exchanged for a signed browser
+   credential. The actual PIN is not retained on the device.
    ============================================================ */
 
 (function () {
@@ -92,6 +93,7 @@
   ];
 
   const LS_PIN = "rpc_intake_pin";
+  const BROWSER_CREDENTIAL_PREFIX = "rpcb1.";
   const TICKET_PAGE_SIZE = 12;
   const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
 
@@ -260,6 +262,22 @@
     pin: localStorage.getItem(LS_PIN) || "",
   });
   const isConfigured = () => !!getCfg().pin;
+  const isBrowserCredential = (value) => String(value || "").startsWith(BROWSER_CREDENTIAL_PREFIX);
+
+  // Migrate browsers that still have the old raw-PIN setting. The existing
+  // PIN continues to work while this one-time exchange is in flight, so no
+  // other view is held up and the user is not asked to sign in again.
+  async function upgradeStoredPinToBrowserCredential() {
+    const saved = getCfg().pin;
+    if (!saved || isBrowserCredential(saved)) return;
+    try {
+      const registration = await api({ action: "registerBrowser" }, { url: SCRIPT_URL, pin: saved });
+      if (registration.ok && registration.credential) localStorage.setItem(LS_PIN, registration.credential);
+    } catch (_) {
+      // Keep the old PIN in place; a temporary network failure should never
+      // sign a working device out.
+    }
+  }
 
   // ---- Settings sub-tabs -----------------------------------------------------
   // General / Technicians / Customers / Prices, so a page that used to be one
@@ -350,7 +368,7 @@
     $("intakeSetup").hidden = false;
     $("intakeMain").hidden = true;
     $("settingsMaintenance").hidden = !prefill;
-    if (prefill) $("cfgPin").value = getCfg().pin;
+    if (prefill) $("cfgPin").value = "";
     if (prefill && isConfigured()) {
       loadTechnicians();
       loadCustomers();
@@ -370,13 +388,17 @@
       err.hidden = false;
       return;
     }
-    // Validate against the live script before saving.
+    // Validate once, register this browser, and retain only the signed
+    // credential. It is accepted across IP/Wi-Fi changes until the team PIN
+    // itself is changed.
     $("cfgSave").disabled = true;
     $("cfgSave").textContent = "Connecting…";
     try {
-      const res = await api({ action: "list" }, { url: SCRIPT_URL, pin });
+      const registration = await api({ action: "registerBrowser" }, { url: SCRIPT_URL, pin });
+      if (!registration.ok || !registration.credential) throw new Error(registration.error || "Rejected");
+      localStorage.setItem(LS_PIN, registration.credential);
+      const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
-      localStorage.setItem(LS_PIN, pin);
       TICKETS = (res.tickets || []).map(normalizeTicket);
       visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
@@ -394,8 +416,14 @@
       err.hidden = false;
     } finally {
       $("cfgSave").disabled = false;
-      $("cfgSave").textContent = "Save & connect";
+      $("cfgSave").textContent = "Register browser & connect";
     }
+  });
+
+  $("cfgPin").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    $("cfgSave").click();
   });
 
   // ---- API -----------------------------------------------------------------
@@ -417,6 +445,8 @@
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
   }
+
+  upgradeStoredPinToBrowserCredential();
 
   // ---- Enter intake view ---------------------------------------------------
   function enterIntake() {
@@ -442,6 +472,13 @@
       render();
       publishTickets();
     } catch (e) {
+      if (/invalid pin/i.test(String(e && e.message))) {
+        localStorage.removeItem(LS_PIN);
+        showSetup(false);
+        $("cfgError").textContent = "This browser registration is no longer valid. Enter the current team PIN to reconnect.";
+        $("cfgError").hidden = false;
+        return;
+      }
       $("intakeList").innerHTML = "";
       $("intakeEmpty").hidden = true;
       $("intakeError").hidden = false;
@@ -3062,6 +3099,16 @@
     return el;
   }
 
+  $("repairsToggleAll").addEventListener("click", () => {
+    const sections = buildStatusSections(currentList());
+    const collapse = sections.some((section) => !collapsedRepairStatuses.has(section.status));
+    for (const section of sections) {
+      if (collapse) collapsedRepairStatuses.add(section.status);
+      else collapsedRepairStatuses.delete(section.status);
+    }
+    render();
+  });
+
   function render() {
     const list = currentList();
     const sections = statusFilter === "all"
@@ -3092,6 +3139,12 @@
     $("intakeCount").textContent = list.length
       ? `Showing ${shownCount} of ${list.length} device${list.length === 1 ? "" : "s"}`
       : "";
+    const toggleAll = $("repairsToggleAll");
+    const grouped = statusFilter === "all" && sections.length > 0;
+    const allCollapsed = grouped && sections.every((section) => collapsedRepairStatuses.has(section.status));
+    toggleAll.hidden = !grouped;
+    toggleAll.textContent = allCollapsed ? "Expand all" : "Collapse all";
+    toggleAll.setAttribute("aria-expanded", allCollapsed ? "false" : "true");
     if (shownCount < list.length) {
       const more = document.createElement("button");
       const remaining = list.length - shownCount;

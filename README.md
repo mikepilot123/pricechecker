@@ -34,6 +34,12 @@ parts are saved.
 
 Tip: on a phone, use **Share → Add to Home Screen** to install it like an app.
 It opens full-screen and even loads offline (showing the last saved prices).
+The first successful team-PIN sign-in registers that browser with a signed
+credential, so changing Wi-Fi or mobile networks does not require another
+sign-in. The PIN itself is not stored. Rotating `INTAKE_PIN` revokes all
+registered browsers. Set `BROWSER_CREDENTIAL_SECRET` to a long random server
+secret if desired; otherwise the server uses its existing `DATABASE_URL`
+secret for signing.
 
 There's also a Chrome extension (`extension/`) for the counter/office laptop:
 click its toolbar icon on *any* site — Facebook, WhatsApp Web, email — to open

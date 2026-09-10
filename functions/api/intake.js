@@ -16,7 +16,7 @@ import { listMedia, addMedia, deleteMedia } from "../_lib/media.js";
 import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../_lib/appointments.js";
 import { listExpenses, addExpense, updateExpense, deleteExpense } from "../_lib/expenses.js";
 import { ensureSchema } from "../_lib/db.js";
-import { checkPin, jsonResponse, preflightResponse } from "../_lib/security.js";
+import { checkPin, createBrowserCredential, jsonResponse, preflightResponse } from "../_lib/security.js";
 
 // Cloudflare Pages Functions build of api/intake.js. Same dispatch-by-action
 // shape as the Vercel original and apps-script/Code.gs before it: same
@@ -37,6 +37,11 @@ export async function onRequest(context) {
 
   const action = body.action || "list";
   try {
+    if (action === "registerBrowser") {
+      const credential = createBrowserCredential(body.pin, env);
+      if (!credential) return jsonResponse({ ok: false, error: "Invalid PIN" }, request);
+      return jsonResponse({ ok: true, credential }, request);
+    }
     await ensureSchema();
     if (action === "list") {
       return jsonResponse({ ok: true, tickets: await listTickets({ includeDeleted: !!body.includeDeleted }) }, request);

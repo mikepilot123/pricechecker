@@ -7,12 +7,14 @@
 // a CORS pass. Note this protects browsers, not curl; the PIN check is
 // still the real gate.
 //
-// Rate limiting: the PIN is the whole auth model, so unlimited guessing was
+// Rate limiting: the PIN bootstraps a durable browser credential, so unlimited guessing was
 // the biggest hole. This is a per-isolate in-memory counter — Cloudflare
 // can spin up multiple isolates, so a determined attacker spread across
 // many cold starts gets more attempts than the nominal limit, but casual
 // brute-forcing against a warm isolate goes from thousands of guesses a
 // minute to a handful. Same tradeoff as the original Vercel version.
+
+import crypto from "node:crypto";
 
 const ALLOWED_ORIGINS = new Set([
   "https://mikepilot123.github.io",
@@ -42,6 +44,7 @@ export function preflightResponse(request) {
   return new Response(null, { status: 204, headers: corsHeaders(request) });
 }
 
+const BROWSER_CREDENTIAL_PREFIX = "rpcb1";
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_FAILURES_PER_WINDOW = 10;
 const failures = new Map(); // ip -> { count, windowStart }
@@ -68,7 +71,7 @@ export function checkPin(request, pin, env) {
     return { status: 429, error: "Too many failed attempts. Try again later." };
   }
   const expectedPin = env && env.INTAKE_PIN;
-  if (expectedPin && String(pin) === String(expectedPin)) {
+  if (expectedPin && (safeEqual(pin, expectedPin) || validBrowserCredential(pin, expectedPin, env))) {
     if (entry) failures.delete(ip);
     return null;
   }
@@ -84,4 +87,32 @@ export function checkPin(request, pin, env) {
     }
   }
   return { status: 200, error: "Invalid PIN" };
+}
+
+export function createBrowserCredential(pin, env) {
+  const expectedPin = env && env.INTAKE_PIN;
+  if (!expectedPin || !credentialSecret(env) || !safeEqual(pin, expectedPin)) return null;
+  const nonce = crypto.randomBytes(32).toString("base64url");
+  const signature = signBrowserNonce(nonce, expectedPin, env);
+  return `${BROWSER_CREDENTIAL_PREFIX}.${nonce}.${signature}`;
+}
+
+function validBrowserCredential(value, secret, env) {
+  const parts = String(value || "").split(".");
+  if (!credentialSecret(env) || parts.length !== 3 || parts[0] !== BROWSER_CREDENTIAL_PREFIX || !parts[1] || !parts[2]) return false;
+  return safeEqual(parts[2], signBrowserNonce(parts[1], secret, env));
+}
+
+function credentialSecret(env) {
+  return (env && (env.BROWSER_CREDENTIAL_SECRET || env.DATABASE_URL)) || "";
+}
+
+function signBrowserNonce(nonce, pin, env) {
+  return crypto.createHmac("sha256", credentialSecret(env)).update(nonce).update("\0").update(pin).digest("base64url");
+}
+
+function safeEqual(left, right) {
+  const a = Buffer.from(String(left ?? ""));
+  const b = Buffer.from(String(right ?? ""));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }

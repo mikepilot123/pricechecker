@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=bank-account-1" />
+  <link rel="stylesheet" href="assets/style.css?v=browser-registration-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -1673,16 +1673,16 @@
 
   <!-- ============ INTAKE VIEW ============ -->
   <main class="container view" id="view-intake" hidden>
-    <!-- Setup panel: shown until the script URL + PIN are saved on this device -->
+    <!-- Setup panel: shown until this browser has a saved signed credential -->
     <section id="intakeSetup" class="setup-card" hidden>
       <h2 class="setup-title">Connect device check-in</h2>
       <p class="setup-sub">
-        Enter the team PIN (your manager has it). Stored only on this
-        device — entered once.
+        Enter the team PIN once to register this browser. The PIN itself is
+        not saved, and the browser stays connected when you change Wi-Fi.
       </p>
       <label class="field-label" for="cfgPin">Team PIN</label>
-      <input id="cfgPin" class="text-input" type="password" inputmode="numeric" placeholder="••••" />
-      <button id="cfgSave" class="primary-btn">Save & connect</button>
+      <input id="cfgPin" class="text-input" type="password" inputmode="numeric" name="team-pin" autocomplete="current-password" placeholder="••••" />
+      <button id="cfgSave" class="primary-btn">Register browser & connect</button>
       <p id="cfgError" class="field-error" hidden></p>
       <div id="settingsMaintenance" class="settings-maintenance" hidden>
         <div class="appt-subnav settings-subnav" role="tablist" aria-label="Settings sections">
@@ -1867,7 +1867,10 @@
           </div>
         </div>
 
-        <p id="intakeCount" class="result-count"></p>
+        <div class="repairs-list-summary">
+          <p id="intakeCount" class="result-count"></p>
+          <button id="repairsToggleAll" class="repairs-toggle-all" type="button" hidden>Collapse all</button>
+        </div>
         <div id="intakeList" class="results" aria-live="polite"></div>
 
         <div id="intakeEmpty" class="empty-state" hidden>
@@ -2538,7 +2541,7 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=repairs-status-collapse-1"></script>
+  <script defer src="assets/intake.js?v=browser-registration-1"></script>
   <script defer src="assets/dashboard.js?v=collect-back-expense-2"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
