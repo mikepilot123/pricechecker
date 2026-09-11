@@ -3093,13 +3093,18 @@
     el.title = "Drag to rearrange repair groups";
     el.dataset.repairStatus = status;
     el.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    el.setAttribute("aria-label", `${status}: ${count} device${count === 1 ? "" : "s"}. ${collapsed ? "Expand" : "Collapse"} group. Drag to reorder.`);
     el.innerHTML = `
       <span class="repairs-status-section-title">
         <span class="repairs-status-drag-handle" aria-hidden="true">⠿</span>
         <svg class="icon repairs-status-chevron${collapsed ? " is-collapsed" : ""}" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
         ${esc(status)}
       </span>
-      <span class="repairs-status-section-meta"><span class="repairs-status-drag-hint">Drag to reorder</span><span class="repairs-status-section-count">${count} device${count === 1 ? "" : "s"}</span></span>`;
+      <span class="repairs-status-section-meta">
+        <span class="repairs-status-drag-hint">Drag to reorder</span>
+        <span class="repairs-status-section-state">${collapsed ? "Expand" : "Collapse"}</span>
+        <span class="repairs-status-section-count">${count}</span>
+      </span>`;
     el.addEventListener("click", () => {
       if (collapsedRepairStatuses.has(status)) collapsedRepairStatuses.delete(status);
       else collapsedRepairStatuses.add(status);
