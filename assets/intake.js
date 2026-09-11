@@ -3471,9 +3471,10 @@
     return el;
   }
 
-  // One card for a client who dropped off several devices in the same
-  // check-in: their details sit in the header once, and each device keeps its
-  // own row with its own status, technician, and activity log.
+  // Every client card uses the same header-and-device-row pattern. This keeps
+  // the customer and phone in one predictable place and makes each repair's
+  // device, issues, status, and actions line up identically whether the
+  // client logged one device or several.
   function ticketGroupCard(tickets) {
     const first = tickets[0];
     const el = document.createElement("div");
@@ -3485,7 +3486,7 @@
         <div class="ticket-customer">${esc(first.customerName || "Unknown customer")}</div>
         ${ticketPhoneLineHtml(first)}
       </div>
-      <span class="ticket-group-count">${tickets.length} devices</span>`;
+      <span class="ticket-group-count">${tickets.length} device${tickets.length === 1 ? "" : "s"}</span>`;
     header.querySelectorAll("a.ticket-phone").forEach((phoneEl) => {
       phoneEl.onclick = (e) => e.stopPropagation();
     });
@@ -3543,7 +3544,7 @@
   }
 
   function checkinCard(tickets) {
-    return tickets.length > 1 ? ticketGroupCard(tickets) : ticketCard(tickets[0]);
+    return ticketGroupCard(tickets);
   }
 
   async function setPartsOrdered(ticket, ordered) {
