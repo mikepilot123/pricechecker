@@ -32,6 +32,7 @@
   // every visit to this tab (see backfillPendingShipmentExpenses).
   const expenseSyncedBatchIds = new Set();
   let statusFilter = "all";
+  let sourceFilter = { type: "all", value: "" };
   let searchQuery = "";
   let editingId = null;
   let saving = false;
@@ -162,6 +163,8 @@
 
   function filteredPartsOrders() {
     return PARTS_ORDERS.filter((item) => {
+      if (sourceFilter.type === "merchant" && item.vendor !== sourceFilter.value) return false;
+      if (sourceFilter.type === "shipment" && item.shipmentName !== sourceFilter.value) return false;
       if (!searchQuery) return true;
       // A part linked to a repair usually has no customerName of its own —
       // that lives on the ticket — so search that too, or "search by
@@ -176,13 +179,17 @@
     const box = $("partsOrderStatusChips");
     if (!box) return;
     statusFilter = "all";
-    const chips = [{ key: "all", label: "All", count: PARTS_ORDERS.length }];
-    box.innerHTML = chips.map((c) => `
-      <button type="button" class="inventory-stock-filter inventory-stock-filter-${esc(c.key)}${statusFilter === c.key ? " active" : ""}"
-        data-parts-status-filter="${esc(c.key)}" role="tab" aria-selected="${statusFilter === c.key ? "true" : "false"}">
-        <span class="inventory-stock-dot" aria-hidden="true"></span>${esc(c.label)} (${c.count})
-      </button>
-    `).join("");
+    const merchants = [...new Set(PARTS_ORDERS.map((item) => item.vendor).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const shipments = [...new Set(PARTS_ORDERS.map((item) => item.shipmentName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const option = (type, value, label) => {
+      const selected = sourceFilter.type === type && sourceFilter.value === value ? " selected" : "";
+      return `<option value="${esc(JSON.stringify({ type, value }))}"${selected}>${esc(label)}</option>`;
+    };
+    box.innerHTML = `<select id="partsOrderSourceFilter" class="parts-order-source-filter" aria-label="Filter all orders by merchant or shipment">
+      ${option("all", "", `All (${PARTS_ORDERS.length})`)}
+      ${merchants.length ? `<optgroup label="Merchants">${merchants.map((merchant) => option("merchant", merchant, merchant)).join("")}</optgroup>` : ""}
+      ${shipments.length ? `<optgroup label="Shipments">${shipments.map((shipment) => option("shipment", shipment, shipment)).join("")}</optgroup>` : ""}
+    </select>`;
   }
 
   function renderSummary() {
@@ -1143,10 +1150,10 @@
       $("clearPartsOrderSearch").hidden = true;
       renderPartsOrders();
     });
-    $("partsOrderStatusChips")?.addEventListener("click", (event) => {
-      const chip = event.target.closest("[data-parts-status-filter]");
-      if (!chip) return;
-      statusFilter = chip.dataset.partsStatusFilter;
+    $("partsOrderStatusChips")?.addEventListener("change", (event) => {
+      const select = event.target.closest("#partsOrderSourceFilter");
+      if (!select) return;
+      try { sourceFilter = JSON.parse(select.value); } catch { sourceFilter = { type: "all", value: "" }; }
       renderPartsOrders();
     });
 

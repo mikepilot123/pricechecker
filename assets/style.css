@@ -6471,6 +6471,17 @@ video.media-viewer-media {
 .parts-order-arrived-toggle { border: 0; cursor: pointer; font-family: inherit; }
 .parts-order-arrived-toggle:hover,
 .parts-order-arrived-toggle:focus-visible { background: #ccefdc; outline: 2px solid var(--price); outline-offset: 2px; }
+.parts-order-source-filter {
+  min-height: 40px;
+  max-width: min(260px, 100%);
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font: 600 0.82rem var(--font-display);
+  cursor: pointer;
+}
 .parts-order-status-cancelled { background: var(--bg-soft); color: var(--text-dim); }
 .parts-order-row.is-cancelled { opacity: 0.65; }
 .parts-order-arrived-btn {
