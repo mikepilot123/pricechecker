@@ -356,17 +356,21 @@
       if (!groups.has(key)) { groups.set(key, []); order.push(key); }
       groups.get(key).push(item);
     }
-    return order
-      .map((key) => groups.get(key))
-      .sort((left, right) => {
-        const leftVendor = String(left.find((item) => item.vendor)?.vendor || "");
-        const rightVendor = String(right.find((item) => item.vendor)?.vendor || "");
-        const merchantOrder = leftVendor.localeCompare(rightVendor, undefined, { sensitivity: "base" });
-        if (merchantOrder) return merchantOrder;
-        const leftDate = String(left[0]?.orderedAt || "");
-        const rightDate = String(right[0]?.orderedAt || "");
-        return rightDate.localeCompare(leftDate);
-      });
+    const merchantGroups = new Map();
+    for (const group of order.map((key) => groups.get(key))) {
+      const merchant = String(group.find((item) => item.vendor)?.vendor || "Unspecified merchant");
+      const bucketKey = merchant.toLocaleLowerCase();
+      if (!merchantGroups.has(bucketKey)) merchantGroups.set(bucketKey, { merchant, shipments: [] });
+      merchantGroups.get(bucketKey).shipments.push(group);
+    }
+    const shipmentDate = (group) => Math.max(...group.map((item) => Date.parse(item.orderedAt) || 0));
+    return [...merchantGroups.values()]
+      .map((bucket) => ({
+        ...bucket,
+        shipments: bucket.shipments.sort((left, right) => shipmentDate(right) - shipmentDate(left)),
+      }))
+      .sort((left, right) => shipmentDate(right.shipments[0]) - shipmentDate(left.shipments[0]))
+      .flatMap((bucket) => bucket.shipments);
   }
 
   function toggleShipment(batchId) {
