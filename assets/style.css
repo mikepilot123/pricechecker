@@ -6474,20 +6474,6 @@ video.media-viewer-media {
   white-space: nowrap;
 }
 .parts-order-arrived-btn:hover { background: #e7f6ef; }
-.parts-order-unarrive-btn {
-  display: inline-flex;
-  align-items: center;
-  min-height: 38px;
-  padding: 0 12px;
-  border: 1px solid #e2b35d;
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--warn);
-  font: 500 0.82rem var(--font-display);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.parts-order-unarrive-btn:hover { background: #fdf3e6; }
 .parts-order-payment-btn {
   display: inline-flex;
   align-items: center;
