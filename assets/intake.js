@@ -3095,10 +3095,11 @@
     el.setAttribute("aria-expanded", collapsed ? "false" : "true");
     el.innerHTML = `
       <span class="repairs-status-section-title">
+        <span class="repairs-status-drag-handle" aria-hidden="true">⠿</span>
         <svg class="icon repairs-status-chevron${collapsed ? " is-collapsed" : ""}" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
         ${esc(status)}
       </span>
-      <span class="repairs-status-section-count">${count} device${count === 1 ? "" : "s"}</span>`;
+      <span class="repairs-status-section-meta"><span class="repairs-status-drag-hint">Drag to reorder</span><span class="repairs-status-section-count">${count} device${count === 1 ? "" : "s"}</span></span>`;
     el.addEventListener("click", () => {
       if (collapsedRepairStatuses.has(status)) collapsedRepairStatuses.delete(status);
       else collapsedRepairStatuses.add(status);
