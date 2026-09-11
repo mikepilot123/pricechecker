@@ -254,8 +254,23 @@
     const withdrawal = kind === "withdrawal";
     label.textContent = withdrawal ? "Merchant name" : "Category";
     input.placeholder = withdrawal ? "e.g. Courts, Massy Stores" : "e.g. Sales, rent";
-    input.toggleAttribute("list", !withdrawal);
+    if (withdrawal) {
+      renderMerchantOptions();
+      input.setAttribute("list", "bankMerchantOptions");
+    } else {
+      input.setAttribute("list", "bankCategoryOptions");
+    }
     input.setAttribute("aria-label", withdrawal ? "Merchant name" : "Category");
+  }
+
+  function renderMerchantOptions() {
+    const list = $("bankMerchantOptions");
+    if (!list) return;
+    const merchants = [...new Set(BANK_TRANSACTIONS
+      .filter((item) => item.kind === "withdrawal" && String(item.category || "").trim())
+      .map((item) => String(item.category).trim()))]
+      .sort((a, b) => a.localeCompare(b));
+    list.innerHTML = merchants.map((merchant) => `<option value="${esc(merchant)}"></option>`).join("");
   }
 
   function closeBankTransactionModal() {
