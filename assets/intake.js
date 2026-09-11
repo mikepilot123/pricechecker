@@ -128,6 +128,10 @@
   // status name — expanded by default, same as Parts Orders' shipment
   // groups (collapsedShipments there).
   const collapsedRepairStatuses = new Set();
+  const REPAIR_STATUS_ORDER_KEY = "repair-status-order";
+  let repairStatusOrder = (() => {
+    try { return JSON.parse(localStorage.getItem(REPAIR_STATUS_ORDER_KEY) || "[]"); } catch { return []; }
+  })();
   // If Check In is not configured yet, retain a price-row selection until the
   // user has manually connected the Check In tab.
   let pendingLogDevice = null;
@@ -3072,7 +3076,8 @@
   // to a single flat section, since there's nothing left to separate.
   function buildStatusSections(list) {
     const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up" && s !== "No Fix");
-    return filterableStatuses
+    const order = [...repairStatusOrder, ...filterableStatuses.filter((status) => !repairStatusOrder.includes(status))];
+    return order
       .map((status) => {
         const statusList = list.filter((t) => t.status === status);
         return { status, count: statusList.length, groups: groupTicketsByCheckin(statusList) };
@@ -3084,6 +3089,9 @@
     const el = document.createElement("button");
     el.type = "button";
     el.className = `repairs-status-section ${STATUS_CLASS[status] || ""}`;
+    el.draggable = true;
+    el.title = "Drag to rearrange repair groups";
+    el.dataset.repairStatus = status;
     el.setAttribute("aria-expanded", collapsed ? "false" : "true");
     el.innerHTML = `
       <span class="repairs-status-section-title">
@@ -3094,6 +3102,29 @@
     el.addEventListener("click", () => {
       if (collapsedRepairStatuses.has(status)) collapsedRepairStatuses.delete(status);
       else collapsedRepairStatuses.add(status);
+      render();
+    });
+    el.addEventListener("dragstart", (event) => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", status);
+      el.classList.add("is-dragging");
+    });
+    el.addEventListener("dragend", () => el.classList.remove("is-dragging"));
+    el.addEventListener("dragover", (event) => { event.preventDefault(); el.classList.add("is-drag-target"); });
+    el.addEventListener("dragleave", () => el.classList.remove("is-drag-target"));
+    el.addEventListener("drop", (event) => {
+      event.preventDefault();
+      el.classList.remove("is-drag-target");
+      const dragged = event.dataTransfer.getData("text/plain");
+      if (!dragged || dragged === status) return;
+      const current = buildStatusSections(currentList()).map((section) => section.status);
+      const from = current.indexOf(dragged);
+      const to = current.indexOf(status);
+      if (from < 0 || to < 0) return;
+      current.splice(from, 1);
+      current.splice(to, 0, dragged);
+      repairStatusOrder = current;
+      try { localStorage.setItem(REPAIR_STATUS_ORDER_KEY, JSON.stringify(current)); } catch {}
       render();
     });
     return el;
