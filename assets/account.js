@@ -236,6 +236,7 @@
     $("bankTransactionSubmit").textContent = transaction ? "Save changes" : selectedKind === "deposit" ? "Save deposit" : "Save withdrawal";
     $("bankTransactionId").value = bankEditingId || "";
     $("bankTransactionKind").value = selectedKind;
+    updateBankTransactionKindUI(selectedKind);
     $("bankTransactionAmount").value = transaction ? Number(transaction.amount).toFixed(2) : "";
     $("bankTransactionDate").value = toDateInput(transaction?.occurredAt || new Date());
     $("bankTransactionCategory").value = transaction?.category || (BANK_TRANSACTIONS.length ? "" : "Opening balance");
@@ -244,6 +245,17 @@
     setMessage("bankTransactionMessage", "");
     $("bankTransactionModal").hidden = false;
     setTimeout(() => $("bankTransactionAmount").focus(), 50);
+  }
+
+  function updateBankTransactionKindUI(kind) {
+    const label = $("bankTransactionCategoryLabel");
+    const input = $("bankTransactionCategory");
+    if (!label || !input) return;
+    const withdrawal = kind === "withdrawal";
+    label.textContent = withdrawal ? "Merchant name" : "Category";
+    input.placeholder = withdrawal ? "e.g. Courts, Massy Stores" : "e.g. Sales, rent";
+    input.toggleAttribute("list", !withdrawal);
+    input.setAttribute("aria-label", withdrawal ? "Merchant name" : "Category");
   }
 
   function closeBankTransactionModal() {
@@ -786,6 +798,7 @@
     $("closeBankTransactionModal")?.addEventListener("click", closeBankTransactionModal);
     $("bankTransactionCancel")?.addEventListener("click", closeBankTransactionModal);
     $("bankTransactionSubmit")?.addEventListener("click", submitBankTransaction);
+    $("bankTransactionKind")?.addEventListener("change", (event) => updateBankTransactionKindUI(event.target.value));
     $("bankTransactionForm")?.addEventListener("submit", (event) => { event.preventDefault(); submitBankTransaction(); });
     $("bankKindChips")?.addEventListener("click", (event) => {
       const kind = event.target.closest("[data-bank-kind]")?.dataset.bankKind;

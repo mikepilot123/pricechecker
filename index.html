@@ -477,7 +477,7 @@
         <div class="leads-topbar expenses-topbar">
           <div class="leads-searchbar">
             <svg class="icon"><use href="#i-search"></use></svg>
-            <input id="bankSearch" type="search" placeholder="Search category, reference, notes…" aria-label="Search bank transactions" />
+          <input id="bankSearch" type="search" placeholder="Search merchant, reference, notes…" aria-label="Search bank transactions" />
             <button id="clearBankSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
           </div>
           <div id="bankKindChips" class="filter-chips" role="tablist" aria-label="Filter bank transactions">
@@ -986,7 +986,7 @@
               <input id="bankTransactionDate" class="text-input" type="date" required />
             </div>
             <div class="form-field">
-              <label class="field-label" for="bankTransactionCategory">Category</label>
+              <label class="field-label" id="bankTransactionCategoryLabel" for="bankTransactionCategory">Category</label>
               <input id="bankTransactionCategory" class="text-input" list="bankCategoryOptions" placeholder="e.g. Sales, rent" />
               <datalist id="bankCategoryOptions"><option value="Opening balance"><option value="Sales"><option value="Card payout"><option value="Inventory"><option value="Rent"><option value="Utilities"><option value="Payroll"><option value="Bank fee"></datalist>
             </div>
