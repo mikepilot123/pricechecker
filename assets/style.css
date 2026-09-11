@@ -4045,7 +4045,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .ticket-head {
   display: grid;
   grid-template-columns: 64px minmax(180px, 0.85fr) minmax(180px, 1.45fr) minmax(128px, auto) 44px;
-  grid-template-areas: "thumb identity repair status activity";
+  grid-template-areas: "thumb identity repair status activity" "thumb phone repair status activity";
   align-items: center;
   gap: 16px;
   min-height: 104px;
@@ -4071,6 +4071,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .ticket-device-thumb.has-image img { display: block; }
 .ticket-device-thumb.has-image .ticket-device-fallback { display: none; }
 .ticket-identity { grid-area: identity; min-width: 0; }
+.ticket-phone-row { grid-area: phone; }
 .ticket-num {
   display: block;
   margin-bottom: 3px;
@@ -4199,6 +4200,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 /* Full-width duplicate of the phone link, shown only on the narrow mobile
    ticket-head layout where the identity column is too cramped for it. */
 .ticket-phone-row { display: none; }
+.ticket-head:not(.ticket-head-compact) .ticket-phone-row { display: block; }
 /* Tap-to-call number shown right on the card */
 .ticket-phone {
   display: flex;
@@ -4494,7 +4496,7 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 }
 .ticket-group-item.has-parts-alert,
 .ticket-group-item.has-repair-alert { --status-dot: var(--danger); }
-.ticket-head-compact { min-height: 88px; }
+.ticket-head-compact { min-height: 88px; grid-template-areas: "thumb identity repair status activity"; }
 @media (max-width: 559px) {
   .ticket-group-head { padding: 14px; }
   /* Compact rows have no phone line — drop that row from the mobile grid. */

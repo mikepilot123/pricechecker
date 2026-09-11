@@ -3380,7 +3380,6 @@
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
-        ${phoneLine}
       </div>
       <div class="ticket-phone-row">${phoneLine}</div>`;
     head.innerHTML = `
