@@ -3111,18 +3111,26 @@
       el.classList.add("is-dragging");
     });
     el.addEventListener("dragend", () => el.classList.remove("is-dragging"));
-    el.addEventListener("dragover", (event) => { event.preventDefault(); el.classList.add("is-drag-target"); });
-    el.addEventListener("dragleave", () => el.classList.remove("is-drag-target"));
+    el.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      const after = event.clientY > el.getBoundingClientRect().top + el.offsetHeight / 2;
+      el.classList.toggle("is-drag-before", !after);
+      el.classList.toggle("is-drag-after", after);
+    });
+    el.addEventListener("dragleave", () => el.classList.remove("is-drag-before", "is-drag-after"));
     el.addEventListener("drop", (event) => {
       event.preventDefault();
-      el.classList.remove("is-drag-target");
+      const placeAfter = el.classList.contains("is-drag-after");
+      el.classList.remove("is-drag-before", "is-drag-after");
       const dragged = event.dataTransfer.getData("text/plain");
       if (!dragged || dragged === status) return;
       const current = buildStatusSections(currentList()).map((section) => section.status);
       const from = current.indexOf(dragged);
-      const to = current.indexOf(status);
+      let to = current.indexOf(status);
       if (from < 0 || to < 0) return;
       current.splice(from, 1);
+      if (from < to) to -= 1;
+      if (placeAfter) to += 1;
       current.splice(to, 0, dragged);
       repairStatusOrder = current;
       try { localStorage.setItem(REPAIR_STATUS_ORDER_KEY, JSON.stringify(current)); } catch {}
@@ -3154,30 +3162,37 @@
     $("intakeError").hidden = true;
     const frag = document.createDocumentFragment();
     let shownCount = 0;
-    for (const section of sections) {
-      if (shownCount >= visibleTicketCount) break;
-      let headerAdded = false;
-      const collapsed = !!(section.status && collapsedRepairStatuses.has(section.status));
-      for (const group of section.groups) {
+    const grouped = statusFilter === "all" && sections.length > 0;
+    const allCollapsed = grouped && sections.every((section) => collapsedRepairStatuses.has(section.status));
+    if (allCollapsed) {
+      for (const section of sections) {
+        frag.appendChild(statusSectionHeaderEl(section.status, section.count, true));
+      }
+      shownCount = list.length;
+    } else {
+      for (const section of sections) {
         if (shownCount >= visibleTicketCount) break;
-        if (section.status && !headerAdded) {
-          frag.appendChild(statusSectionHeaderEl(section.status, section.count, collapsed));
-          headerAdded = true;
+        let headerAdded = false;
+        const collapsed = !!(section.status && collapsedRepairStatuses.has(section.status));
+        for (const group of section.groups) {
+          if (shownCount >= visibleTicketCount) break;
+          if (section.status && !headerAdded) {
+            frag.appendChild(statusSectionHeaderEl(section.status, section.count, collapsed));
+            headerAdded = true;
+          }
+          if (!collapsed) frag.appendChild(checkinCard(group));
+          shownCount += group.length;
         }
-        if (!collapsed) frag.appendChild(checkinCard(group));
-        shownCount += group.length;
       }
     }
     $("intakeCount").textContent = list.length
       ? `Showing ${shownCount} of ${list.length} device${list.length === 1 ? "" : "s"}`
       : "";
     const toggleAll = $("repairsToggleAll");
-    const grouped = statusFilter === "all" && sections.length > 0;
-    const allCollapsed = grouped && sections.every((section) => collapsedRepairStatuses.has(section.status));
     toggleAll.hidden = !grouped;
     toggleAll.textContent = allCollapsed ? "Expand all" : "Collapse all";
     toggleAll.setAttribute("aria-expanded", allCollapsed ? "false" : "true");
-    if (shownCount < list.length) {
+    if (!allCollapsed && shownCount < list.length) {
       const more = document.createElement("button");
       const remaining = list.length - shownCount;
       more.className = "view-more-btn";
