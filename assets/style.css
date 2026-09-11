@@ -86,7 +86,10 @@ body {
   height: 40px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--card);
+  background-color: var(--card);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%23607086' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
   color: var(--text);
   cursor: pointer;
   flex: none;
@@ -6472,16 +6475,22 @@ video.media-viewer-media {
 .parts-order-arrived-toggle:hover,
 .parts-order-arrived-toggle:focus-visible { background: #ccefdc; outline: 2px solid var(--price); outline-offset: 2px; }
 .parts-order-source-filter {
+  appearance: none;
+  -webkit-appearance: none;
   min-height: 40px;
   max-width: min(260px, 100%);
-  padding: 0 34px 0 12px;
+  padding: 0 46px 0 12px;
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--card);
   color: var(--text);
   font: 600 0.82rem var(--font-display);
   cursor: pointer;
+  outline: none;
+  box-shadow: none;
 }
+.parts-order-source-filter:focus,
+.parts-order-source-filter:focus-visible { outline: none; box-shadow: none; border-color: var(--accent); }
 .parts-order-status-cancelled { background: var(--bg-soft); color: var(--text-dim); }
 .parts-order-row.is-cancelled { opacity: 0.65; }
 .parts-order-arrived-btn {
