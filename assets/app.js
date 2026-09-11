@@ -430,6 +430,9 @@ function buildChips() {
   els.chips.innerHTML = "";
   brands.forEach((b) => {
     const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", b === activeBrand ? "true" : "false");
     btn.className = "chip" + (b === activeBrand ? " active" : "");
     btn.textContent = labels[b] || b;
     btn.onclick = () => {

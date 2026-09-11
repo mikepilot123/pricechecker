@@ -102,11 +102,11 @@
       <button type="button" class="nav-menu-toggle" id="navMenuToggle" aria-label="Open menu" aria-expanded="false" aria-controls="viewNav">
         <svg class="icon"><use href="#i-menu"></use></svg>
       </button>
-      <div class="brand"><img class="brand-logo" src="assets/branding/jq-electronics-logo.png" alt="JQ Electronics" /></div>
+      <div class="brand"><img class="brand-logo" src="assets/branding/jq-electronics-logo.png" alt="JQ Electronics" width="1125" height="537" /></div>
     </div>
-    <nav class="view-nav" id="viewNav" role="tablist" aria-label="Sections">
+    <nav class="view-nav" id="viewNav" aria-label="Sections">
       <div class="nav-drawer-header">
-        <img class="nav-drawer-logo" src="assets/branding/jq-electronics-logo.png" alt="JQ Electronics" />
+        <img class="nav-drawer-logo" src="assets/branding/jq-electronics-logo.png" alt="JQ Electronics" width="1125" height="537" />
         <button type="button" class="nav-drawer-close" id="navDrawerClose" aria-label="Close menu">
           <svg class="icon"><use href="#i-xmark"></use></svg>
         </button>
@@ -481,9 +481,9 @@
             <button id="clearBankSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
           </div>
           <div id="bankKindChips" class="filter-chips" role="tablist" aria-label="Filter bank transactions">
-            <button type="button" class="chip active" data-bank-kind="all">All</button>
-            <button type="button" class="chip" data-bank-kind="deposit">Deposits</button>
-            <button type="button" class="chip" data-bank-kind="withdrawal">Withdrawals</button>
+            <button type="button" class="chip active" data-bank-kind="all" role="tab" aria-selected="true">All</button>
+            <button type="button" class="chip" data-bank-kind="deposit" role="tab" aria-selected="false">Deposits</button>
+            <button type="button" class="chip" data-bank-kind="withdrawal" role="tab" aria-selected="false">Withdrawals</button>
           </div>
         </div>
         <div class="leads-heading-row">

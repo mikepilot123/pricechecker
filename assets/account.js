@@ -412,7 +412,7 @@
     const counts = PAYMENTS.reduce((acc, p) => { acc[p.state] = (acc[p.state] || 0) + 1; return acc; }, {});
     box.innerHTML = STATE_FILTERS.map((f) => {
       const n = f.key === "all" ? PAYMENTS.filter((p) => p.state !== "void").length : (counts[f.key] || 0);
-      return `<button type="button" class="chip${stateFilter === f.key ? " active" : ""}" data-state-filter="${f.key}" role="tab" aria-selected="${stateFilter === f.key}">${f.label}${n ? ` <span class="chip-count">${n}</span>` : ""}</button>`;
+      return `<button type="button" class="chip${stateFilter === f.key ? " active" : ""}" data-state-filter="${f.key}" role="tab" aria-selected="${stateFilter === f.key ? "true" : "false"}">${f.label}${n ? ` <span class="chip-count">${n}</span>` : ""}</button>`;
     }).join("");
   }
 

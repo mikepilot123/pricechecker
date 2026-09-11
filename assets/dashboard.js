@@ -942,7 +942,7 @@
     const used = EXPENSE_CATEGORIES.filter((c) => totals[c]);
     const chips = [{ key: "all", label: "All" }].concat(used.map((c) => ({ key: c, label: c })));
     box.innerHTML = chips.map((c) =>
-      `<button type="button" class="chip${expenseCategoryFilter === c.key ? " active" : ""}" data-expense-category="${esc(c.key)}">${esc(c.label)}</button>`
+      `<button type="button" class="chip${expenseCategoryFilter === c.key ? " active" : ""}" role="tab" aria-selected="${expenseCategoryFilter === c.key ? "true" : "false"}" data-expense-category="${esc(c.key)}">${esc(c.label)}</button>`
     ).join("");
   }
 
