@@ -312,6 +312,7 @@
 
   function partsOrderRowHtml(item, { grouped = false } = {}) {
     const canAdvance = !grouped && item.status !== "arrived" && item.status !== "cancelled";
+    const canRevertArrival = item.status === "arrived" && item.inventoryStockState !== "stocked";
     return `<tr class="inventory-row parts-order-row is-${esc(item.status)}${grouped ? " parts-order-shipment-item" : ""}">
       <td data-label="Part">
         <div class="inventory-product">
@@ -334,6 +335,7 @@
       <td data-label="Actions">
         <div class="parts-order-actions">
           ${canAdvance ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrived="${esc(item.id)}">Mark arrived</button>` : ""}
+          ${canRevertArrival ? `<button type="button" class="parts-order-unarrive-btn" data-parts-unarrive="${esc(item.id)}">Mark ordered</button>` : ""}
           ${!grouped ? paymentStatusButtonHtml(item.batchId || item.id, item.paymentStatus) : ""}
           <div class="parts-order-icon-actions">
             ${!grouped && item.sourceDocumentUrl ? `<a class="icon-btn ghost-btn" href="${esc(item.sourceDocumentUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
@@ -377,6 +379,7 @@
     const total = group.reduce((sum, i) => sum + i.totalCost, 0);
     const pdfUrl = group.find((i) => i.sourceDocumentUrl)?.sourceDocumentUrl || null;
     const pending = group.filter((i) => i.status !== "arrived" && i.status !== "cancelled");
+    const reversibleArrivals = group.filter((i) => i.status === "arrived" && i.inventoryStockState !== "stocked");
     return `<tr class="parts-order-shipment-header">
       <td colspan="8">
         <div class="parts-order-shipment-bar">
@@ -395,6 +398,7 @@
             ${pending.length
               ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrive-shipment="${esc(batchId)}">Mark shipment arrived</button>`
               : `<span class="parts-order-status-badge parts-order-status-arrived">All arrived</span>`}
+            ${reversibleArrivals.length ? `<button type="button" class="parts-order-unarrive-btn" data-parts-unarrive-shipment="${esc(batchId)}">Mark shipment ordered</button>` : ""}
           </div>
         </div>
       </td>
@@ -699,6 +703,41 @@
     }
   }
 
+  async function unmarkArrived(id) {
+    const item = PARTS_ORDERS.find((part) => part.id === id);
+    if (!item || item.status !== "arrived") return;
+    if (item.inventoryStockState === "stocked") {
+      return notifyError("This part is already in inventory and must remain marked arrived.");
+    }
+    if (!window.confirm(`Mark “${item.part}” as ordered again?`)) return;
+    try {
+      const data = await partsOrderApi({ action: "updatePartsOrder", id, status: "ordered" });
+      PARTS_ORDERS = PARTS_ORDERS.map((part) => part.id === id ? data.partsOrder : part);
+      renderPartsOrders();
+      if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Part marked ordered", { tone: "info", duration: 2500 });
+    } catch (err) {
+      notifyError("Couldn't mark that part ordered: " + err.message);
+    }
+  }
+
+  async function unmarkShipmentArrived(batchId) {
+    const arrived = PARTS_ORDERS.filter((item) =>
+      (item.batchId || item.id) === batchId && item.status === "arrived" && item.inventoryStockState !== "stocked");
+    if (!arrived.length) return;
+    const suffix = arrived.length === 1 ? "part" : "parts";
+    if (!window.confirm(`Mark ${arrived.length} ${suffix} in this shipment as ordered again?`)) return;
+    try {
+      for (const item of arrived) {
+        const data = await partsOrderApi({ action: "updatePartsOrder", id: item.id, status: "ordered" });
+        PARTS_ORDERS = PARTS_ORDERS.map((part) => part.id === item.id ? data.partsOrder : part);
+      }
+      renderPartsOrders();
+      if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(`Marked ${arrived.length} ${suffix} ordered`, { tone: "info", duration: 2500 });
+    } catch (err) {
+      notifyError("Couldn't mark the shipment ordered: " + err.message);
+    }
+  }
+
   async function renameShipment(batchId) {
     const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
     if (!group.length) return;
@@ -818,17 +857,21 @@
 
   function handlePartsOrderListClick(event) {
     const arrivedBtn = event.target.closest("[data-parts-arrived]");
+    const unarriveBtn = event.target.closest("[data-parts-unarrive]");
     const editBtn = event.target.closest("[data-parts-edit]");
     const deleteBtn = event.target.closest("[data-parts-delete]");
     const linkBtn = event.target.closest("[data-parts-link]");
     const chooseRepairBtn = event.target.closest("[data-parts-choose-repair]");
     const inventoryBtn = event.target.closest("[data-parts-inventory]");
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
+    const unarriveShipmentBtn = event.target.closest("[data-parts-unarrive-shipment]");
     const toggleBtn = event.target.closest("[data-parts-toggle-shipment]");
     const renameShipmentBtn = event.target.closest("[data-parts-rename-shipment]");
     const paymentBtn = event.target.closest("[data-parts-toggle-payment]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
+    if (unarriveBtn) { unmarkArrived(unarriveBtn.dataset.partsUnarrive); return; }
     if (shipmentBtn) { markShipmentArrived(shipmentBtn.dataset.partsArriveShipment); return; }
+    if (unarriveShipmentBtn) { unmarkShipmentArrived(unarriveShipmentBtn.dataset.partsUnarriveShipment); return; }
     if (toggleBtn) { toggleShipment(toggleBtn.dataset.partsToggleShipment); return; }
     if (renameShipmentBtn) { renameShipment(renameShipmentBtn.dataset.partsRenameShipment); return; }
     if (paymentBtn) { togglePaymentStatus(paymentBtn.dataset.partsTogglePayment); return; }
