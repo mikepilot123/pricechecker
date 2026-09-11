@@ -6491,6 +6491,17 @@ video.media-viewer-media {
 }
 .parts-order-source-filter:focus,
 .parts-order-source-filter:focus-visible { outline: none; box-shadow: none; border-color: var(--accent); }
+.parts-orders-toggle-all {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 600 0.8rem var(--font-display);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.parts-orders-toggle-all:hover,
+.parts-orders-toggle-all:focus-visible { text-decoration: underline; outline: none; }
 .parts-order-status-cancelled { background: var(--bg-soft); color: var(--text-dim); }
 .parts-order-row.is-cancelled { opacity: 0.65; }
 .parts-order-arrived-btn {

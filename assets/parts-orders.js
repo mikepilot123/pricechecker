@@ -435,6 +435,14 @@
       const header = shipmentHeaderRowHtml(group, collapsed);
       return collapsed ? header : header + group.map((item) => partsOrderRowHtml(item, { grouped: true })).join("");
     }).join("");
+    const toggleAll = $("partsOrdersToggleAll");
+    if (toggleAll) {
+      const batchIds = groupOrdersByBatch(visible).map((group) => group[0].batchId || group[0].id);
+      const allCollapsed = batchIds.length > 0 && batchIds.every((batchId) => collapsedShipments.has(batchId));
+      toggleAll.hidden = batchIds.length === 0;
+      toggleAll.textContent = allCollapsed ? "Expand all" : "Collapse all";
+      toggleAll.setAttribute("aria-expanded", allCollapsed ? "false" : "true");
+    }
     const empty = $("partsOrderEmpty");
     if (empty) {
       empty.hidden = visible.length > 0;
@@ -1168,6 +1176,15 @@
       const select = event.target.closest("#partsOrderSourceFilter");
       if (!select) return;
       try { sourceFilter = JSON.parse(select.value); } catch { sourceFilter = { type: "all", value: "" }; }
+      renderPartsOrders();
+    });
+    $("partsOrdersToggleAll")?.addEventListener("click", () => {
+      const batchIds = groupOrdersByBatch(filteredPartsOrders()).map((group) => group[0].batchId || group[0].id);
+      const collapse = batchIds.some((batchId) => !collapsedShipments.has(batchId));
+      for (const batchId of batchIds) {
+        if (collapse) collapsedShipments.add(batchId);
+        else collapsedShipments.delete(batchId);
+      }
       renderPartsOrders();
     });
 
