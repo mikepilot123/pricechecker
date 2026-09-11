@@ -356,7 +356,17 @@
       if (!groups.has(key)) { groups.set(key, []); order.push(key); }
       groups.get(key).push(item);
     }
-    return order.map((key) => groups.get(key));
+    return order
+      .map((key) => groups.get(key))
+      .sort((left, right) => {
+        const leftVendor = String(left.find((item) => item.vendor)?.vendor || "");
+        const rightVendor = String(right.find((item) => item.vendor)?.vendor || "");
+        const merchantOrder = leftVendor.localeCompare(rightVendor, undefined, { sensitivity: "base" });
+        if (merchantOrder) return merchantOrder;
+        const leftDate = String(left[0]?.orderedAt || "");
+        const rightDate = String(right[0]?.orderedAt || "");
+        return rightDate.localeCompare(leftDate);
+      });
   }
 
   function toggleShipment(batchId) {
