@@ -162,13 +162,12 @@
 
   function filteredPartsOrders() {
     return PARTS_ORDERS.filter((item) => {
-      if (statusFilter !== "all" && item.status !== statusFilter) return false;
       if (!searchQuery) return true;
       // A part linked to a repair usually has no customerName of its own —
       // that lives on the ticket — so search that too, or "search by
       // customer" would silently miss every linked part.
       const ticket = item.ticketId ? tickets.find((t) => t.id === item.ticketId) : null;
-      return [item.part, item.vendor, item.customerName, item.notes, ticket?.customerName, ticket?.device, ticket?.phone]
+      return [item.part, item.vendor, item.shipmentName, item.customerName, item.notes, ticket?.customerName, ticket?.device, ticket?.phone]
         .some((v) => String(v || "").toLowerCase().includes(searchQuery));
     });
   }
@@ -176,15 +175,8 @@
   function renderStatusChips() {
     const box = $("partsOrderStatusChips");
     if (!box) return;
-    const counts = PARTS_ORDERS.reduce((acc, item) => {
-      acc[item.status] = (acc[item.status] || 0) + 1;
-      return acc;
-    }, {});
-    const chips = [{ key: "all", label: "All", count: PARTS_ORDERS.length }].concat(
-      Object.keys(STATUS_LABELS)
-        .filter((key) => counts[key])
-        .map((key) => ({ key, label: STATUS_LABELS[key], count: counts[key] }))
-    );
+    statusFilter = "all";
+    const chips = [{ key: "all", label: "All", count: PARTS_ORDERS.length }];
     box.innerHTML = chips.map((c) => `
       <button type="button" class="inventory-stock-filter inventory-stock-filter-${esc(c.key)}${statusFilter === c.key ? " active" : ""}"
         data-parts-status-filter="${esc(c.key)}" role="tab" aria-selected="${statusFilter === c.key ? "true" : "false"}">
