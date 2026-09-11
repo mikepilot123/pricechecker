@@ -6458,6 +6458,9 @@ video.media-viewer-media {
 .parts-order-status-ordered { background: #fdf3e6; color: var(--warn); }
 .parts-order-status-backordered { background: #fdecea; color: var(--danger); }
 .parts-order-status-arrived { background: #e7f6ef; color: var(--price); }
+.parts-order-arrived-toggle { border: 0; cursor: pointer; font-family: inherit; }
+.parts-order-arrived-toggle:hover,
+.parts-order-arrived-toggle:focus-visible { background: #ccefdc; outline: 2px solid var(--price); outline-offset: 2px; }
 .parts-order-status-cancelled { background: var(--bg-soft); color: var(--text-dim); }
 .parts-order-row.is-cancelled { opacity: 0.65; }
 .parts-order-arrived-btn {

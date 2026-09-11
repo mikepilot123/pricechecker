@@ -394,7 +394,7 @@
             ${pdfUrl ? `<a class="icon-btn ghost-btn" href="${esc(pdfUrl)}" target="_blank" rel="noopener" title="View order PDF" aria-label="View order PDF"><svg class="icon"><use href="#i-receipt"></use></svg></a>` : ""}
             ${pending.length
               ? `<button type="button" class="parts-order-arrived-btn" data-parts-arrive-shipment="${esc(batchId)}">Mark shipment arrived</button>`
-              : `<span class="parts-order-status-badge parts-order-status-arrived">All arrived</span>`}
+              : `<button type="button" class="parts-order-status-badge parts-order-status-arrived parts-order-arrived-toggle" data-parts-unarrive-shipment="${esc(batchId)}" title="Mark this shipment ordered again">All arrived</button>`}
           </div>
         </div>
       </td>
@@ -699,6 +699,26 @@
     }
   }
 
+  async function unmarkShipmentArrived(batchId) {
+    const arrived = PARTS_ORDERS.filter((item) =>
+      (item.batchId || item.id) === batchId && item.status === "arrived" && item.inventoryStockState !== "stocked");
+    if (!arrived.length) {
+      notifyError("This shipment has already been added to inventory and must remain marked arrived.");
+      return;
+    }
+    if (!window.confirm(`Mark ${arrived.length} part${arrived.length === 1 ? "" : "s"} in this shipment as ordered again?`)) return;
+    try {
+      for (const item of arrived) {
+        const data = await partsOrderApi({ action: "updatePartsOrder", id: item.id, status: "ordered" });
+        PARTS_ORDERS = PARTS_ORDERS.map((part) => part.id === item.id ? data.partsOrder : part);
+      }
+      renderPartsOrders();
+      if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Shipment marked ordered", { tone: "info", duration: 2500 });
+    } catch (err) {
+      notifyError("Couldn't mark the shipment ordered: " + err.message);
+    }
+  }
+
   async function renameShipment(batchId) {
     const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
     if (!group.length) return;
@@ -824,11 +844,13 @@
     const chooseRepairBtn = event.target.closest("[data-parts-choose-repair]");
     const inventoryBtn = event.target.closest("[data-parts-inventory]");
     const shipmentBtn = event.target.closest("[data-parts-arrive-shipment]");
+    const unarriveShipmentBtn = event.target.closest("[data-parts-unarrive-shipment]");
     const toggleBtn = event.target.closest("[data-parts-toggle-shipment]");
     const renameShipmentBtn = event.target.closest("[data-parts-rename-shipment]");
     const paymentBtn = event.target.closest("[data-parts-toggle-payment]");
     if (arrivedBtn) { markArrived(arrivedBtn.dataset.partsArrived); return; }
     if (shipmentBtn) { markShipmentArrived(shipmentBtn.dataset.partsArriveShipment); return; }
+    if (unarriveShipmentBtn) { unmarkShipmentArrived(unarriveShipmentBtn.dataset.partsUnarriveShipment); return; }
     if (toggleBtn) { toggleShipment(toggleBtn.dataset.partsToggleShipment); return; }
     if (renameShipmentBtn) { renameShipment(renameShipmentBtn.dataset.partsRenameShipment); return; }
     if (paymentBtn) { togglePaymentStatus(paymentBtn.dataset.partsTogglePayment); return; }
