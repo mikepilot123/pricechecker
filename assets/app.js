@@ -43,6 +43,14 @@ const els = {
   addPriceDeviceValue: document.getElementById("addPriceDeviceValue"),
   addPriceDeviceSave: document.getElementById("addPriceDeviceSave"),
   addPriceDeviceError: document.getElementById("addPriceDeviceError"),
+  addPriceRepairModal: document.getElementById("addPriceRepairModal"),
+  closeAddPriceRepairModal: document.getElementById("closeAddPriceRepairModal"),
+  addPriceRepairModel: document.getElementById("addPriceRepairModel"),
+  addPriceRepairType: document.getElementById("addPriceRepairType"),
+  addPriceRepairValue: document.getElementById("addPriceRepairValue"),
+  addPriceRepairError: document.getElementById("addPriceRepairError"),
+  addPriceRepairSave: document.getElementById("addPriceRepairSave"),
+  addPriceRepairCancel: document.getElementById("addPriceRepairCancel"),
   commonSearchSettingsFilter: document.getElementById("commonSearchSettingsFilter"),
   commonSearchSettingsRefresh: document.getElementById("commonSearchSettingsRefresh"),
   commonSearchSettingsCount: document.getElementById("commonSearchSettingsCount"),
@@ -814,11 +822,68 @@ function card(m, expand = false) {
   } else {
     body.innerHTML = `<p class="no-prices">No set price for this model yet — please call to confirm a quote.</p>`;
   }
+  const addRepair = document.createElement("button");
+  addRepair.type = "button";
+  addRepair.className = "price-add-repair-btn";
+  addRepair.innerHTML = `<svg class="icon"><use href="#i-plus"></use></svg>Add repair`;
+  addRepair.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openAddPriceRepairModal(m);
+  });
+  body.appendChild(addRepair);
 
   head.onclick = () => el.classList.toggle("open");
   el.appendChild(head);
   el.appendChild(body);
   return el;
+}
+
+let addPriceRepairModel = null;
+
+function showAddPriceRepairError(message) {
+  if (!els.addPriceRepairError) return;
+  els.addPriceRepairError.textContent = message || "";
+  els.addPriceRepairError.hidden = !message;
+}
+
+function openAddPriceRepairModal(model) {
+  if (!storedPin()) { openPricesSetupModal(); return; }
+  addPriceRepairModel = model;
+  els.addPriceRepairModel.textContent = `Add a repair price for ${model.name}.`;
+  els.addPriceRepairType.value = "";
+  els.addPriceRepairValue.value = "";
+  showAddPriceRepairError("");
+  els.addPriceRepairModal.hidden = false;
+  els.addPriceRepairType.focus();
+}
+
+function closeAddPriceRepairModal() {
+  if (els.addPriceRepairModal) els.addPriceRepairModal.hidden = true;
+  addPriceRepairModel = null;
+}
+
+async function saveAddedPriceRepair() {
+  const model = addPriceRepairModel;
+  const type = (els.addPriceRepairType.value || "").trim().replace(/\s+/g, " ");
+  const value = (els.addPriceRepairValue.value || "").trim();
+  if (!model || !type || !value) return showAddPriceRepairError("Enter both a repair name and price.");
+  if (model.prices.some((entry) => entry.type.toLowerCase() === type.toLowerCase())) {
+    return showAddPriceRepairError("That repair already exists. Use its pencil to change the price.");
+  }
+  const button = els.addPriceRepairSave;
+  button.disabled = true;
+  showAddPriceRepairError("");
+  try {
+    const data = await savePriceEntries([{ name: model.name, brand: model.brand, entries: [{ type, value }] }], storedPin());
+    if (!data.ok) throw new Error(data.error || "Update failed");
+    closeAddPriceRepairModal();
+    await loadData({ reason: "add-price-repair" });
+    if (typeof window.RPC_TOAST === "function") window.RPC_TOAST("Repair price added", { tone: "success" });
+  } catch (error) {
+    showAddPriceRepairError("Couldn't add repair: " + error.message);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 // --- Price rows + inline pencil edit ------------------------------------------
@@ -1127,6 +1192,16 @@ els.addPriceDeviceModal?.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && e.target?.tagName === "INPUT") {
     e.preventDefault();
     saveAddedPriceDevice();
+  }
+});
+els.closeAddPriceRepairModal?.addEventListener("click", closeAddPriceRepairModal);
+els.addPriceRepairCancel?.addEventListener("click", closeAddPriceRepairModal);
+els.addPriceRepairSave?.addEventListener("click", saveAddedPriceRepair);
+els.addPriceRepairModal?.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeAddPriceRepairModal();
+  if (e.key === "Enter" && e.target?.tagName === "INPUT") {
+    e.preventDefault();
+    saveAddedPriceRepair();
   }
 });
 

@@ -1982,6 +1982,33 @@
     </div>
   </div>
 
+  <div id="addPriceRepairModal" class="modal-backdrop" hidden>
+    <div class="modal-panel modal-panel-sm" role="dialog" aria-modal="true" aria-labelledby="addPriceRepairTitle">
+      <div class="modal-header">
+        <h3 id="addPriceRepairTitle">Add repair</h3>
+        <button type="button" id="closeAddPriceRepairModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="addPriceRepairModel" class="hint"></p>
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="field-label" for="addPriceRepairType">Repair / part</label>
+            <input id="addPriceRepairType" class="text-input" type="text" autocomplete="off" placeholder="e.g. Battery replacement" />
+          </div>
+          <div class="form-field">
+            <label class="field-label" for="addPriceRepairValue">Price (TTD)</label>
+            <input id="addPriceRepairValue" class="text-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0" />
+          </div>
+        </div>
+        <p id="addPriceRepairError" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer"><div class="form-actions">
+        <button type="button" id="addPriceRepairCancel" class="ghost-btn">Cancel</button>
+        <button type="button" id="addPriceRepairSave" class="primary-btn"><svg class="icon"><use href="#i-check"></use></svg>Save repair</button>
+      </div></div>
+    </div>
+  </div>
+
   <!-- Log / edit device modal -->
   <div id="intakeFormModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="intakeFormTitle">
