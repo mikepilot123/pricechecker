@@ -563,6 +563,8 @@ body.nav-open .nav-backdrop { opacity: 1; }
   gap: 6px;
   text-align: left;
 }
+.price-name-editing { padding-right: 8px !important; }
+.price-inline-name-input { width: 100%; min-width: 0; padding: 6px 8px; font: inherit; }
 .price-val-editing .price-inline-input {
   flex: 1;
   min-width: 0;

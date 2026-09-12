@@ -916,6 +916,10 @@ function bindPriceEditBtn(rowEl, model, priceEntry) {
 function startPriceInlineEdit(rowEl, model, priceEntry) {
   if (!storedPin()) { openPricesSetupModal(); return; }
   const raw = String(priceEntry.value).replace(/[^0-9.]/g, "");
+  rowEl.querySelector(".price-name").outerHTML = `
+    <span class="price-name price-name-editing">
+      <input type="text" class="text-input price-inline-name-input" value="${escapeHtml(priceEntry.type)}" aria-label="Repair or part name" />
+    </span>`;
   rowEl.querySelector(".price-val").outerHTML = `
     <span class="price-val price-val-editing">
       <input type="text" inputmode="decimal" class="text-input price-inline-input" value="${escapeHtml(raw)}" />
@@ -924,8 +928,9 @@ function startPriceInlineEdit(rowEl, model, priceEntry) {
     </span>`;
   rowEl.querySelector("[data-edit-price]")?.remove();
   const input = rowEl.querySelector(".price-inline-input");
-  input.focus();
-  input.select();
+  const nameInput = rowEl.querySelector(".price-inline-name-input");
+  nameInput.focus();
+  nameInput.select();
   rowEl.querySelector("[data-save-price]").addEventListener("click", (e) => {
     e.stopPropagation();
     savePriceInlineEdit(rowEl, model, priceEntry);
@@ -934,14 +939,20 @@ function startPriceInlineEdit(rowEl, model, priceEntry) {
     e.stopPropagation();
     renderPriceRowStatic(rowEl, model, priceEntry);
   });
-  input.addEventListener("click", (e) => e.stopPropagation());
-  input.addEventListener("keydown", (e) => {
+  [input, nameInput].forEach((editor) => {
+    editor.addEventListener("click", (e) => e.stopPropagation());
+    editor.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); savePriceInlineEdit(rowEl, model, priceEntry); }
     if (e.key === "Escape") { e.preventDefault(); renderPriceRowStatic(rowEl, model, priceEntry); }
+    });
   });
 }
 
 function renderPriceRowStatic(rowEl, model, priceEntry) {
+  rowEl.querySelector(".price-name-editing")?.replaceWith(Object.assign(document.createElement("span"), {
+    className: "price-name",
+    innerHTML: `<button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(priceEntry.type)}${isPricePartInStock(model.name, priceEntry.type) ? `<span class="price-stock-tick" title="In stock" aria-label="In stock">✓</span>` : ""}`,
+  }));
   rowEl.querySelector(".price-val-editing")?.remove();
   rowEl.insertAdjacentHTML(
     "beforeend",
@@ -953,21 +964,33 @@ function renderPriceRowStatic(rowEl, model, priceEntry) {
 
 async function savePriceInlineEdit(rowEl, model, priceEntry) {
   const pin = storedPin();
+  const nameInput = rowEl.querySelector(".price-inline-name-input");
   const input = rowEl.querySelector(".price-inline-input");
   const saveBtn = rowEl.querySelector("[data-save-price]");
+  const type = (nameInput.value || "").trim().replace(/\s+/g, " ");
   const value = (input.value || "").trim();
-  if (!value) {
+  if (!type || !value) {
+    nameInput.classList.toggle("field-error-input", !type);
     input.classList.add("field-error-input");
+    return;
+  }
+  if (type.toLowerCase() !== priceEntry.type.toLowerCase()
+      && model.prices.some((entry) => entry !== priceEntry && entry.type.toLowerCase() === type.toLowerCase())) {
+    nameInput.classList.add("field-error-input");
     return;
   }
   saveBtn.disabled = true;
   try {
+    const entries = type === priceEntry.type
+      ? [{ type, value }]
+      : [{ type: priceEntry.type, value: "" }, { type, value }];
     const data = await savePriceEntries([
-      { name: model.name, brand: model.brand, entries: [{ type: priceEntry.type, value }] },
+      { name: model.name, brand: model.brand, entries },
     ], pin);
     if (!data.ok) throw new Error(data.error || "Update failed");
     // Optimistic local update so the row reflects the new value immediately;
     // still reload in the background to reconcile formatting.
+    priceEntry.type = type;
     priceEntry.value = value;
     renderPriceRowStatic(rowEl, model, priceEntry);
     loadData({ reason: "price-edit" });
