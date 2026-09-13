@@ -15,15 +15,23 @@ const { ensureSchema } = await import("../lib/db.js");
 await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
 const { addBankTransaction, updateBankTransaction, deleteBankTransaction, listBankTransactions, bankAccountSummary } = await import("../lib/bank-transactions.js");
+const { listExpenses } = await import("../lib/expenses.js");
 
 const deposit = await addBankTransaction({ kind: "deposit", amount: 1500, occurredAt: new Date().toISOString(), category: "Opening balance", reference: "OPEN" });
 const withdrawal = await addBankTransaction({ kind: "withdrawal", amount: 225.5, occurredAt: new Date().toISOString(), category: "Inventory" });
 assert.equal((await bankAccountSummary()).balance, 1274.5);
 assert.equal((await listBankTransactions()).length, 2);
+let expenses = await listExpenses();
+assert.equal(expenses.length, 1);
+assert.equal(expenses[0].vendor, "Inventory");
+assert.equal(expenses[0].amount, 225.5);
 
 const edited = await updateBankTransaction({ id: withdrawal.id, amount: 200, notes: "Corrected" });
 assert.equal(edited.notes, "Corrected");
 assert.equal((await bankAccountSummary()).balance, 1300);
+expenses = await listExpenses();
+assert.equal(expenses[0].amount, 200);
+assert.equal(expenses[0].notes, "Corrected");
 
 await assert.rejects(addBankTransaction({ kind: "transfer", amount: 10 }), /deposit or withdrawal/);
 await assert.rejects(addBankTransaction({ kind: "deposit", amount: 0 }), /greater than zero/);
