@@ -587,8 +587,10 @@
     <p class="info-banner">Track parts ordered from suppliers, then assign them to a repair or add them to inventory.</p>
     <div class="inventory-add-row">
       <button type="button" id="partsOrderUploadBtn" class="ghost-btn"><svg class="icon"><use href="#i-upload"></use></svg>Upload order PDF</button>
+      <button type="button" id="partsOrderCsvUploadBtn" class="ghost-btn" title="CSV columns: part, quantity, unit_cost, vendor, shipment_name"><svg class="icon"><use href="#i-upload"></use></svg>Import CSV (no AI)</button>
       <button type="button" id="partsOrderNewBtn" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add part</button>
       <input id="partsOrderPdfInput" type="file" accept="application/pdf" hidden />
+      <input id="partsOrderCsvInput" type="file" accept=".csv,text/csv" hidden />
     </div>
     <div class="inventory-summary" id="partsOrderSummary" aria-live="polite"></div>
     <section class="inventory-table-shell">
@@ -623,7 +625,7 @@
     <div id="partsOrderEmpty" class="empty-state" hidden>
       <div class="empty-icon"><svg class="icon"><use href="#i-search"></use></svg></div>
       <p class="empty-title" id="partsOrderEmptyTitle">No parts ordered yet</p>
-      <p class="empty-sub">Upload an order PDF or add one by hand.</p>
+      <p class="empty-sub">Import an order CSV without AI, upload a PDF, or add one by hand.</p>
     </div>
   </main>
 
@@ -905,7 +907,7 @@
     </div>
   </div>
 
-  <!-- Parts order PDF upload/review modal -->
+  <!-- Parts order PDF/CSV upload review modal -->
   <div id="partsOrderReviewModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="partsOrderReviewTitle">
       <div class="modal-header">
@@ -999,6 +1001,15 @@
             <div class="form-field form-field-full">
               <label class="field-label" for="bankTransactionNotes">Notes</label>
               <textarea id="bankTransactionNotes" class="text-input" rows="2" placeholder="Optional details"></textarea>
+            </div>
+            <div class="form-field form-field-full" id="bankWithdrawalExpenseField" hidden>
+              <label class="reclaim-toggle" for="bankWithdrawalExpense">
+                <input id="bankWithdrawalExpense" type="checkbox" />
+                <span>
+                  <strong>Also add this withdrawal as an expense</strong>
+                  <small>Uses the same date, amount, category, reference, and notes.</small>
+                </span>
+              </label>
             </div>
           </div>
           <p id="bankTransactionMessage" class="field-error" hidden></p>

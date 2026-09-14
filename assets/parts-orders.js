@@ -43,6 +43,8 @@
 
   let reviewBatchId = null;
   let reviewUploadUrl = null;
+  let reviewSource = "pdf";
+  let reviewSourceLabel = "PDF";
   let reviewRows = [];
   let formTicketCombobox = null;
   let reviewTicketCombobox = null;
@@ -977,10 +979,11 @@
     });
   }
 
-  /* ---- PDF upload + AI-extraction review -------------------------------
+  /* ---- PDF/CSV upload review --------------------------------------------
      Supplier PDFs are small, so they travel to the server in the existing
-     PIN-protected request and Gemini reads them there. Nothing is saved to
-     parts_orders until the reviewed rows are explicitly confirmed here. */
+     PIN-protected request and Gemini reads them there. CSV files are parsed
+     entirely in the browser and never invoke an AI model. Nothing is saved
+     to parts_orders until the reviewed rows are explicitly confirmed here. */
   function resetReviewState() {
     reviewRows = [];
     reviewUploadUrl = null;
@@ -1067,6 +1070,9 @@
       return;
     }
     resetReviewState();
+    reviewSource = "pdf";
+    reviewSourceLabel = "PDF";
+    $("partsOrderReviewTitle").textContent = "Review parts from PDF";
     openReviewModal();
     ensureCustomersLoaded();
     $("partsOrderReviewStatus").textContent = "Reading the PDF…";
@@ -1094,6 +1100,46 @@
     }
   }
 
+  async function handleCsvSelected(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!/\.csv$/i.test(file.name) && file.type !== "text/csv") {
+      notifyError("Please choose a CSV file.");
+      return;
+    }
+    if (!pin()) {
+      notifyError("Enter Check In PIN first.");
+      return;
+    }
+    resetReviewState();
+    reviewSource = "csv";
+    reviewSourceLabel = "CSV";
+    $("partsOrderReviewTitle").textContent = "Review parts from CSV";
+    openReviewModal();
+    ensureCustomersLoaded();
+    $("partsOrderReviewStatus").textContent = "Reading the CSV…";
+    try {
+      if (typeof window.RPC_PARSE_PARTS_ORDER_CSV !== "function") {
+        throw new Error("The CSV importer did not load. Refresh the app and try again.");
+      }
+      reviewBatchId = "PO" + crypto.randomUUID();
+      const extracted = window.RPC_PARSE_PARTS_ORDER_CSV(await file.text());
+      reviewRows = extracted.parts;
+      $("partsOrderReviewVendor").value = extracted.vendor || "";
+      $("partsOrderReviewShipmentName").value = extracted.shipmentName || "";
+      renderReviewRows();
+      const suggested = suggestReviewTicket();
+      if (suggested) reviewTicketCombobox?.set(suggested.id, ticketLabel(suggested));
+      $("partsOrderReviewStatus").hidden = true;
+      $("partsOrderReviewForm").hidden = false;
+      $("partsOrderReviewSaveBtn").disabled = false;
+    } catch (err) {
+      $("partsOrderReviewStatus").hidden = false;
+      $("partsOrderReviewStatus").textContent = "Couldn't read that CSV: " + err.message;
+    }
+  }
+
   async function saveReviewRows() {
     const message = $("partsOrderReviewMessage");
     message.hidden = true;
@@ -1117,7 +1163,7 @@
       for (const row of rows) {
         const data = await partsOrderApi({
           action: "addPartsOrder", batchId: reviewBatchId, vendor, shipmentName, part: row.part.trim(), quantity: row.quantity,
-          unitCost: row.unitCost, customerName, customerPhone, ticketId, source: "pdf", sourceDocumentUrl: reviewUploadUrl,
+          unitCost: row.unitCost, customerName, customerPhone, ticketId, source: reviewSource, sourceDocumentUrl: reviewUploadUrl,
         });
         saved.push(data.partsOrder);
       }
@@ -1125,7 +1171,7 @@
       renderPartsOrders();
       closeReviewModal();
       if (typeof window.RPC_TOAST === "function") {
-        window.RPC_TOAST(`Added ${saved.length} part${saved.length === 1 ? "" : "s"} from the PDF`, { tone: "info", duration: 3000 });
+        window.RPC_TOAST(`Added ${saved.length} part${saved.length === 1 ? "" : "s"} from the ${reviewSourceLabel}`, { tone: "info", duration: 3000 });
       }
       if (ticketId) markTicketPartOrdered(ticketId);
       syncShipmentExpense(reviewBatchId);
@@ -1190,6 +1236,8 @@
 
     $("partsOrderUploadBtn")?.addEventListener("click", () => $("partsOrderPdfInput")?.click());
     $("partsOrderPdfInput")?.addEventListener("change", handlePdfSelected);
+    $("partsOrderCsvUploadBtn")?.addEventListener("click", () => $("partsOrderCsvInput")?.click());
+    $("partsOrderCsvInput")?.addEventListener("change", handleCsvSelected);
     $("closePartsOrderReviewModal")?.addEventListener("click", closeReviewModal);
     $("partsOrderReviewCancelBtn")?.addEventListener("click", closeReviewModal);
     $("partsOrderReviewSaveBtn")?.addEventListener("click", saveReviewRows);

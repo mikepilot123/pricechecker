@@ -465,7 +465,7 @@
       renderExpenses();
       refreshExpenseDependents();
       if (typeof window.RPC_TOAST === "function") {
-        window.RPC_TOAST(undo ? "Last collection undone" : "Fully collected", { tone: "info", duration: 3000 });
+        window.RPC_TOAST(undo ? "Last collection and bank withdrawal undone" : "Fully collected · bank withdrawal recorded", { tone: "info", duration: 3000 });
       }
     } catch (err) {
       notifyExpenseError("Couldn't update collection: " + err.message);
@@ -563,7 +563,7 @@
       $("expenseCollectionNotes").value = "";
       $("expenseCollectionDate").value = toDatetimeLocal(new Date().toISOString());
       refreshExpenseDependents();
-      $("expenseCollectionStatus").textContent = `${payload.action === "undoExpenseCollection" ? "Collection undone" : "Collection recorded"} · ${expenseMoney(remainingAmount(data.expense))} remaining`;
+      $("expenseCollectionStatus").textContent = `${payload.action === "undoExpenseCollection" ? "Collection and bank withdrawal undone" : "Collection and bank withdrawal recorded"} · ${expenseMoney(remainingAmount(data.expense))} remaining`;
     } catch (err) {
       message.textContent = err.message;
       message.hidden = false;

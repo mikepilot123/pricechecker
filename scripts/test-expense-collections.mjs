@@ -18,6 +18,7 @@ for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migr
 const { addExpense, updateExpense, listExpenses, addExpenseCollection, undoExpenseCollection, deleteExpense } = await import("../lib/expenses.js");
 const { updateReminder, listReminders } = await import("../lib/reminders.js");
 const { accountSummary } = await import("../lib/card-payments.js");
+const { listBankTransactions } = await import("../lib/bank-transactions.js");
 const { default: handler } = await import("../api/intake.js");
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log("  ok  " + name); }
@@ -34,11 +35,14 @@ await test("first partial payment reduces debt, preserving the original expense"
   assert.equal((await reminder()).done, false);
   assert.match((await reminder()).title, /749\.75/);
   assert.equal((await accountSummary()).expenseReclaim.total, 749.75);
+  const [withdrawal] = await listBankTransactions();
+  assert.deepEqual([withdrawal.id, withdrawal.kind, withdrawal.amount], ["BANK_COLLECTION_expense-test_first", "withdrawal", 250.25]);
 });
 await test("retrying the same receipt is idempotent", async () => {
   const e = await collect("first", 250.25, { notes: "Cash" });
   assert.equal(e.collectedAmount, 250.25);
   assert.equal(e.collections.length, 1);
+  assert.equal((await listBankTransactions()).length, 1);
   await assert.rejects(collect("first", 300), /different details/);
 });
 await test("invalid or excessive collections are rejected without changing the balance", async () => {
@@ -61,6 +65,7 @@ await test("the final collection settles both the expense and reminder", async (
   assert.equal((await reminder()).done, true);
   assert.equal((await reminder()).amount, 0);
   assert.equal((await accountSummary()).expenseReclaim.total, 0);
+  assert.deepEqual((await listBankTransactions()).map((item) => item.amount).sort((a, b) => a - b), [250.25, 749.75]);
   await assert.rejects(collect("extra", 0.01), /exceeds/);
 });
 await test("undo restores only that receipt and retains its history", async () => {
@@ -68,6 +73,7 @@ await test("undo restores only that receipt and retains its history", async () =
   assert.equal(e.collectedAmount, 250.25);
   assert.equal(e.remainingAmount, 749.75);
   assert.ok(e.collections.find((c) => c.id === "final").voidedAt);
+  assert.deepEqual((await listBankTransactions()).map((item) => item.amount), [250.25]);
   assert.equal((await reminder()).done, false);
   assert.equal((await reminder()).amount, 749.75);
   e = await undoExpenseCollection({ id: expense.id, collectionId: "final" });
@@ -78,9 +84,11 @@ await test("undo restores only that receipt and retains its history", async () =
 await test("reminder completion collects the remainder and reopening preserves earlier payments", async () => {
   await updateReminder({ id: "CASHBACK:" + expense.id, done: true });
   assert.equal((await current()).collectedAmount, 1000);
+  assert.equal((await listBankTransactions()).length, 2);
   assert.equal((await reminder()).amount, 0);
   await updateReminder({ id: "CASHBACK:" + expense.id, done: false });
   assert.equal((await current()).collectedAmount, 250.25);
+  assert.equal((await listBankTransactions()).length, 1);
   assert.equal((await reminder()).amount, 749.75);
 });
 await test("disabling cash reclaim does not erase receipts, and re-enabling restores the debt", async () => {
@@ -122,6 +130,7 @@ await test("collection and reminder roll back together on a database error", asy
   await db.exec('DROP TRIGGER reject_collection_reminder ON reminders; DROP FUNCTION reject_collection_reminder();');
   assert.equal((await current()).remainingAmount, 100);
   assert.equal((await current()).collections.some((c) => c.id === "rolled-back"), false);
+  assert.equal((await listBankTransactions()).some((item) => item.id === "BANK_COLLECTION_expense-test_rolled-back"), false);
 });
 await test("simultaneous collection requests cannot overwrite or over-collect", async () => {
   const results = await Promise.allSettled([collect("concurrent-a", 60), collect("concurrent-b", 60)]);

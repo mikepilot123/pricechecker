@@ -3,6 +3,7 @@
 // response parser.
 import { registerHooks } from "node:module";
 import { readFileSync, readdirSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import assert from "node:assert/strict";
 const standin = new URL("./testing/neon-pglite.mjs", import.meta.url).href;
 registerHooks({ resolve(specifier, context, nextResolve) {
@@ -25,6 +26,9 @@ const {
 const { listCustomers } = await import("../lib/customers.js");
 const { extractPartsFromPdf, parseExtractionResult } = await import("../lib/parts-order-extraction.js");
 const { default: handler } = await import("../api/intake.js");
+const csvSandbox = { window: {} };
+runInNewContext(readFileSync(new URL("../assets/parts-order-csv.js", import.meta.url), "utf8"), csvSandbox);
+const parsePartsOrderCsv = csvSandbox.window.RPC_PARSE_PARTS_ORDER_CSV;
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log("  ok  " + name); }
 
@@ -213,6 +217,31 @@ await test("malformed or missing-shape responses are rejected, not silently acce
 await test("a missing/invalid quantity or cost in a line item falls back sanely rather than throwing", () => {
   const result = parseExtractionResult(JSON.stringify({ parts: [{ part: "Screw kit", quantity: -1, unitCost: "N/A" }] }));
   assert.deepEqual(result.parts, [{ part: "Screw kit", quantity: 1, unitCost: 0 }]);
+});
+
+// ---- Manual CSV import (browser-only, no model/API call) ----
+await test("CSV import accepts standard columns, aliases, quoted commas, and currency", () => {
+  const result = parsePartsOrderCsv(
+    '\uFEFFdescription,qty,price,supplier,shipment name\n"Pixel 7 screen, OLED",2,"$45.50",MobileSentrix,September order\nBattery,3,12.999,,\n'
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    vendor: "MobileSentrix",
+    shipmentName: "September order",
+    parts: [
+      { part: "Pixel 7 screen, OLED", quantity: 2, unitCost: 45.5 },
+      { part: "Battery", quantity: 3, unitCost: 13 },
+    ],
+  });
+});
+
+await test("CSV import defaults optional quantity and cost without using AI", () => {
+  const result = parsePartsOrderCsv("part\nPixel 6 battery\n");
+  assert.deepEqual(JSON.parse(JSON.stringify(result.parts)), [{ part: "Pixel 6 battery", quantity: 1, unitCost: 0 }]);
+});
+
+await test("CSV import reports missing headers and incomplete rows", () => {
+  assert.throws(() => parsePartsOrderCsv("quantity,cost\n1,5\n"), /part.*column/i);
+  assert.throws(() => parsePartsOrderCsv("part,quantity\n,1\n"), /Row 2.*missing/i);
 });
 
 console.log(`PASS — ${passed} parts order scenarios`);
