@@ -161,7 +161,9 @@
       const result = partsFromRows(sheetRows(await zipXml(entries, path), sharedStrings));
       if (result) return result;
     }
-    throw new Error('No sheet has a "part" column with at least one item. "item" or "description" also works.');
+    const error = new Error('No sheet has a "part" column with at least one item. "item" or "description" also works.');
+    error.code = "NO_PART_COLUMN";
+    throw error;
   }
 
   window.RPC_PARSE_PARTS_ORDER_XLSX = parsePartsOrderXlsx;

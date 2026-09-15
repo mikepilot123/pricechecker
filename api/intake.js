@@ -253,7 +253,7 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
-    return res.status(200).json({ ok: false, error: String((err && err.message) || err) });
+    return res.status(200).json({ ok: false, error: String((err && err.message) || err), ...(err?.code ? { code: err.code } : {}) });
   }
 }
 

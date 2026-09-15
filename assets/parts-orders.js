@@ -78,7 +78,11 @@
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "Rejected");
+    if (!data.ok) {
+      const error = new Error(data.error || "Rejected");
+      error.code = data.code || "";
+      throw error;
+    }
     return data;
   }
 
@@ -1095,8 +1099,18 @@
       $("partsOrderReviewForm").hidden = false;
       $("partsOrderReviewSaveBtn").disabled = false;
     } catch (err) {
-      $("partsOrderReviewStatus").hidden = false;
-      $("partsOrderReviewStatus").textContent = "Couldn't read that PDF: " + err.message;
+      if (err.code === "AI_TEMPORARILY_UNAVAILABLE") {
+        reviewRows = [{ part: "", quantity: 1, unitCost: 0 }];
+        renderReviewRows();
+        $("partsOrderReviewStatus").textContent = err.message;
+        $("partsOrderReviewStatus").hidden = false;
+        $("partsOrderReviewForm").hidden = false;
+        $("partsOrderReviewSaveBtn").disabled = false;
+        $("partsOrderReviewRows").querySelector('[data-review-field="part"]')?.focus();
+      } else {
+        $("partsOrderReviewStatus").hidden = false;
+        $("partsOrderReviewStatus").textContent = "Couldn't read that PDF: " + err.message;
+      }
     }
   }
 
@@ -1139,8 +1153,18 @@
       $("partsOrderReviewForm").hidden = false;
       $("partsOrderReviewSaveBtn").disabled = false;
     } catch (err) {
-      $("partsOrderReviewStatus").hidden = false;
-      $("partsOrderReviewStatus").textContent = "Couldn't read that workbook: " + err.message;
+      if (err.code === "NO_PART_COLUMN") {
+        reviewRows = [{ part: "", quantity: 1, unitCost: 0 }];
+        renderReviewRows();
+        $("partsOrderReviewStatus").textContent = "Couldn't match a parts column in this workbook. Enter the parts manually below, or add a Part, Item, or Description column to the workbook and import it again.";
+        $("partsOrderReviewStatus").hidden = false;
+        $("partsOrderReviewForm").hidden = false;
+        $("partsOrderReviewSaveBtn").disabled = false;
+        $("partsOrderReviewRows").querySelector('[data-review-field="part"]')?.focus();
+      } else {
+        $("partsOrderReviewStatus").hidden = false;
+        $("partsOrderReviewStatus").textContent = "Couldn't read that workbook: " + err.message;
+      }
     }
   }
 

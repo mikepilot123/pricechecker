@@ -191,6 +191,51 @@ await test("PDF extraction sends the PDF to Gemini and reads its structured JSON
   }
 });
 
+await test("temporary AI outages are retried before PDF extraction succeeds", async () => {
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) return new Response(JSON.stringify({ error: { code: 503, message: "high demand" } }), { status: 503 });
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ vendor: "Supplier", parts: [{ part: "Screen", quantity: 1, unitCost: 25 }] }) }] } }] }), { status: 200 });
+  };
+  try {
+    const result = await extractPartsFromPdf("cGRmLWJ5dGVz");
+    assert.equal(calls, 2);
+    assert.equal(result.parts[0].part, "Screen");
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.GEMINI_API_KEY;
+  }
+});
+
+await test("persistent AI 503 returns a short fallback message, not raw service JSON", async () => {
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response(JSON.stringify({ error: { code: 503, message: "This model is currently experiencing high demand" } }), { status: 503 });
+  };
+  try {
+    await assert.rejects(extractPartsFromPdf("cGRmLWJ5dGVz"), (error) => {
+      assert.equal(error.code, "AI_TEMPORARILY_UNAVAILABLE");
+      assert.match(error.message, /enter the parts manually/i);
+      assert.doesNotMatch(error.message, /HTTP 503|high demand|UNAVAILABLE/);
+      return true;
+    });
+    assert.equal(calls, 3);
+    const viaApi = await api({ pin: "0000", action: "extractPartsOrderPdf", pdfBase64: "cGRmLWJ5dGVz" });
+    assert.equal(viaApi.payload.ok, false);
+    assert.equal(viaApi.payload.code, "AI_TEMPORARILY_UNAVAILABLE");
+    assert.match(viaApi.payload.error, /enter the parts manually/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.GEMINI_API_KEY;
+  }
+});
+
 // ---- PDF-extraction response parsing (no network, no real PDF) ----
 await test("a well-formed extraction response parses into clean line items", () => {
   const result = parseExtractionResult(JSON.stringify({
@@ -322,7 +367,11 @@ await test("Excel import reports invalid workbooks and incomplete rows", async (
 
 await test("Excel import reports missing part columns", async () => {
   const sheet = '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>quantity</t></is></c></row><row r="2"><c r="A2"><v>1</v></c></row></sheetData></worksheet>';
-  await assert.rejects(parsePartsOrderXlsx(workbook(sheet)), /part.*column/i);
+  await assert.rejects(parsePartsOrderXlsx(workbook(sheet)), (error) => {
+    assert.equal(error.code, "NO_PART_COLUMN");
+    assert.match(error.message, /part.*column/i);
+    return true;
+  });
 });
 
 console.log(`PASS — ${passed} parts order scenarios`);
