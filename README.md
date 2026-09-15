@@ -9,12 +9,13 @@ a published Google Sheet; inventory pulls from a Google Sheet.
 
 ## Supplier order import
 
-The Parts Orders panel can import a CSV entirely in the browser, without an
-AI model or API key. Use a header row with `part` (required), plus any of
+The Parts Orders panel can import an Excel `.xlsx` workbook entirely in the
+browser, without an AI model or API key. Use a header row with `part` (required), plus any of
 `quantity`, `unit_cost`, `vendor`, and `shipment_name`. Common alternatives
 such as `item`, `description`, `qty`, `price`, and `supplier` are accepted.
-The imported rows open in the same editable review screen and are not saved
-until **Save parts** is selected.
+The importer checks the workbook's sheets for that header row. Imported rows
+open in the same editable review screen and are not saved until **Save parts**
+is selected.
 
 The Parts Orders panel can read a supplier order-confirmation PDF into an
 editable list of parts. It uses the Gemini Developer API from the Vercel API

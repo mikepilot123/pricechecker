@@ -4,6 +4,7 @@
 import { registerHooks } from "node:module";
 import { readFileSync, readdirSync } from "node:fs";
 import { runInNewContext } from "node:vm";
+import { deflateRawSync } from "node:zlib";
 import assert from "node:assert/strict";
 const standin = new URL("./testing/neon-pglite.mjs", import.meta.url).href;
 registerHooks({ resolve(specifier, context, nextResolve) {
@@ -26,9 +27,9 @@ const {
 const { listCustomers } = await import("../lib/customers.js");
 const { extractPartsFromPdf, parseExtractionResult } = await import("../lib/parts-order-extraction.js");
 const { default: handler } = await import("../api/intake.js");
-const csvSandbox = { window: {} };
-runInNewContext(readFileSync(new URL("../assets/parts-order-csv.js", import.meta.url), "utf8"), csvSandbox);
-const parsePartsOrderCsv = csvSandbox.window.RPC_PARSE_PARTS_ORDER_CSV;
+const xlsxSandbox = { window: {}, TextDecoder, Uint8Array, DataView, Blob, Response, DecompressionStream };
+runInNewContext(readFileSync(new URL("../assets/parts-order-xlsx.js", import.meta.url), "utf8"), xlsxSandbox);
+const parsePartsOrderXlsx = xlsxSandbox.window.RPC_PARSE_PARTS_ORDER_XLSX;
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log("  ok  " + name); }
 
@@ -219,11 +220,60 @@ await test("a missing/invalid quantity or cost in a line item falls back sanely 
   assert.deepEqual(result.parts, [{ part: "Screw kit", quantity: 1, unitCost: 0 }]);
 });
 
-// ---- Manual CSV import (browser-only, no model/API call) ----
-await test("CSV import accepts standard columns, aliases, quoted commas, and currency", () => {
-  const result = parsePartsOrderCsv(
-    '\uFEFFdescription,qty,price,supplier,shipment name\n"Pixel 7 screen, OLED",2,"$45.50",MobileSentrix,September order\nBattery,3,12.999,,\n'
-  );
+// ---- Browser-only Excel import (no model/API call) ----
+function testXlsx(files, compressed = true) {
+  const local = [], central = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(files)) {
+    const nameBytes = Buffer.from(name);
+    const raw = Buffer.from(content);
+    const data = compressed ? deflateRawSync(raw) : raw;
+    const method = compressed ? 8 : 0;
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(method, 8);
+    header.writeUInt32LE(data.length, 18);
+    header.writeUInt32LE(raw.length, 22);
+    header.writeUInt16LE(nameBytes.length, 26);
+    local.push(header, nameBytes, data);
+    const directory = Buffer.alloc(46);
+    directory.writeUInt32LE(0x02014b50, 0);
+    directory.writeUInt16LE(method, 10);
+    directory.writeUInt32LE(data.length, 20);
+    directory.writeUInt32LE(raw.length, 24);
+    directory.writeUInt16LE(nameBytes.length, 28);
+    directory.writeUInt32LE(offset, 42);
+    central.push(directory, nameBytes);
+    offset += header.length + nameBytes.length + data.length;
+  }
+  const centralBytes = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(Object.keys(files).length, 8);
+  end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt32LE(centralBytes.length, 12);
+  end.writeUInt32LE(offset, 16);
+  const bytes = Buffer.concat([...local, centralBytes, end]);
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+}
+
+function workbook(sheetXml, extras = {}, compressed = true) {
+  return testXlsx({
+    "xl/workbook.xml": '<workbook><sheets><sheet name="Orders" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels": '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+    "xl/worksheets/sheet1.xml": sheetXml,
+    ...extras,
+  }, compressed);
+}
+
+await test("Excel import accepts shared strings, aliases, quoted commas, and numeric costs", async () => {
+  const shared = '<sst><si><t>description</t></si><si><t>qty</t></si><si><t>price</t></si><si><t>supplier</t></si><si><t>shipment name</t></si><si><t>Pixel 7 screen, OLED</t></si><si><t>MobileSentrix</t></si><si><t>September order</t></si><si><t>Battery</t></si></sst>';
+  const sheet = '<worksheet><sheetData>'
+    + '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c><c r="D1" t="s"><v>3</v></c><c r="E1" t="s"><v>4</v></c></row>'
+    + '<row r="2"><c r="A2" t="s"><v>5</v></c><c r="B2"><v>2</v></c><c r="C2"><v>45.50</v></c><c r="D2" t="s"><v>6</v></c><c r="E2" t="s"><v>7</v></c></row>'
+    + '<row r="3"><c r="A3" t="s"><v>8</v></c><c r="B3"><v>3</v></c><c r="C3"><v>12.999</v></c></row>'
+    + '</sheetData></worksheet>';
+  const result = await parsePartsOrderXlsx(workbook(sheet, { "xl/sharedStrings.xml": shared }));
   assert.deepEqual(JSON.parse(JSON.stringify(result)), {
     vendor: "MobileSentrix",
     shipmentName: "September order",
@@ -234,14 +284,45 @@ await test("CSV import accepts standard columns, aliases, quoted commas, and cur
   });
 });
 
-await test("CSV import defaults optional quantity and cost without using AI", () => {
-  const result = parsePartsOrderCsv("part\nPixel 6 battery\n");
-  assert.deepEqual(JSON.parse(JSON.stringify(result.parts)), [{ part: "Pixel 6 battery", quantity: 1, unitCost: 0 }]);
+await test("Excel import reads inline strings and defaults optional quantity and cost", async () => {
+  const sheet = '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>part</t></is></c></row>'
+    + '<row r="2"><c r="A2" t="inlineStr"><is><t>Pixel 6 &amp; 6a battery</t></is></c></row></sheetData></worksheet>';
+  const result = await parsePartsOrderXlsx(workbook(sheet, {}, false));
+  assert.deepEqual(JSON.parse(JSON.stringify(result.parts)), [{ part: "Pixel 6 & 6a battery", quantity: 1, unitCost: 0 }]);
 });
 
-await test("CSV import reports missing headers and incomplete rows", () => {
-  assert.throws(() => parsePartsOrderCsv("quantity,cost\n1,5\n"), /part.*column/i);
-  assert.throws(() => parsePartsOrderCsv("part,quantity\n,1\n"), /Row 2.*missing/i);
+await test("Excel import finds a parts sheet after a cover sheet", async () => {
+  const cover = '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Supplier order</t></is></c></row></sheetData></worksheet>';
+  const orders = '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>item</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Screen</t></is></c></row></sheetData></worksheet>';
+  const files = {
+    "xl/workbook.xml": '<workbook><sheets><sheet name="Cover" sheetId="1" r:id="rId1"/><sheet name="Orders" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels": '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>',
+    "xl/worksheets/sheet1.xml": cover,
+    "xl/worksheets/sheet2.xml": orders,
+  };
+  const result = await parsePartsOrderXlsx(testXlsx(files));
+  assert.equal(result.parts[0].part, "Screen");
+});
+
+await test("Excel import accepts a title row above the header", async () => {
+  const sheet = '<worksheet><sheetData>'
+    + '<row r="1"><c r="A1" t="inlineStr"><is><t>September supplier order</t></is></c></row>'
+    + '<row r="3"><c r="A3" t="inlineStr"><is><t>Part</t></is></c><c r="B3" t="inlineStr"><is><t>Quantity</t></is></c></row>'
+    + '<row r="4"><c r="A4" t="inlineStr"><is><t>Pixel display</t></is></c><c r="B4"><v>2</v></c></row>'
+    + '</sheetData></worksheet>';
+  const result = await parsePartsOrderXlsx(workbook(sheet));
+  assert.deepEqual(JSON.parse(JSON.stringify(result.parts)), [{ part: "Pixel display", quantity: 2, unitCost: 0 }]);
+});
+
+await test("Excel import reports invalid workbooks and incomplete rows", async () => {
+  await assert.rejects(parsePartsOrderXlsx(new Uint8Array([1, 2, 3]).buffer), /valid.*xlsx/i);
+  const sheet = '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>part</t></is></c></row><row r="2"><c r="B2"><v>1</v></c></row></sheetData></worksheet>';
+  await assert.rejects(parsePartsOrderXlsx(workbook(sheet)), /Row 2.*missing/i);
+});
+
+await test("Excel import reports missing part columns", async () => {
+  const sheet = '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>quantity</t></is></c></row><row r="2"><c r="A2"><v>1</v></c></row></sheetData></worksheet>';
+  await assert.rejects(parsePartsOrderXlsx(workbook(sheet)), /part.*column/i);
 });
 
 console.log(`PASS — ${passed} parts order scenarios`);

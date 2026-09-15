@@ -979,9 +979,9 @@
     });
   }
 
-  /* ---- PDF/CSV upload review --------------------------------------------
+  /* ---- PDF/XLSX upload review -------------------------------------------
      Supplier PDFs are small, so they travel to the server in the existing
-     PIN-protected request and Gemini reads them there. CSV files are parsed
+     PIN-protected request and Gemini reads them there. XLSX files are parsed
      entirely in the browser and never invoke an AI model. Nothing is saved
      to parts_orders until the reviewed rows are explicitly confirmed here. */
   function resetReviewState() {
@@ -1100,12 +1100,16 @@
     }
   }
 
-  async function handleCsvSelected(event) {
+  async function handleXlsxSelected(event) {
     const file = event.target.files && event.target.files[0];
     event.target.value = "";
     if (!file) return;
-    if (!/\.csv$/i.test(file.name) && file.type !== "text/csv") {
-      notifyError("Please choose a CSV file.");
+    if (!/\.xlsx$/i.test(file.name)) {
+      notifyError("Please choose an Excel .xlsx file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      notifyError("That workbook is over 8MB. Split it, then try again.");
       return;
     }
     if (!pin()) {
@@ -1113,18 +1117,18 @@
       return;
     }
     resetReviewState();
-    reviewSource = "csv";
-    reviewSourceLabel = "CSV";
-    $("partsOrderReviewTitle").textContent = "Review parts from CSV";
+    reviewSource = "xlsx";
+    reviewSourceLabel = "Excel";
+    $("partsOrderReviewTitle").textContent = "Review parts from Excel";
     openReviewModal();
     ensureCustomersLoaded();
-    $("partsOrderReviewStatus").textContent = "Reading the CSV…";
+    $("partsOrderReviewStatus").textContent = "Reading the workbook…";
     try {
-      if (typeof window.RPC_PARSE_PARTS_ORDER_CSV !== "function") {
-        throw new Error("The CSV importer did not load. Refresh the app and try again.");
+      if (typeof window.RPC_PARSE_PARTS_ORDER_XLSX !== "function") {
+        throw new Error("The Excel importer did not load. Refresh the app and try again.");
       }
       reviewBatchId = "PO" + crypto.randomUUID();
-      const extracted = window.RPC_PARSE_PARTS_ORDER_CSV(await file.text());
+      const extracted = await window.RPC_PARSE_PARTS_ORDER_XLSX(await file.arrayBuffer());
       reviewRows = extracted.parts;
       $("partsOrderReviewVendor").value = extracted.vendor || "";
       $("partsOrderReviewShipmentName").value = extracted.shipmentName || "";
@@ -1136,7 +1140,7 @@
       $("partsOrderReviewSaveBtn").disabled = false;
     } catch (err) {
       $("partsOrderReviewStatus").hidden = false;
-      $("partsOrderReviewStatus").textContent = "Couldn't read that CSV: " + err.message;
+      $("partsOrderReviewStatus").textContent = "Couldn't read that workbook: " + err.message;
     }
   }
 
@@ -1236,8 +1240,8 @@
 
     $("partsOrderUploadBtn")?.addEventListener("click", () => $("partsOrderPdfInput")?.click());
     $("partsOrderPdfInput")?.addEventListener("change", handlePdfSelected);
-    $("partsOrderCsvUploadBtn")?.addEventListener("click", () => $("partsOrderCsvInput")?.click());
-    $("partsOrderCsvInput")?.addEventListener("change", handleCsvSelected);
+    $("partsOrderXlsxUploadBtn")?.addEventListener("click", () => $("partsOrderXlsxInput")?.click());
+    $("partsOrderXlsxInput")?.addEventListener("change", handleXlsxSelected);
     $("closePartsOrderReviewModal")?.addEventListener("click", closeReviewModal);
     $("partsOrderReviewCancelBtn")?.addEventListener("click", closeReviewModal);
     $("partsOrderReviewSaveBtn")?.addEventListener("click", saveReviewRows);
