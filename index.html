@@ -827,6 +827,23 @@
   </div>
 
   <!-- Receive an ordered part into inventory -->
+  <div id="partsOrderExpenseConfirmModal" class="modal-backdrop" hidden>
+    <div class="modal-panel modal-panel-sm" role="dialog" aria-modal="true" aria-labelledby="partsOrderExpenseConfirmTitle">
+      <div class="modal-header">
+        <h3 id="partsOrderExpenseConfirmTitle">Track as a collect-back expense?</h3>
+        <button type="button" id="closePartsOrderExpenseConfirmModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="partsOrderExpenseConfirmText" class="hint"></p>
+        <p class="hint">Skip this if you've already logged the cost yourself — as an expense, a bank withdrawal, or any other way — so it doesn't get tracked twice.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="partsOrderExpenseConfirmSkip" class="ghost-btn">Skip — just update status</button>
+        <button type="button" id="partsOrderExpenseConfirmCreate" class="primary-btn">Create expense</button>
+      </div>
+    </div>
+  </div>
+
   <div id="partsOrderInventoryModal" class="modal-backdrop" hidden>
     <div class="modal-panel modal-panel-sm" role="dialog" aria-modal="true" aria-labelledby="partsOrderInventoryTitle">
       <div class="modal-header">
@@ -2591,6 +2608,6 @@
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
   <script defer src="assets/account.js?v=bank-account-1"></script>
   <script defer src="assets/parts-order-xlsx.js?v=pdf-text-extract-1"></script>
-  <script defer src="assets/parts-orders.js?v=no-auto-link-1"></script>
+  <script defer src="assets/parts-orders.js?v=expense-confirm-1"></script>
 </body>
 </html>

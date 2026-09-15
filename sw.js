@@ -17,7 +17,7 @@
    The prices/intake API and Google Sheet are never touched here — those go
    straight to the network and have their own localStorage fallbacks. */
 
-const VERSION = "v91";
+const VERSION = "v92";
 const CACHE = `rpc-shell-${VERSION}`;
 
 // How long any single network request may take before we stop waiting and

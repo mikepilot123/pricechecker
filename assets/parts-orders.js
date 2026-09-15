@@ -138,6 +138,13 @@
   // their collect-back expense — the toggle only syncs on the click that
   // changes it. Catches those up whenever the list loads, once per batch
   // per page load so revisiting this tab doesn't keep re-hitting the API.
+  // createIfMissing: false — this runs unattended on every visit, so it may
+  // only refresh an expense that's already there (a cost correction, say).
+  // It must never silently create a new one: the shop often already has this
+  // shipment's cost logged some other way (an expense entered by hand, a
+  // bank withdrawal), and a background sweep is the last place that should
+  // be guessing whether this is one of those times. Creating one is always
+  // an explicit, confirmed choice now — see confirmCreateExpense below.
   function backfillPendingShipmentExpenses() {
     const pendingBatchIds = new Set(
       PARTS_ORDERS
@@ -147,7 +154,7 @@
     for (const batchId of pendingBatchIds) {
       if (expenseSyncedBatchIds.has(batchId)) continue;
       expenseSyncedBatchIds.add(batchId);
-      syncShipmentExpense(batchId);
+      syncShipmentExpense(batchId, { createIfMissing: false });
     }
   }
 
@@ -689,7 +696,10 @@
       renderPartsOrders();
       $("partsOrderFormModal").hidden = true;
       if (saved.ticketId && saved.ticketId !== previousTicketId) markTicketPartOrdered(saved.ticketId);
-      if (!editingId) syncShipmentExpense(saved.batchId || saved.id);
+      if (!editingId && (saved.paymentStatus || "pending") === "pending") {
+        const shouldSync = await confirmCreateExpense(shipmentLabelAndTotalTtd([saved]));
+        if (shouldSync) syncShipmentExpense(saved.batchId || saved.id);
+      }
     } catch (err) {
       message.textContent = err.message;
       message.hidden = false;
@@ -769,6 +779,44 @@
     }
   }
 
+  // Asks before a NEW collect-back expense gets created — the shop sometimes
+  // already logs a shipment's cost by hand (an expense, a bank withdrawal)
+  // without ever uploading the shipment itself here, and this is the moment
+  // that would otherwise silently create a second record for the same money.
+  // Resolves true to go ahead and create/sync it, false to skip and leave
+  // the payment status change as the only thing that happens.
+  function confirmCreateExpense({ label, amountTtd }) {
+    return new Promise((resolve) => {
+      const modal = $("partsOrderExpenseConfirmModal");
+      const skipBtn = $("partsOrderExpenseConfirmSkip");
+      const createBtn = $("partsOrderExpenseConfirmCreate");
+      const closeBtn = $("closePartsOrderExpenseConfirmModal");
+      if (!modal || !skipBtn || !createBtn) { resolve(true); return; }
+      $("partsOrderExpenseConfirmText").textContent =
+        `Track ${money(amountTtd)} TTD for ${label} as a collect-back expense? This adds it to Accounting and creates a reminder to chase it.`;
+      modal.hidden = false;
+      function cleanup(result) {
+        modal.hidden = true;
+        skipBtn.removeEventListener("click", onSkip);
+        createBtn.removeEventListener("click", onCreate);
+        closeBtn?.removeEventListener("click", onSkip);
+        resolve(result);
+      }
+      function onSkip() { cleanup(false); }
+      function onCreate() { cleanup(true); }
+      skipBtn.addEventListener("click", onSkip);
+      createBtn.addEventListener("click", onCreate);
+      closeBtn?.addEventListener("click", onSkip);
+    });
+  }
+
+  function shipmentLabelAndTotalTtd(group) {
+    const vendor = group.find((item) => item.vendor)?.vendor || "";
+    const label = group.find((item) => item.shipmentName)?.shipmentName || vendor || group[0].part || "this shipment";
+    const totalUsd = group.reduce((sum, item) => sum + item.totalCost, 0);
+    return { label, amountTtd: Math.round(totalUsd * USD_TO_TTD_RATE * 100) / 100 };
+  }
+
   // Whether the shop has paid the supplier for a shipment — separate from
   // the part's own ordered/arrived/cancelled status. Applies to every part
   // sharing a batchId, so it works the same for a single standalone part
@@ -777,6 +825,9 @@
     const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
     if (!group.length) return;
     const paymentStatus = group[0].paymentStatus === "collected" ? "pending" : "collected";
+    // Reopening a settled shipment back to "pending" is the only toggle
+    // direction that would (re-)create an expense — settling one never does.
+    const shouldSync = paymentStatus !== "pending" || await confirmCreateExpense(shipmentLabelAndTotalTtd(group));
     try {
       await partsOrderApi({ action: "setPartsShipmentPaymentStatus", batchId, paymentStatus });
       PARTS_ORDERS = PARTS_ORDERS.map((item) =>
@@ -785,7 +836,7 @@
       if (typeof window.RPC_TOAST === "function") {
         window.RPC_TOAST(paymentStatus === "collected" ? "Payment marked collected" : "Marked pending collection", { tone: "info", duration: 2500 });
       }
-      syncShipmentExpense(batchId);
+      if (shouldSync) syncShipmentExpense(batchId);
     } catch (err) {
       notifyError("Couldn't update payment status: " + err.message);
     }
@@ -799,7 +850,7 @@
   // second shipment on the same batch) always lands on the same expense
   // instead of piling up duplicates; the linked reminder lives and dies with
   // it via lib/expenses.js's own addExpense/updateExpense.
-  async function syncShipmentExpense(batchId) {
+  async function syncShipmentExpense(batchId, { createIfMissing = true } = {}) {
     const group = PARTS_ORDERS.filter((item) => (item.batchId || item.id) === batchId);
     if (!group.length) return;
     expenseSyncedBatchIds.add(batchId);
@@ -830,6 +881,7 @@
       try {
         await partsOrderApi({ action: "updateExpense", id: expenseId, ...payload });
       } catch (err) {
+        if (!createIfMissing) return;
         await partsOrderApi({ action: "addExpense", id: expenseId, ...payload });
       }
     } catch (err) {
@@ -1228,7 +1280,8 @@
         window.RPC_TOAST(`Added ${saved.length} part${saved.length === 1 ? "" : "s"} from the ${reviewSourceLabel}`, { tone: "info", duration: 3000 });
       }
       if (ticketId) markTicketPartOrdered(ticketId);
-      syncShipmentExpense(reviewBatchId);
+      const shouldSync = await confirmCreateExpense(shipmentLabelAndTotalTtd(saved));
+      if (shouldSync) syncShipmentExpense(reviewBatchId);
     } catch (err) {
       message.textContent = "Some parts couldn't be saved: " + err.message;
       message.hidden = false;
@@ -1326,6 +1379,7 @@
       if (!$("partsOrderInventoryModal")?.hidden) closeInventoryModal();
       if (!$("partsOrderReviewModal")?.hidden) closeReviewModal();
       if (!$("partsOrderLinkModal")?.hidden) closeLinkModal();
+      if (!$("partsOrderExpenseConfirmModal")?.hidden) $("partsOrderExpenseConfirmSkip")?.click();
     });
   }
 
