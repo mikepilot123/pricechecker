@@ -998,6 +998,9 @@
     $("partsOrderReviewCustomerName").value = "";
     $("partsOrderReviewCustomerPhone").value = "";
     reviewTicketCombobox?.reset();
+    if ($("partsOrderReviewTicketSearch")) {
+      $("partsOrderReviewTicketSearch").placeholder = "Search customer, device, or ticket #";
+    }
     $("partsOrderReviewRows").innerHTML = "";
     $("partsOrderReviewMessage").hidden = true;
     $("partsOrderReviewForm").hidden = true;
@@ -1103,11 +1106,13 @@
       $("partsOrderReviewVendor").value = extracted.vendor || "";
       if (!reviewRows.length) reviewRows.push({ part: "", quantity: 1, unitCost: 0 });
       renderReviewRows();
+      // Surfaced as a hint only — never pre-selected. A part must only get
+      // linked to a repair when someone actually picks it from the dropdown.
       const suggested = suggestReviewTicket();
-      if (suggested) {
-        reviewTicketCombobox?.set(suggested.id, ticketLabel(suggested));
+      if (suggested && $("partsOrderReviewTicketSearch")) {
+        $("partsOrderReviewTicketSearch").placeholder = `Suggested: ${ticketLabel(suggested)} — search to link`;
         if (typeof window.RPC_TOAST === "function") {
-          window.RPC_TOAST(`Auto-linked to ${ticketLabel(suggested)} — change below if that's wrong`, { tone: "info", duration: 4000 });
+          window.RPC_TOAST(`This looks like it might be for ${ticketLabel(suggested)} — search above to link it`, { tone: "info", duration: 4000 });
         }
       }
       $("partsOrderReviewStatus").hidden = true;
@@ -1165,8 +1170,11 @@
       $("partsOrderReviewVendor").value = extracted.vendor || "";
       $("partsOrderReviewShipmentName").value = extracted.shipmentName || "";
       renderReviewRows();
+      // Hint only — see the matching comment in handlePdfSelected above.
       const suggested = suggestReviewTicket();
-      if (suggested) reviewTicketCombobox?.set(suggested.id, ticketLabel(suggested));
+      if (suggested && $("partsOrderReviewTicketSearch")) {
+        $("partsOrderReviewTicketSearch").placeholder = `Suggested: ${ticketLabel(suggested)} — search to link`;
+      }
       $("partsOrderReviewStatus").hidden = true;
       $("partsOrderReviewForm").hidden = false;
       $("partsOrderReviewSaveBtn").disabled = false;
