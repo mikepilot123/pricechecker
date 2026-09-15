@@ -942,6 +942,13 @@ function startPriceInlineEdit(rowEl, model, priceEntry) {
   [input, nameInput].forEach((editor) => {
     editor.addEventListener("click", (e) => e.stopPropagation());
     editor.addEventListener("keydown", (e) => {
+    // The row itself is keyboard-activatable (Enter/Space opens "Log
+    // device" for this repair — see the rowEl keydown listener above), and
+    // keydown bubbles right past this editor unless stopped here. Without
+    // this, typing a space while editing the name/price gets eaten by that
+    // row-level handler instead of landing in the field, and pops "Log
+    // device" open mid-edit.
+    e.stopPropagation();
     if (e.key === "Enter") { e.preventDefault(); savePriceInlineEdit(rowEl, model, priceEntry); }
     if (e.key === "Escape") { e.preventDefault(); renderPriceRowStatic(rowEl, model, priceEntry); }
     });
