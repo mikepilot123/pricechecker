@@ -225,7 +225,8 @@ await test("persistent AI 503 returns a short fallback message, not raw service 
       assert.doesNotMatch(error.message, /HTTP 503|high demand|UNAVAILABLE/);
       return true;
     });
-    assert.equal(calls, 3);
+    // 3 attempts against each of the 3 models in the fallback chain.
+    assert.equal(calls, 9);
     const viaApi = await api({ pin: "0000", action: "extractPartsOrderPdf", pdfBase64: "cGRmLWJ5dGVz" });
     assert.equal(viaApi.payload.ok, false);
     assert.equal(viaApi.payload.code, "AI_TEMPORARILY_UNAVAILABLE");
@@ -234,6 +235,156 @@ await test("persistent AI 503 returns a short fallback message, not raw service 
     globalThis.fetch = originalFetch;
     delete process.env.GEMINI_API_KEY;
   }
+});
+
+// ---- PDF extraction reliability: Gemini is flaky, so the route retries ----
+function geminiOk() {
+  return new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: JSON.stringify({
+      vendor: "MobileSentrix",
+      parts: [{ part: "Pixel screen", quantity: 1, unitCost: 50 }],
+    }) }] } }],
+  }), { status: 200, headers: { "content-type": "application/json" } });
+}
+
+async function withStubbedGemini(handler, run) {
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push(String(url));
+    return handler(calls.length, String(url), options);
+  };
+  try {
+    return await run(calls);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.GEMINI_API_KEY;
+  }
+}
+
+await test("a 503 'high demand' is retried instead of failing the upload", async () => {
+  await withStubbedGemini(
+    (call) => call === 1
+      ? new Response('{"error":{"code":503,"message":"high demand"}}', { status: 503 })
+      : geminiOk(),
+    async (calls) => {
+      const extracted = await extractPartsFromPdf("cGRmLWJ5dGVz");
+      assert.equal(calls.length, 2, "should have retried once after the 503");
+      assert.equal(extracted.vendor, "MobileSentrix");
+    },
+  );
+});
+
+await test("a retired model (404) falls through to the backup model", async () => {
+  await withStubbedGemini(
+    (_call, url) => url.includes("gemini-3.5-flash-lite")
+      ? new Response('{"error":{"code":404,"message":"not found"}}', { status: 404 })
+      : geminiOk(),
+    async (calls) => {
+      const extracted = await extractPartsFromPdf("cGRmLWJ5dGVz");
+      // Straight to the fallback: a retired model never comes back, so it
+      // must not burn the retry budget first.
+      assert.equal(calls.length, 2);
+      assert.match(calls[1], /gemini-3\.6-flash/);
+      assert.equal(extracted.vendor, "MobileSentrix");
+    },
+  );
+});
+
+await test("a bad request fails fast rather than retrying a doomed call", async () => {
+  await withStubbedGemini(
+    () => new Response('{"error":{"code":400,"message":"API key not valid"}}', { status: 400 }),
+    async (calls) => {
+      await assert.rejects(extractPartsFromPdf("cGRmLWJ5dGVz"), /could not read this PDF/);
+      assert.equal(calls.length, 1, "400 is not transient — one call only");
+    },
+  );
+});
+
+await test("an exhausted retry chain reports a plain-English busy message", async () => {
+  await withStubbedGemini(
+    () => new Response('{"error":{"code":503,"message":"high demand"}}', { status: 503 }),
+    async (calls) => {
+      await assert.rejects(extractPartsFromPdf("cGRmLWJ5dGVz"), (err) => {
+        assert.match(err.message, /busy right now/);
+        assert.doesNotMatch(err.message, /\{/, "raw API JSON should stay in the server log");
+        return true;
+      });
+      // 3 attempts on each model in the chain.
+      assert.equal(calls.length, 9);
+    },
+  );
+});
+
+// Builds a real (tiny) PDF with a genuine text layer, so the text-vs-image
+// decision is exercised against actual pdfjs rather than a mock of it.
+function makeTextPdf(lines) {
+  const content = "BT /F1 12 Tf " + lines.map((line, i) =>
+    `1 0 0 1 50 ${700 - i * 20} Tm (${line.replace(/([()\\])/g, "\\$1")}) Tj`).join(" ") + " ET";
+  const objs = [
+    "<</Type/Catalog/Pages 2 0 R>>",
+    "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>",
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    `<</Length ${content.length}>>stream\n${content}\nendstream`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [];
+  objs.forEach((body, i) => {
+    offsets.push(pdf.length);
+    pdf += `${i + 1} 0 obj${body}endobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`
+    + offsets.map((o) => String(o).padStart(10, "0") + " 00000 n \n").join("")
+    + `trailer<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf, "latin1").toString("base64");
+}
+
+await test("a PDF with a text layer is sent as text, not as a 150KB image", async () => {
+  const pdfBase64 = makeTextPdf([
+    "MobileSentrix Order Confirmation",
+    "Product Description SKU Unit Price Quantity Subtotal",
+    "Replacement Battery For Google Pixel 6 GMSB3 109082004843 $8.10 1 $8.10",
+    "Inner OLED Assembly With Frame For Samsung Galaxy Z Flip 3 $129.66 1 $129.66",
+    "Subtotal: $137.76 Grand Total: $151.67 Order Number 108620485",
+  ]);
+  await withStubbedGemini(() => geminiOk(), async () => {
+    await extractPartsFromPdf(pdfBase64);
+  });
+  // Re-run capturing the body so we can assert on what was actually sent.
+  let body;
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  globalThis.fetch = async (_url, options) => { body = JSON.parse(options.body); return geminiOk(); };
+  try {
+    await extractPartsFromPdf(pdfBase64);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.GEMINI_API_KEY;
+  }
+  const parts = body.contents[0].parts;
+  assert.ok(!parts.some((p) => p.inlineData), "must not ship the PDF as an image when text is available");
+  assert.match(parts[0].text, /Replacement Battery For Google Pixel 6/);
+  assert.match(parts[0].text, /\$129\.66/);
+});
+
+await test("a PDF with no readable text layer still falls back to the image path", async () => {
+  // Not a parseable PDF at all — the worst case the text extractor can hit.
+  const notAPdf = Buffer.from("this is not a pdf at all").toString("base64");
+  let body;
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  globalThis.fetch = async (_url, options) => { body = JSON.parse(options.body); return geminiOk(); };
+  try {
+    await extractPartsFromPdf(notAPdf);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.GEMINI_API_KEY;
+  }
+  const parts = body.contents[0].parts;
+  assert.ok(parts.some((p) => p.inlineData?.mimeType === "application/pdf"), "should send the PDF itself when there's no text");
 });
 
 // ---- PDF-extraction response parsing (no network, no real PDF) ----

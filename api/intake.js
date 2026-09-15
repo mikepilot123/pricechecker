@@ -38,6 +38,12 @@ import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
 import { applyCors, checkPin, createBrowserCredential } from "../lib/security.js";
 
+// Default is 10s, which isn't enough for extractPartsOrderPdf: Gemini answers
+// "503 high demand" often enough that the retry chain in
+// lib/parts-order-extraction.js needs room to actually wait and re-ask. Retry
+// gaps are idle I/O, so this raises the ceiling without raising active CPU.
+export const maxDuration = 60;
+
 // Mirrors apps-script/Code.gs's handle(p) dispatch-by-action shape exactly,
 // so assets/intake.js needs no changes beyond pointing SCRIPT_URL at this
 // endpoint: same { action, pin, ...fields } request shape, same { ok, ... }

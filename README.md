@@ -22,11 +22,21 @@ editable list of parts. It uses the Gemini Developer API from the Vercel API
 route, so the API key is never sent to the browser. The Gemini Developer API
 has a free tier suitable for low-volume shop use.
 
+Supplier PDFs are browser print-to-PDFs and carry a real text layer, so the
+route extracts that text (`lib/pdf-text.js`) and sends ~1KB of text rather than
+a ~150KB base64 image of the same page — far fewer tokens, so it sits well
+inside the free tier and is much less likely to be throttled. A PDF with no
+text layer (a scan or photo) falls back to sending the PDF for the model to
+read as an image.
+
 To enable it, create a Gemini API key in Google AI Studio and add it to the
 Vercel project as `GEMINI_API_KEY` for Production, Preview, and Development.
 Optionally set `GEMINI_MODEL` to a compatible Gemini model; the default is
-`gemini-3.8-flash`. Uploaded PDFs are still reviewed and edited before any
-parts are saved.
+`gemini-3.5-flash-lite,gemini-3.6-flash,gemini-3.8-flash` — tried in order,
+cheapest and least contended first, so a comma-separated list sets the whole
+fallback chain. Transient failures (503 "high demand", rate limits, timeouts)
+are retried with backoff before moving down the chain. Uploaded PDFs are still
+reviewed and edited before any parts are saved.
 
 ---
 

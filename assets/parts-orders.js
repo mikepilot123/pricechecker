@@ -45,6 +45,8 @@
   let reviewUploadUrl = null;
   let reviewSource = "pdf";
   let reviewSourceLabel = "PDF";
+  // Held so a failed extraction can be retried without re-picking the file.
+  let reviewFile = null;
   let reviewRows = [];
   let formTicketCombobox = null;
   let reviewTicketCombobox = null;
@@ -1079,6 +1081,19 @@
     $("partsOrderReviewTitle").textContent = "Review parts from PDF";
     openReviewModal();
     ensureCustomersLoaded();
+    reviewFile = file;
+    await runPdfExtraction();
+  }
+
+  // Split out from the file picker so the "Try again" button can re-run the
+  // same PDF: Gemini's overload errors are transient, and making someone
+  // re-pick the file to retry one is pure friction.
+  async function runPdfExtraction() {
+    const file = reviewFile;
+    if (!file) return;
+    const retryBtn = $("partsOrderReviewRetryBtn");
+    if (retryBtn) retryBtn.hidden = true;
+    $("partsOrderReviewStatus").hidden = false;
     $("partsOrderReviewStatus").textContent = "Reading the PDF…";
     try {
       reviewBatchId = "PO" + crypto.randomUUID();
@@ -1111,6 +1126,9 @@
         $("partsOrderReviewStatus").hidden = false;
         $("partsOrderReviewStatus").textContent = "Couldn't read that PDF: " + err.message;
       }
+      // Either way the file is still in hand, so re-asking beats re-picking.
+      const retryBtn = $("partsOrderReviewRetryBtn");
+      if (retryBtn) retryBtn.hidden = false;
     }
   }
 
@@ -1269,6 +1287,7 @@
     $("closePartsOrderReviewModal")?.addEventListener("click", closeReviewModal);
     $("partsOrderReviewCancelBtn")?.addEventListener("click", closeReviewModal);
     $("partsOrderReviewSaveBtn")?.addEventListener("click", saveReviewRows);
+    $("partsOrderReviewRetryBtn")?.addEventListener("click", runPdfExtraction);
     $("partsOrderReviewAddRow")?.addEventListener("click", () => {
       reviewRows.push({ part: "", quantity: 1, unitCost: 0 });
       renderReviewRows();

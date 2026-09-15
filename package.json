@@ -9,6 +9,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@neondatabase/serverless": "^0.10.4",
     "@vercel/blob": "^2.5.0",
+    "pdfjs-dist": "^4.10.38",
     "zod": "^4.6.2"
   },
   "scripts": {
