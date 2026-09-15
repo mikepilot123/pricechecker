@@ -1158,6 +1158,12 @@
       $("partsOrderReviewVendor").value = extracted.vendor || "";
       if (!reviewRows.length) reviewRows.push({ part: "", quantity: 1, unitCost: 0 });
       renderReviewRows();
+      // The invoice's per-unit prices are pre-tax; each line below already
+      // has its share of this folded in, so the reviewer isn't left thinking
+      // the AI got the unit costs wrong.
+      if (extracted.taxAmount > 0 && typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(`Includes ${money(extracted.taxAmount)} sales tax, split across the line items below`, { tone: "info", duration: 4500 });
+      }
       // Surfaced as a hint only — never pre-selected. A part must only get
       // linked to a repair when someone actually picks it from the dropdown.
       const suggested = suggestReviewTicket();

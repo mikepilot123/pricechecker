@@ -179,7 +179,7 @@ await test("PDF extraction sends the PDF to Gemini and reads its structured JSON
     assert.equal(body.contents[0].parts[0].inlineData.mimeType, "application/pdf");
     assert.equal(body.contents[0].parts[0].inlineData.data, "cGRmLWJ5dGVz");
     assert.equal(body.generationConfig.responseMimeType, "application/json");
-    assert.deepEqual(extracted, { vendor: "MobileSentrix", parts: [{ part: "Pixel screen", quantity: 2, unitCost: 50 }] });
+    assert.deepEqual(extracted, { vendor: "MobileSentrix", taxAmount: 0, parts: [{ part: "Pixel screen", quantity: 2, unitCost: 50 }] });
 
     const viaApi = await api({ pin: "0000", action: "extractPartsOrderPdf", pdfBase64: "cGRmLWJ5dGVz" });
     assert.equal(viaApi.payload.ok, true);
@@ -404,7 +404,7 @@ await test("a well-formed extraction response parses into clean line items", () 
 });
 await test("a fenced code block around the JSON is stripped", () => {
   const result = parseExtractionResult("```json\n" + JSON.stringify({ vendor: "X", parts: [] }) + "\n```");
-  assert.deepEqual(result, { vendor: "X", parts: [] });
+  assert.deepEqual(result, { vendor: "X", taxAmount: 0, parts: [] });
 });
 await test("malformed or missing-shape responses are rejected, not silently accepted", () => {
   assert.throws(() => parseExtractionResult("not json"), /parse/i);
@@ -414,6 +414,55 @@ await test("malformed or missing-shape responses are rejected, not silently acce
 await test("a missing/invalid quantity or cost in a line item falls back sanely rather than throwing", () => {
   const result = parseExtractionResult(JSON.stringify({ parts: [{ part: "Screw kit", quantity: -1, unitCost: "N/A" }] }));
   assert.deepEqual(result.parts, [{ part: "Screw kit", quantity: 1, unitCost: 0 }]);
+});
+
+await test("sales tax on the invoice is folded into each line's unit cost proportionally", () => {
+  // Mirrors a real MobileSentrix invoice: $217.48 subtotal, 7% tax = $15.57.
+  const result = parseExtractionResult(JSON.stringify({
+    vendor: "MobileSentrix",
+    taxAmount: 15.57,
+    parts: [
+      { part: "OLED Assembly", quantity: 1, unitCost: 96.08 },
+      { part: "Flex cable", quantity: 1, unitCost: 6.71 },
+      { part: "Hinge flex cable", quantity: 1, unitCost: 7.83 },
+      { part: "OLED Assembly 2", quantity: 1, unitCost: 89.50 },
+      { part: "iClamp", quantity: 1, unitCost: 17.36 },
+    ],
+  }));
+  assert.equal(result.taxAmount, 15.57);
+  const total = result.parts.reduce((sum, p) => sum + p.unitCost * p.quantity, 0);
+  // Rounds to the cent per line, so the reconstructed total lands within a
+  // few cents of subtotal + tax ($233.05) rather than bit-for-bit exact.
+  assert.ok(Math.abs(total - 233.05) < 0.05, `total ${total} should be close to $233.05`);
+  // The pricier line should absorb more of the tax than the cheaper one.
+  const oled = result.parts.find((p) => p.part === "OLED Assembly");
+  const clamp = result.parts.find((p) => p.part === "iClamp");
+  assert.ok(oled.unitCost > 96.08, "the $96.08 line should have gained some tax");
+  assert.ok(clamp.unitCost > 17.36, "the $17.36 line should have gained some tax");
+  assert.ok((oled.unitCost - 96.08) > (clamp.unitCost - 17.36), "the pricier line should absorb more tax than the cheaper one");
+});
+
+await test("a quantity greater than 1 has tax distributed across the whole line, not per unit", () => {
+  const result = parseExtractionResult(JSON.stringify({
+    vendor: "X", taxAmount: 7,
+    parts: [{ part: "Screw kit", quantity: 2, unitCost: 50 }], // line = $100, tax = $7 -> $107 / 2
+  }));
+  assert.equal(result.parts[0].unitCost, 53.5);
+});
+
+await test("no tax on the invoice leaves unit costs untouched", () => {
+  const result = parseExtractionResult(JSON.stringify({
+    vendor: "eBay", taxAmount: 0,
+    parts: [{ part: "LCD bezel", quantity: 1, unitCost: 43 }],
+  }));
+  assert.equal(result.taxAmount, 0);
+  assert.equal(result.parts[0].unitCost, 43);
+});
+
+await test("tax with no line items to distribute across doesn't throw", () => {
+  const result = parseExtractionResult(JSON.stringify({ vendor: "X", taxAmount: 5, parts: [] }));
+  assert.equal(result.taxAmount, 5);
+  assert.deepEqual(result.parts, []);
 });
 
 // ---- Browser-only Excel import (no model/API call) ----
