@@ -27,7 +27,7 @@ import { listReminders, addReminder, updateReminder, deleteReminder } from "../l
 // accountSummary survives, for the Dashboard's residual "card takings owed"
 // tile; the historical data and library code are otherwise untouched.
 import { accountSummary } from "../lib/card-payments.js";
-import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction } from "../lib/bank-transactions.js";
+import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction, addCashDepositToBank } from "../lib/bank-transactions.js";
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
@@ -213,6 +213,10 @@ export default async function handler(req, res) {
     }
     if (action === "deleteBankTransaction") {
       return res.status(200).json({ ok: true, deletedId: await deleteBankTransaction(body) });
+    }
+    if (action === "addCashDepositToBank") {
+      const { withdrawal, deposit } = await addCashDepositToBank(body);
+      return res.status(200).json({ ok: true, withdrawal, deposit });
     }
     if (action === "accountSummary") {
       return res.status(200).json({ ok: true, summary: await accountSummary() });

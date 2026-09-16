@@ -6832,6 +6832,7 @@ video.media-viewer-media {
 .acct-tile-cash strong { color: #7c3aed; }
 .acct-pill-cash { background: #f1eafe; color: #7c3aed; }
 .acct-pill-bank { background: #eef4ff; color: #2b52b8; }
+.acct-pill-transfer { background: #fef3e2; color: #b4650a; }
 .bank-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bank-pill-deposit { background: #e2f2e7; color: var(--price); }
 .bank-pill-withdrawal { background: #fce8e6; color: var(--danger); }

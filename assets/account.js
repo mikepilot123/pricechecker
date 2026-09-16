@@ -209,6 +209,7 @@
           <strong class="bank-amount bank-amount-${item.kind}">${item.kind === "deposit" ? "+" : "−"}${money(item.amount)}</strong>
           <span class="acct-pill bank-pill-${item.kind}">${item.kind === "deposit" ? "Deposit" : "Withdrawal"}</span>
           <span class="acct-pill acct-pill-${item.accountType || "bank"}">${item.accountType === "cash" ? "Cash" : "Bank"}</span>
+          ${item.transferId ? `<span class="acct-pill acct-pill-transfer">Transfer</span>` : ""}
           <div class="ops-row-actions"><button type="button" data-bank-edit="${esc(item.id)}">Edit</button><button type="button" class="danger-text" data-bank-delete="${esc(item.id)}">Delete</button></div>
         </div>
       </article>`).join("");
@@ -308,14 +309,57 @@
 
   async function deleteBankTransaction(id) {
     const transaction = BANK_TRANSACTIONS.find((item) => item.id === id);
-    if (!transaction || !window.confirm(`Delete this ${transaction.kind} of ${money(transaction.amount)}?`)) return;
+    if (!transaction) return;
+    const prompt = transaction.transferId
+      ? `Delete this cash-to-bank transfer of ${money(transaction.amount)}? Both the cash and bank sides will be removed.`
+      : `Delete this ${transaction.kind} of ${money(transaction.amount)}?`;
+    if (!window.confirm(prompt)) return;
     try {
       await api({ action: "deleteBankTransaction", id });
       BANK_SUMMARY = null;
       await loadAll(true);
-      toast("Bank transaction deleted");
+      toast(transaction.transferId ? "Transfer deleted" : "Bank transaction deleted");
     } catch (error) {
       toast(error.message);
+    }
+  }
+
+  // ---- Cash-to-bank transfer -----------------------------------------------
+  function openCashToBankModal() {
+    $("cashToBankAmount").value = "";
+    $("cashToBankDate").value = toDateInput(new Date());
+    $("cashToBankNotes").value = "";
+    setMessage("cashToBankMessage", "");
+    $("cashToBankModal").hidden = false;
+    setTimeout(() => $("cashToBankAmount").focus(), 50);
+  }
+
+  function closeCashToBankModal() {
+    $("cashToBankModal").hidden = true;
+  }
+
+  async function submitCashToBank() {
+    const amount = Number($("cashToBankAmount").value || 0);
+    if (amount <= 0) return setMessage("cashToBankMessage", "Enter an amount greater than zero.");
+    const date = $("cashToBankDate").value;
+    if (!date) return setMessage("cashToBankMessage", "Choose the transfer date.");
+    const button = $("cashToBankSubmit");
+    button.disabled = true;
+    try {
+      await api({
+        action: "addCashDepositToBank",
+        amount,
+        occurredAt: new Date(`${date}T12:00:00`).toISOString(),
+        notes: $("cashToBankNotes").value.trim(),
+      });
+      closeCashToBankModal();
+      BANK_SUMMARY = null;
+      await loadAll(true);
+      toast("Cash deposited to bank");
+    } catch (error) {
+      setMessage("cashToBankMessage", error.message);
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -326,6 +370,11 @@
 
     $("bankDepositBtn")?.addEventListener("click", () => openBankTransactionModal("deposit"));
     $("bankWithdrawalBtn")?.addEventListener("click", () => openBankTransactionModal("withdrawal"));
+    $("cashToBankBtn")?.addEventListener("click", openCashToBankModal);
+    $("closeCashToBankModal")?.addEventListener("click", closeCashToBankModal);
+    $("cashToBankCancel")?.addEventListener("click", closeCashToBankModal);
+    $("cashToBankSubmit")?.addEventListener("click", submitCashToBank);
+    $("cashToBankForm")?.addEventListener("submit", (event) => { event.preventDefault(); submitCashToBank(); });
     $("closeBankTransactionModal")?.addEventListener("click", closeBankTransactionModal);
     $("bankTransactionCancel")?.addEventListener("click", closeBankTransactionModal);
     $("bankTransactionSubmit")?.addEventListener("click", submitBankTransaction);
@@ -390,6 +439,8 @@
       if (e.key !== "Escape") return;
       const el = $("bankTransactionModal");
       if (el && !el.hidden) el.hidden = true;
+      const cashModal = $("cashToBankModal");
+      if (cashModal && !cashModal.hidden) cashModal.hidden = true;
     });
   }
 

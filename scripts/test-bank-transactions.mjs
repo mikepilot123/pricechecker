@@ -14,7 +14,7 @@ await db.exec(readFileSync(new URL(files[0], migrations), "utf8"));
 const { ensureSchema } = await import("../lib/db.js");
 await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
-const { addBankTransaction, updateBankTransaction, deleteBankTransaction, listBankTransactions, bankAccountSummary } = await import("../lib/bank-transactions.js");
+const { addBankTransaction, updateBankTransaction, deleteBankTransaction, listBankTransactions, bankAccountSummary, addCashDepositToBank } = await import("../lib/bank-transactions.js");
 const { listExpenses } = await import("../lib/expenses.js");
 
 const deposit = await addBankTransaction({ kind: "deposit", amount: 1500, occurredAt: new Date().toISOString(), category: "Opening balance", reference: "OPEN" });
@@ -67,6 +67,32 @@ await deleteBankTransaction({ id: deposit.id });
 assert.equal((await bankAccountSummary()).balance, -200);
 assert.equal((await bankAccountSummary()).cash.balance, 420, "deleting a bank row leaves cash untouched");
 assert.equal((await listBankTransactions()).length, 3, "the bank deposit is gone; both cash rows remain");
+
+// Depositing cash into the bank moves money between ledgers, not just into one.
+const before = await bankAccountSummary();
+const transfer = await addCashDepositToBank({ amount: 150, occurredAt: new Date().toISOString(), notes: "Till count" });
+assert.equal(transfer.withdrawal.accountType, "cash");
+assert.equal(transfer.deposit.accountType, "bank");
+assert.equal(transfer.withdrawal.transferId, transfer.deposit.transferId, "both legs share a transfer id");
+let after = await bankAccountSummary();
+assert.equal(after.balance, before.balance + 150, "the bank side gains the deposit");
+assert.equal(after.cash.balance, before.cash.balance - 150, "the cash side loses the same amount");
+let expensesAfterTransfer = await listExpenses();
+assert.ok(!expensesAfterTransfer.some((e) => e.id === transfer.withdrawal.expenseId), "a transfer's cash leg is not a real expense");
+
+// Editing either leg's amount keeps the pair in step.
+const editedTransfer = await updateBankTransaction({ id: transfer.deposit.id, amount: 200 });
+assert.equal(editedTransfer.amount, 200);
+after = await bankAccountSummary();
+assert.equal(after.balance, before.balance + 200, "the bank leg picked up the new amount");
+assert.equal(after.cash.balance, before.cash.balance - 200, "the cash leg followed it");
+
+// Deleting one leg removes both, so the ledger never records money that only half-moved.
+await deleteBankTransaction({ id: editedTransfer.id });
+after = await bankAccountSummary();
+assert.equal(after.balance, before.balance, "deleting the bank leg undoes the whole transfer");
+assert.equal(after.cash.balance, before.cash.balance, "and restores the cash side too");
+assert.ok(!(await listBankTransactions()).some((t) => t.transferId === transfer.withdrawal.transferId), "both transfer rows are gone");
 
 console.log("PASS — bank transaction ledger scenarios");
 await db.close();
