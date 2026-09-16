@@ -302,8 +302,8 @@
   });
 
   // ---- Account sub-tabs ------------------------------------------------------
-  // Expenses / Bank account (balance). Navigated only from the sidebar's
-  // "Account sections" group now — no in-page pill row duplicating it.
+  // Expenses / Bank account (balance). Sidebar's "Account sections" group on
+  // desktop, in-page pill row on mobile — same split as Appointments/Targets.
   function setAccountPanel(panel) {
     document.querySelectorAll("[data-account-panel-section]").forEach((section) => {
       section.hidden = section.dataset.accountPanelSection !== panel;

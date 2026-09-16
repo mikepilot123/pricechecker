@@ -5410,6 +5410,9 @@ video.media-viewer-media {
   #view-targets > .targets-content-subnav {
     display: none;
   }
+  #view-account > .account-content-subnav {
+    display: none;
+  }
   /* Settings and Repairs show their sub-tabs in the sidebar (above) at this
      width, same as Appointments/Targets — the pill row inside the content
      area is the mobile-only fallback, so it's redundant here. */

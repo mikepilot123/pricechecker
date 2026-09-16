@@ -163,6 +163,10 @@
     setText("cashBalanceSub", cash.lastActivity ? `Last activity ${formatDay(cash.lastActivity)}` : "No activity yet");
     $("bankBalance")?.classList.toggle("money-negative", Number(summary.balance) < 0);
     $("cashBalance")?.classList.toggle("money-negative", Number(cash.balance) < 0);
+    // Same transfer either way, but "Deposit to account" reads right while
+    // looking at cash on hand — "Deposit cash to bank" only makes sense from
+    // the bank side, where "to bank" isn't already implied by the tab you're on.
+    setText("cashToBankBtn", bankAccountFilter === "cash" ? "Deposit to account" : "Deposit cash to bank");
 
     document.querySelectorAll("[data-bank-account]").forEach((button) => {
       const active = button.dataset.bankAccount === bankAccountFilter;

@@ -417,10 +417,14 @@
   </main>
 
   <!-- ============ ACCOUNT VIEW ============ -->
-  <!-- Money in and money out. Navigated only from the sidebar's "Account
-       sections" group (Expenses / Bank account) — no in-page pill row, so
-       these sub-categories live in exactly one place. -->
+  <!-- Money in and money out. Navigated from the sidebar's "Account sections"
+       group (Expenses / Bank account) on desktop, or the in-page pill row
+       below on mobile, same split as Appointments/Targets. -->
   <main class="container view" id="view-account" hidden>
+    <div class="appt-subnav account-content-subnav" role="tablist" aria-label="Account sections">
+      <button type="button" class="appt-subnav-btn" data-account-panel="expenses" role="tab" aria-selected="false">Expenses</button>
+      <button type="button" class="appt-subnav-btn active" data-account-panel="overview" role="tab" aria-selected="true">Bank account</button>
+    </div>
     <!-- ---------- Bank account balance ---------- -->
     <section class="appt-panel" data-account-panel-section="overview">
       <div class="leads-heading-row">
