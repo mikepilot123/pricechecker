@@ -302,34 +302,19 @@
   });
 
   // ---- Account sub-tabs ------------------------------------------------------
-  // Balance / Card payments / Payouts / Expenses. The first three are grouped
-  // under one outer "Bank account" tab so the subnav row doesn't run out
-  // of horizontal space — they still toggle individually via the same
-  // data-account-panel-section mechanism, just via a second subnav row nested
-  // inside the group's wrapper instead of the top-level one.
-  const BANK_ACCOUNT_PANELS = new Set(["overview", "payments", "payouts"]);
+  // Expenses / Bank account (balance). Navigated only from the sidebar's
+  // "Account sections" group now — no in-page pill row duplicating it.
   function setAccountPanel(panel) {
     document.querySelectorAll("[data-account-panel-section]").forEach((section) => {
       section.hidden = section.dataset.accountPanelSection !== panel;
-    });
-    document.querySelectorAll("[data-account-panel-section-group]").forEach((group) => {
-      group.hidden = !BANK_ACCOUNT_PANELS.has(panel);
     });
     document.querySelectorAll(".appt-subnav-btn[data-account-panel]").forEach((btn) => {
       const active = btn.dataset.accountPanel === panel;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
-    // The outer "Bank account" tab has no single matching section of its own —
-    // it should read as active whenever any of the three grouped panels is
-    // showing, not only when panel is exactly "overview".
-    document.querySelectorAll(".appt-subnav-btn[data-account-panel-group]").forEach((btn) => {
-      const active = BANK_ACCOUNT_PANELS.has(panel);
-      btn.classList.toggle("active", active);
-      btn.setAttribute("aria-selected", active ? "true" : "false");
-    });
-    // Expenses loads on the event it has always loaded on; the card-takings
-    // panels get their own so assets/account.js can refresh what's on screen.
+    // Expenses loads on the event it has always loaded on; Bank account gets
+    // its own so assets/account.js can refresh what's on screen.
     if (panel === "expenses") window.dispatchEvent(new Event("rpc-enter-expenses"));
     else window.dispatchEvent(new CustomEvent("rpc-account-panel", { detail: { panel } }));
   }
@@ -1226,17 +1211,16 @@
     repairDueDate: { type: "date", required: false },
     repairCost: { type: "number", required: false },
     amountPaid: { type: "number", required: false },
-    // Method and card type are one choice to staff ("how did they pay?") but
-    // two fields to the server, so the option value carries both and
-    // saveInlineEdit splits it back apart on the way out.
+    // Card payments/payouts (the card-machine reconciliation ledger) were
+    // retired — "Card" is no longer offered here so nothing new can feed
+    // that ledger. The card:debit/card:credit values are still recognized
+    // below purely to label tickets that already have one on file.
     paymentMethod: {
       type: "select",
       required: false,
       options: [
         { value: "", label: "Not recorded" },
         { value: "cash", label: "Cash" },
-        { value: "card:debit", label: "Card — Debit" },
-        { value: "card:credit", label: "Card — Credit" },
         { value: "transfer", label: "Bank transfer" },
       ],
     },
@@ -1264,14 +1248,8 @@
       case "repairDueDate": return esc(repairDueDateLabel(ticket.repairDueDate));
       case "repairCost": return formatMoney(ticket.repairCost);
       case "amountPaid": return formatMoney(ticket.amountPaid);
-      case "paymentMethod": {
-        const label = PAYMENT_METHOD_LABELS[paymentMethodValue(ticket)] || "Not recorded";
-        // A card payment isn't in the shop's hands yet, so say so here rather
-        // than letting "paid" read as "collected".
-        return ticket.paymentMethod === "card"
-          ? `${esc(label)} <span class="ticket-card-hint">· in the card takings ledger</span>`
-          : esc(label);
-      }
+      case "paymentMethod":
+        return esc(PAYMENT_METHOD_LABELS[paymentMethodValue(ticket)] || "Not recorded");
       default: return "—";
     }
   }

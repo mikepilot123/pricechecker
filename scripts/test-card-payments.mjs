@@ -194,36 +194,51 @@ check("covers only what was ticked", second.amount, 179.25);
 summary = await accountSummary();
 check("the rest stays owed", summary.owed, 432);
 
-section("A repair paid on the card machine");
-// The ticket is the only place the amount is typed; the ledger row has to
-// follow it, or the two quietly disagree about what the shop is owed.
+section("Card payments/payouts are retired — no new ledger rows from tickets");
+// "card" was removed from lib/tickets.js's PAYMENT_METHODS allow-list (the
+// app no longer offers it, and the Account tab's UI to view/settle it is
+// gone) — a new ticket must not be able to feed that ledger any more, even
+// if something still sends paymentMethod: "card".
 const beforeTickets = (await listCardPayments({ includeVoided: true })).length;
-const ticket = await addTicket({
+const newTicket = await addTicket({
   customerName: "Shivani Baksh", device: "iPhone 13", issues: "Screen",
   repairCost: 900, amountPaid: 900, paymentMethod: "card", cardType: "credit",
 });
-check("the ticket records how it was paid", [ticket.paymentMethod, ticket.cardType], ["card", "credit"]);
-check("and it created exactly one ledger row", (await listCardPayments({ includeVoided: true })).length, beforeTickets + 1);
-let linked = (await listCardPayments({ includeVoided: true })).find((p) => p.id === ticket.cardPaymentId);
-check("with the repair's amount and a 4% fee", [linked.gross, linked.fee, linked.net], [900, 36, 864]);
-check("linked back to the ticket", linked.ticketId, ticket.id);
+check("a new ticket falls back instead of accepting \"card\"", newTicket.paymentMethod, "");
+check("and no ledger row gets created", (await listCardPayments({ includeVoided: true })).length, beforeTickets);
 
-const corrected = await updateTicket({ id: ticket.id, amountPaid: 850 });
-linked = (await listCardPayments({ includeVoided: true })).find((p) => p.id === corrected.cardPaymentId);
-check("correcting the amount follows through to the ledger", [linked.gross, linked.fee, linked.net], [850, 34, 816]);
+section("A ticket already linked before the retirement keeps working");
+// Simulates data from before this change shipped: a normal ticket with a
+// card_payments row wired up directly (bypassing addTicket, which can no
+// longer produce this state) — the same shape years of real tickets are
+// already sitting in production with. Editing it must keep reconciling the
+// ledger correctly; only *new* links are refused.
+const legacyTicket = await addTicket({
+  customerName: "Rajesh Ramoutar", device: "Galaxy S22", issues: "Battery",
+  repairCost: 900, amountPaid: 900,
+});
+const legacyPayment = await addCardPayment({
+  gross: 900, cardType: "credit", customer: "Rajesh Ramoutar", ticketId: legacyTicket.id, notes: "legacy",
+});
+await sql`UPDATE tickets SET payment_method = 'card', card_payment_id = ${legacyPayment.id}, payment_card_type = 'credit' WHERE id = ${legacyTicket.id}`;
 
-const switched = await updateTicket({ id: ticket.id, paymentMethod: "cash" });
-const wasLinked = (await listCardPayments({ includeVoided: true })).find((p) => p.id === ticket.cardPaymentId);
-check("switching to cash voids the ledger row", wasLinked.state, "void");
-check("and unlinks it from the ticket", [switched.paymentMethod, switched.cardPaymentId], ["cash", ""]);
+const correctedLegacy = await updateTicket({ id: legacyTicket.id, amountPaid: 850 });
+let linked = (await listCardPayments({ includeVoided: true })).find((p) => p.id === correctedLegacy.cardPaymentId);
+check("an unrelated amount edit still follows through to the ledger", [linked.gross, linked.fee, linked.net], [850, 34, 816]);
+check("the ticket is still recorded as paid by card", [correctedLegacy.paymentMethod, correctedLegacy.cardType], ["card", "credit"]);
 
-const backToCard = await updateTicket({ id: ticket.id, paymentMethod: "card", cardType: "debit" });
-linked = (await listCardPayments({ includeVoided: true })).find((p) => p.id === backToCard.cardPaymentId);
-check("switching back opens a fresh row, not the voided one", [linked.state !== "void", linked.fee], [true, 0.75]);
+const switchedLegacy = await updateTicket({ id: legacyTicket.id, paymentMethod: "cash" });
+const wasLinked = (await listCardPayments({ includeVoided: true })).find((p) => p.id === legacyPayment.id);
+check("switching an existing card ticket to cash still voids its row", wasLinked.state, "void");
+check("and unlinks it from the ticket", [switchedLegacy.paymentMethod, switchedLegacy.cardPaymentId], ["cash", ""]);
+
+const attemptedBackToCard = await updateTicket({ id: legacyTicket.id, paymentMethod: "card", cardType: "debit" });
+check("switching back to card is refused, not silently allowed", attemptedBackToCard.paymentMethod, "cash");
+check("so no fresh ledger row gets created", (await listCardPayments({ includeVoided: true })).find((p) => p.ticketId === legacyTicket.id && p.state !== "void"), undefined);
 
 // An ordinary status change must not disturb the ledger.
 const beforeStatus = (await listCardPayments({ includeVoided: true })).length;
-await updateTicket({ id: ticket.id, status: "Ready for Pickup" });
+await updateTicket({ id: legacyTicket.id, status: "Ready for Pickup" });
 check("a status change leaves the ledger alone", (await listCardPayments({ includeVoided: true })).length, beforeStatus);
 
 section("The invariant");

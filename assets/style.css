@@ -6810,6 +6810,14 @@ video.media-viewer-media {
   font-variant-numeric: tabular-nums;
 }
 .acct-tile small { color: var(--text-dim); font-size: 0.76rem; }
+.acct-tile-clickable {
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.acct-tile-clickable:hover { border-color: var(--accent); }
+.acct-tile-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.acct-tile-clickable.is-active-filter { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 /* Only the two tiles that answer "where is the money" carry a rail; giving
    every tile one would flatten them back into a uniform row. */
 .acct-tile-owed { border-left: 3px solid #0f7285; }
