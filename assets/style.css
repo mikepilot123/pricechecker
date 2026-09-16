@@ -6828,6 +6828,10 @@ video.media-viewer-media {
 .bank-tile-deposit strong, .bank-amount-deposit { color: var(--price); }
 .bank-tile-withdrawal { border-left: 3px solid var(--danger); }
 .bank-tile-withdrawal strong, .bank-amount-withdrawal, .money-negative { color: var(--danger) !important; }
+.acct-tile-cash { border-left: 3px solid #7c3aed; }
+.acct-tile-cash strong { color: #7c3aed; }
+.acct-pill-cash { background: #f1eafe; color: #7c3aed; }
+.acct-pill-bank { background: #eef4ff; color: #2b52b8; }
 .bank-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bank-pill-deposit { background: #e2f2e7; color: var(--price); }
 .bank-pill-withdrawal { background: #fce8e6; color: var(--danger); }

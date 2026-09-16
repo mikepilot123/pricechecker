@@ -33,6 +33,10 @@
 
   let BANK_TRANSACTIONS = readCache(BANK_CACHE_KEY);
   let BANK_SUMMARY = null;
+  // Bank and cash are the same ledger (bank_transactions.account_type),
+  // browsed one side at a time — "bank" is the default so nothing changes
+  // for anyone who never touches cash.
+  let bankAccountFilter = "bank";
   let bankKindFilter = "all";
   let bankSearchQuery = "";
   let bankEditingId = null;
@@ -120,54 +124,78 @@
   }
 
   // ---- Bank account -------------------------------------------------------
-  function bankSummaryFromCache() {
+  // Same shape bankAccountSummary() returns server-side — one account type's
+  // worth of balance/flow figures, computed from whatever's cached locally.
+  function accountSummaryFromCache(accountType) {
+    const items = BANK_TRANSACTIONS.filter((item) => (item.accountType || "bank") === accountType);
     const month = new Date().toISOString().slice(0, 7);
-    const deposits = BANK_TRANSACTIONS.filter((item) => item.kind === "deposit" && String(item.occurredAt).slice(0, 7) === month)
+    const deposits = items.filter((item) => item.kind === "deposit" && String(item.occurredAt).slice(0, 7) === month)
       .reduce((total, item) => total + Number(item.amount || 0), 0);
-    const withdrawals = BANK_TRANSACTIONS.filter((item) => item.kind === "withdrawal" && String(item.occurredAt).slice(0, 7) === month)
+    const withdrawals = items.filter((item) => item.kind === "withdrawal" && String(item.occurredAt).slice(0, 7) === month)
       .reduce((total, item) => total + Number(item.amount || 0), 0);
     return {
-      balance: BANK_TRANSACTIONS.reduce((total, item) => total + (item.kind === "deposit" ? 1 : -1) * Number(item.amount || 0), 0),
+      balance: items.reduce((total, item) => total + (item.kind === "deposit" ? 1 : -1) * Number(item.amount || 0), 0),
       depositsThisMonth: deposits,
       withdrawalsThisMonth: withdrawals,
-      netChangeThisMonth: deposits - withdrawals,
-      transactionCount: BANK_TRANSACTIONS.length,
-      lastActivity: BANK_TRANSACTIONS[0]?.occurredAt || null,
+      transactionCount: items.length,
+      lastActivity: items[0]?.occurredAt || null,
+    };
+  }
+
+  function bankSummaryFromCache() {
+    const bank = accountSummaryFromCache("bank");
+    return {
+      ...bank,
+      netChangeThisMonth: bank.depositsThisMonth - bank.withdrawalsThisMonth,
+      cash: accountSummaryFromCache("cash"),
     };
   }
 
   function renderBankAccount() {
     const summary = BANK_SUMMARY || bankSummaryFromCache();
+    const cash = summary.cash || { balance: 0, lastActivity: null };
     const setText = (id, value) => { const element = $(id); if (element) element.textContent = value; };
     setText("bankBalance", money(summary.balance));
     setText("bankDeposits", money(summary.depositsThisMonth));
     setText("bankWithdrawals", money(summary.withdrawalsThisMonth));
-    setText("bankNetChange", money(summary.netChangeThisMonth));
+    setText("cashBalance", money(cash.balance));
     setText("bankBalanceSub", summary.lastActivity ? `Last activity ${formatDay(summary.lastActivity)}` : "No activity yet");
+    setText("cashBalanceSub", cash.lastActivity ? `Last activity ${formatDay(cash.lastActivity)}` : "No activity yet");
     $("bankBalance")?.classList.toggle("money-negative", Number(summary.balance) < 0);
-    $("bankNetChange")?.classList.toggle("money-negative", Number(summary.netChangeThisMonth) < 0);
+    $("cashBalance")?.classList.toggle("money-negative", Number(cash.balance) < 0);
 
+    document.querySelectorAll("[data-bank-account]").forEach((button) => {
+      const active = button.dataset.bankAccount === bankAccountFilter;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
     document.querySelectorAll("[data-bank-kind]").forEach((button) => {
       const active = button.dataset.bankKind === bankKindFilter;
       button.classList.toggle("active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
     });
-    // The summary tiles are a second way to reach the same kind filter as the
-    // chips above the ledger — clicking either moves the same state, so they
-    // stay in sync and highlight together.
-    document.querySelectorAll("[data-bank-tile-filter]").forEach((tile) => {
-      tile.classList.toggle("is-active-filter", tile.dataset.bankTileFilter === bankKindFilter);
+    // The summary tiles are a second way to reach the same account+kind
+    // filter the chips drive — clicking either moves the same state, so they
+    // stay in sync and highlight together. "Current balance"/"Cash on hand"
+    // have no kind of their own, so they open onto everything for that side.
+    document.querySelectorAll("[data-tile-account]").forEach((tile) => {
+      const active = tile.dataset.tileAccount === bankAccountFilter && tile.dataset.tileKind === bankKindFilter;
+      tile.classList.toggle("is-active-filter", active);
     });
+    const eyebrow = $("bankLedgerEyebrow");
+    if (eyebrow) eyebrow.textContent = bankAccountFilter === "cash" ? "Cash ledger" : "Bank ledger";
+
     const query = bankSearchQuery.trim().toLowerCase();
-    const visible = BANK_TRANSACTIONS.filter((item) => {
+    const scoped = BANK_TRANSACTIONS.filter((item) => (item.accountType || "bank") === bankAccountFilter);
+    const visible = scoped.filter((item) => {
       if (bankKindFilter !== "all" && item.kind !== bankKindFilter) return false;
       return !query || [item.category, item.reference, item.notes].some((value) => String(value || "").toLowerCase().includes(query));
     });
-    setText("bankTransactionCount", BANK_TRANSACTIONS.length ? `${visible.length} of ${BANK_TRANSACTIONS.length} transaction${BANK_TRANSACTIONS.length === 1 ? "" : "s"}` : "No bank transactions yet");
+    setText("bankTransactionCount", scoped.length ? `${visible.length} of ${scoped.length} transaction${scoped.length === 1 ? "" : "s"}` : `No ${bankAccountFilter} transactions yet`);
     const list = $("bankTransactionList");
     if (!list) return;
     if (!visible.length) {
-      list.innerHTML = `<p class="ops-empty">${BANK_TRANSACTIONS.length ? "No transactions match this filter." : "Add your current balance as an opening deposit to begin."}</p>`;
+      list.innerHTML = `<p class="ops-empty">${scoped.length ? "No transactions match this filter." : bankAccountFilter === "cash" ? "Record a cash deposit or withdrawal to begin." : "Add your current balance as an opening deposit to begin."}</p>`;
       return;
     }
     list.innerHTML = visible.map((item) => `
@@ -180,9 +208,19 @@
         <div class="acct-row-side">
           <strong class="bank-amount bank-amount-${item.kind}">${item.kind === "deposit" ? "+" : "−"}${money(item.amount)}</strong>
           <span class="acct-pill bank-pill-${item.kind}">${item.kind === "deposit" ? "Deposit" : "Withdrawal"}</span>
+          <span class="acct-pill acct-pill-${item.accountType || "bank"}">${item.accountType === "cash" ? "Cash" : "Bank"}</span>
           <div class="ops-row-actions"><button type="button" data-bank-edit="${esc(item.id)}">Edit</button><button type="button" class="danger-text" data-bank-delete="${esc(item.id)}">Delete</button></div>
         </div>
       </article>`).join("");
+  }
+
+  let bankTransactionAccountType = "bank";
+
+  function setBankTransactionAccountType(type) {
+    bankTransactionAccountType = type === "cash" ? "cash" : "bank";
+    document.querySelectorAll("[data-account-type]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.accountType === bankTransactionAccountType);
+    });
   }
 
   function openBankTransactionModal(kind, transaction) {
@@ -193,6 +231,9 @@
     $("bankTransactionId").value = bankEditingId || "";
     $("bankTransactionKind").value = selectedKind;
     updateBankTransactionKindUI(selectedKind);
+    // New entries default to whichever ledger is currently on screen — the
+    // common case is adding to the one you're already looking at.
+    setBankTransactionAccountType(transaction ? transaction.accountType || "bank" : bankAccountFilter);
     $("bankTransactionAmount").value = transaction ? Number(transaction.amount).toFixed(2) : "";
     $("bankTransactionDate").value = toDateInput(transaction?.occurredAt || new Date());
     $("bankTransactionCategory").value = transaction?.category || (BANK_TRANSACTIONS.length ? "" : "Opening balance");
@@ -247,6 +288,7 @@
         action: wasEditing ? "updateBankTransaction" : "addBankTransaction",
         id: bankEditingId || undefined,
         kind: $("bankTransactionKind").value,
+        accountType: bankTransactionAccountType,
         amount,
         occurredAt: new Date(`${date}T12:00:00`).toISOString(),
         category: $("bankTransactionCategory").value.trim(),
@@ -256,7 +298,7 @@
       closeBankTransactionModal();
       BANK_SUMMARY = null;
       await loadAll(true);
-      toast(wasEditing ? "Bank transaction updated" : "Bank transaction saved");
+      toast(wasEditing ? `${bankTransactionAccountType === "cash" ? "Cash" : "Bank"} transaction updated` : `${bankTransactionAccountType === "cash" ? "Cash" : "Bank"} transaction saved`);
     } catch (error) {
       setMessage("bankTransactionMessage", error.message);
     } finally {
@@ -289,23 +331,36 @@
     $("bankTransactionSubmit")?.addEventListener("click", submitBankTransaction);
     $("bankTransactionKind")?.addEventListener("change", (event) => updateBankTransactionKindUI(event.target.value));
     $("bankTransactionForm")?.addEventListener("submit", (event) => { event.preventDefault(); submitBankTransaction(); });
+    $("bankTransactionAccountChips")?.addEventListener("click", (event) => {
+      const type = event.target.closest("[data-account-type]")?.dataset.accountType;
+      if (type) setBankTransactionAccountType(type);
+    });
+    $("bankAccountChips")?.addEventListener("click", (event) => {
+      const account = event.target.closest("[data-bank-account]")?.dataset.bankAccount;
+      if (!account) return;
+      bankAccountFilter = account;
+      renderBankAccount();
+    });
     $("bankKindChips")?.addEventListener("click", (event) => {
       const kind = event.target.closest("[data-bank-kind]")?.dataset.bankKind;
       if (!kind) return;
       bankKindFilter = kind;
       renderBankAccount();
     });
-    // Deposits/Withdrawals/Net change tiles double as shortcuts into the same
-    // kind filter the chips drive — Net change has no transaction kind of its
-    // own, so it opens onto everything rather than filtering to nothing.
+    // The 4 summary tiles double as shortcuts into the same account+kind
+    // filter the chips above the ledger drive — "Current balance" and "Cash
+    // on hand" have no kind of their own, so they open onto everything for
+    // that side rather than filtering to nothing.
     function applyTileFilter(tile) {
-      const kind = tile?.dataset.bankTileFilter;
-      if (!kind) return;
+      const account = tile?.dataset.tileAccount;
+      const kind = tile?.dataset.tileKind;
+      if (!account || !kind) return;
+      bankAccountFilter = account;
       bankKindFilter = kind;
       renderBankAccount();
       $("bankTransactionList")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-    document.querySelectorAll("[data-bank-tile-filter]").forEach((tile) => {
+    document.querySelectorAll("[data-tile-account]").forEach((tile) => {
       tile.addEventListener("click", () => applyTileFilter(tile));
       tile.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;

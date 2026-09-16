@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=bank-account-retire-cards-1" />
+  <link rel="stylesheet" href="assets/style.css?v=cash-tracking-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -437,25 +437,25 @@
       <p class="info-banner">Add your current balance as an opening deposit, then record money entering and leaving the account.</p>
 
       <div class="acct-tiles">
-        <article class="acct-tile acct-tile-owed">
+        <article class="acct-tile acct-tile-owed acct-tile-clickable" data-tile-account="bank" data-tile-kind="all" role="button" tabindex="0" aria-label="Show all bank transactions">
           <p class="dashboard-eyebrow">Current balance</p>
           <strong id="bankBalance">$0.00</strong>
           <small id="bankBalanceSub">No activity yet</small>
         </article>
-        <article class="acct-tile bank-tile-deposit acct-tile-clickable" data-bank-tile-filter="deposit" role="button" tabindex="0" aria-label="Show only deposits">
+        <article class="acct-tile bank-tile-deposit acct-tile-clickable" data-tile-account="bank" data-tile-kind="deposit" role="button" tabindex="0" aria-label="Show only bank deposits">
           <p class="dashboard-eyebrow">Deposits this month</p>
           <strong id="bankDeposits">$0.00</strong>
           <small>Money in</small>
         </article>
-        <article class="acct-tile bank-tile-withdrawal acct-tile-clickable" data-bank-tile-filter="withdrawal" role="button" tabindex="0" aria-label="Show only withdrawals">
+        <article class="acct-tile bank-tile-withdrawal acct-tile-clickable" data-tile-account="bank" data-tile-kind="withdrawal" role="button" tabindex="0" aria-label="Show only bank withdrawals">
           <p class="dashboard-eyebrow">Withdrawals this month</p>
           <strong id="bankWithdrawals">$0.00</strong>
           <small>Money out</small>
         </article>
-        <article class="acct-tile acct-tile-clickable" data-bank-tile-filter="all" role="button" tabindex="0" aria-label="Show all transactions">
-          <p class="dashboard-eyebrow">Net change this month</p>
-          <strong id="bankNetChange">$0.00</strong>
-          <small>Deposits less withdrawals</small>
+        <article class="acct-tile acct-tile-cash acct-tile-clickable" data-tile-account="cash" data-tile-kind="all" role="button" tabindex="0" aria-label="Show cash transactions">
+          <p class="dashboard-eyebrow">Cash on hand</p>
+          <strong id="cashBalance">$0.00</strong>
+          <small id="cashBalanceSub">No activity yet</small>
         </article>
       </div>
 
@@ -466,6 +466,10 @@
           <input id="bankSearch" type="search" placeholder="Search merchant, reference, notes…" aria-label="Search bank transactions" />
             <button id="clearBankSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
           </div>
+          <div id="bankAccountChips" class="filter-chips" role="tablist" aria-label="Bank or cash">
+            <button type="button" class="chip active" data-bank-account="bank" role="tab" aria-selected="true">Bank</button>
+            <button type="button" class="chip" data-bank-account="cash" role="tab" aria-selected="false">Cash</button>
+          </div>
           <div id="bankKindChips" class="filter-chips" role="tablist" aria-label="Filter bank transactions">
             <button type="button" class="chip active" data-bank-kind="all" role="tab" aria-selected="true">All</button>
             <button type="button" class="chip" data-bank-kind="deposit" role="tab" aria-selected="false">Deposits</button>
@@ -474,7 +478,7 @@
         </div>
         <div class="leads-heading-row">
           <div>
-            <p class="dashboard-eyebrow">Bank ledger</p>
+            <p class="dashboard-eyebrow" id="bankLedgerEyebrow">Bank ledger</p>
             <h3>Transaction history</h3>
           </div>
         </div>
@@ -944,6 +948,13 @@
                 <option value="deposit">Deposit</option>
                 <option value="withdrawal">Withdrawal</option>
               </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label">Account</label>
+              <div class="filter-chips" id="bankTransactionAccountChips" role="group" aria-label="Bank or cash">
+                <button type="button" class="chip active" data-account-type="bank">Bank</button>
+                <button type="button" class="chip" data-account-type="cash">Cash</button>
+              </div>
             </div>
             <div class="form-field">
               <label class="field-label" for="bankTransactionAmount">Amount (TTD)</label>
@@ -2370,7 +2381,7 @@
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
-  <script defer src="assets/account.js?v=bank-account-retire-cards-1"></script>
+  <script defer src="assets/account.js?v=cash-tracking-1"></script>
   <script defer src="assets/parts-order-xlsx.js?v=pdf-text-extract-1"></script>
   <script defer src="assets/parts-orders.js?v=sales-tax-1"></script>
 </body>
