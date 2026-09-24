@@ -113,9 +113,9 @@
   let statusFilter = "all";
   let editingId = null;
   let formStep = 1;
-  // Client whose device(s) were just saved — powers the success screen's
-  // "Add another device" shortcut so staff can check in a forgotten device.
-  let lastSavedClient = null;
+  // Ticket a new device is being added alongside (the "+" on a client's
+  // repair card). Saved as checkinGroup so both stay on the same card.
+  let addToCheckinGroup = "";
   // Highest step the user has validated their way to in this form session —
   // lets the progress-step numbers jump straight to any already-visited step.
   let maxStepReached = 1;
@@ -1305,17 +1305,12 @@
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       ${notifyUrl ? `<a class="ghost-btn whatsapp-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : ""}
       <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
-      <button type="button" class="ghost-btn" id="ticketModalAddDevice"><svg class="icon"><use href="#i-plus"></use></svg>Add device</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     bindActivityLogBtn($("ticketModalActivity"), ticket);
     $("ticketModalStatus").onclick = () => { closeTicketModal(); openStatusModalForTicket(ticket); };
     $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
-    $("ticketModalAddDevice").onclick = () => {
-      closeTicketModal();
-      openFormForClient({ name: ticket.customerName, phone: ticket.phone, email: ticket.email });
-    };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     bindTicketMediaControls(ticket);
     loadTicketMedia(ticket);
@@ -2127,6 +2122,7 @@
 
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
+    addToCheckinGroup = "";
     setQuickLogMode(false);
     maxStepReached = 1;
     clearFormDevices();
@@ -2166,12 +2162,14 @@
   }
   // Starts a fresh check-in for a client who already has a repair logged:
   // their details are carried over and the wizard opens on the device step.
-  function openFormForClient(client) {
+  function openFormForClient(ticket, checkinGroup) {
     openForm(null);
-    $("intakeFormTitle").textContent = client.name ? `Add device for ${client.name}` : "Add device";
-    $("fName").value = client.name || "";
-    $("fPhone").value = client.phone || "";
-    $("fEmail").value = client.email || "";
+    addToCheckinGroup = checkinGroup || "";
+    const name = ticket.customerName || "";
+    $("intakeFormTitle").textContent = name ? `Add device for ${name}` : "Add device";
+    $("fName").value = name;
+    $("fPhone").value = ticket.phone || "";
+    $("fEmail").value = ticket.email || "";
     setFormStep(2);
     focusUnlessTouch($("fDevice"));
   }
@@ -2213,7 +2211,6 @@
     $("saveForm").hidden = step !== 3;
     $("cancelForm").hidden = isComplete;
     $("doneForm").hidden = !isComplete;
-    $("addDeviceForClient").hidden = !isComplete || !lastSavedClient;
     $("formError").hidden = true;
     if (step === 3) renderPaymentCards();
   }
@@ -2280,9 +2277,6 @@
   $("previousFormStep").addEventListener("click", () => setFormStep(quickLogMode && formStep === 3 ? 1 : formStep - 1));
   $("cancelForm").addEventListener("click", closeForm);
   $("doneForm").addEventListener("click", closeForm);
-  $("addDeviceForClient").addEventListener("click", () => {
-    if (lastSavedClient) openFormForClient(lastSavedClient);
-  });
   $("fSendInvoice").addEventListener("change", () => {
     const field = $("fInvoiceDelivery").closest(".invoice-delivery-field");
     if (field) field.hidden = !$("fSendInvoice").checked;
@@ -2684,7 +2678,6 @@
         $("intakeFormTitle").textContent = "Device updated";
         $("formSuccessTitle").textContent = "Device successfully updated";
         $("formSuccessMessage").textContent = "The device check-in has been saved.";
-        lastSavedClient = { name: customerName, phone, email };
         setFormStep(4);
         $("doneForm").focus();
         uploadMediaQueueForTicket(res.ticket, pendingFormMedia.slice(), { narrate: true });
@@ -2758,6 +2751,7 @@
           repairCost: dev.repairCost,
           amountPaid: dev.amountPaid,
           inventoryItemKey: dev.inventoryItemKey,
+          checkinGroup: addToCheckinGroup,
         });
         if (!res.ok) throw new Error(res.error || "Rejected");
         mergeTicket(res.ticket);
@@ -2797,7 +2791,6 @@
     ];
     if (wasPartial) summaryLines.push(`${failureMessage} The remaining device(s) were not logged — add them separately.`);
     $("formSuccessMessage").textContent = summaryLines.join(" ");
-    lastSavedClient = { name: customerName, phone, email };
     setFormStep(4);
     $("doneForm").focus();
     // Fire-and-forget: queued photos/videos upload per ticket while the
@@ -3510,10 +3503,16 @@
         <div class="ticket-customer">${esc(first.customerName || "Unknown customer")}</div>
         ${ticketPhoneLineHtml(first)}
       </div>
-      <span class="ticket-group-count">${tickets.length} device${tickets.length === 1 ? "" : "s"}</span>`;
+      <span class="ticket-group-count">${tickets.length} device${tickets.length === 1 ? "" : "s"}</span>
+      <button type="button" class="ticket-group-add" aria-label="Add another device for ${esc(first.customerName || "this client")}" title="Add another device"><svg class="icon"><use href="#i-plus"></use></svg></button>`;
     header.querySelectorAll("a.ticket-phone").forEach((phoneEl) => {
       phoneEl.onclick = (e) => e.stopPropagation();
     });
+    header.querySelector(".ticket-group-add").onclick = (e) => {
+      e.stopPropagation();
+      const linked = tickets.find((t) => t.checkinGroup);
+      openFormForClient(first, linked ? linked.checkinGroup : first.id);
+    };
     el.appendChild(header);
 
     const rows = document.createElement("div");
@@ -3548,21 +3547,36 @@
 
   // Returns the list re-grouped in place: each entry is one card's worth of
   // tickets, in the order the tickets already came in. Tickets without a
-  // usable client key or timestamp always stand alone.
+  // usable client key or timestamp always stand alone. A device added later
+  // through a card's "+" carries checkinGroup (the ticket it was added to)
+  // and always joins that ticket's card, however much later it was logged.
   function groupTicketsByCheckin(list) {
-    const groups = [];
+    const groupOf = new Map();
     const openByKey = new Map();
     for (const t of list) {
+      if (t.checkinGroup) continue;
       const key = checkinGroupKey(t);
       const time = t.created ? new Date(t.created).getTime() : NaN;
       const open = key && !isNaN(time) ? openByKey.get(key) : null;
       if (open && Math.abs(time - open.time) <= CHECKIN_GROUP_WINDOW_MS) {
-        open.tickets.push(t);
+        groupOf.set(t.id, open);
         continue;
       }
-      const group = { time, tickets: [t] };
-      groups.push(group);
+      const group = { time, tickets: [] };
+      groupOf.set(t.id, group);
       if (key && !isNaN(time)) openByKey.set(key, group);
+    }
+    const groups = [];
+    for (const t of list) {
+      let group = groupOf.get(t.checkinGroup || t.id);
+      if (!group) {
+        // The ticket it was added to isn't in this list (another status
+        // section, or deleted) — linked devices still share a card.
+        group = { time: NaN, tickets: [] };
+        groupOf.set(t.checkinGroup, group);
+      }
+      if (!group.tickets.length) groups.push(group);
+      group.tickets.push(t);
     }
     return groups.map((g) => g.tickets);
   }
