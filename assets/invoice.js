@@ -376,6 +376,8 @@
       updateLogPreview();
     });
     modal.querySelector("#invLogRepairs").addEventListener("change", updateLogPreview);
+    modal.querySelector("#invBillPhone").addEventListener("input", updateLogPreview);
+    modal.querySelector("#invBillName").addEventListener("input", updateLogPreview);
     modal.querySelector("#invItems").addEventListener("click", (e) => {
       const remove = e.target.closest("[data-item-remove]");
       if (!remove) return;
@@ -474,6 +476,17 @@
       }
       const rep = e.target.closest("[data-suggest-repair]");
       if (rep) addSuggestedRepair(Number(rep.dataset.suggestRepair));
+      const openExisting = e.target.closest("[data-open-existing]");
+      if (openExisting) {
+        const x = (suggest.existing || [])[Number(openExisting.dataset.openExisting)];
+        if (!x) return;
+        // Carry over anything typed on the new invoice as extra lines.
+        const typed = readItems();
+        const merged = { ...x.invoice, items: [...(x.invoice.items || []), ...typed.filter((t) => !(x.invoice.items || []).some((i) => i.description === t.description))] };
+        const { onSaved } = editing || {};
+        closeEditor();
+        openEditor(merged, { onSaved: (saved, url) => { replaceInList(saved); if (onSaved) onSaved(saved, url); } });
+      }
     });
   }
 
@@ -484,6 +497,7 @@
     set("invBillPhone", c.phone);
     set("invBillEmail", c.email);
     suggest.devices = c.devices || [];
+    checkExistingInvoice(c);
     if (suggest.devices.length) {
       const first = suggest.devices[0];
       // Their most recent device goes on the first empty line.
@@ -498,6 +512,25 @@
     } else {
       renderSuggest();
     }
+  }
+
+  // Picking a client with an open repair that's already invoiced (new
+  // invoices only): offer that invoice, so they keep one invoice per job.
+  async function checkExistingInvoice(c) {
+    suggest.existing = [];
+    if (editing?.invoice?.id || typeof window.RPC_OPEN_INVOICED_REPAIRS !== "function") return;
+    try {
+      if (!list.loaded) {
+        const res = await request({ action: "list" });
+        list.invoices = res.invoices || [];
+        list.defaults = res.defaults || list.defaults;
+        list.loaded = true;
+      }
+      suggest.existing = window.RPC_OPEN_INVOICED_REPAIRS(c, list.invoices);
+    } catch (_) {
+      suggest.existing = [];
+    }
+    renderSuggest();
   }
 
   function setSuggestDevice(device, issues) {
@@ -516,16 +549,23 @@
     const box = $("invSuggest");
     if (!box) return;
     const repairs = currentRepairSuggestions();
-    if (!suggest.device) { box.hidden = true; box.innerHTML = ""; return; }
+    const existing = suggest.existing || [];
+    if (!suggest.device && !existing.length) { box.hidden = true; box.innerHTML = ""; return; }
     box.hidden = false;
     box.innerHTML = `
+      ${existing.map((x, i) => `<div class="inv-existing">
+        <p><strong>${esc(x.invoice.billTo?.name || "This client")} already has invoice ${esc(x.invoice.number)}</strong>
+        for their open ${esc(x.ticket.device || "repair")} (${esc(x.ticket.status)}). Add these items there to keep one invoice for the job.</p>
+        <button type="button" class="primary-btn" data-open-existing="${i}"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg>Open ${esc(x.invoice.number)} instead</button>
+      </div>`).join("")}
+      ${suggest.device ? `
       ${suggest.devices.length > 1 ? `<div class="inv-suggest-row"><span class="inv-suggest-label">Their devices</span>
         ${suggest.devices.map((d, i) => `<button type="button" class="inv-suggest-chip${d.device === suggest.device ? " active" : ""}" data-suggest-device="${i}">${esc(d.device)}</button>`).join("")}</div>` : ""}
       <div class="inv-suggest-row"><span class="inv-suggest-label">Suggested repairs · ${esc(suggest.device)}</span>
         ${repairs.map((r, i) => `<button type="button" class="inv-suggest-chip inv-suggest-repair${r.fromRepair ? " is-match" : ""}" data-suggest-repair="${i}" title="${r.fromRepair ? "Matches the issue on their repair" : "Add this repair"}">
           <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>${esc(r.label)}${r.rate != null ? ` <span>${esc(money(r.rate))}</span>` : ""}</button>`).join("")}
       </div>
-      <p class="inv-suggest-note">Suggestions aren't printed. Click one to add it as a line${repairs.some((r) => r.fromRepair) ? " — highlighted ones match the issue they came in with" : ""}.</p>`;
+      <p class="inv-suggest-note">Suggestions aren't printed. Click one to add it as a line${repairs.some((r) => r.fromRepair) ? " — highlighted ones match the issue they came in with" : ""}.</p>` : ""}`;
   }
 
   // Fills the line that holds just this device's name (from picking the
@@ -561,9 +601,10 @@
       preview.textContent = "Only the invoice will be saved — no repair is logged.";
       return;
     }
-    const lines = typeof window.RPC_INVOICE_REPAIR_PREVIEW === "function" ? window.RPC_INVOICE_REPAIR_PREVIEW(readItems()) : [];
+    const billTo = { name: $("invBillName").value, phone: $("invBillPhone").value };
+    const lines = typeof window.RPC_INVOICE_REPAIR_PREVIEW === "function" ? window.RPC_INVOICE_REPAIR_PREVIEW(readItems(), billTo) : [];
     preview.textContent = lines.length
-      ? `On save, logs ${lines.length} repair${lines.length === 1 ? "" : "s"} (status Received): ${lines.join(" · ")}`
+      ? `On save: ${lines.join(" · ")}. Fees and accessories are added to the repair, not logged separately.`
       : "Add a line like “Pixel 7 Pro Screen Replacement” and the repair is logged on save.";
   }
 
@@ -675,6 +716,7 @@
     suggest.devices = [];
     suggest.device = "";
     suggest.issues = "";
+    suggest.existing = [];
     renderSuggest();
     if (typeof window.RPC_PREPARE_CUSTOMER_SUGGEST === "function") {
       Promise.resolve(window.RPC_PREPARE_CUSTOMER_SUGGEST()).then(() => suggest.refresh && suggest.refresh());
@@ -741,10 +783,15 @@
         // rather than losing the invoice.
         try {
           btn.textContent = "Logging repairs…";
-          const tickets = await window.RPC_LOG_REPAIRS_FOR_INVOICE(res.invoice);
+          const { tickets, created, reused } = await window.RPC_LOG_REPAIRS_FOR_INVOICE(res.invoice);
           if (tickets.length) {
             res = await request({ action: "update", id: res.invoice.id, invoice: { ticketIds: tickets.map((t) => t.id) } });
-            notify(`Invoice ${res.invoice.number} saved and ${tickets.length} repair${tickets.length === 1 ? "" : "s"} logged.`);
+            // Sale amounts and payment come from the invoice, once.
+            await window.RPC_SYNC_REPAIRS_FROM_INVOICE?.(res.invoice);
+            const parts = [];
+            if (reused) parts.push(`${reused} existing repair${reused === 1 ? "" : "s"} updated`);
+            if (created) parts.push(`${created} new repair${created === 1 ? "" : "s"} logged`);
+            notify(`Invoice ${res.invoice.number} saved — ${parts.join(" and ")}.`);
           }
         } catch (logErr) {
           notify(`Invoice ${res.invoice.number} was saved, but the repair couldn't be logged: ${logErr.message || logErr}. Log it from the Repairs tab.`, "error");

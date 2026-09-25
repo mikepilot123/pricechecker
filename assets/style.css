@@ -7189,6 +7189,20 @@ video.media-viewer-media {
   font-family: var(--font-display);
 }
 .inv-suggest[hidden] { display: none; }
+.inv-existing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #f1d3ab;
+  border-radius: 8px;
+  background: #fdf3e6;
+}
+.inv-existing p { flex: 1 1 280px; margin: 0 !important; color: #6b3c09; font-size: 0.82rem; line-height: 1.4; }
+.inv-existing .primary-btn { min-height: 40px; white-space: nowrap; }
 .inv-suggest-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .inv-suggest-row + .inv-suggest-row { margin-top: 8px; }
 .inv-suggest-label { width: 100%; color: var(--text-dim); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }

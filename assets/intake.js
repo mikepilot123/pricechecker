@@ -2050,11 +2050,20 @@
     [/power/i, "Won't Power On"],
   ];
 
-  function repairFromInvoiceLine(description) {
+  // Words that start the repair part of a line when the device isn't a known
+  // model: parts ("keyboard", "hinge"…) and generic repair words.
+  const REPAIR_SPLIT_PATTERN = /\b(keyboard|hinge|motherboard|logic board|trackpad|touchpad|fan|ssd|hard drive|hdd|ram|memory|button|housing|frame|lens|joy-?cons?|thumb ?stick|port|replacement|replace|repair|fix|cleaning|service|upgrade|install)/i;
+
+  // knownDevices: this client's own repair devices, matched like price-list
+  // models (so "HP Stream Keyboard Replacement" finds their "HP Stream").
+  function repairFromInvoiceLine(description, knownDevices = []) {
     const text = String(description || "").trim();
     if (!text) return null;
     const key = normalizeModelName(text);
-    const models = Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : [];
+    const models = [
+      ...(Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : []),
+      ...knownDevices.filter(Boolean).map((name) => ({ name })),
+    ];
     let model = null;
     for (const m of models) {
       const name = normalizeModelName(m.name);
@@ -2074,9 +2083,9 @@
       device = model.name;
       rest = text.slice(cut).trim();
     } else {
-      // Not a price-list model: split at the first repair word, if any.
-      const hit = INVOICE_ISSUE_PATTERNS
-        .map(([re]) => re.exec(text))
+      // Unknown model: split at the first repair or part word, if any.
+      const hit = [...INVOICE_ISSUE_PATTERNS.map(([re]) => re), REPAIR_SPLIT_PATTERN]
+        .map((re) => re.exec(text))
         .filter(Boolean)
         .sort((a, b) => a.index - b.index)[0];
       device = hit && hit.index > 0 ? text.slice(0, hit.index).trim() : text;
@@ -2087,36 +2096,125 @@
     return { device: device || text, issue };
   }
 
-  function repairsFromInvoiceItems(items) {
+  // Lines that are charges rather than repairs: fees, delivery/courier,
+  // labour, deposits, and accessories sold alongside (protector, charger…).
+  // They don't become repairs — their amount is added to the repair on the
+  // line above (or the invoice's first repair).
+  const CHARGE_LINE_PATTERN = /\b(fee|fees|charge|charges|courier|delivery|pick\s*-?\s*up|drop\s*-?\s*off|shipping|transport|call[\s-]?out|travel|labou?r|deposit|tax|vat|discount|protector|tempered glass|charger|adapter|cable|power bank|earphones?|headphones?)\b/i;
+
+  function isChargeLine(description) {
+    return CHARGE_LINE_PATTERN.test(String(description || ""));
+  }
+
+  function repairsFromInvoiceItems(items, knownDevices = []) {
     const byDevice = new Map();
+    const pendingCharges = [];
+    let lastKey = null;
+    const addCharge = (entry, item, amount) => {
+      entry.cost += amount;
+      entry.charges.push(item.description);
+    };
     for (const item of items || []) {
-      const parsed = repairFromInvoiceLine(item.description);
-      if (!parsed) continue;
       const amount = (Number(item.qty) || 1) * (Number(item.rate) || 0);
+      if (isChargeLine(item.description)) {
+        if (lastKey && byDevice.has(lastKey)) addCharge(byDevice.get(lastKey), item, amount);
+        else pendingCharges.push({ item, amount });
+        continue;
+      }
+      const parsed = repairFromInvoiceLine(item.description, knownDevices);
+      if (!parsed) continue;
       const key = normalizeModelName(parsed.device);
-      const entry = byDevice.get(key) || { device: parsed.device, issues: [], cost: 0, details: [] };
+      const entry = byDevice.get(key) || { device: parsed.device, issues: [], cost: 0, details: [], charges: [] };
       if (!entry.issues.includes(parsed.issue)) entry.issues.push(parsed.issue);
       entry.cost += amount;
       if (item.detail) entry.details.push(item.detail);
       byDevice.set(key, entry);
+      lastKey = key;
     }
-    return [...byDevice.values()].map((r) => ({ ...r, cost: Math.round(r.cost * 100) / 100 }));
+    const repairs = [...byDevice.values()];
+    // Charges listed before any repair line go on the first repair.
+    if (repairs.length) pendingCharges.forEach(({ item, amount }) => addCharge(repairs[0], item, amount));
+    return repairs.map((r) => ({ ...r, cost: Math.round(r.cost * 100) / 100 }));
   }
 
-  // Preview for the editor: "Pixel 7 pro — Screen Cracked / Broken".
-  window.RPC_INVOICE_REPAIR_PREVIEW = (items) =>
-    repairsFromInvoiceItems(items).map((r) => `${r.device} — ${r.issues.map((i) => i.replace(/^Other:\s*/, "")).join(", ")}`);
+  const FINAL_TICKET_STATUSES = new Set(["Picked Up", "No Fix", "Cancelled"]);
+  const phoneKey = (phone) => String(phone || "").replace(/\D/g, "").slice(-7);
 
-  // Logs the repairs for a just-created invoice and returns the new tickets.
-  // The payment on the invoice is applied to the repairs in order.
+  function isSameClient(t, billTo) {
+    const phone = phoneKey(billTo?.phone);
+    const name = String(billTo?.name || "").trim().toLowerCase();
+    if (phone.length === 7 && phoneKey(t.phone).length === 7) return phoneKey(t.phone) === phone;
+    return !!name && String(t.customerName || "").trim().toLowerCase() === name;
+  }
+
+  // Devices this client has brought in (open repairs first).
+  function clientDevices(billTo) {
+    return TICKETS.filter((t) => isSameClient(t, billTo))
+      .sort((a, b) => Number(FINAL_TICKET_STATUSES.has(a.status)) - Number(FINAL_TICKET_STATUSES.has(b.status)))
+      .map((t) => t.device);
+  }
+
+  // The client's open repair for this device, if they already have one —
+  // matched by phone number (or name when there's no phone) and model.
+  function openRepairFor(billTo, device) {
+    const deviceKey = normalizeModelName(device);
+    return [...TICKETS]
+      .sort((a, b) => (new Date(b.created).getTime() || 0) - (new Date(a.created).getTime() || 0))
+      .find((t) => !FINAL_TICKET_STATUSES.has(t.status)
+        && normalizeModelName(t.device) === deviceKey
+        && isSameClient(t, billTo)) || null;
+  }
+
+  // Preview for the editor: "Updates HP Stream repair (Received) — …" or
+  // "New repair: Pixel 7 pro — Screen Cracked / Broken", plus added charges.
+  window.RPC_INVOICE_REPAIR_PREVIEW = (items, billTo) =>
+    repairsFromInvoiceItems(items, clientDevices(billTo)).map((r) => {
+      const existing = openRepairFor(billTo, r.device);
+      const issues = r.issues.map((i) => i.replace(/^Other:\s*/, "")).join(", ");
+      const charges = r.charges.length ? ` (+ ${r.charges.join(", ")})` : "";
+      return existing
+        ? `updates their open ${r.device} repair (${existing.status})${charges}`
+        : `new repair: ${r.device} — ${issues}${charges}`;
+    });
+
+  // Links a just-created invoice to repairs: reuses the client's open repair
+  // for a device when there is one (adding any new issues), otherwise logs a
+  // new one. Returns every linked ticket. Sale amounts and payment are then
+  // set from the invoice by RPC_SYNC_REPAIRS_FROM_INVOICE, so payments are
+  // counted once.
   window.RPC_LOG_REPAIRS_FOR_INVOICE = async (invoice) => {
     if (!isConfigured()) throw new Error("Set up the Check In PIN from the Repairs tab first");
-    const repairs = repairsFromInvoiceItems(invoice.items);
-    let unpaid = Number(invoice.paymentMade) || 0;
+    if (!loadedOnce) await loadTickets();
+    const repairs = repairsFromInvoiceItems(invoice.items, clientDevices(invoice.billTo));
     const tickets = [];
+    let created = 0;
+    let reused = 0;
     for (const r of repairs) {
-      const paid = Math.min(unpaid, r.cost);
-      unpaid = Math.round((unpaid - paid) * 100) / 100;
+      const existing = openRepairFor(invoice.billTo, r.device);
+      if (existing) {
+        const issues = [...new Set([...splitIssues(existing.issues), ...r.issues])].join(", ");
+        const note = `Billed on invoice ${invoice.number}.`;
+        const res = await api({
+          action: "update",
+          id: existing.id,
+          status: existing.status,
+          customerName: existing.customerName,
+          client: existing.customerName,
+          phone: existing.phone || invoice.billTo?.phone || "",
+          email: existing.email || invoice.billTo?.email || "",
+          device: existing.device,
+          issues,
+          issue: issues,
+          notes: [existing.notes, note].filter(Boolean).join("\n"),
+          repairCost: existing.repairCost,
+          amountPaid: existing.amountPaid,
+        });
+        if (!res.ok) throw new Error(res.error || "Couldn't update " + existing.device);
+        mergeTicket(res.ticket);
+        tickets.push(res.ticket);
+        reused++;
+        continue;
+      }
       const issues = r.issues.join(", ");
       const res = await api({
         action: "add",
@@ -2130,16 +2228,32 @@
         status: "Received",
         notes: [`Logged from invoice ${invoice.number}.`, ...r.details].join("\n"),
         repairCost: String(r.cost),
-        amountPaid: String(Math.round(paid * 100) / 100),
+        amountPaid: "0",
         checkinGroup: tickets[0]?.id || "",
       });
       if (!res.ok) throw new Error(res.error || "Couldn't log " + r.device);
       mergeTicket(res.ticket);
       tickets.push(res.ticket);
+      created++;
     }
     renderStatusChips();
     render();
-    return tickets;
+    return { tickets, created, reused };
+  };
+
+  // Open repairs of this client that are already on an invoice — so a new
+  // invoice for them can point to it instead of starting a second one.
+  window.RPC_OPEN_INVOICED_REPAIRS = (billTo, invoices) => {
+    const phone = phoneKey(billTo?.phone);
+    const name = String(billTo?.name || "").trim().toLowerCase();
+    const mine = TICKETS.filter((t) => !FINAL_TICKET_STATUSES.has(t.status) && (
+      phone.length === 7 ? phoneKey(t.phone) === phone : String(t.customerName || "").trim().toLowerCase() === name));
+    const out = [];
+    for (const inv of invoices || []) {
+      const t = mine.find((x) => (inv.ticketIds || []).includes(x.id));
+      if (t) out.push({ invoice: inv, ticket: t });
+    }
+    return out;
   };
 
   // The invoice card on the final "Device logged" step: PDF, share, edit.
@@ -2301,7 +2415,7 @@
     if (plans.length === 1) {
       plans[0].cost = invoiceTotal;
     } else {
-      const groups = repairsFromInvoiceItems(items);
+      const groups = repairsFromInvoiceItems(items, linked.map((t) => t.device));
       const costFor = (t) => groups.find((g) => normalizeModelName(g.device) === normalizeModelName(t.device));
       if (plans.every((p) => costFor(p.ticket))) plans.forEach((p) => { p.cost = costFor(p.ticket).cost; });
     }
