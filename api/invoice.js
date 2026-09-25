@@ -2,6 +2,7 @@ import { ensureSchema } from "../lib/db.js";
 import { deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
 import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
 import { applyCors, checkPin } from "../lib/security.js";
+import { drawInvoicePdf, invoicePdfName } from "../lib/invoice-pdf.js";
 
 export default async function handler(req, res) {
   // GET serves the customer-facing invoice page as a top-level navigation,
@@ -22,17 +23,37 @@ export default async function handler(req, res) {
   }
 }
 
+// Customer-facing link. ?format=pdf (the "View invoice" button in emails)
+// returns the invoice PDF — the same file the app attaches — to open in the
+// browser; without it, the web version of the invoice.
 async function viewInvoice(req, res) {
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  let invoice;
   try {
-    const invoice = await getInvoiceByToken(req.query?.token);
-    return res.status(200).send(invoiceHtml(invoice));
+    invoice = await getInvoiceByToken(req.query?.token);
   } catch (err) {
-    // A customer's browser hits this GET directly, so show a plain page
-    // instead of a JSON error blob.
-    return res.status(404).send(`<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:60px 20px;color:#334">
-      <h1>Invoice not found</h1><p>${escapeHtml(String((err && err.message) || err))}</p></body></html>`);
+    // A customer's browser hits this directly, so show a plain page instead
+    // of a JSON error blob.
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(404).send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Invoice unavailable</title></head>
+      <body style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;text-align:center;padding:60px 20px;color:#334">
+      <h1 style="font-size:22px">This invoice link is no longer available</h1>
+      <p style="max-width:420px;margin:12px auto;line-height:1.5;color:#607086">The invoice may have been replaced or removed. Please contact ${escapeHtml(INVOICE_BUSINESS.name)}${INVOICE_BUSINESS.email ? ` at <a href="mailto:${escapeHtml(INVOICE_BUSINESS.email)}">${escapeHtml(INVOICE_BUSINESS.email)}</a>` : ""} for a current copy.</p>
+      </body></html>`);
   }
+  if (String(req.query?.format || "").toLowerCase() === "pdf") {
+    const pdf = await invoicePdfBuffer(invoice);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${invoicePdfName(invoice)}"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.status(200).send(pdf);
+  }
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  return res.status(200).send(invoiceHtml(invoice));
+}
+
+async function invoicePdfBuffer(invoice) {
+  const { jsPDF } = await import("jspdf");
+  return Buffer.from(drawInvoicePdf(jsPDF, invoice).output("arraybuffer"));
 }
 
 function escapeHtml(value) {
@@ -118,7 +139,8 @@ async function createAndDeliverInvoice(req, res) {
   }
   if (action === "email") {
     const invoice = await getInvoiceById(body.id);
-    const invoiceUrl = publicInvoiceUrl(req, invoice.token);
+    // The email's "View invoice" button opens the PDF.
+    const invoiceUrl = publicInvoiceUrl(req, invoice.token) + "&format=pdf";
     const sent = await sendInvoiceMail({ ...body, invoice, invoiceUrl });
     const updated = await recordInvoiceEmail(invoice.id, sent);
     return res.status(200).json({ ok: true, sent, invoice: updated, invoiceUrl });
