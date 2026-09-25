@@ -913,24 +913,39 @@
 
     $("invList").innerHTML = `
       <div class="inv-list-row inv-list-header" aria-hidden="true">
-        <span>Date</span><span>Invoice #</span><span>Customer</span><span>Status</span><span>Due date</span>
-        <span class="num">Amount</span><span class="num">Balance due</span><span></span>
+        <span>Invoice</span><span>Customer</span><span>Status</span>
+        <span class="num">Amount</span><span class="num">Paid</span><span class="num">Balance</span><span></span>
       </div>
       ${rows.map((inv) => {
         const t = totalsOf(inv);
         const s = invoiceStatus(inv, today);
-        return `<div class="inv-list-row" role="button" tabindex="0" data-inv-open="${esc(inv.id)}" aria-label="Open invoice ${esc(inv.number)} for ${esc(inv.billTo?.name || "customer")}">
-          <span class="inv-c-date">${esc(displayDate(inv.invoiceDate))}</span>
-          <span class="inv-c-num">${esc(inv.number)}</span>
-          <span class="inv-c-name">${esc(inv.billTo?.name || "—")}</span>
-          <span class="inv-c-status"><span class="inv-status inv-status-${s.tone}">${esc(s.label)}</span></span>
-          <span class="inv-c-due"><span class="inv-m-label">Due </span>${esc(displayDate(inv.dueDate))}</span>
-          <span class="num inv-c-amount">${esc(cur)}${esc(money(t.total))}</span>
-          <span class="num inv-c-balance"><span class="inv-m-label">Balance </span>${esc(cur)}${esc(money(t.balanceDue))}</span>
+        const who = esc(inv.billTo?.name || "customer");
+        const itemsText = (inv.items || []).map((i) => i.description).filter(Boolean).join(" · ");
+        const balanceHtml = t.balanceDue > 0.004
+          ? `<span class="bal-pill is-due">${esc(cur)}${esc(money(t.balanceDue))} due</span>
+             <button type="button" class="bal-mark" data-inv-markpaid="${esc(inv.id)}" aria-label="Mark ${who}'s ${esc(cur)}${esc(money(t.balanceDue))} balance as paid"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Mark paid</button>`
+          : t.balanceDue < -0.004
+            ? `<span class="bal-pill is-credit">${esc(cur)}${esc(money(-t.balanceDue))} over</span>`
+            : `<span class="bal-pill is-paid"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Paid</span>`;
+        return `<div class="inv-list-row" role="button" tabindex="0" data-inv-open="${esc(inv.id)}" aria-label="Open invoice ${esc(inv.number)} for ${who}">
+          <span class="inv-c-inv">
+            <span class="inv-num-btn" title="Edit invoice ${esc(inv.number)}"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg><span>${esc(inv.number)}</span></span>
+            <small>${esc(displayDate(inv.invoiceDate))}${inv.dueDate && inv.dueDate !== inv.invoiceDate ? ` · Due ${esc(displayDate(inv.dueDate))}` : ""}</small>
+          </span>
+          <span class="inv-c-name">
+            <strong>${esc(inv.billTo?.name || "—")}</strong>
+            ${itemsText ? `<small title="${esc(itemsText)}">${esc(itemsText)}</small>` : ""}
+          </span>
+          <span class="inv-c-status"><span class="inv-pill inv-pill-${s.tone}">${esc(s.label)}</span></span>
+          <span class="inv-money inv-c-amount"><span class="sales-m-label">Amount</span><strong>${esc(cur)}${esc(money(t.total))}</strong></span>
+          <span class="inv-money inv-c-paid">
+            <span class="sales-m-label">Paid</span>
+            <label class="money-field"><span aria-hidden="true">$</span><input class="sales-amt inv-paid-input" type="text" inputmode="decimal" autocomplete="off" data-inv-paid="${esc(inv.id)}" value="${esc(money(t.paymentMade))}" aria-label="Amount paid on invoice ${esc(inv.number)}" /></label>
+          </span>
+          <span class="inv-money inv-c-balance"><span class="sales-m-label">Balance</span>${balanceHtml}</span>
           <span class="inv-c-actions">
-            ${t.balanceDue > 0.004 ? `<button type="button" class="ghost-btn inv-row-btn" data-inv-pay="${esc(inv.id)}">Record payment</button>` : ""}
-            <button type="button" class="ghost-btn icon-btn inv-row-btn" data-inv-pdf="${esc(inv.id)}" aria-label="Download PDF for ${esc(inv.number)}"><svg class="icon"><use href="#i-download"></use></svg></button>
-            <button type="button" class="ghost-btn icon-btn inv-row-btn inv-row-delete" data-inv-del="${esc(inv.id)}" aria-label="Delete invoice ${esc(inv.number)}"><svg class="icon"><use href="#i-trash"></use></svg></button>
+            <button type="button" class="ghost-btn icon-btn inv-row-btn" data-inv-pdf="${esc(inv.id)}" aria-label="Download PDF for ${esc(inv.number)}" title="Download PDF"><svg class="icon"><use href="#i-download"></use></svg></button>
+            <button type="button" class="ghost-btn icon-btn inv-row-btn inv-row-delete" data-inv-del="${esc(inv.id)}" aria-label="Delete invoice ${esc(inv.number)}" title="Delete invoice"><svg class="icon"><use href="#i-trash"></use></svg></button>
           </span>
         </div>`;
       }).join("")}`;
@@ -992,66 +1007,41 @@
     renderInvoiceList();
   }
 
-  // Record payment: a small sheet with the balance prefilled; the amount is
-  // added to the invoice's Payment Made.
-  function openPaymentDialog(inv) {
-    let modal = $("invPayModal");
-    if (!modal) {
-      modal = document.createElement("div");
-      modal.id = "invPayModal";
-      modal.className = "modal-backdrop";
-      modal.hidden = true;
-      modal.innerHTML = `
-        <div class="modal-panel inv-pay-panel" role="dialog" aria-modal="true" aria-labelledby="invPayTitle">
-          <div class="modal-header">
-            <h3 id="invPayTitle">Record payment</h3>
-            <button type="button" class="modal-close" data-pay-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
-          </div>
-          <div class="modal-body">
-            <p id="invPaySummary" class="inv-pay-summary"></p>
-            <div class="form-field">
-              <label class="field-label" for="invPayAmount">Amount received</label>
-              <input id="invPayAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" />
-            </div>
-            <p id="invPayError" class="field-error" hidden></p>
-          </div>
-          <div class="modal-footer"><div class="form-actions">
-            <button type="button" class="ghost-btn" data-pay-close>Cancel</button>
-            <button type="button" class="primary-btn" id="invPaySave"><svg class="icon"><use href="#i-check"></use></svg>Record payment</button>
-          </div></div>
-        </div>`;
-      document.body.appendChild(modal);
-      modal.querySelectorAll("[data-pay-close]").forEach((b) => b.addEventListener("click", () => { modal.hidden = true; }));
+  // Paid is edited in place (same as the dashboard's Sales breakdown):
+  // saved on Enter or when the field is left; "Mark paid" settles the
+  // balance. Linked repairs are updated to match.
+  const parseMoney = (raw) => {
+    const cleaned = String(raw ?? "").replace(/[$,\s]/g, "");
+    return cleaned === "" ? NaN : Math.round(Number(cleaned) * 100) / 100;
+  };
+
+  async function saveInvoicePaid(inv, value, { input, button } = {}) {
+    const row = $("invList").querySelector(`[data-inv-open="${CSS.escape(inv.id)}"]`);
+    if (!Number.isFinite(value) || value < 0) {
+      if (input) {
+        const field = input.closest(".money-field") || input;
+        field.classList.add("is-invalid");
+        input.value = input.defaultValue;
+        setTimeout(() => field.classList.remove("is-invalid"), 1500);
+      }
+      return;
     }
-    const t = totalsOf(inv);
-    const cur = inv.currency || "TTD";
-    $("invPaySummary").innerHTML = `<strong>${esc(inv.number)}</strong> · ${esc(inv.billTo?.name || "")}<br>Total ${esc(cur)}${esc(money(t.total))} · Paid ${esc(cur)}${esc(money(t.paymentMade))} · <strong>Balance ${esc(cur)}${esc(money(t.balanceDue))}</strong>`;
-    $("invPayAmount").value = t.balanceDue.toFixed(2);
-    $("invPayError").hidden = true;
-    $("invPaySave").onclick = async () => {
-      const amount = num($("invPayAmount").value);
-      if (amount <= 0) {
-        $("invPayError").textContent = "Enter the amount received.";
-        $("invPayError").hidden = false;
-        return;
-      }
-      const btn = $("invPaySave");
-      btn.disabled = true;
-      try {
-        const res = await request({ action: "update", id: inv.id, invoice: { paymentMade: num(t.paymentMade + amount) } });
-        modal.hidden = true;
-        replaceInList(res.invoice);
-        await syncRepairs(res.invoice);
-      } catch (err) {
-        $("invPayError").textContent = "Couldn't record the payment: " + (err.message || err);
-        $("invPayError").hidden = false;
-      } finally {
-        btn.disabled = false;
-      }
-    };
-    modal.hidden = false;
-    $("invPayAmount").focus();
-    $("invPayAmount").select();
+    if (value === num(inv.paymentMade)) { if (input) input.value = input.defaultValue; return; }
+    row?.classList.add("is-saving");
+    if (button) button.disabled = true;
+    try {
+      const res = await request({ action: "update", id: inv.id, invoice: { paymentMade: value } });
+      replaceInList(res.invoice);
+      const fresh = $("invList").querySelector(`[data-inv-open="${CSS.escape(inv.id)}"]`);
+      fresh?.classList.add("is-saved");
+      setTimeout(() => fresh?.classList.remove("is-saved"), 1200);
+      await syncRepairs(res.invoice);
+    } catch (err) {
+      row?.classList.remove("is-saving");
+      if (input) input.value = input.defaultValue;
+      if (button) button.disabled = false;
+      notify("Couldn't save the payment: " + (err.message || err), "error");
+    }
   }
 
   function newInvoiceDraft() {
@@ -1089,7 +1079,14 @@
     });
     const byId = (id) => list.invoices.find((x) => x.id === id);
     $("invList").addEventListener("click", async (e) => {
-      const pay = e.target.closest("[data-inv-pay]");
+      if (e.target.closest(".money-field")) { e.stopPropagation(); return; }
+      const markPaid = e.target.closest("[data-inv-markpaid]");
+      if (markPaid) {
+        e.stopPropagation();
+        const inv = byId(markPaid.dataset.invMarkpaid);
+        if (inv) saveInvoicePaid(inv, totalsOf(inv).total, { button: markPaid });
+        return;
+      }
       const pdf = e.target.closest("[data-inv-pdf]");
       const del = e.target.closest("[data-inv-del]");
       if (del) {
@@ -1106,7 +1103,6 @@
         return;
       }
       const row = e.target.closest("[data-inv-open]");
-      if (pay) { e.stopPropagation(); openPaymentDialog(byId(pay.dataset.invPay)); return; }
       if (pdf) {
         e.stopPropagation();
         pdf.disabled = true;
@@ -1116,7 +1112,21 @@
       }
       if (row) openEditor(byId(row.dataset.invOpen), { onSaved: (saved) => replaceInList(saved), onDeleted: removeFromList });
     });
+    $("invList").addEventListener("focusin", (e) => {
+      if (e.target.matches(".inv-paid-input")) setTimeout(() => e.target.select(), 0);
+    });
+    $("invList").addEventListener("change", (e) => {
+      const input = e.target.closest(".inv-paid-input");
+      if (!input) return;
+      const inv = byId(input.dataset.invPaid);
+      if (inv) saveInvoicePaid(inv, parseMoney(input.value), { input });
+    });
     $("invList").addEventListener("keydown", (e) => {
+      if (e.target.matches(".inv-paid-input")) {
+        if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
+        if (e.key === "Escape") { e.stopPropagation(); e.target.value = e.target.defaultValue; e.target.blur(); }
+        return;
+      }
       if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-inv-open]")) {
         e.preventDefault();
         e.target.click();
