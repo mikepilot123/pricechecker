@@ -1306,9 +1306,12 @@
         </div>
         <div class="modal-body">
           <div class="sales-breakdown-stats" id="salesBreakdownStats"></div>
-          <div class="leads-searchbar sales-breakdown-search">
-            <svg class="icon"><use href="#i-search"></use></svg>
-            <input id="salesBreakdownSearch" type="search" autocomplete="off" placeholder="Customer, device or invoice #" aria-label="Search this month's sales" />
+          <div class="sales-breakdown-tools">
+            <div class="leads-searchbar sales-breakdown-search">
+              <svg class="icon"><use href="#i-search"></use></svg>
+              <input id="salesBreakdownSearch" type="search" autocomplete="off" placeholder="Customer, device or invoice #" aria-label="Search this month's sales" />
+            </div>
+            <button type="button" class="ghost-btn" id="salesBreakdownExport"><svg class="icon"><use href="#i-download"></use></svg>Export CSV</button>
           </div>
           <div class="sales-breakdown-list" id="salesBreakdownList"></div>
         </div>
@@ -1321,6 +1324,7 @@
       if (e.key === "Escape" && !modal.hidden && ($("invoiceEditorModal")?.hidden ?? true)) close();
     });
     $("salesBreakdownSearch").addEventListener("input", renderSalesBreakdown);
+    $("salesBreakdownExport").addEventListener("click", exportSalesCsv);
     $("salesBreakdownList").addEventListener("click", (e) => {
       const invBtn = e.target.closest("[data-sales-invoice]");
       if (invBtn) {
@@ -1373,12 +1377,7 @@
       <div><span>Collected</span><strong class="is-good">${esc(money2(collected))}</strong></div>
       <div><span>Still owed</span><strong class="is-warn">${esc(money2(total - collected))}</strong></div>`;
 
-    const q = ($("salesBreakdownSearch").value || "").trim().toLowerCase();
-    const shown = rows.filter((t) => {
-      if (!q) return true;
-      const inv = invoiceForTicket(t.id);
-      return [t.customerName, t.phone, t.device, t.issues, t.id, inv && inv.number].some((v) => String(v || "").toLowerCase().includes(q));
-    });
+    const shown = filteredSalesRows(rows);
     if (!shown.length) {
       list.innerHTML = `<p class="today-focus-empty">${rows.length ? "No sales match that search." : "No repairs logged this month yet."}</p>`;
       return;
@@ -1402,6 +1401,48 @@
           <span class="num sales-c-sale">${esc(money2(t.repairCost))}</span>
         </div>`;
       }).join("")}`;
+  }
+
+  function filteredSalesRows(rows = salesTicketsThisMonth()) {
+    const q = ($("salesBreakdownSearch")?.value || "").trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((t) => {
+      const inv = invoiceForTicket(t.id);
+      return [t.customerName, t.phone, t.device, t.issues, t.id, inv && inv.number].some((v) => String(v || "").toLowerCase().includes(q));
+    });
+  }
+
+  // CSV opens straight in Excel, Numbers and Google Sheets. Exports what's
+  // listed (so a search narrows the export too), plus a totals row.
+  function exportSalesCsv() {
+    const rows = filteredSalesRows();
+    const cell = (v) => {
+      const s = String(v ?? "");
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const amount = (v) => (Math.round(Number(v || 0) * 100) / 100).toFixed(2);
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const lines = [["Date", "Repair #", "Customer", "Phone", "Email", "Device", "Issues", "Status", "Invoice #", "Sale (TTD)", "Paid (TTD)", "Owed (TTD)"]];
+    let sale = 0, paid = 0, owed = 0;
+    for (const t of rows) {
+      const inv = invoiceForTicket(t.id);
+      const owe = Math.max(0, t.repairCost - t.amountPaid);
+      sale += t.repairCost; paid += t.amountPaid; owed += owe;
+      lines.push([ymd(ticketDate(t)), t.id, t.customerName, t.phone, t.email, t.device, t.issues, t.status, inv ? inv.number : "", amount(t.repairCost), amount(t.amountPaid), amount(owe)]);
+    }
+    lines.push([]);
+    lines.push(["Total", "", `${rows.length} repair${rows.length === 1 ? "" : "s"}`, "", "", "", "", "", "", amount(sale), amount(paid), amount(owed)]);
+    // Leading BOM so Excel reads names with accents correctly.
+    const csv = "\ufeff" + lines.map((r) => r.map(cell).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sales-${monthKey(new Date())}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function openSalesBreakdown() {

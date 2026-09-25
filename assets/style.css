@@ -7266,7 +7266,9 @@ video.media-viewer-media {
 .sales-breakdown-stats strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
 .sales-breakdown-stats .is-good { color: var(--price); }
 .sales-breakdown-stats .is-warn { color: var(--warn); }
-.sales-breakdown-search { margin: 12px 0; }
+.sales-breakdown-tools { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+.sales-breakdown-tools .sales-breakdown-search { flex: 1; min-width: 0; margin: 0; }
+.sales-breakdown-tools .ghost-btn { flex: none; min-height: 44px; white-space: nowrap; }
 .sales-breakdown-list { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
 .sales-row {
   display: grid;
