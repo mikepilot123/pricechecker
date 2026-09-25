@@ -261,7 +261,10 @@
         const kind = btn.dataset.invCard;
         if (kind === "pdf") busy(btn, () => downloadPdf(invoice));
         if (kind === "share") busy(btn, () => sharePdf(invoice));
-        if (kind === "edit") openEditor(invoice, { onSaved: (saved, savedUrl) => renderCard(el, saved, { url: savedUrl || url }) });
+        if (kind === "edit") openEditor(invoice, {
+          onSaved: (saved, savedUrl) => renderCard(el, saved, { url: savedUrl || url }),
+          onDeleted: () => { el.innerHTML = `<div class="invoice-card"><p class="invoice-card-deleted">Invoice ${esc(invoice.number)} was deleted.</p></div>`; },
+        });
       };
     });
   }
@@ -342,6 +345,7 @@
           <p id="invError" class="field-error" hidden></p>
         </div>
         <div class="modal-footer"><div class="form-actions">
+          <button type="button" class="ghost-btn danger-btn invoice-delete-btn" data-inv-delete aria-label="Delete invoice"><svg class="icon"><use href="#i-trash"></use></svg><span>Delete</span></button>
           <button type="button" class="ghost-btn" data-inv-close>Cancel</button>
           <button type="button" class="ghost-btn" data-inv-save="pdf"><svg class="icon"><use href="#i-download"></use></svg>Save &amp; PDF</button>
           <button type="button" class="primary-btn" data-inv-save="only"><svg class="icon"><use href="#i-check"></use></svg>Save</button>
@@ -369,6 +373,23 @@
     modal.querySelector("#invPaymentMade").addEventListener("input", updateEditorTotals);
     modal.querySelector("#invNotes").addEventListener("input", (e) => autoGrow(e.target));
     modal.querySelectorAll("[data-inv-save]").forEach((btn) => btn.addEventListener("click", () => saveEditor(btn)));
+    modal.querySelector("[data-inv-delete]").addEventListener("click", async (e) => {
+      if (!editing?.invoice?.id) return;
+      const { invoice, onDeleted } = editing;
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        if (await deleteInvoiceWithConfirm(invoice)) {
+          closeEditor();
+          if (onDeleted) onDeleted(invoice);
+        }
+      } catch (err) {
+        $("invError").textContent = "Couldn't delete the invoice: " + (err.message || err);
+        $("invError").hidden = false;
+      } finally {
+        btn.disabled = false;
+      }
+    });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !modal.hidden) { e.stopPropagation(); closeEditor(); }
     }, true);
@@ -428,9 +449,22 @@
     $("invHeadBalance").textContent = `${cur}${money(t.balanceDue)}`;
   }
 
-  function openEditor(invoice, { onSaved } = {}) {
+  // Shared by the editor and the Invoices list. Returns true once deleted.
+  async function deleteInvoiceWithConfirm(invoice) {
+    const t = totalsOf(invoice);
+    const ok = window.confirm(
+      `Delete invoice ${invoice.number} for ${invoice.billTo?.name || "this customer"} (${invoice.currency || "TTD"}${money(t.total)})?\n\n`
+      + "It will disappear from the Invoices list and its customer link will stop working."
+    );
+    if (!ok) return false;
+    await request({ action: "delete", id: invoice.id });
+    return true;
+  }
+
+  function openEditor(invoice, { onSaved, onDeleted } = {}) {
     const modal = ensureEditor();
-    editing = { invoice, onSaved };
+    editing = { invoice, onSaved, onDeleted };
+    modal.querySelector("[data-inv-delete]").hidden = !invoice.id;
     const b = invoice.business || {};
     $("invFrom").innerHTML = `<p class="inv-from-name">${esc(b.name || "JQ Electronics Ltd.")}</p>`
       + [...(b.addressLines || []), b.email].filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("");
@@ -636,9 +670,15 @@
           <span class="inv-c-actions">
             ${t.balanceDue > 0.004 ? `<button type="button" class="ghost-btn inv-row-btn" data-inv-pay="${esc(inv.id)}">Record payment</button>` : ""}
             <button type="button" class="ghost-btn icon-btn inv-row-btn" data-inv-pdf="${esc(inv.id)}" aria-label="Download PDF for ${esc(inv.number)}"><svg class="icon"><use href="#i-download"></use></svg></button>
+            <button type="button" class="ghost-btn icon-btn inv-row-btn inv-row-delete" data-inv-del="${esc(inv.id)}" aria-label="Delete invoice ${esc(inv.number)}"><svg class="icon"><use href="#i-trash"></use></svg></button>
           </span>
         </div>`;
       }).join("")}`;
+  }
+
+  function removeFromList(invoice) {
+    list.invoices = list.invoices.filter((x) => x.id !== invoice.id);
+    renderInvoiceList();
   }
 
   function replaceInList(saved) {
@@ -745,6 +785,20 @@
     $("invList").addEventListener("click", async (e) => {
       const pay = e.target.closest("[data-inv-pay]");
       const pdf = e.target.closest("[data-inv-pdf]");
+      const del = e.target.closest("[data-inv-del]");
+      if (del) {
+        e.stopPropagation();
+        const inv = byId(del.dataset.invDel);
+        del.disabled = true;
+        try {
+          if (await deleteInvoiceWithConfirm(inv)) removeFromList(inv);
+        } catch (err) {
+          $("invListStatus").textContent = "Couldn't delete the invoice: " + (err.message || err);
+        } finally {
+          del.disabled = false;
+        }
+        return;
+      }
       const row = e.target.closest("[data-inv-open]");
       if (pay) { e.stopPropagation(); openPaymentDialog(byId(pay.dataset.invPay)); return; }
       if (pdf) {
@@ -754,7 +808,7 @@
         finally { pdf.disabled = false; }
         return;
       }
-      if (row) openEditor(byId(row.dataset.invOpen), { onSaved: (saved) => replaceInList(saved) });
+      if (row) openEditor(byId(row.dataset.invOpen), { onSaved: (saved) => replaceInList(saved), onDeleted: removeFromList });
     });
     $("invList").addEventListener("keydown", (e) => {
       if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-inv-open]")) {

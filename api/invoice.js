@@ -1,5 +1,5 @@
 import { ensureSchema } from "../lib/db.js";
-import { createInvoice, DEFAULT_INVOICE_NOTES, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
+import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
@@ -46,6 +46,7 @@ function escapeHtml(value) {
 //   list       – every invoice (with its customer link), plus the defaults a
 //                brand-new invoice starts from
 //   send       – { id, delivery } re-delivers an existing invoice
+//   delete     – { id } hides the invoice (soft delete)
 // No action = the original one-device create-and-send call, still accepted
 // so a browser running an older copy of the app keeps working.
 async function createAndDeliverInvoice(req, res) {
@@ -58,6 +59,9 @@ async function createAndDeliverInvoice(req, res) {
   if (action === "update") {
     const invoice = await updateInvoice(body.id, body.invoice || {});
     return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token) });
+  }
+  if (action === "delete") {
+    return res.status(200).json({ ok: true, ...(await deleteInvoice(body.id)) });
   }
   if (action === "list") {
     const invoices = (await listInvoices()).map((invoice) => ({ ...invoice, url: publicInvoiceUrl(req, invoice.token) }));

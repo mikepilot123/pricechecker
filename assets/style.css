@@ -7234,6 +7234,10 @@ video.media-viewer-media {
   .invoice-card-actions > * { flex: 1 1 calc(50% - 4px); justify-content: center; }
   .invoice-editor-panel .form-actions button { white-space: nowrap; }
   .invoice-editor-panel .form-actions .icon { display: none; }
+  /* Delete stays an icon on phones so the three main buttons keep their room. */
+  .invoice-editor-panel .invoice-delete-btn .icon { display: inline-block; }
+  .invoice-editor-panel .invoice-delete-btn span { display: none; }
+  .invoice-editor-panel .invoice-delete-btn { flex: 0 0 44px; padding: 0; justify-content: center; }
 }
 
 /* ---------- Invoices tab (assets/invoice.js) ---------- */
@@ -7288,7 +7292,7 @@ video.media-viewer-media {
 .inv-list .empty-state { border: 0; box-shadow: none; }
 .inv-list-row {
   display: grid;
-  grid-template-columns: 100px 110px minmax(0, 1.3fr) minmax(0, 1.2fr) 100px 110px 110px 170px;
+  grid-template-columns: 100px 110px minmax(0, 1.3fr) minmax(0, 1.2fr) 100px 110px 110px 212px;
   align-items: center;
   gap: 12px;
   min-height: 56px;
@@ -7317,6 +7321,10 @@ video.media-viewer-media {
 .inv-c-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .inv-row-btn { min-height: 36px; padding: 0 10px; font-size: 0.8rem; white-space: nowrap; }
 .inv-row-btn.icon-btn { width: 36px; padding: 0; justify-content: center; }
+.inv-row-delete { color: var(--danger); }
+.inv-row-delete:hover { background: #fdecea; border-color: #f3c9c2; }
+.invoice-delete-btn { margin-right: auto; color: var(--danger); }
+.invoice-card-deleted { margin: 0; color: var(--text-dim); font-size: 0.9rem; }
 .inv-m-label { display: none; }
 .inv-status { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
 .inv-status-paid { color: var(--price); }
