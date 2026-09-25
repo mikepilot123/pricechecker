@@ -8267,3 +8267,12 @@ video.media-viewer-media {
   .email-empty { flex-wrap: wrap; }
   .email-empty .primary-btn { margin-left: 0; width: 100%; }
 }
+
+/* Settings: "this browser is connected" (replaces the PIN form once registered) */
+.setup-connected { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid #bfe3d3; border-radius: 12px; background: #effaf5; }
+.setup-connected[hidden], #cfgPinForm[hidden] { display: none; }
+.setup-connected-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--price); color: #fff; }
+.setup-connected-icon .icon { width: 16px; height: 16px; }
+.setup-connected p { flex: 1 1 220px; margin: 0; font-size: 0.9rem; }
+.setup-connected p span { color: var(--text-dim); }
+.setup-connected .ghost-btn { min-height: 40px; }

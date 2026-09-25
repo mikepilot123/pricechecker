@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=invoice-email-2" />
+  <link rel="stylesheet" href="assets/style.css?v=settings-fix-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -1599,15 +1599,24 @@
   <main class="container view" id="view-intake" hidden>
     <!-- Setup panel: shown until this browser has a saved signed credential -->
     <section id="intakeSetup" class="setup-card" hidden>
-      <h2 class="setup-title">Connect device check-in</h2>
-      <p class="setup-sub">
-        Enter the team PIN once to register this browser. The PIN itself is
-        not saved, and the browser stays connected when you change Wi-Fi.
-      </p>
-      <label class="field-label" for="cfgPin">Team PIN</label>
-      <input id="cfgPin" class="text-input" type="password" inputmode="numeric" name="team-pin" autocomplete="current-password" placeholder="••••" />
-      <button id="cfgSave" class="primary-btn">Register browser & connect</button>
-      <p id="cfgError" class="field-error" hidden></p>
+      <!-- Already registered: a one-line status instead of the PIN form, so
+           Settings doesn't look like it needs a PIN to be used. -->
+      <div id="cfgConnected" class="setup-connected" hidden>
+        <span class="setup-connected-icon" aria-hidden="true"><svg class="icon"><use href="#i-check"></use></svg></span>
+        <p><strong>This browser is connected.</strong> <span>Settings below can be changed straight away.</span></p>
+        <button type="button" id="cfgReconnect" class="ghost-btn">Re-connect with PIN</button>
+      </div>
+      <div id="cfgPinForm">
+        <h2 class="setup-title">Connect device check-in</h2>
+        <p class="setup-sub">
+          Enter the team PIN once to register this browser. The PIN itself is
+          not saved, and the browser stays connected when you change Wi-Fi.
+        </p>
+        <label class="field-label" for="cfgPin">Team PIN</label>
+        <input id="cfgPin" class="text-input" type="password" inputmode="numeric" name="team-pin" autocomplete="current-password" placeholder="••••" />
+        <button id="cfgSave" class="primary-btn">Register browser & connect</button>
+        <p id="cfgError" class="field-error" hidden></p>
+      </div>
       <div id="settingsMaintenance" class="settings-maintenance" hidden>
         <div class="appt-subnav settings-subnav" role="tablist" aria-label="Settings sections">
           <button type="button" class="appt-subnav-btn active" data-settings-panel="general" role="tab" aria-selected="true">General</button>
@@ -2534,7 +2543,7 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=invoice-email-1"></script>
+  <script defer src="assets/intake.js?v=settings-fix-1"></script>
   <script defer src="assets/invoice.js?v=invoice-email-1"></script>
   <script defer src="assets/email.js?v=invoice-email-1"></script>
   <script defer src="assets/dashboard.js?v=sales-ux-1"></script>

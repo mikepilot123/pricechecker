@@ -336,7 +336,12 @@
     });
   }
   document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
-    btn.addEventListener("click", () => setSettingsPanel(btn.dataset.settingsPanel));
+    btn.addEventListener("click", () => {
+      // From the sidebar/drawer this may be clicked while another tab is
+      // showing — open Settings first so the section is actually visible.
+      if (!settingsMode || $("intakeSetup").hidden || $("view-intake").hidden) settingsNavBtn?.click();
+      setSettingsPanel(btn.dataset.settingsPanel);
+    });
   });
   // Jump straight to a Settings section (e.g. "Link an email account").
   window.RPC_OPEN_SETTINGS_PANEL = (panel) => {
@@ -396,10 +401,19 @@
     });
   });
 
+  // prefill = opened as Settings (not the first-run "connect" screen).
+  let settingsMode = false;
   function showSetup(prefill) {
+    settingsMode = !!prefill;
     $("intakeSetup").hidden = false;
     $("intakeMain").hidden = true;
     $("settingsMaintenance").hidden = !prefill;
+    // Already registered: show a compact "connected" line instead of the PIN
+    // form, which otherwise reads as "you must register to use Settings".
+    const connected = !!prefill && isConfigured();
+    $("cfgConnected").hidden = !connected;
+    $("cfgPinForm").hidden = connected;
+    $("cfgError").hidden = true;
     if (prefill) $("cfgPin").value = "";
     if (prefill && isConfigured()) {
       loadTechnicians();
@@ -434,10 +448,17 @@
       TICKETS = (res.tickets || []).map(normalizeTicket);
       visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
-      showMain();
       renderStatusChips();
       render();
       publishTickets();
+      // Registering from Settings keeps you in Settings (it used to jump to
+      // Repairs and hide everything you were about to change).
+      if (settingsMode) {
+        showSetup(true);
+        toast("Browser connected.", { tone: "info", duration: 2500 });
+        return;
+      }
+      showMain();
       if (pendingLogDevice) {
         const detail = pendingLogDevice;
         pendingLogDevice = null;
@@ -450,6 +471,12 @@
       $("cfgSave").disabled = false;
       $("cfgSave").textContent = "Register browser & connect";
     }
+  });
+
+  $("cfgReconnect").addEventListener("click", () => {
+    $("cfgConnected").hidden = true;
+    $("cfgPinForm").hidden = false;
+    $("cfgPin").focus();
   });
 
   $("cfgPin").addEventListener("keydown", (event) => {
