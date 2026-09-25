@@ -7037,6 +7037,97 @@ video.media-viewer-media {
    ====================================================================== */
 .bottom-nav { display: none; }
 
+/* ---------- Check-in invoice (assets/invoice.js) ---------- */
+.invoice-success { margin-top: 18px; text-align: left; }
+.invoice-success[hidden] { display: none; }
+.invoice-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.invoice-card-head { display: flex; align-items: center; gap: 12px; }
+.invoice-card-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.invoice-card-icon .icon { width: 20px; height: 20px; }
+.invoice-card-id { flex: 1; min-width: 0; }
+.invoice-card-num { margin: 0; font-weight: 600; }
+.invoice-card-sub { margin: 2px 0 0; color: var(--text-dim); font-size: 0.8rem; overflow-wrap: anywhere; }
+.invoice-card-due { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
+.invoice-card-due span { color: var(--text-dim); font-size: 0.7rem; }
+.invoice-card-due strong { font-size: 1rem; }
+.invoice-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.invoice-card-actions > * { min-height: 44px; text-decoration: none; white-space: nowrap; }
+.invoice-card-error { margin: 10px 0 0; }
+.invoice-card-failed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.invoice-card-failed p { margin: 0; color: var(--danger); font-size: 0.88rem; }
+
+.invoice-editor-panel { width: min(100%, 760px); }
+.invoice-items-label { margin: 18px 0 8px; }
+.invoice-items { display: flex; flex-direction: column; gap: 10px; }
+.invoice-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+}
+.invoice-item-num { padding-top: 11px; color: var(--text-dim); font-size: 0.8rem; font-weight: 600; text-align: center; }
+.invoice-item-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.invoice-item-fields textarea { min-height: 38px; resize: vertical; }
+.invoice-item-numbers { display: grid; grid-template-columns: 90px 130px minmax(0, 1fr); gap: 8px; align-items: end; }
+.invoice-item-numbers label { display: flex; flex-direction: column; gap: 3px; color: var(--text-dim); font-size: 0.72rem; font-weight: 500; }
+.invoice-item-amount { justify-self: end; padding-bottom: 10px; font-weight: 600; }
+.invoice-item-remove {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--danger);
+  cursor: pointer;
+}
+.invoice-add-item { margin-top: 10px; }
+.invoice-editor-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 320px);
+  margin: 16px 0 16px auto;
+  font-size: 0.9rem;
+}
+.invoice-editor-totals > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.invoice-payment-row input { width: 140px; text-align: right; }
+.invoice-balance-row { padding: 10px; border-radius: var(--radius-sm); background: #f5f4f3; font-weight: 600; }
+
+@media (max-width: 559px) {
+  .invoice-card-head { flex-wrap: wrap; }
+  .invoice-card-due { flex-direction: row; align-items: baseline; gap: 6px; width: 100%; padding-left: 52px; }
+  .invoice-card-actions > * { flex: 1 1 calc(50% - 4px); justify-content: center; }
+  .invoice-item { grid-template-columns: minmax(0, 1fr) 40px; }
+  .invoice-item-num { display: none; }
+  .invoice-item-numbers { grid-template-columns: 1fr 1fr; }
+  .invoice-item-amount { grid-column: 1 / -1; padding-bottom: 0; }
+  .invoice-editor-totals { width: 100%; }
+  .invoice-editor-panel .text-input { font-size: 16px; }
+  .invoice-editor-panel .form-actions button { white-space: nowrap; }
+  .invoice-editor-panel .form-actions .icon { display: none; }
+}
+
 /* ---------- Repair cost suggested from the price list ---------- */
 .price-suggest-inline { margin: 8px 0 0; color: var(--price); font-weight: 500; }
 .price-suggest {

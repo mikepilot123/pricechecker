@@ -1462,12 +1462,14 @@
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       ${notifyUrl ? `<a class="ghost-btn whatsapp-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : ""}
       <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
+      <button type="button" class="ghost-btn" id="ticketModalInvoice"><svg class="icon"><use href="#i-receipt"></use></svg>Invoice</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     bindActivityLogBtn($("ticketModalActivity"), ticket);
     $("ticketModalStatus").onclick = () => { closeTicketModal(); openStatusModalForTicket(ticket); };
     $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
+    $("ticketModalInvoice").onclick = (e) => openInvoiceForTicket(ticket, e.currentTarget);
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     bindTicketMediaControls(ticket);
     loadTicketMedia(ticket);
@@ -1941,47 +1943,155 @@
     }
   }
 
-  async function sendInvoiceForTicket(ticket, delivery) {
-    if (!ticket?.id) return "";
+  // ---- Invoices ----------------------------------------------------------------
+  // assets/invoice.js builds the PDF and the editor; it talks to the API
+  // through this so the URL and PIN stay in one place.
+  window.RPC_INVOICE_REQUEST = async (body) => {
+    const res = await fetch(INVOICE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ pin: getCfg().pin }, body)),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Invoice request failed");
+    return data;
+  };
+
+  // How each check-in issue reads as an invoice line ("Pixel 7 Pro Screen
+  // Replacement", "Nintendo Switch Diagnostic"), as on the shop's Zoho invoices.
+  const ISSUE_INVOICE_LABEL = {
+    "Screen Cracked / Broken": "Screen Replacement",
+    "Battery Issue": "Battery Replacement",
+    "Charging Port": "Charging Port Repair",
+    "Won't Power On": "Power Issue Repair",
+    "Water Damage": "Water Damage Repair",
+    "Camera Issue": "Camera Repair",
+    "Speaker / Mic Issue": "Speaker / Mic Repair",
+    "Back Glass Cracked": "Back Glass Replacement",
+    "Software Issue": "Software Repair",
+    "Diagnostic Needed": "Diagnostic",
+  };
+
+  // Price-sheet types that already name the work ("Screen replacement",
+  // "OLED Screen", "Ear speaker cleaning") are used as-is, title-cased; bare
+  // part names ("Battery", "Charging Port") get the issue's wording instead.
+  function invoiceLineName(line) {
+    const type = String(line.type || "").trim();
+    if (!/replace|repair|clean|screen|glass/i.test(type)) return ISSUE_INVOICE_LABEL[line.issue] || type;
+    return type.split(/\s+/).map((word) => (
+      /^(OLED|LCD|OEM)$/i.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    )).join(" ");
+  }
+
+  function splitIssues(issuesStr) {
+    return String(issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+  }
+
+  // Invoice lines for one logged device. When the repair cost is exactly the
+  // price-list total, each priced repair gets its own line with its own rate;
+  // otherwise the device is one line at the cost staff entered.
+  function invoiceItemsForDevice(dev) {
+    const cost = Number(String(dev.repairCost || "").replace(/[^0-9.]/g, "")) || 0;
+    const issues = splitIssues(dev.issues);
+    const suggestion = priceSuggestionFor(dev.device, issues, dev.priceChoices || {});
+    const detail = String(dev.notes || "").trim();
+    if (suggestion && Math.abs(suggestion.total - cost) < 0.005) {
+      return suggestion.lines.map((line, i) => ({
+        description: `${dev.device} ${invoiceLineName(line)}`,
+        detail: i === 0 ? detail : "",
+        qty: 1,
+        rate: line.value,
+      }));
+    }
+    const labels = issues.map((issue) => issue.startsWith("Other:") ? issue.slice(6).trim() : (ISSUE_INVOICE_LABEL[issue] || issue));
+    const description = labels.length && labels.length <= 2
+      ? `${dev.device} ${labels.join(" & ")}`
+      : `${dev.device} Repair`;
+    const extra = labels.length > 2 ? labels.join(", ") : "";
+    return [{ description, detail: [extra, detail].filter(Boolean).join("\n"), qty: 1, rate: cost }];
+  }
+
+  // One invoice per check-in, covering every device logged together.
+  async function createCheckinInvoice({ tickets, devices, customerName, phone, email, send }) {
+    const items = devices.flatMap(invoiceItemsForDevice);
+    const paymentMade = devices.reduce((sum, d) => sum + (Number(String(d.amountPaid || "").replace(/[^0-9.]/g, "")) || 0), 0);
+    const today = new Date();
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    return window.RPC_INVOICE_REQUEST({
+      action: "create",
+      ticketIds: tickets.map((t) => t.id),
+      billTo: { name: customerName, phone, email },
+      items,
+      paymentMade,
+      invoiceDate: ymd,
+      useDefaultNotes: true,
+      send: send || "",
+    });
+  }
+
+  // The invoice card on the final "Device logged" step: PDF, share, edit.
+  function renderSuccessInvoice(data, error, { retry } = {}) {
+    const box = $("invoiceSuccessCard");
+    if (!box) return;
+    if (data && data.invoice && window.RPC_INVOICE) {
+      window.RPC_INVOICE.renderCard(box, data.invoice, { url: data.invoiceUrl });
+      return;
+    }
+    box.hidden = false;
+    box.innerHTML = `
+      <div class="invoice-card invoice-card-failed">
+        <p>The device was logged, but the invoice couldn't be created${error ? `: ${esc(error)}` : "."}</p>
+        <button type="button" class="ghost-btn" data-invoice-retry>Try again</button>
+      </div>`;
+    box.querySelector("[data-invoice-retry]").onclick = async (e) => {
+      e.target.disabled = true;
+      e.target.textContent = "Creating invoice…";
+      try {
+        renderSuccessInvoice(await retry(), "", { retry });
+      } catch (ex) {
+        renderSuccessInvoice(null, ex.message || String(ex), { retry });
+      }
+    };
+  }
+
+  // Repair details → Invoice: open the invoice this repair was billed on, or
+  // make one for it (checked in before invoices were automatic).
+  async function openInvoiceForTicket(ticket, btn) {
+    const original = btn ? btn.innerHTML : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
     try {
-      const res = await fetch(INVOICE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          pin: getCfg().pin,
-          delivery,
-          ticketId: ticket.id,
+      let data = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId: ticket.id });
+      if (!data.invoice) {
+        data = await createCheckinInvoice({
+          tickets: [ticket],
+          devices: [{ device: ticket.device, issues: ticket.issues, notes: "", repairCost: ticket.repairCost, amountPaid: ticket.amountPaid }],
           customerName: ticket.customerName,
           phone: ticket.phone,
           email: ticket.email,
-          device: ticket.device,
-          issues: ticket.issues,
-          status: ticket.status,
-          notes: ticket.notes,
-          repairCost: ticket.repairCost,
-          amountPaid: ticket.amountPaid,
-        }),
+          send: "",
+        });
+      }
+      closeTicketModal();
+      window.RPC_INVOICE.openEditor(data.invoice, {
+        onSaved: () => toast("Invoice saved.", { tone: "info", duration: 2500 }),
       });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Invoice failed");
-      if (delivery === "whatsapp") {
-        if (data.whatsappUrl) window.open(data.whatsappUrl, "_blank", "noopener");
-        return data.invoiceNumber
-          ? `Invoice ${data.invoiceNumber} was created; WhatsApp is ready to send.`
-          : "Invoice was created; WhatsApp is ready to send.";
-      }
-      if (data.emailSent) {
-        return data.invoiceNumber
-          ? `Invoice ${data.invoiceNumber} was emailed to the client.`
-          : "The invoice was emailed to the client.";
-      }
-      return data.invoiceNumber
-        ? `Invoice ${data.invoiceNumber} was created, but the email did not send. Open the invoice link and send it manually.`
-        : "The invoice was created, but the email did not send. Open the invoice link and send it manually.";
-    } catch (err) {
-      return "The invoice could not be sent: " + err.message;
+    } catch (ex) {
+      toast("Couldn't open the invoice: " + (ex.message || ex));
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = original; }
     }
+  }
+
+  function invoiceDeliveryMessage(data, delivery) {
+    if (!delivery) return "";
+    if (delivery === "whatsapp") {
+      if (data.whatsappUrl) window.open(data.whatsappUrl, "_blank", "noopener");
+      return data.whatsappUrl ? "WhatsApp is ready to send the invoice." : "No WhatsApp number on file — share the PDF instead.";
+    }
+    return data.emailSent
+      ? "The invoice was emailed to the client."
+      : "The invoice email didn't send — download or share the PDF instead.";
   }
 
   function formatMoney(value) {
@@ -2149,6 +2259,7 @@
       media: pendingFormMedia.slice(),
       repairCost: currentPriceSuggestion() ? String(currentPriceSuggestion().total) : "",
       amountPaid: "",
+      priceChoices: { ...priceChoices },
     });
     renderAddedDevices();
     // The next device starts with a fresh price suggestion.
@@ -2289,6 +2400,8 @@
     addToCheckinGroup = "";
     priceChoices = {};
     autoRepairCost = "";
+    const invoiceCard = $("invoiceSuccessCard");
+    if (invoiceCard) { invoiceCard.hidden = true; invoiceCard.innerHTML = ""; }
     setQuickLogMode(false);
     maxStepReached = 1;
     clearFormDevices();
@@ -2879,6 +2992,7 @@
       repairDueDate: d.repairDueDate || "",
       notes: d.notes,
       media: d.media || [],
+      priceChoices: d.priceChoices || {},
       repairCost: ($("devRepairCost_" + i)?.value ?? d.repairCost ?? "").toString().trim(),
       amountPaid: ($("devAmountPaid_" + i)?.value ?? d.amountPaid ?? "").toString().trim(),
     }));
@@ -2891,6 +3005,7 @@
         inventoryItemKey: $("fInventoryItem").value,
         notes: $("fNotes").value.trim(),
         media: pendingFormMedia.slice(),
+        priceChoices: { ...priceChoices },
         repairCost: $("fRepairCost").value.trim(),
         amountPaid: $("fAmountPaid").value.trim(),
       });
@@ -2906,7 +3021,6 @@
       : "";
     saveBtn.disabled = true;
     const savedTickets = [];
-    const invoiceMessages = [];
     let failureMessage = "";
     for (let i = 0; i < devices.length; i++) {
       const dev = devices[i];
@@ -2932,13 +3046,29 @@
         if (!res.ok) throw new Error(res.error || "Rejected");
         mergeTicket(res.ticket);
         savedTickets.push(res.ticket);
-        if (shouldSendInvoice) {
-          saveBtn.textContent = invoiceDelivery === "whatsapp" ? "Creating invoice…" : "Sending invoice…";
-          invoiceMessages.push(await sendInvoiceForTicket(res.ticket, invoiceDelivery));
-        }
       } catch (ex) {
         failureMessage = `Couldn't save ${dev.device || "a device"}: ${ex.message}`;
         break;
+      }
+    }
+
+    // Every check-in gets an invoice automatically (one for all its devices);
+    // "Send invoice to client" additionally emails/WhatsApps it.
+    let invoiceData = null;
+    let invoiceError = "";
+    if (savedTickets.length) {
+      saveBtn.textContent = "Creating invoice…";
+      try {
+        invoiceData = await createCheckinInvoice({
+          tickets: savedTickets,
+          devices: devices.slice(0, savedTickets.length),
+          customerName,
+          phone,
+          email,
+          send: shouldSendInvoice ? invoiceDelivery : "",
+        });
+      } catch (ex) {
+        invoiceError = ex.message || String(ex);
       }
     }
 
@@ -2963,10 +3093,16 @@
       savedTickets.length > 1
         ? `${savedTickets.length} devices were checked in for ${customerName}.`
         : "The device check-in has been saved.",
-      ...invoiceMessages,
     ];
+    if (invoiceData) {
+      const delivered = invoiceDeliveryMessage(invoiceData, shouldSendInvoice ? invoiceDelivery : "");
+      if (delivered) summaryLines.push(delivered);
+    }
     if (wasPartial) summaryLines.push(`${failureMessage} The remaining device(s) were not logged — add them separately.`);
     $("formSuccessMessage").textContent = summaryLines.join(" ");
+    renderSuccessInvoice(invoiceData, invoiceError, {
+      retry: () => createCheckinInvoice({ tickets: savedTickets, devices: devices.slice(0, savedTickets.length), customerName, phone, email, send: "" }),
+    });
     setFormStep(4);
     $("doneForm").focus();
     // Fire-and-forget: queued photos/videos upload per ticket while the

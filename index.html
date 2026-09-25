@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=price-suggest-1" />
+  <link rel="stylesheet" href="assets/style.css?v=invoice-pdf-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -1903,7 +1903,7 @@
               </div>
               <label class="invoice-request form-field-full">
                 <input id="fSendInvoice" type="checkbox" checked />
-                <span><strong>Send invoice to client</strong><small>Create a JQ Electronics invoice after the device is logged.</small></span>
+                <span><strong>Send invoice to client</strong><small>An invoice is created automatically when the device is logged — tick to also email or WhatsApp it.</small></span>
               </label>
               <div class="form-field form-field-full invoice-delivery-field">
                 <label class="field-label" for="fInvoiceDelivery">Invoice delivery</label>
@@ -2015,6 +2015,7 @@
               <h4 id="formSuccessTitle">Device successfully logged</h4>
               <p id="formSuccessMessage"></p>
             </div>
+            <div id="invoiceSuccessCard" class="invoice-success" hidden></div>
           </section>
           <p id="formError" class="field-error" hidden></p>
         </form>
@@ -2429,7 +2430,8 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=price-suggest-2"></script>
+  <script defer src="assets/intake.js?v=invoice-pdf-1"></script>
+  <script defer src="assets/invoice.js?v=invoice-pdf-1"></script>
   <script defer src="assets/dashboard.js?v=mobile-layout-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>

@@ -1,5 +1,5 @@
 import { ensureSchema } from "../lib/db.js";
-import { createInvoice, getInvoiceByToken, invoiceHtml, invoiceWhatsAppUrl, sendInvoiceEmail } from "../lib/invoices.js";
+import { createInvoice, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, invoiceHtml, invoiceWhatsAppUrl, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
@@ -38,17 +38,45 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// POST actions (all PIN-protected):
+//   create     – new invoice from { billTo, items, paymentMade, ticketIds, … };
+//                `send: "email" | "whatsapp"` also delivers it.
+//   update     – { id, invoice: { …editable fields } }
+//   forTicket  – { ticketId } → the latest invoice containing that repair
+//   send       – { id, delivery } re-delivers an existing invoice
+// No action = the original one-device create-and-send call, still accepted
+// so a browser running an older copy of the app keeps working.
 async function createAndDeliverInvoice(req, res) {
   const body = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
   const denied = checkPin(req, body.pin);
   if (denied) {
     return res.status(denied.status).json({ ok: false, error: denied.error });
   }
-  const invoice = await createInvoice(body);
+  const action = body.action || "legacy";
+  if (action === "update") {
+    const invoice = await updateInvoice(body.id, body.invoice || {});
+    return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token) });
+  }
+  if (action === "forTicket") {
+    const invoice = await getInvoiceForTicket(body.ticketId);
+    return res.status(200).json({ ok: true, invoice, invoiceUrl: invoice ? publicInvoiceUrl(req, invoice.token) : "" });
+  }
+  let invoice;
+  let delivery = "";
+  if (action === "send") {
+    invoice = await getInvoiceById(body.id);
+    delivery = body.delivery === "whatsapp" ? "whatsapp" : "email";
+  } else if (action === "create") {
+    invoice = await createInvoice(body);
+    delivery = body.send === "whatsapp" || body.send === "email" ? body.send : "";
+  } else {
+    invoice = await createInvoice({ ...body, notes: undefined });
+    delivery = body.delivery === "whatsapp" ? "whatsapp" : "email";
+  }
   const invoiceUrl = publicInvoiceUrl(req, invoice.token);
   let emailSent = false;
   let emailError = "";
-  if (body.delivery !== "whatsapp") {
+  if (delivery === "email") {
     try {
       await sendInvoiceEmail(invoice, invoiceUrl);
       emailSent = true;
@@ -58,8 +86,9 @@ async function createAndDeliverInvoice(req, res) {
   }
   return res.status(200).json({
     ok: true,
+    invoice,
     invoiceId: invoice.id,
-    invoiceNumber: invoice.id,
+    invoiceNumber: invoice.number,
     invoiceUrl,
     emailSent,
     emailError,
