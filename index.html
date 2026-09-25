@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=mobile-layout-1" />
+  <link rel="stylesheet" href="assets/style.css?v=price-suggest-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -164,7 +164,7 @@
     <button type="button" class="bottom-nav-btn" data-bottom-target="prices"><svg class="icon" aria-hidden="true"><use href="#i-tag"></use></svg><span>Prices</span></button>
     <button type="button" class="bottom-nav-btn" data-bottom-target="intake"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"></use></svg><span>Repairs</span></button>
     <button type="button" class="bottom-nav-btn bottom-nav-log" id="bottomNavLog"><span class="bottom-nav-log-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg></span><span>Log device</span></button>
-    <button type="button" class="bottom-nav-btn" data-bottom-target="inventory"><svg class="icon" aria-hidden="true"><use href="#i-inventory-flow"></use></svg><span>Inventory</span></button>
+    <button type="button" class="bottom-nav-btn" data-bottom-target="account"><svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg><span>Accounting</span></button>
     <button type="button" class="bottom-nav-btn" id="bottomNavMore" aria-controls="viewNav" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-more"></use></svg><span>More</span><span class="bottom-nav-badge" id="bottomNavMoreBadge" hidden></span></button>
   </nav>
 
@@ -1935,6 +1935,7 @@
                   <svg class="icon issue-select-chevron"><use href="#i-chevron-down"></use></svg>
                 </button>
                 <div id="issueSummary" class="issue-tags issue-tags-readonly"></div>
+                <p id="priceSuggestionInline" class="field-hint price-suggest-inline" hidden></p>
               </div>
               <div class="form-field">
                 <label class="field-label" for="fStatus">Status</label>
@@ -1994,6 +1995,7 @@
             <div id="paymentDeviceCards"></div>
             <div class="payment-device-card" id="currentPaymentCard">
               <p class="payment-device-label" id="currentPaymentLabel" hidden></p>
+              <div id="priceSuggestion" class="price-suggest" hidden></div>
               <div class="form-grid">
                 <div id="repairCostField" class="form-field">
                   <label class="field-label" for="fRepairCost">Repair cost (TTD)</label>
@@ -2427,7 +2429,7 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=mobile-layout-1"></script>
+  <script defer src="assets/intake.js?v=price-suggest-1"></script>
   <script defer src="assets/dashboard.js?v=mobile-layout-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>

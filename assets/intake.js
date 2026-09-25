@@ -958,6 +958,12 @@
   populateIssueTags();
 
   let selectedIssues = new Set();
+  // Price-list suggestion for the device being entered: which price row was
+  // picked for each issue (when a model has several, e.g. OLED vs Incell
+  // screen), and the last Repair cost value filled in automatically — so a
+  // cost staff typed themselves is never overwritten.
+  let priceChoices = {};
+  let autoRepairCost = "";
 
   function populateStatusSelect() {
     $("fStatus").innerHTML = STATUSES.map(
@@ -987,6 +993,7 @@
     $("fIssueOther").hidden = !otherOn;
     if (otherOn) $("fIssueOther").focus();
     updateIssueSummary();
+    refreshPriceSuggestion({ apply: true });
   }
 
   function updateIssueSummary() {
@@ -999,7 +1006,122 @@
     btn.classList.toggle("has-selection", count > 0);
     $("issueSummary").innerHTML = count ? issueTagsHtml(str) : "";
     updateInventoryOptions($("fInventoryItem")?.value || "");
+    refreshPriceSuggestion();
   }
+
+  // ---- Repair cost from the price list --------------------------------------
+  // Each check-in issue maps to the price-sheet repair types that cover it.
+  // A model's matching rows are offered in sheet order, so the first one (the
+  // shop's own ordering) is the default and staff can switch to another.
+  const ISSUE_PRICE_TYPES = {
+    "Screen Cracked / Broken": /screen|front glass/i,
+    "Battery Issue": /battery/i,
+    "Charging Port": /charging port/i,
+    "Water Damage": /water damage/i,
+    "Speaker / Mic Issue": /speaker/i,
+    "Back Glass Cracked": /back glass/i,
+  };
+  const normalizeModelName = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const priceNumber = (value) => {
+    const n = parseFloat(String(value == null ? "" : value).replace(/[^0-9.]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  function findPriceModel(device) {
+    const key = normalizeModelName(device);
+    if (!key) return null;
+    const models = Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : [];
+    return models.find((m) => normalizeModelName(m.name) === key) || null;
+  }
+
+  // Returns { model, lines, total } for the issues that have a price on this
+  // device, or null when nothing selected is on the price list.
+  function priceSuggestionFor(device, issues, choices = {}) {
+    const model = findPriceModel(device);
+    if (!model) return null;
+    const lines = [];
+    issues.forEach((issue) => {
+      const pattern = ISSUE_PRICE_TYPES[issue];
+      if (!pattern) return;
+      const options = (model.prices || [])
+        .map((p) => ({ type: String(p.type || "").trim(), value: priceNumber(p.value) }))
+        .filter((p) => p.type && p.value != null && pattern.test(p.type));
+      if (!options.length) return;
+      const chosen = options.find((o) => o.type === choices[issue]) || options[0];
+      lines.push({ issue, type: chosen.type, value: chosen.value, options });
+    });
+    if (!lines.length) return null;
+    const total = Math.round(lines.reduce((sum, l) => sum + l.value, 0) * 100) / 100;
+    return { model, lines, total };
+  }
+
+  function currentPriceSuggestion() {
+    return priceSuggestionFor($("fDevice").value, [...selectedIssues], priceChoices);
+  }
+
+  // Redraws the price hints and, when `apply` is set (staff just changed the
+  // device, an issue or a price option), fills Repair cost — unless it holds
+  // a figure staff entered themselves.
+  function refreshPriceSuggestion({ apply = false } = {}) {
+    const inline = $("priceSuggestionInline");
+    const panel = $("priceSuggestion");
+    if (!inline || !panel) return;
+    const suggestion = quickLogMode ? null : currentPriceSuggestion();
+    const costInput = $("fRepairCost");
+    const current = costInput.value.trim();
+    const isAuto = !current || current === autoRepairCost;
+    if (apply && !quickLogMode && isAuto) {
+      const next = suggestion ? String(suggestion.total) : "";
+      costInput.value = next;
+      autoRepairCost = next;
+    }
+    if (!suggestion) {
+      inline.hidden = true;
+      panel.hidden = true;
+      panel.innerHTML = "";
+      return;
+    }
+    const summary = suggestion.lines.map((l) => `${l.type} ${formatMoney(l.value)}`).join(" + ");
+    inline.hidden = false;
+    inline.textContent = `Price list: ${formatMoney(suggestion.total)} (${summary})`;
+    const costNow = costInput.value.trim();
+    const differs = priceNumber(costNow) !== suggestion.total;
+    panel.hidden = false;
+    panel.innerHTML = `
+      <p class="price-suggest-title">From the price list · ${esc(suggestion.model.name)}</p>
+      <ul class="price-suggest-lines">
+        ${suggestion.lines.map((l) => `
+          <li>
+            ${l.options.length > 1
+              ? `<select class="price-suggest-select" data-price-issue="${esc(l.issue)}" aria-label="Price option for ${esc(l.issue)}">
+                  ${l.options.map((o) => `<option value="${esc(o.type)}"${o.type === l.type ? " selected" : ""}>${esc(o.type)} — ${esc(formatMoney(o.value))}</option>`).join("")}
+                </select>`
+              : `<span class="price-suggest-type">${esc(l.type)}</span><strong>${esc(formatMoney(l.value))}</strong>`}
+          </li>`).join("")}
+      </ul>
+      <div class="price-suggest-total">
+        <span>Suggested total <strong>${esc(formatMoney(suggestion.total))}</strong></span>
+        ${differs ? `<button type="button" class="ghost-btn price-suggest-apply" data-apply-price>Use ${esc(formatMoney(suggestion.total))}</button>` : ""}
+      </div>`;
+  }
+
+  $("priceSuggestion")?.addEventListener("change", (e) => {
+    const select = e.target.closest("[data-price-issue]");
+    if (!select) return;
+    priceChoices[select.dataset.priceIssue] = select.value;
+    refreshPriceSuggestion({ apply: true });
+  });
+  $("priceSuggestion")?.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-apply-price]")) return;
+    const suggestion = currentPriceSuggestion();
+    if (!suggestion) return;
+    $("fRepairCost").value = String(suggestion.total);
+    autoRepairCost = String(suggestion.total);
+    refreshPriceSuggestion();
+  });
+  $("fRepairCost")?.addEventListener("input", () => refreshPriceSuggestion());
+  // The price list loads in the background; redraw once it's there.
+  window.addEventListener("rpc-price-models", () => refreshPriceSuggestion());
 
   // ---- Issue picker modal ---------------------------------------------------
   function openIssueModal() {
@@ -1336,12 +1458,10 @@
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       ${notifyUrl ? `<a class="ghost-btn whatsapp-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : ""}
-      <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     bindActivityLogBtn($("ticketModalActivity"), ticket);
     $("ticketModalStatus").onclick = () => { closeTicketModal(); openStatusModalForTicket(ticket); };
-    $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     bindTicketMediaControls(ticket);
@@ -1956,6 +2076,7 @@
     $("intakeFormModal").classList.toggle("quick-log", on);
     $("repairCostField").hidden = on;
     $("quotedPriceSummary").hidden = !on;
+    refreshPriceSuggestion();
   }
 
   // ---- Multiple devices for one client --------------------------------------
@@ -2021,10 +2142,14 @@
       repairDueDate: $("fRepairDueDate").value,
       notes: $("fNotes").value.trim(),
       media: pendingFormMedia.slice(),
-      repairCost: "",
+      repairCost: currentPriceSuggestion() ? String(currentPriceSuggestion().total) : "",
       amountPaid: "",
     });
     renderAddedDevices();
+    // The next device starts with a fresh price suggestion.
+    if ($("fRepairCost").value.trim() === autoRepairCost) $("fRepairCost").value = "";
+    autoRepairCost = "";
+    priceChoices = {};
     // Clear the current entry (but don't revoke its media — ownership just
     // moved to the device entry above) so staff can fill in the next device.
     $("fDevice").value = "";
@@ -2094,6 +2219,8 @@
     $("fNotes").value = previous.notes || "";
     $("fRepairCost").value = previous.repairCost || "";
     $("fAmountPaid").value = previous.amountPaid || "";
+    autoRepairCost = previous.repairCost || "";
+    priceChoices = {};
     setIssueTags(previous.issues || "");
     // Ownership of the restored entry's media moves back to the live form.
     pendingFormMedia = previous.media || [];
@@ -2155,6 +2282,8 @@
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
     addToCheckinGroup = "";
+    priceChoices = {};
+    autoRepairCost = "";
     setQuickLogMode(false);
     maxStepReached = 1;
     clearFormDevices();
@@ -2213,7 +2342,11 @@
     clearFormDevices();
     resetPendingFormMedia();
   }
-  $("fDevice").addEventListener("input", () => updateInventoryOptions($("fInventoryItem").value));
+  $("fDevice").addEventListener("input", () => {
+    updateInventoryOptions($("fInventoryItem").value);
+    priceChoices = {};
+    refreshPriceSuggestion({ apply: true });
+  });
 
   $("newIntakeBtn").addEventListener("click", () => openForm(null));
   function setFormStep(step) {
@@ -3454,9 +3587,6 @@
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
         ${partsBtnHtml}
         ${duePill}
-        <button type="button" class="ticket-tech-btn${t.technician ? " is-assigned" : ""}" aria-label="${esc(t.technician ? `Technician: ${t.technician}. Reassign` : "Assign technician")}">
-          <svg class="icon" aria-hidden="true"><use href="#${t.technician ? "i-user" : "i-user-plus"}"></use></svg><span>${esc(t.technician || "Assign technician")}</span>
-        </button>
       </div>
       <div class="ticket-activity">
         ${activityLogBtnHtml(t, "")}

@@ -7036,6 +7036,50 @@ video.media-viewer-media {
    bar's default `display: none`.
    ====================================================================== */
 .bottom-nav { display: none; }
+
+/* ---------- Repair cost suggested from the price list ---------- */
+.price-suggest-inline { margin: 8px 0 0; color: var(--price); font-weight: 500; }
+.price-suggest {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #bfe3d3;
+  border-radius: var(--radius-md);
+  background: #effaf5;
+}
+.price-suggest[hidden] { display: none; }
+.price-suggest-title {
+  margin: 0 0 6px;
+  color: var(--price);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.price-suggest-lines { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.price-suggest-lines li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.88rem; }
+.price-suggest-type { min-width: 0; }
+.price-suggest-select {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font: 500 0.88rem var(--font-display);
+}
+.price-suggest-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #bfe3d3;
+  font-size: 0.88rem;
+}
+.price-suggest-apply { min-height: 40px; }
 /* Phone-only icon for the status filter (the select shows its text above). */
 .intake-filter-icon { display: none; }
 /* Device names in a client card's rows wrap to two lines rather than
@@ -7355,6 +7399,8 @@ video.media-viewer-media {
   /* Inside a status section the header already names the status; changing
      it is one tap away in the repair's details. */
   #intakeList.is-grouped-by-status .ticket-head-compact .status-badge-btn { display: none; }
+  /* ...and when that badge was all the column held, drop the empty row. */
+  #intakeList.is-grouped-by-status .ticket-head-compact .ticket-status:not(:has(> :not(.status-badge-btn))) { display: none; }
   .ticket-head-compact .ticket-tech-btn {
     min-height: var(--m-touch);
     max-width: 100%;
