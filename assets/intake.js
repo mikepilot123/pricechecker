@@ -1120,8 +1120,11 @@
     refreshPriceSuggestion();
   });
   $("fRepairCost")?.addEventListener("input", () => refreshPriceSuggestion());
-  // The price list loads in the background; redraw once it's there.
-  window.addEventListener("rpc-price-models", () => refreshPriceSuggestion());
+  // The price list loads in the background. If it lands while a new check-in
+  // is already open, fill the cost then (an empty or auto-filled one only).
+  window.addEventListener("rpc-price-models", () => {
+    refreshPriceSuggestion({ apply: !$("intakeFormModal").hidden && !editingId });
+  });
 
   // ---- Issue picker modal ---------------------------------------------------
   function openIssueModal() {
@@ -1458,10 +1461,12 @@
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       ${notifyUrl ? `<a class="ghost-btn whatsapp-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : ""}
+      <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
       <button type="button" class="ghost-btn danger-btn" id="ticketModalDelete"><svg class="icon"><use href="#i-trash"></use></svg><span class="visually-hidden">Delete</span></button>`;
     bindActivityLogBtn($("ticketModalActivity"), ticket);
     $("ticketModalStatus").onclick = () => { closeTicketModal(); openStatusModalForTicket(ticket); };
+    $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
     bindTicketMediaControls(ticket);
@@ -2377,7 +2382,13 @@
     $("cancelForm").hidden = isComplete;
     $("doneForm").hidden = !isComplete;
     $("formError").hidden = true;
-    if (step === 3) renderPaymentCards();
+    if (step === 3) {
+      renderPaymentCards();
+      // Safety net: if the cost is still blank (or auto-filled) on arrival,
+      // fill it from the price list now rather than relying on the earlier
+      // device/issue events having fired with the list already loaded.
+      refreshPriceSuggestion({ apply: !editingId });
+    }
   }
 
   // Clicking a step number jumps straight there: backward or to any
@@ -3587,6 +3598,9 @@
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
         ${partsBtnHtml}
         ${duePill}
+        <button type="button" class="ticket-tech-btn${t.technician ? " is-assigned" : ""}" aria-label="${esc(t.technician ? `Technician: ${t.technician}. Reassign` : "Assign technician")}">
+          <svg class="icon" aria-hidden="true"><use href="#${t.technician ? "i-user" : "i-user-plus"}"></use></svg><span>${esc(t.technician || "Assign technician")}</span>
+        </button>
       </div>
       <div class="ticket-activity">
         ${activityLogBtnHtml(t, "")}
