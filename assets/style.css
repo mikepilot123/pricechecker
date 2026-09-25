@@ -7348,7 +7348,8 @@ video.media-viewer-media {
 @media (max-width: 559px) {
   /* Icon only on phones so the three header buttons fit beside the title. */
   #invListExport span { display: none; }
-  #invListExport { width: 44px; padding: 0; justify-content: center; }
+  #invListExport { width: 44px; min-width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+  #invListRefresh { min-width: 44px; min-height: 44px; }
 }
 .inv-summary {
   display: grid;
