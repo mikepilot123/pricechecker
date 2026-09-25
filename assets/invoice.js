@@ -269,6 +269,8 @@
   /* ---- Editor ---------------------------------------------------------- */
   let editing = null; // { invoice, onSaved }
 
+  // The editor is the invoice itself: the same sheet as the PDF, with every
+  // field editable in place (click a value to change it).
   function ensureEditor() {
     let modal = $("invoiceEditorModal");
     if (modal) return modal;
@@ -279,34 +281,63 @@
     modal.innerHTML = `
       <div class="modal-panel invoice-editor-panel" role="dialog" aria-modal="true" aria-labelledby="invoiceEditorTitle">
         <div class="modal-header">
-          <h3 id="invoiceEditorTitle">Edit invoice</h3>
+          <div>
+            <h3 id="invoiceEditorTitle">Edit invoice</h3>
+            <p class="invoice-editor-hint">Click any value on the invoice to change it.</p>
+          </div>
           <button type="button" class="modal-close" data-inv-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
         </div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-field"><label class="field-label" for="invNumber">Invoice #</label><input id="invNumber" class="text-input" autocomplete="off" /></div>
-            <div class="form-field"><label class="field-label" for="invTerms">Terms</label><input id="invTerms" class="text-input" list="invTermsList" autocomplete="off" /></div>
-            <datalist id="invTermsList"><option value="Due on Receipt"></option><option value="Net 7"></option><option value="Net 15"></option><option value="Net 30"></option></datalist>
-            <div class="form-field"><label class="field-label" for="invDate">Invoice date</label><input id="invDate" class="text-input" type="date" /></div>
-            <div class="form-field"><label class="field-label" for="invDueDate">Due date</label><input id="invDueDate" class="text-input" type="date" /></div>
-            <div class="form-field form-field-full"><label class="field-label" for="invBillName">Bill to</label><input id="invBillName" class="text-input" autocomplete="off" /></div>
-            <div class="form-field"><label class="field-label" for="invBillPhone">Phone</label><input id="invBillPhone" class="text-input" type="tel" autocomplete="off" /></div>
-            <div class="form-field"><label class="field-label" for="invBillEmail">Email</label><input id="invBillEmail" class="text-input" type="email" autocomplete="off" /></div>
-          </div>
-          <p class="field-label invoice-items-label">Items</p>
-          <div id="invItems" class="invoice-items"></div>
-          <button type="button" class="ghost-btn invoice-add-item" data-inv-add-item><svg class="icon"><use href="#i-plus"></use></svg>Add line</button>
-          <div class="invoice-editor-totals">
-            <div><span>Sub total</span><strong id="invSubTotal"></strong></div>
-            <div class="invoice-payment-row">
-              <label for="invPaymentMade">Payment made</label>
-              <input id="invPaymentMade" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" />
+        <div class="modal-body invoice-editor-body">
+          <div class="inv-sheet">
+            <section class="inv-top">
+              <div class="inv-from" id="invFrom"></div>
+              <div class="inv-title">
+                <p class="inv-word">INVOICE</p>
+                <label class="inv-number"># <input id="invNumber" class="inv-inline inv-inline-bold" autocomplete="off" aria-label="Invoice number" /></label>
+                <p class="inv-bal-label">Balance Due</p>
+                <p class="inv-bal" id="invHeadBalance"></p>
+              </div>
+            </section>
+
+            <section class="inv-meta">
+              <div class="inv-bill">
+                <p class="inv-muted-label">Bill To</p>
+                <input id="invBillName" class="inv-inline inv-inline-bold" autocomplete="off" placeholder="Customer name" aria-label="Bill to name" />
+                <input id="invBillPhone" class="inv-inline inv-inline-small" type="tel" autocomplete="off" placeholder="Phone (not printed)" aria-label="Phone" />
+                <input id="invBillEmail" class="inv-inline inv-inline-small" type="email" autocomplete="off" placeholder="Email (not printed)" aria-label="Email" />
+              </div>
+              <div class="inv-dates">
+                <label><span>Invoice Date :</span><input id="invDate" class="inv-inline" type="date" /></label>
+                <label><span>Terms :</span><input id="invTerms" class="inv-inline" list="invTermsList" autocomplete="off" /></label>
+                <datalist id="invTermsList"><option value="Due on Receipt"></option><option value="Net 7"></option><option value="Net 15"></option><option value="Net 30"></option></datalist>
+                <label><span>Due Date :</span><input id="invDueDate" class="inv-inline" type="date" /></label>
+              </div>
+            </section>
+
+            <div class="inv-table" role="table" aria-label="Invoice items">
+              <div class="inv-row inv-head" role="row">
+                <span role="columnheader">#</span>
+                <span role="columnheader">Item &amp; Description</span>
+                <span role="columnheader" class="inv-num-col">Qty</span>
+                <span role="columnheader" class="inv-num-col">Rate</span>
+                <span role="columnheader" class="inv-num-col">Amount</span>
+                <span aria-hidden="true"></span>
+              </div>
+              <div id="invItems" class="invoice-items"></div>
             </div>
-            <div class="invoice-balance-row"><span>Balance due</span><strong id="invBalanceDue"></strong></div>
-          </div>
-          <div class="form-field form-field-full">
-            <label class="field-label" for="invNotes">Notes</label>
-            <textarea id="invNotes" class="text-input" rows="8"></textarea>
+            <button type="button" class="inv-add-line" data-inv-add-item><svg class="icon"><use href="#i-plus"></use></svg>Add line</button>
+
+            <div class="inv-totals">
+              <div><span>Sub Total</span><span id="invSubTotal"></span></div>
+              <div class="inv-strong"><span>Total</span><span id="invTotal"></span></div>
+              <label class="inv-paid"><span>Payment Made</span><span class="inv-paid-value">(-) <input id="invPaymentMade" class="inv-inline inv-inline-num" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" aria-label="Payment made" /></span></label>
+              <div class="inv-due"><span>Balance Due</span><span id="invBalanceDue"></span></div>
+            </div>
+
+            <section class="inv-notes">
+              <p class="inv-muted-label">Notes</p>
+              <textarea id="invNotes" class="inv-inline inv-notes-input" rows="10" aria-label="Notes"></textarea>
+            </section>
           </div>
           <p id="invError" class="field-error" hidden></p>
         </div>
@@ -324,7 +355,10 @@
       const rows = modal.querySelectorAll(".invoice-item");
       rows[rows.length - 1]?.querySelector("[data-item=description]")?.focus();
     });
-    modal.querySelector("#invItems").addEventListener("input", updateEditorTotals);
+    modal.querySelector("#invItems").addEventListener("input", (e) => {
+      if (e.target.matches("textarea")) autoGrow(e.target);
+      updateEditorTotals();
+    });
     modal.querySelector("#invItems").addEventListener("click", (e) => {
       const remove = e.target.closest("[data-item-remove]");
       if (!remove) return;
@@ -333,6 +367,7 @@
       updateEditorTotals();
     });
     modal.querySelector("#invPaymentMade").addEventListener("input", updateEditorTotals);
+    modal.querySelector("#invNotes").addEventListener("input", (e) => autoGrow(e.target));
     modal.querySelectorAll("[data-inv-save]").forEach((btn) => btn.addEventListener("click", () => saveEditor(btn)));
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !modal.hidden) { e.stopPropagation(); closeEditor(); }
@@ -340,21 +375,25 @@
     return modal;
   }
 
+  function autoGrow(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + 2 + "px";
+  }
+
   function addItemRow(item) {
     const wrap = $("invItems");
     const row = document.createElement("div");
-    row.className = "invoice-item";
+    row.className = "inv-row invoice-item";
+    row.setAttribute("role", "row");
     row.innerHTML = `
-      <span class="invoice-item-num"></span>
-      <div class="invoice-item-fields">
-        <input class="text-input" data-item="description" placeholder="Item, e.g. Pixel 7 Pro Screen Replacement" value="${esc(item.description)}" aria-label="Item description" />
-        <textarea class="text-input" data-item="detail" rows="1" placeholder="Details (optional)" aria-label="Item details">${esc(item.detail)}</textarea>
-        <div class="invoice-item-numbers">
-          <label>Qty<input class="text-input" data-item="qty" type="number" min="0" step="1" inputmode="decimal" value="${esc(item.qty ?? 1)}" /></label>
-          <label>Rate<input class="text-input" data-item="rate" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(item.rate === "" ? "" : num(item.rate))}" /></label>
-          <span class="invoice-item-amount" data-item-amount></span>
-        </div>
+      <span class="invoice-item-num" role="cell"></span>
+      <div class="invoice-item-desc" role="cell">
+        <input class="inv-inline" data-item="description" placeholder="Item, e.g. Pixel 7 Pro Screen Replacement" value="${esc(item.description)}" aria-label="Item description" />
+        <textarea class="inv-inline inv-inline-detail" data-item="detail" rows="1" placeholder="Add details (optional)" aria-label="Item details">${esc(item.detail)}</textarea>
       </div>
+      <label class="inv-num-col" role="cell"><span class="inv-cell-label">Qty</span><input class="inv-inline inv-inline-num" data-item="qty" type="number" min="0" step="1" inputmode="decimal" value="${esc(item.qty ?? 1)}" aria-label="Quantity" /></label>
+      <label class="inv-num-col" role="cell"><span class="inv-cell-label">Rate</span><input class="inv-inline inv-inline-num" data-item="rate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="${esc(item.rate === "" ? "" : num(item.rate))}" aria-label="Rate" /></label>
+      <span class="inv-num-col invoice-item-amount" role="cell"><span class="inv-cell-label">Amount</span><span data-item-amount></span></span>
       <button type="button" class="invoice-item-remove" data-item-remove aria-label="Remove line"><svg class="icon"><use href="#i-trash"></use></svg></button>`;
     wrap.appendChild(row);
     renumberItems();
@@ -383,13 +422,18 @@
       row.querySelector("[data-item-amount]").textContent = money(qty * rate);
     });
     const t = totalsOf({ items: readItems(), paymentMade: $("invPaymentMade").value });
-    $("invSubTotal").textContent = `${cur}${money(t.subTotal)}`;
+    $("invSubTotal").textContent = money(t.subTotal);
+    $("invTotal").textContent = `${cur}${money(t.total)}`;
     $("invBalanceDue").textContent = `${cur}${money(t.balanceDue)}`;
+    $("invHeadBalance").textContent = `${cur}${money(t.balanceDue)}`;
   }
 
   function openEditor(invoice, { onSaved } = {}) {
     const modal = ensureEditor();
     editing = { invoice, onSaved };
+    const b = invoice.business || {};
+    $("invFrom").innerHTML = `<p class="inv-from-name">${esc(b.name || "JQ Electronics Ltd.")}</p>`
+      + [...(b.addressLines || []), b.email].filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("");
     $("invoiceEditorTitle").textContent = `Edit invoice ${invoice.number || ""}`;
     $("invNumber").value = invoice.number || "";
     $("invTerms").value = invoice.terms || "Due on Receipt";
@@ -406,7 +450,8 @@
     $("invError").hidden = true;
     updateEditorTotals();
     modal.hidden = false;
-    $("invNumber").focus();
+    modal.querySelector(".invoice-editor-body").scrollTop = 0;
+    modal.querySelectorAll("textarea").forEach(autoGrow);
   }
 
   function closeEditor() {
