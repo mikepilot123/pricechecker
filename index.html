@@ -1754,6 +1754,14 @@
                       <button type="button" class="email-swatch" data-swatch="#c2410c" style="--sw:#c2410c" aria-label="Orange"></button>
                       <label class="email-color-custom"><input type="color" id="edAccent" aria-label="Custom colour" /><span id="edAccentHex">#1f5fbf</span></label>
                     </div>
+                    <label class="field-label" for="edHeaderColor">Header bar colour <span class="field-optional">(when the logo is off)</span></label>
+                    <div class="email-swatches" role="radiogroup" aria-label="Header bar colour">
+                      <button type="button" class="email-swatch" data-hswatch="#3c3d3a" style="--sw:#3c3d3a" aria-label="Charcoal"></button>
+                      <button type="button" class="email-swatch" data-hswatch="#1f5fbf" style="--sw:#1f5fbf" aria-label="JQ blue"></button>
+                      <button type="button" class="email-swatch" data-hswatch="#111827" style="--sw:#111827" aria-label="Black"></button>
+                      <button type="button" class="email-swatch" data-hswatch="#047857" style="--sw:#047857" aria-label="Green"></button>
+                      <label class="email-color-custom"><input type="color" id="edHeaderColor" aria-label="Custom header colour" /><span id="edHeaderHex">#3c3d3a</span></label>
+                    </div>
                     <label class="field-label">Font</label>
                     <div class="email-seg" role="radiogroup" aria-label="Font">
                       <button type="button" data-ed-font="modern">Modern</button>
@@ -1764,7 +1772,7 @@
 
                   <fieldset>
                     <legend>Logo</legend>
-                    <label class="email-check"><input type="checkbox" id="edShowLogo" /><span>Show the logo (otherwise the shop name)</span></label>
+                    <label class="email-check"><input type="checkbox" id="edShowLogo" /><span>Show the logo in the header (otherwise the shop name on the header bar)</span></label>
                     <div class="email-seg" role="radiogroup" aria-label="Logo position">
                       <button type="button" data-ed-align="left">Left</button>
                       <button type="button" data-ed-align="center">Centred</button>
@@ -1781,22 +1789,23 @@
                     <div class="email-placeholders" id="edPlaceholders"></div>
                     <label class="field-label" for="edSubject">Subject</label>
                     <input id="edSubject" class="text-input ed-text" />
-                    <label class="field-label" for="edHeadingDue">Heading — invoice with a balance</label>
+                    <label class="field-label" for="edHeadingDue">Heading — invoice with a balance <span class="field-optional">(leave blank for none)</span></label>
                     <input id="edHeadingDue" class="text-input ed-text" />
-                    <label class="field-label" for="edHeadingPaid">Heading — invoice paid in full</label>
+                    <label class="field-label" for="edHeadingPaid">Heading — invoice paid in full <span class="field-optional">(leave blank for none)</span></label>
                     <input id="edHeadingPaid" class="text-input ed-text" />
                     <label class="email-check"><input type="checkbox" id="edShowDueLine" /><span>Show the “balance is due by…” line under the heading</span></label>
                     <label class="field-label" for="edMessage">Default message <span class="field-optional">(can still be changed per email)</span></label>
                     <textarea id="edMessage" class="text-input ed-text" rows="6"></textarea>
                     <label class="field-label" for="edButton">Button text</label>
                     <input id="edButton" class="text-input ed-text" maxlength="40" />
-                    <label class="field-label" for="edFooter">Footer</label>
+                    <label class="field-label" for="edFooter">Footer <span class="field-optional">(below the card — leave blank for none)</span></label>
                     <textarea id="edFooter" class="text-input ed-text" rows="3"></textarea>
                   </fieldset>
 
                   <fieldset>
                     <legend>Sections</legend>
-                    <label class="email-check"><input type="checkbox" id="edShowSummary" /><span>Invoice summary (items and totals)</span></label>
+                    <label class="email-check"><input type="checkbox" id="edShowSummary" /><span>Balance box (amount due, total, paid and the button)</span></label>
+                    <label class="email-check"><input type="checkbox" id="edShowItems" /><span>List the invoice items in the balance box</span></label>
                     <label class="email-check"><input type="checkbox" id="edShowCustomer" /><span>Customer information</span></label>
                     <label class="email-check"><input type="checkbox" id="edShowAddress" /><span>Shop name and address in the footer</span></label>
                   </fieldset>
@@ -2641,7 +2650,7 @@
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/intake.js?v=settings-fix-1"></script>
   <script defer src="assets/invoice.js?v=invoice-email-1"></script>
-  <script defer src="assets/email.js?v=email-design-1"></script>
+  <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/dashboard.js?v=sales-ux-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>

@@ -217,7 +217,7 @@
   /* ---- Email design editor (Settings → Email) ------------------------- */
   const design = { saved: null, current: null, placeholders: [], previewPaid: false, previewTimer: 0, lastField: null, bound: false };
   const TEXT_FIELDS = { edSubject: "subject", edHeadingDue: "headingDue", edHeadingPaid: "headingPaid", edMessage: "message", edButton: "buttonText", edFooter: "footerText" };
-  const CHECK_FIELDS = { edShowLogo: "showLogo", edShowDueLine: "showDueLine", edShowSummary: "showSummary", edShowCustomer: "showCustomerInfo", edShowAddress: "showAddress" };
+  const CHECK_FIELDS = { edShowLogo: "showLogo", edShowDueLine: "showDueLine", edShowSummary: "showSummary", edShowItems: "showItems", edShowCustomer: "showCustomerInfo", edShowAddress: "showAddress" };
 
   function fillDesignForm(t) {
     Object.entries(TEXT_FIELDS).forEach(([id, key]) => { $(id).value = t[key] || ""; });
@@ -226,6 +226,7 @@
     $("edLogoWidth").value = t.logoWidth;
     $("edLogoWidthLabel").textContent = `${t.logoWidth}px`;
     setAccent(t.accentColor, false);
+    setHeaderColor(t.headerColor, false);
     setSeg("[data-ed-font]", "edFont", t.font);
     setSeg("[data-ed-align]", "edAlign", t.logoAlign);
   }
@@ -249,6 +250,17 @@
     if (changed) designChanged();
   }
 
+  function setHeaderColor(color, changed = true) {
+    $("edHeaderColor").value = color;
+    $("edHeaderHex").textContent = color;
+    document.querySelectorAll("[data-hswatch]").forEach((s) => {
+      const on = s.dataset.hswatch.toLowerCase() === color.toLowerCase();
+      s.classList.toggle("active", on);
+      s.setAttribute("aria-checked", on ? "true" : "false");
+    });
+    if (changed) designChanged();
+  }
+
   function readDesignForm() {
     const t = {};
     Object.entries(TEXT_FIELDS).forEach(([id, key]) => { t[key] = $(id).value; });
@@ -256,6 +268,7 @@
     t.logoUrl = $("edLogoUrl").value.trim();
     t.logoWidth = Number($("edLogoWidth").value);
     t.accentColor = $("edAccent").value;
+    t.headerColor = $("edHeaderColor").value;
     t.font = document.querySelector("[data-ed-font].active")?.dataset.edFont || "modern";
     t.logoAlign = document.querySelector("[data-ed-align].active")?.dataset.edAlign || "left";
     return t;
@@ -304,11 +317,13 @@
     form.addEventListener("input", (e) => {
       if (e.target.id === "edLogoWidth") $("edLogoWidthLabel").textContent = `${e.target.value}px`;
       if (e.target.id === "edAccent") { setAccent(e.target.value); return; }
+      if (e.target.id === "edHeaderColor") { setHeaderColor(e.target.value); return; }
       designChanged();
     });
     form.addEventListener("change", designChanged);
     form.addEventListener("focusin", (e) => { if (e.target.matches(".ed-text")) design.lastField = e.target; });
     document.querySelectorAll("[data-swatch]").forEach((b) => b.addEventListener("click", () => setAccent(b.dataset.swatch)));
+    document.querySelectorAll("[data-hswatch]").forEach((b) => b.addEventListener("click", () => setHeaderColor(b.dataset.hswatch)));
     document.querySelectorAll("[data-ed-font]").forEach((b) => b.addEventListener("click", () => { setSeg("[data-ed-font]", "edFont", b.dataset.edFont); designChanged(); }));
     document.querySelectorAll("[data-ed-align]").forEach((b) => b.addEventListener("click", () => { setSeg("[data-ed-align]", "edAlign", b.dataset.edAlign); designChanged(); }));
     document.querySelectorAll("[data-ed-preview]").forEach((b) => b.addEventListener("click", () => {
