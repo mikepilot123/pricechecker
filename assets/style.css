@@ -7256,6 +7256,63 @@ video.media-viewer-media {
   .invoice-editor-panel .invoice-delete-btn { flex: 0 0 44px; padding: 0; justify-content: center; }
 }
 
+/* ---------- Dashboard: "Sales this month" breakdown ---------- */
+.sales-breakdown-panel { max-width: 920px; max-height: 92vh; }
+@media (min-width: 560px) { .sales-breakdown-panel { width: calc(100% - 32px); } }
+.sales-breakdown-sub { margin: 2px 0 0; color: var(--text-dim); font-size: 0.8rem; }
+.sales-breakdown-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.sales-breakdown-stats > div { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); }
+.sales-breakdown-stats span { display: block; color: var(--text-dim); font-size: 0.75rem; }
+.sales-breakdown-stats strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.sales-breakdown-stats .is-good { color: var(--price); }
+.sales-breakdown-stats .is-warn { color: var(--warn); }
+.sales-breakdown-search { margin: 12px 0; }
+.sales-breakdown-list { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.sales-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 130px 110px 100px 100px;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.sales-row:first-child { border-top: 0; }
+.sales-row:not(.sales-row-head):hover { background: var(--card-hover); }
+.sales-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sales-row-head { min-height: 38px; background: var(--bg-soft); color: var(--text-dim); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; cursor: default; }
+.sales-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+.sales-c-main { display: flex; flex-direction: column; min-width: 0; }
+.sales-c-main small { color: var(--text-dim); overflow-wrap: anywhere; }
+.sales-c-date, .sales-c-status { color: var(--text-dim); }
+.sales-c-sale { font-weight: 700; }
+.sales-c-paid small { display: block; color: var(--warn); font-size: 0.72rem; }
+.sales-inv-link { min-height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--accent); font: 600 0.78rem var(--font-display); cursor: pointer; }
+.sales-inv-link:hover { border-color: var(--accent); background: var(--accent-soft); }
+.sales-inv-none { color: var(--text-dim); font-size: 0.75rem; }
+@media (max-width: 700px) {
+  .sales-breakdown-stats { gap: 6px; }
+  .sales-breakdown-stats > div { padding: 8px; }
+  .sales-breakdown-stats strong { font-size: 0.92rem; }
+  .sales-breakdown-search input { font-size: 16px; }
+  .sales-row-head { display: none; }
+  .sales-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "main sale" "status paid" "date inv";
+    gap: 4px 10px;
+    padding: 12px;
+  }
+  .sales-c-main { grid-area: main; }
+  .sales-c-sale { grid-area: sale; font-size: 1rem; }
+  .sales-c-status { grid-area: status; font-size: 0.78rem; }
+  .sales-c-paid { grid-area: paid; font-size: 0.8rem; }
+  .sales-c-date { grid-area: date; font-size: 0.78rem; align-self: center; }
+  .sales-c-inv { grid-area: inv; justify-self: end; }
+  .sales-inv-link { min-height: 40px; }
+}
+
 /* ---------- Invoices tab (assets/invoice.js) ---------- */
 .inv-list-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .inv-list-title { margin: 2px 0 0; font-size: 1.4rem; }

@@ -1101,6 +1101,7 @@
         value: ticketUnavailable ? "—" : money(metrics.salesThisMonth),
         sub: ticketUnavailable ? "Save Check In PIN to load sales" : salesComparison,
         icon: "i-cash",
+        action: ticketUnavailable ? "" : "sales-month",
       },
       {
         title: "Monthly Goal Progress",
@@ -1108,6 +1109,7 @@
         sub: ticketUnavailable ? "Goal data unavailable" : `${money(metrics.salesThisMonth)} / ${money(metrics.goal)}`,
         icon: "i-dashboard",
         progress: ticketUnavailable ? 0 : metrics.goalPercent,
+        action: ticketUnavailable ? "" : "sales-month",
       },
       {
         title: "Active Repairs",
@@ -1238,6 +1240,10 @@
   }
 
   function runAction(action) {
+    if (action === "sales-month") {
+      openSalesBreakdown();
+      return;
+    }
     if (action === "card-takings") {
       if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("account");
       if (typeof window.RPC_ACCOUNT_PANEL === "function") window.RPC_ACCOUNT_PANEL("overview");
@@ -1262,6 +1268,148 @@
     if (state === "error") updated.textContent = "Dashboard sync failed";
     else if (!lastUpdated) updated.textContent = "Loading dashboard…";
     else updated.textContent = "Updated " + relativeTime(lastUpdated);
+  }
+
+  /* ---- Sales this month: what makes up the number ---------------------
+     Same filter as buildMetrics(): every repair logged this month, counted
+     at its repair cost. Each row shows the invoice it was billed on (when
+     there is one); the row opens the repair, the invoice number opens the
+     invoice. */
+  function salesTicketsThisMonth() {
+    const currentMonth = monthKey(new Date());
+    return tickets
+      .filter((ticket) => monthKey(ticketDate(ticket)) === currentMonth)
+      .sort((a, b) => ticketDate(b) - ticketDate(a));
+  }
+
+  function money2(value) {
+    return "$" + Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  let salesInvoices = [];
+
+  function ensureSalesModal() {
+    let modal = $("salesBreakdownModal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "salesBreakdownModal";
+    modal.className = "modal-backdrop";
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="modal-panel sales-breakdown-panel" role="dialog" aria-modal="true" aria-labelledby="salesBreakdownTitle">
+        <div class="modal-header">
+          <div>
+            <h3 id="salesBreakdownTitle">Sales this month</h3>
+            <p class="sales-breakdown-sub" id="salesBreakdownSub"></p>
+          </div>
+          <button type="button" class="modal-close" data-sales-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+        </div>
+        <div class="modal-body">
+          <div class="sales-breakdown-stats" id="salesBreakdownStats"></div>
+          <div class="leads-searchbar sales-breakdown-search">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <input id="salesBreakdownSearch" type="search" autocomplete="off" placeholder="Customer, device or invoice #" aria-label="Search this month's sales" />
+          </div>
+          <div class="sales-breakdown-list" id="salesBreakdownList"></div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const close = () => { modal.hidden = true; };
+    modal.querySelector("[data-sales-close]").addEventListener("click", close);
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.hidden && ($("invoiceEditorModal")?.hidden ?? true)) close();
+    });
+    $("salesBreakdownSearch").addEventListener("input", renderSalesBreakdown);
+    $("salesBreakdownList").addEventListener("click", (e) => {
+      const invBtn = e.target.closest("[data-sales-invoice]");
+      if (invBtn) {
+        e.stopPropagation();
+        const inv = salesInvoices.find((x) => x.id === invBtn.dataset.salesInvoice);
+        if (inv && window.RPC_INVOICE) window.RPC_INVOICE.openEditor(inv, { onSaved: () => loadSalesInvoices() });
+        return;
+      }
+      const row = e.target.closest("[data-sales-ticket]");
+      if (row && typeof window.RPC_OPEN_TICKET_BY_ID === "function") {
+        close();
+        window.RPC_OPEN_TICKET_BY_ID(row.dataset.salesTicket);
+      }
+    });
+    $("salesBreakdownList").addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-sales-ticket]")) {
+        e.preventDefault();
+        e.target.click();
+      }
+    });
+    return modal;
+  }
+
+  function invoiceForTicket(ticketId) {
+    return salesInvoices.find((inv) => (inv.ticketIds || []).includes(ticketId)) || null;
+  }
+
+  async function loadSalesInvoices() {
+    if (typeof window.RPC_INVOICE_REQUEST !== "function") return;
+    try {
+      const res = await window.RPC_INVOICE_REQUEST({ action: "list" });
+      salesInvoices = res.invoices || [];
+    } catch (_) {
+      salesInvoices = [];
+    }
+    renderSalesBreakdown();
+  }
+
+  function renderSalesBreakdown() {
+    const list = $("salesBreakdownList");
+    if (!list) return;
+    const rows = salesTicketsThisMonth();
+    const total = rows.reduce((sum, t) => sum + t.repairCost, 0);
+    const collected = rows.reduce((sum, t) => sum + Math.min(t.amountPaid, t.repairCost), 0);
+    const monthName = new Date().toLocaleDateString([], { month: "long", year: "numeric" });
+    $("salesBreakdownTitle").textContent = `Sales this month · ${money(total)}`;
+    $("salesBreakdownSub").textContent = `${rows.length} repair${rows.length === 1 ? "" : "s"} logged in ${monthName}, counted at their repair cost.`;
+    $("salesBreakdownStats").innerHTML = `
+      <div><span>Total sales</span><strong>${esc(money2(total))}</strong></div>
+      <div><span>Collected</span><strong class="is-good">${esc(money2(collected))}</strong></div>
+      <div><span>Still owed</span><strong class="is-warn">${esc(money2(total - collected))}</strong></div>`;
+
+    const q = ($("salesBreakdownSearch").value || "").trim().toLowerCase();
+    const shown = rows.filter((t) => {
+      if (!q) return true;
+      const inv = invoiceForTicket(t.id);
+      return [t.customerName, t.phone, t.device, t.issues, t.id, inv && inv.number].some((v) => String(v || "").toLowerCase().includes(q));
+    });
+    if (!shown.length) {
+      list.innerHTML = `<p class="today-focus-empty">${rows.length ? "No sales match that search." : "No repairs logged this month yet."}</p>`;
+      return;
+    }
+    list.innerHTML = `
+      <div class="sales-row sales-row-head" aria-hidden="true">
+        <span>Date</span><span>Customer &amp; device</span><span>Status</span><span>Invoice</span><span class="num">Paid</span><span class="num">Sale</span>
+      </div>
+      ${shown.map((t) => {
+        const inv = invoiceForTicket(t.id);
+        const date = ticketDate(t).toLocaleDateString([], { day: "numeric", month: "short" });
+        const owed = Math.max(0, t.repairCost - t.amountPaid);
+        return `<div class="sales-row" role="button" tabindex="0" data-sales-ticket="${esc(t.id)}" aria-label="Open repair for ${esc(t.customerName || "customer")}, ${esc(t.device || "device")}">
+          <span class="sales-c-date">${esc(date)}</span>
+          <span class="sales-c-main"><strong>${esc(t.customerName || "Unknown customer")}</strong><small>${esc(t.device || "—")}${t.issues ? " · " + esc(t.issues) : ""}</small></span>
+          <span class="sales-c-status">${esc(t.status || "")}</span>
+          <span class="sales-c-inv">${inv
+            ? `<button type="button" class="sales-inv-link" data-sales-invoice="${esc(inv.id)}">${esc(inv.number)}</button>`
+            : `<span class="sales-inv-none">No invoice</span>`}</span>
+          <span class="num sales-c-paid">${esc(money2(t.amountPaid))}${owed > 0 ? `<small>${esc(money2(owed))} owed</small>` : ""}</span>
+          <span class="num sales-c-sale">${esc(money2(t.repairCost))}</span>
+        </div>`;
+      }).join("")}`;
+  }
+
+  function openSalesBreakdown() {
+    const modal = ensureSalesModal();
+    $("salesBreakdownSearch").value = "";
+    renderSalesBreakdown();
+    modal.hidden = false;
+    loadSalesInvoices();
   }
 
   function monthKey(date) {
