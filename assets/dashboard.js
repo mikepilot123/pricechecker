@@ -1306,6 +1306,7 @@
         </div>
         <div class="modal-body">
           <div class="sales-breakdown-stats" id="salesBreakdownStats"></div>
+          <p class="sales-breakdown-hint">Click a Paid or Sale amount to change it — it saves when you press Enter or click away. Click anywhere else on a row to open the repair.</p>
           <div class="sales-breakdown-tools">
             <div class="leads-searchbar sales-breakdown-search">
               <svg class="icon"><use href="#i-search"></use></svg>
@@ -1325,7 +1326,33 @@
     });
     $("salesBreakdownSearch").addEventListener("input", renderSalesBreakdown);
     $("salesBreakdownExport").addEventListener("click", exportSalesCsv);
+    // Paid / Sale are edited in place: saved when the field is left (or
+    // Enter), without opening the repair. "Mark paid" settles the balance.
+    $("salesBreakdownList").addEventListener("change", (e) => {
+      const input = e.target.closest(".sales-amt");
+      if (input) saveSalesAmount(input);
+    });
+    $("salesBreakdownList").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target.matches(".sales-amt")) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.target.blur();
+      }
+      if (e.key === "Escape" && e.target.matches(".sales-amt")) {
+        e.stopPropagation();
+        e.target.value = e.target.defaultValue;
+        e.target.blur();
+      }
+    }, true);
     $("salesBreakdownList").addEventListener("click", (e) => {
+      if (e.target.closest(".sales-amt")) { e.stopPropagation(); return; }
+      const markPaid = e.target.closest("[data-mark-paid]");
+      if (markPaid) {
+        e.stopPropagation();
+        const t = tickets.find((x) => x.id === markPaid.dataset.markPaid);
+        if (t) saveSalesAmount(null, { id: t.id, field: "amountPaid", value: t.repairCost, button: markPaid });
+        return;
+      }
       const invBtn = e.target.closest("[data-sales-invoice]");
       if (invBtn) {
         e.stopPropagation();
@@ -1397,8 +1424,15 @@
           <span class="sales-c-inv">${inv
             ? `<button type="button" class="sales-inv-link" data-sales-invoice="${esc(inv.id)}">${esc(inv.number)}</button>`
             : `<span class="sales-inv-none">No invoice</span>`}</span>
-          <span class="num sales-c-paid">${esc(money2(t.amountPaid))}${owed > 0 ? `<small>${esc(money2(owed))} owed</small>` : ""}</span>
-          <span class="num sales-c-sale">${esc(money2(t.repairCost))}</span>
+          <span class="num sales-c-paid">
+            <input class="sales-amt" type="number" min="0" step="0.01" inputmode="decimal" data-amt="amountPaid" data-id="${esc(t.id)}" value="${esc(Number(t.amountPaid || 0).toFixed(2))}" aria-label="Amount paid by ${esc(t.customerName || "customer")}" />
+            ${owed > 0
+              ? `<small>${esc(money2(owed))} owed · <button type="button" class="sales-mark-paid" data-mark-paid="${esc(t.id)}">Mark paid</button></small>`
+              : `<small class="is-paid">Paid in full</small>`}
+          </span>
+          <span class="num sales-c-sale">
+            <input class="sales-amt sales-amt-sale" type="number" min="0" step="0.01" inputmode="decimal" data-amt="repairCost" data-id="${esc(t.id)}" value="${esc(Number(t.repairCost || 0).toFixed(2))}" aria-label="Sale amount for ${esc(t.customerName || "customer")}" />
+          </span>
         </div>`;
       }).join("")}`;
   }
@@ -1443,6 +1477,39 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function saveSalesAmount(input, direct) {
+    const id = direct ? direct.id : input.dataset.id;
+    const field = direct ? direct.field : input.dataset.amt;
+    const raw = direct ? direct.value : input.value;
+    const value = Math.round(Number(raw) * 100) / 100;
+    const row = $("salesBreakdownList").querySelector(`[data-sales-ticket="${CSS.escape(id)}"]`);
+    if (input && (input.value.trim() === "" || !Number.isFinite(value) || value < 0)) {
+      input.classList.add("is-invalid");
+      input.value = input.defaultValue;
+      setTimeout(() => input.classList.remove("is-invalid"), 1500);
+      return;
+    }
+    if (input && value === Number(input.defaultValue)) return;
+    if (typeof window.RPC_UPDATE_TICKET_AMOUNTS !== "function") return;
+    row?.classList.add("is-saving");
+    if (direct?.button) direct.button.disabled = true;
+    try {
+      const updated = await window.RPC_UPDATE_TICKET_AMOUNTS(id, { [field]: value });
+      const i = tickets.findIndex((t) => t.id === id);
+      if (i >= 0) tickets[i] = normalizeTicket(updated);
+      renderSalesBreakdown();
+      render({});
+      const fresh = $("salesBreakdownList").querySelector(`[data-sales-ticket="${CSS.escape(id)}"]`);
+      fresh?.classList.add("is-saved");
+      setTimeout(() => fresh?.classList.remove("is-saved"), 1200);
+    } catch (err) {
+      row?.classList.remove("is-saving");
+      if (input) input.value = input.defaultValue;
+      if (direct?.button) direct.button.disabled = false;
+      alert("Couldn't save: " + (err.message || err));
+    }
   }
 
   function openSalesBreakdown() {

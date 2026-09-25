@@ -3380,6 +3380,37 @@
     }
   }
 
+  // Quick money edits from elsewhere (the dashboard's Sales breakdown):
+  // changes a repair's sale amount and/or amount paid in place. A higher
+  // amount paid is also added to the repair's invoice. Throws on failure.
+  window.RPC_UPDATE_TICKET_AMOUNTS = async (id, { repairCost, amountPaid } = {}) => {
+    const ticket = TICKETS.find((t) => t.id === id);
+    if (!ticket) throw new Error("Repair not found — reload and try again");
+    const before = Number(ticket.amountPaid) || 0;
+    const res = await api({
+      action: "update",
+      id: ticket.id,
+      status: ticket.status,
+      customerName: ticket.customerName,
+      client: ticket.customerName,
+      phone: ticket.phone,
+      email: ticket.email,
+      device: ticket.device,
+      issues: ticket.issues,
+      issue: ticket.issues,
+      notes: ticket.notes,
+      repairCost: repairCost ?? ticket.repairCost,
+      amountPaid: amountPaid ?? ticket.amountPaid,
+    });
+    if (!res.ok) throw new Error(res.error || "Rejected");
+    mergeTicket(res.ticket);
+    renderStatusChips();
+    render();
+    const added = Math.round(((Number(res.ticket.amountPaid) || 0) - before) * 100) / 100;
+    if (added > 0) await settleInvoiceForTicket(ticket.id, added);
+    return normalizeTicket(res.ticket);
+  };
+
   async function pickUpWithBalancePaid(ticket, method) {
     const balance = ticketBalance(ticket);
     const updated = await setStatus(ticket, "Picked Up", {
