@@ -6,6 +6,7 @@ import {
   listCommonSearches,
   saveCommonSearch,
   recordCommonSearchUse,
+  searchDemand,
   renameCommonSearch,
   deleteCommonSearch,
 } from "../lib/prices.js";
@@ -40,6 +41,11 @@ export default async function handler(req, res) {
     const denied = checkPin(req, body.pin);
     if (denied) {
       return res.status(denied.status).json({ ok: false, error: denied.error });
+    }
+
+    // Smart restock (assets/restock.js): searches per phrase in the last N days.
+    if (body.action === "searchDemand") {
+      return res.status(200).json({ ok: true, ...(await searchDemand(body.days)) });
     }
 
     if (body.action === "save") {

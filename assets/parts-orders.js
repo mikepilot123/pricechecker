@@ -132,6 +132,8 @@
       notifyError("Couldn't load parts orders: " + err.message);
     }
   }
+  // Smart restock (restock.js) records orders itself, then refreshes this list.
+  window.RPC_PARTS_ORDERS_RELOAD = loadPartsOrders;
 
   // Shipments that were already sitting at "Pending collection" before this
   // syncing existed (or created some other way that skipped it) never got

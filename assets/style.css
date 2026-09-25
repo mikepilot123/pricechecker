@@ -8322,3 +8322,127 @@ video.media-viewer-media {
   .email-design-form .text-input { font-size: 16px; }
   .email-design-head { flex-direction: column; }
 }
+
+/* ---------- Smart restock (top of Parts orders; assets/restock.js) ---------- */
+.restock {
+  margin: 14px 0 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.restock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+}
+.restock.is-collapsed .restock-controls { display: none; }
+.restock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.restock-toggle strong { display: block; font-size: 0.95rem; }
+.restock-toggle small { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 2px; }
+.restock-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.restock-chevron { flex: none; margin-left: auto; color: var(--text-dim); transition: transform 0.15s ease; }
+.restock.is-collapsed .restock-chevron { transform: rotate(-90deg); }
+.restock-controls { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.restock-controls label { display: grid; gap: 3px; font-size: 0.72rem; color: var(--text-dim); }
+.restock-controls select { min-height: 40px; padding: 6px 10px; font-size: 0.85rem; }
+.restock-controls .icon-btn { min-width: 40px; min-height: 40px; }
+.restock-body { border-top: 1px solid var(--border); padding: 10px 14px 14px; }
+.restock-note { margin: 0 0 10px; color: var(--text-dim); font-size: 0.78rem; line-height: 1.45; }
+.restock-empty { margin: 6px 0; font-size: 0.88rem; }
+.restock-list { display: grid; gap: 8px; }
+.restock-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.restock-row.is-picked { border-color: var(--accent); background: var(--accent-soft); }
+.restock-pick { display: grid; place-items: center; width: 28px; height: 28px; cursor: pointer; }
+.restock-pick input { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+.restock-name { margin: 0; font-weight: 600; font-size: 0.92rem; }
+.restock-name > span { font-weight: 400; color: var(--text-dim); }
+.restock-why { margin: 3px 0 0; font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
+.restock-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.restock-badge.is-out { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.restock-badge.is-soon { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.restock-money { display: grid; gap: 2px; justify-items: end; font-size: 0.8rem; text-align: right; }
+.restock-money .muted { color: var(--text-dim); }
+.restock-qty { display: grid; gap: 2px; justify-items: center; font-size: 0.7rem; color: var(--text-dim); }
+.restock-qty input { width: 64px; min-height: 40px; padding: 6px 8px; text-align: center; font-size: 0.92rem; }
+.restock-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+.restock-actions[hidden] { display: none; }
+.restock-actions > span { margin-right: auto; font-size: 0.84rem; font-weight: 500; }
+.restock-vendor { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-dim); }
+.restock-vendor input { width: 170px; min-height: 40px; padding: 6px 10px; font-size: 0.88rem; }
+.restock-slow { margin-top: 12px; font-size: 0.82rem; }
+.restock-slow summary { cursor: pointer; color: var(--text-dim); padding: 6px 0; }
+.restock-slow p { margin: 4px 0; }
+@media (max-width: 720px) {
+  .restock-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .restock-money { grid-column: 2 / 3; justify-items: start; text-align: left; }
+  .restock-qty { grid-row: 1 / 3; grid-column: 3; }
+  .restock-controls { width: 100%; }
+  .restock-controls label { flex: 1 1 120px; }
+  .restock-controls select { width: 100%; }
+  .restock-actions { justify-content: stretch; }
+  .restock-actions > span { flex: 1 1 100%; }
+  .restock-vendor { flex: 1 1 100%; }
+  .restock-vendor input { flex: 1; width: auto; }
+  .restock-actions button { flex: 1 1 auto; }
+}
