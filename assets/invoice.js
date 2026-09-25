@@ -681,12 +681,7 @@
       return `<button type="button" class="inv-chip${list.filter === key ? " active" : ""}" role="tab" aria-selected="${list.filter === key}" data-inv-filter="${key}">${esc(label)} <span>${count}</span></button>`;
     }).join("");
 
-    const q = list.query.trim().toLowerCase();
-    const rows = list.invoices
-      .filter((inv) => matchesFilter(inv, list.filter))
-      .filter((inv) => !q || [inv.number, inv.billTo?.name, inv.billTo?.phone, inv.billTo?.email, ...(inv.items || []).map((i) => i.description)]
-        .some((v) => String(v || "").toLowerCase().includes(q)))
-      .sort((a, b) => (b.invoiceDate || "").localeCompare(a.invoiceDate || "") || (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const rows = visibleInvoices();
 
     $("invListStatus").textContent = list.invoices.length
       ? `${rows.length} of ${list.invoices.length} invoice${list.invoices.length === 1 ? "" : "s"}`
@@ -727,6 +722,50 @@
   function removeFromList(invoice) {
     list.invoices = list.invoices.filter((x) => x.id !== invoice.id);
     renderInvoiceList();
+  }
+
+  // What the list is showing right now (filter + search), newest first.
+  function visibleInvoices() {
+    const q = list.query.trim().toLowerCase();
+    return list.invoices
+      .filter((inv) => matchesFilter(inv, list.filter))
+      .filter((inv) => !q || [inv.number, inv.billTo?.name, inv.billTo?.phone, inv.billTo?.email, ...(inv.items || []).map((i) => i.description)]
+        .some((v) => String(v || "").toLowerCase().includes(q)))
+      .sort((a, b) => (b.invoiceDate || "").localeCompare(a.invoiceDate || "") || (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }
+
+  // CSV of the invoices currently listed (so a filter or search narrows it),
+  // one row per invoice plus a totals row. Opens in Excel/Numbers/Sheets.
+  function exportInvoicesCsv() {
+    const rows = visibleInvoices();
+    const today = todayYmd();
+    const cell = (v) => {
+      const s = String(v ?? "");
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const amt = (v) => num(v).toFixed(2);
+    const lines = [["Invoice date", "Invoice #", "Customer", "Phone", "Email", "Items", "Status", "Due date", "Total (TTD)", "Paid (TTD)", "Balance due (TTD)"]];
+    let total = 0, paid = 0, balance = 0;
+    for (const inv of rows) {
+      const t = totalsOf(inv);
+      total += t.total; paid += t.paymentMade; balance += t.balanceDue;
+      lines.push([
+        inv.invoiceDate, inv.number, inv.billTo?.name, inv.billTo?.phone, inv.billTo?.email,
+        (inv.items || []).map((i) => `${i.description}${num(i.qty) !== 1 ? ` x${num(i.qty)}` : ""} (${money(num(i.qty || 1) * num(i.rate))})`).join("; "),
+        invoiceStatus(inv, today).label, inv.dueDate, amt(t.total), amt(t.paymentMade), amt(t.balanceDue),
+      ]);
+    }
+    lines.push([]);
+    lines.push(["Total", "", `${rows.length} invoice${rows.length === 1 ? "" : "s"}`, "", "", "", "", "", amt(total), amt(paid), amt(balance)]);
+    const csv = "\ufeff" + lines.map((r) => r.map(cell).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `invoices-${list.filter === "all" ? "all" : list.filter}-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function replaceInList(saved) {
@@ -819,6 +858,7 @@
     if (!view || view.dataset.bound) return;
     view.dataset.bound = "1";
     $("invListRefresh").addEventListener("click", loadInvoiceList);
+    $("invListExport").addEventListener("click", exportInvoicesCsv);
     $("invListNew").addEventListener("click", () => {
       openEditor(newInvoiceDraft(), { onSaved: (saved) => replaceInList(saved) });
     });

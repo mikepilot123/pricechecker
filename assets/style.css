@@ -7345,6 +7345,11 @@ video.media-viewer-media {
 .inv-list-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .inv-list-title { margin: 2px 0 0; font-size: 1.4rem; }
 .inv-list-head-actions { display: flex; gap: 8px; }
+@media (max-width: 559px) {
+  /* Icon only on phones so the three header buttons fit beside the title. */
+  #invListExport span { display: none; }
+  #invListExport { width: 44px; padding: 0; justify-content: center; }
+}
 .inv-summary {
   display: grid;
   grid-template-columns: 1.4fr repeat(4, 1fr);
