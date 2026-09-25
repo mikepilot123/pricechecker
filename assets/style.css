@@ -4388,27 +4388,40 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .status-set:hover { background: var(--card-hover); color: var(--text); }
 .status-set.current { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .ticket-tech-btn {
+  /* Unassigned is an action, so it reads as one: an outlined accent button
+     (the old grey fill looked disabled). Assigned shows who has it. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 30px;
   max-width: 190px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  background: var(--bg-soft);
-  color: var(--text-dim);
+  background: var(--card);
+  color: var(--accent);
   padding: 5px 10px;
+  font-family: inherit;
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
+.ticket-tech-btn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ticket-tech-btn .icon { width: 14px; height: 14px; flex: none; }
+.ticket-tech-btn.is-assigned {
+  border-color: var(--border);
+  background: var(--bg-soft);
+  color: var(--text);
+  font-weight: 500;
+}
+.ticket-tech-btn.is-assigned .icon { color: var(--text-dim); }
 .ticket-tech-btn:hover,
 .ticket-tech-btn:focus-visible {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
-  outline: none;
 }
+.ticket-tech-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ticket-due-pill {
   display: inline-flex;
   align-items: center;
@@ -7011,4 +7024,384 @@ video.media-viewer-media {
   .collection-totals { gap: 6px; }
   .collection-totals > div { padding: 8px; }
   .reclaim-strip-row { flex-wrap: wrap; }
+}
+
+
+/* ======================================================================
+   Mobile phone layout (≤767px)
+   ----------------------------------------------------------------------
+   One place for the phone experience instead of more one-off overrides
+   in the scattered breakpoints above. Tablet and desktop are untouched:
+   everything below sits inside the phone media query except the bottom
+   bar's default `display: none`.
+   ====================================================================== */
+.bottom-nav { display: none; }
+/* Phone-only icon for the status filter (the select shows its text above). */
+.intake-filter-icon { display: none; }
+/* Device names in a client card's rows wrap to two lines rather than
+   cutting off after one at tablet/desktop widths. */
+.ticket-head-compact .ticket-customer {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The off-canvas drawer's shadow otherwise bleeds onto the left edge of the
+   page while it's closed. */
+@media (max-width: 899.98px) {
+  body:not(.nav-open) .view-nav { box-shadow: none; }
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --m-pad: 16px;           /* page gutter */
+    --m-gap: 12px;           /* between cards */
+    --m-radius: 14px;        /* cards */
+    --m-touch: 44px;         /* minimum tap target */
+    --m-header-h: 60px;
+    --bottom-nav-h: 64px;
+    --bottom-nav-space: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+    --m-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --workspace-pad: var(--m-pad);
+  }
+
+  /* Room for the bottom bar so the last card always scrolls fully clear. */
+  body { padding-bottom: var(--bottom-nav-space); }
+
+  /* ---- Header: compact, logo only; "More" in the bottom bar replaces the
+     hamburger so there's one way into the full menu, not two. ---- */
+  .app-header {
+    padding: env(safe-area-inset-top, 0px) var(--m-pad) 0;
+  }
+  .header-row {
+    min-height: var(--m-header-h);
+    grid-template-columns: 1fr;
+  }
+  .brand { grid-column: 1; }
+  .brand-logo { width: auto; height: 38px; }
+  /* The drawer and its backdrop live inside the header's stacking context,
+     so lift the whole header over the bottom bar while the drawer is open. */
+  body.nav-open .app-header { z-index: 160; }
+  .nav-menu-toggle { display: none; }
+
+  /* ---- Bottom navigation ---- */
+  .bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 150; /* over content, under the drawer (190/200) and modals */
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    height: var(--bottom-nav-space);
+    padding: 0 max(4px, env(safe-area-inset-left, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-right, 0px));
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.05);
+  }
+  .bottom-nav-btn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: var(--bottom-nav-h);
+    padding: 6px 2px;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font: 500 0.7rem/1.1 var(--font-display);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Same 36px icon box as the Log device tile, so every label lines up. */
+  .bottom-nav-btn > .icon { width: 22px; height: 22px; margin: 7px 0; }
+  .bottom-nav-btn.active { color: var(--accent); font-weight: 600; }
+  .bottom-nav-btn.active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 28%;
+    right: 28%;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--accent);
+  }
+  .bottom-nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 10px; }
+  .bottom-nav-log { color: var(--text); }
+  .bottom-nav-log-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: #111827;
+    color: #fff;
+  }
+  .bottom-nav-log-icon .icon { width: 20px; height: 20px; stroke-width: 2.2; }
+  .bottom-nav-badge {
+    position: absolute;
+    top: 6px;
+    left: calc(50% + 6px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+  }
+  .bottom-nav-badge[hidden] { display: none; }
+
+  /* ---- Page spacing ---- */
+  .container { padding: 12px var(--m-pad) 24px; }
+
+  /* ---- Repairs: search + filter ---- */
+  /* The bottom bar's Log device replaces the full-width black button. */
+  #view-intake .intake-action-row { display: none; }
+  .intake-filter-bar {
+    grid-template-columns: minmax(0, 1fr) 50px;
+    gap: 8px;
+    min-height: 0;
+    margin: 0 0 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .intake-search-field {
+    order: 1;
+    min-height: 50px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: var(--m-shadow);
+  }
+  .intake-search-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(31, 95, 191, 0.14); }
+  .intake-search-field input { min-height: 48px; font-size: 16px; text-overflow: ellipsis; }
+  /* Status filter becomes an icon button; the native select stays on top
+     (transparent) so tapping it still opens the OS picker. */
+  .intake-status-filter-wrap {
+    order: 2;
+    position: relative;
+    width: 50px;
+    height: 50px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--text);
+    box-shadow: var(--m-shadow);
+  }
+  .intake-status-filter-wrap::after { display: none; }
+  .intake-filter-icon {
+    display: block;
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 22px;
+    height: 22px;
+    pointer-events: none;
+  }
+  .intake-status-select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    opacity: 0;
+    font-size: 16px;
+  }
+  .intake-status-filter-wrap:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .intake-status-filter-wrap.is-filtered {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+  .repairs-list-summary { min-height: 32px; margin-bottom: 4px; }
+  .repairs-list-summary .result-count { margin: 0; font-size: 0.8rem; }
+  .repairs-toggle-all { min-height: var(--m-touch); padding: 0 2px 0 12px; }
+
+  /* ---- Status accordion ---- */
+  .repairs-status-section {
+    min-height: 48px;
+    margin: 8px 0 0; /* the list's gap already spaces it from its cards */
+    padding: 8px 12px 8px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .repairs-status-section:active { cursor: pointer; }
+  .repairs-status-drag-handle,
+  .repairs-status-drag-hint,
+  .repairs-status-section-state { display: none; }
+  .repairs-status-section-title { font-size: 0.95rem; }
+  .repairs-status-chevron { width: 18px; height: 18px; }
+
+  /* ---- Cards ---- */
+  #intakeList.results { gap: var(--m-gap); }
+  .ticket {
+    border-radius: var(--m-radius);
+    box-shadow: var(--m-shadow);
+  }
+
+  /* Customer header: name with count + add beside it, then the number on
+     its own full-width line as a plain tap-to-call link (full-height tap
+     target, no tall tinted block) so even long numbers never clip. */
+  .ticket-group-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 2px 8px;
+    padding: 10px 10px 10px 14px;
+  }
+  .ticket-group-identity { display: contents; }
+  .ticket-group-head .ticket-customer { grid-column: 1; grid-row: 1; }
+  .ticket-group-count { grid-column: 2; grid-row: 1; }
+  .ticket-group-add { grid-column: 3; grid-row: 1; }
+  .ticket-group-head .ticket-phone { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+  .ticket-group-head .ticket-customer {
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .ticket-group-head .ticket-phone {
+    display: inline-flex;
+    width: auto;
+    min-height: var(--m-touch);
+    margin: -6px 0 -8px -8px;
+    padding: 0 8px;
+    background: transparent;
+    font-size: 0.92rem;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+  .ticket-group-head .ticket-phone:hover,
+  .ticket-group-head .ticket-phone:active { background: var(--accent-soft); }
+  .ticket-group-head .ticket-phone.no-phone { font-size: 0.82rem; }
+  .ticket-group-count {
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .ticket-group-add { width: var(--m-touch); height: var(--m-touch); }
+  .ticket-group-add .icon { width: 18px; height: 18px; }
+
+  /* Device row:
+     [thumb] #ticket ................ [notes]
+             Device model
+             [issue chips]
+             [technician] [due/parts] */
+  .ticket-head.ticket-head-compact {
+    position: static;
+    grid-template-columns: 56px minmax(0, 1fr) var(--m-touch);
+    grid-template-areas:
+      "thumb identity activity"
+      "thumb repair repair"
+      "thumb status status";
+    align-items: start;
+    gap: 6px 12px;
+    min-height: 0;
+    padding: 12px 10px 12px 12px;
+  }
+  .ticket-head-compact .ticket-device-thumb { width: 56px; height: 56px; border-radius: 12px; }
+  .ticket-head-compact .ticket-device-thumb img { padding: 7px; }
+  .ticket-head-compact .ticket-identity { padding-right: 0; align-self: center; }
+  .ticket-head-compact .ticket-num { margin-bottom: 1px; font-size: 0.78rem; }
+  .ticket-head-compact .ticket-customer {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-line-clamp: 3;
+  }
+  .ticket-head-compact .ticket-activity { position: static; justify-self: end; }
+  .ticket-head-compact .activity-log-btn { width: var(--m-touch); height: var(--m-touch); border-radius: 10px; }
+  .ticket-head-compact .ticket-repair { padding-top: 0; }
+  .ticket-head-compact .ticket-repair-label,
+  /* Same activity log as the notes button (with its count) on the row. */
+  .ticket-head-compact .issue-notes-btn { display: none; }
+  .ticket-head-compact .issue-tags { gap: 6px; }
+  .ticket-head-compact .issue-chip { margin: 0; font-size: 0.8rem; }
+  .ticket-head-compact .ticket-status {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-self: stretch;
+    gap: 8px;
+    min-width: 0;
+    text-align: left;
+  }
+  .ticket-head-compact .ticket-status > * { max-width: 100%; }
+  .ticket-head-compact .status-badge-btn,
+  .ticket-head-compact .ticket-parts-btn,
+  .ticket-head-compact .ticket-due-pill { min-height: 36px; font-size: 0.78rem; }
+  /* Inside a status section the header already names the status; changing
+     it is one tap away in the repair's details. */
+  #intakeList.is-grouped-by-status .ticket-head-compact .status-badge-btn { display: none; }
+  .ticket-head-compact .ticket-tech-btn {
+    min-height: var(--m-touch);
+    max-width: 100%;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-size: 0.84rem;
+  }
+  .ticket-head-compact .ticket-tech-btn .icon { width: 16px; height: 16px; }
+
+  /* ---- Reminders ----
+     A newly due reminder still pops up as cards (an interruption, on
+     purpose) — just above the bottom bar instead of over it. Minimized, it
+     becomes a compact count chip in the header's free right-hand corner,
+     where it can never sit on top of a repair card. */
+  .reminder-alerts {
+    bottom: calc(var(--bottom-nav-space) + 10px);
+    max-height: calc(100dvh - var(--header-h) - var(--bottom-nav-space) - 24px);
+  }
+  .reminder-alerts.is-minimized {
+    top: calc(env(safe-area-inset-top, 0px) + (var(--m-header-h) - var(--m-touch)) / 2);
+    bottom: auto;
+    left: auto;
+    right: var(--m-pad);
+    max-height: none;
+    overflow: visible;
+  }
+  .reminder-alerts.is-minimized .reminder-alert-pill {
+    gap: 6px;
+    min-width: var(--m-touch);
+    min-height: var(--m-touch);
+    padding: 0 12px;
+    border: 1px solid #f1d3ab;
+    background: #fdf3e6;
+    color: #8a4b0c;
+    box-shadow: none;
+    font-weight: 700;
+    animation: none;
+  }
+  body.nav-open .reminder-alerts.is-minimized { visibility: hidden; }
+  .reminder-alerts.is-minimized .reminder-alert-pill-label,
+  .reminder-alerts.is-minimized .reminder-alert-pill-chevron { display: none; }
+}
+
+@media (max-width: 359.98px) {
+  :root { --m-pad: 12px; }
+  .bottom-nav-btn { font-size: 0.64rem; }
+  .ticket-head.ticket-head-compact { grid-template-columns: 48px minmax(0, 1fr) var(--m-touch); gap: 6px 10px; }
+  .ticket-head-compact .ticket-device-thumb { width: 48px; height: 48px; }
+  .ticket-group-head .ticket-phone { font-size: 0.86rem; }
 }

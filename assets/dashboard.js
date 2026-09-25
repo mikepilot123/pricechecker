@@ -2571,9 +2571,12 @@
   }
 
   function minimizedPillHtml(count) {
-    return `<button type="button" class="reminder-alert-pill" data-alert-restore="1">
+    const label = `${count} reminder${count === 1 ? "" : "s"} due`;
+    // Count and words are split so the phone header chip can show just the
+    // count; the aria-label keeps the full phrase for screen readers.
+    return `<button type="button" class="reminder-alert-pill" data-alert-restore="1" aria-label="${label}. Show reminders">
       <svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg>
-      ${count} reminder${count === 1 ? "" : "s"} due
+      <span class="reminder-alert-pill-count">${count}</span><span class="reminder-alert-pill-label"> reminder${count === 1 ? "" : "s"} due</span>
       <svg class="icon reminder-alert-pill-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
     </button>`;
   }
@@ -2633,6 +2636,15 @@
       badge.textContent = count > 99 ? "99+" : String(count);
       badge.setAttribute("aria-label", `${count} reminder${count === 1 ? "" : "s"} due`);
     });
+    // Reminders sits behind "More" on the phone bottom bar, so surface the
+    // count there too.
+    const moreBadge = document.getElementById("bottomNavMoreBadge");
+    if (moreBadge) {
+      moreBadge.hidden = !count;
+      moreBadge.textContent = count > 99 ? "99+" : String(count || "");
+      const more = document.getElementById("bottomNavMore");
+      more?.setAttribute("aria-label", count ? `More, ${count} reminder${count === 1 ? "" : "s"} due` : "More");
+    }
   }
 
   function isDemoAlert(id) {

@@ -192,6 +192,17 @@
       b.setAttribute("aria-selected", active ? "true" : "false");
     });
     if (settingsNavBtn) settingsNavBtn.classList.toggle("active", target === "settings");
+    // Phone bottom bar mirrors the same state; anything it doesn't list
+    // lives behind "More", so that tab lights up instead.
+    let bottomMatched = false;
+    document.querySelectorAll(".bottom-nav-btn[data-bottom-target]").forEach((b) => {
+      const active = b.dataset.bottomTarget === target;
+      bottomMatched = bottomMatched || active;
+      b.classList.toggle("active", active);
+      if (active) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+    $("bottomNavMore")?.classList.toggle("active", !bottomMatched);
   }
   function showView(target) {
     Object.entries(views).forEach(([k, v]) => (v.hidden = k !== target));
@@ -248,16 +259,37 @@
     document.body.classList.add("nav-open");
     if (navBackdrop) navBackdrop.hidden = false;
     navMenuToggle?.setAttribute("aria-expanded", "true");
+    $("bottomNavMore")?.setAttribute("aria-expanded", "true");
   }
   function closeNavDrawer() {
     document.body.classList.remove("nav-open");
     navMenuToggle?.setAttribute("aria-expanded", "false");
+    $("bottomNavMore")?.setAttribute("aria-expanded", "false");
     if (navBackdrop) setTimeout(() => navBackdrop.hidden = true, 250);
   }
   navMenuToggle?.addEventListener("click", () => {
     document.body.classList.contains("nav-open") ? closeNavDrawer() : openNavDrawer();
   });
   navBackdrop?.addEventListener("click", closeNavDrawer);
+
+  // ---- Phone bottom bar -----------------------------------------------------
+  document.querySelectorAll(".bottom-nav-btn[data-bottom-target]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      closeNavDrawer();
+      navigateTo(btn.dataset.bottomTarget);
+    });
+  });
+  $("bottomNavMore")?.addEventListener("click", () => {
+    document.body.classList.contains("nav-open") ? closeNavDrawer() : openNavDrawer();
+  });
+  // "Log device" is the Repairs tab's primary action, not a separate view:
+  // go to Repairs and press its button, so setup/PIN gating stays in one place.
+  $("bottomNavLog")?.addEventListener("click", () => {
+    closeNavDrawer();
+    navigateTo("intake");
+    if (!isConfigured()) return;
+    $("newIntakeBtn")?.click();
+  });
   navDrawerClose?.addEventListener("click", closeNavDrawer);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeNavDrawer();
@@ -3165,6 +3197,12 @@
     const frag = document.createDocumentFragment();
     let shownCount = 0;
     const grouped = statusFilter === "all" && sections.length > 0;
+    // Lets phone CSS drop each row's status badge when the section header
+    // above it already names the status.
+    $("intakeList").classList.toggle("is-grouped-by-status", grouped);
+    // The phone filter control is icon-only, so it needs its own "a filter
+    // is on" cue (the full select text shows it everywhere else).
+    $("statusFilterSelect")?.closest(".intake-status-filter-wrap")?.classList.toggle("is-filtered", statusFilter !== "all");
     const allCollapsed = grouped && sections.every((section) => collapsedRepairStatuses.has(section.status));
     if (allCollapsed) {
       for (const section of sections) {
@@ -3187,8 +3225,12 @@
         }
       }
     }
+    const filterSelect = $("statusFilterSelect");
+    const filterName = statusFilter !== "all" && filterSelect && filterSelect.selectedIndex >= 0
+      ? filterSelect.options[filterSelect.selectedIndex].text.replace(/\s*\(\d+\)$/, "").replace(/^⚠\s*/, "")
+      : "";
     $("intakeCount").textContent = list.length
-      ? `Showing ${shownCount} of ${list.length} device${list.length === 1 ? "" : "s"}`
+      ? `Showing ${shownCount} of ${list.length} device${list.length === 1 ? "" : "s"}${filterName ? ` · ${filterName}` : ""}`
       : "";
     const toggleAll = $("repairsToggleAll");
     toggleAll.hidden = !grouped;
@@ -3373,7 +3415,6 @@
     head.tabIndex = 0;
     head.setAttribute("role", "button");
     head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
-    const technicianLabel = t.technician ? `Assigned to ${t.technician}` : "Assign technician";
     const phoneLine = ticketPhoneLineHtml(t);
     const deviceIcon = deviceTypeIcon(t.device);
     const partsPending = needsPartsOrdered(t);
@@ -3413,7 +3454,9 @@
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
         ${partsBtnHtml}
         ${duePill}
-        <button type="button" class="ticket-tech-btn" aria-label="${esc(technicianLabel)}">${esc(technicianLabel)}</button>
+        <button type="button" class="ticket-tech-btn${t.technician ? " is-assigned" : ""}" aria-label="${esc(t.technician ? `Technician: ${t.technician}. Reassign` : "Assign technician")}">
+          <svg class="icon" aria-hidden="true"><use href="#${t.technician ? "i-user" : "i-user-plus"}"></use></svg><span>${esc(t.technician || "Assign technician")}</span>
+        </button>
       </div>
       <div class="ticket-activity">
         ${activityLogBtnHtml(t, "")}

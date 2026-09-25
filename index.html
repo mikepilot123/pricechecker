@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=cash-to-bank-1" />
+  <link rel="stylesheet" href="assets/style.css?v=mobile-layout-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -49,6 +49,9 @@
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.2 4.2"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-user-plus" viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.7 2.7-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1.1 1.5v.2h-4v-.2a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 13.9h-.2v-4H3A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9L4.2 7 6.9 4.3l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3.2V3h4v.2a1.7 1.7 0 0 0 1.1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6.9h.2v4h-.2a1.7 1.7 0 0 0-1.6 1.1Z"/></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24"><path d="M7.1 3.8 4.6 5.1c-.8.4-1.1 1.3-.8 2.1 2.5 6.5 7.6 11.6 14.1 14.1.8.3 1.7 0 2.1-.8l1.3-2.5a1.7 1.7 0 0 0-.4-2l-2.8-2.3a1.7 1.7 0 0 0-2-.1l-1.7 1.1a13.2 13.2 0 0 1-5.2-5.2l1.1-1.7a1.7 1.7 0 0 0-.1-2L9.1 4.2a1.7 1.7 0 0 0-2-.4Z"/></symbol>
@@ -153,6 +156,17 @@
     </nav>
     <div class="nav-backdrop" id="navBackdrop" hidden></div>
   </header>
+
+  <!-- Phone-only bottom bar (see "Mobile phone layout" in style.css). Every
+       destination here already exists in #viewNav; "More" opens that drawer
+       for everything else, so nothing is reachable only from here. -->
+  <nav class="bottom-nav" id="bottomNav" aria-label="Main">
+    <button type="button" class="bottom-nav-btn" data-bottom-target="intake"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"></use></svg><span>Repairs</span></button>
+    <button type="button" class="bottom-nav-btn" data-bottom-target="prices"><svg class="icon" aria-hidden="true"><use href="#i-tag"></use></svg><span>Prices</span></button>
+    <button type="button" class="bottom-nav-btn bottom-nav-log" id="bottomNavLog"><span class="bottom-nav-log-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg></span><span>Log device</span></button>
+    <button type="button" class="bottom-nav-btn" data-bottom-target="inventory"><svg class="icon" aria-hidden="true"><use href="#i-inventory-flow"></use></svg><span>Inventory</span></button>
+    <button type="button" class="bottom-nav-btn" id="bottomNavMore" aria-controls="viewNav" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-more"></use></svg><span>More</span><span class="bottom-nav-badge" id="bottomNavMoreBadge" hidden></span></button>
+  </nav>
 
   <!-- ============ DASHBOARD VIEW ============ -->
   <main class="container view" id="view-dashboard" hidden>
@@ -1702,12 +1716,13 @@
 
         <div class="intake-filter-bar">
           <div class="select-wrap intake-status-filter-wrap">
+            <svg class="icon intake-filter-icon" aria-hidden="true"><use href="#i-filter"></use></svg>
             <select id="statusFilterSelect" class="intake-status-select" aria-label="Filter devices by status"></select>
           </div>
           <div class="intake-search-field">
             <svg class="icon"><use href="#i-search"></use></svg>
             <input id="intakeSearch" type="search" autocomplete="off"
-              placeholder="Search device, issue, ticket…" aria-label="Search devices" />
+              placeholder="Customer, device or ticket #" aria-label="Search repairs by customer, device or ticket" />
           </div>
         </div>
 
@@ -2412,8 +2427,8 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=bank-account-retire-cards-1"></script>
-  <script defer src="assets/dashboard.js?v=collect-back-expense-2"></script>
+  <script defer src="assets/intake.js?v=mobile-layout-1"></script>
+  <script defer src="assets/dashboard.js?v=mobile-layout-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
