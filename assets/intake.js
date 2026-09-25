@@ -328,6 +328,7 @@
     document.querySelectorAll("[data-settings-panel-section]").forEach((section) => {
       section.hidden = section.dataset.settingsPanelSection !== panel;
     });
+    if (panel === "email") window.dispatchEvent(new Event("rpc-enter-email-settings"));
     document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
       const active = btn.dataset.settingsPanel === panel;
       btn.classList.toggle("active", active);
@@ -337,6 +338,11 @@
   document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
     btn.addEventListener("click", () => setSettingsPanel(btn.dataset.settingsPanel));
   });
+  // Jump straight to a Settings section (e.g. "Link an email account").
+  window.RPC_OPEN_SETTINGS_PANEL = (panel) => {
+    settingsNavBtn?.click();
+    setSettingsPanel(panel);
+  };
 
   // ---- Account sub-tabs ------------------------------------------------------
   // Expenses / Bank account (balance). Sidebar's "Account sections" group on
@@ -2489,8 +2495,8 @@
       return data.whatsappUrl ? "WhatsApp is ready to send the invoice." : "No WhatsApp number on file — share the PDF instead.";
     }
     return data.emailSent
-      ? "The invoice was emailed to the client."
-      : "The invoice email didn't send — download or share the PDF instead.";
+      ? `The invoice was emailed to ${data.emailTo || "the client"}.`
+      : `The invoice wasn't emailed (${data.emailError || "email isn't set up"}) — use Email below, or share the PDF.`;
   }
 
   function formatMoney(value) {
@@ -3484,10 +3490,20 @@
           customerName,
           phone,
           email,
-          send: shouldSendInvoice ? invoiceDelivery : "",
+          send: shouldSendInvoice && invoiceDelivery === "whatsapp" ? "whatsapp" : "",
         });
       } catch (ex) {
         invoiceError = ex.message || String(ex);
+      }
+      // Email goes out from the linked mailbox with the PDF attached.
+      if (invoiceData && shouldSendInvoice && invoiceDelivery === "email") {
+        saveBtn.textContent = "Emailing invoice…";
+        try {
+          const sent = await window.RPC_EMAIL.sendDefault(invoiceData.invoice);
+          invoiceData = { ...invoiceData, invoice: sent.invoice, emailSent: true, emailTo: sent.sent.to.join(", ") };
+        } catch (ex) {
+          invoiceData = { ...invoiceData, emailSent: false, emailError: ex.message || String(ex) };
+        }
       }
     }
 

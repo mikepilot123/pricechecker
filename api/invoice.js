@@ -1,5 +1,6 @@
 import { ensureSchema } from "../lib/db.js";
-import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
+import { deleteSender, listSenders, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
+import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
@@ -47,6 +48,10 @@ function escapeHtml(value) {
 //                brand-new invoice starts from
 //   send       – { id, delivery } re-delivers an existing invoice
 //   delete     – { id } hides the invoice (soft delete)
+//   email      – { id, senderId, to, cc, subject, message, pdfBase64,
+//                  includeLink } sends it from a linked mailbox (lib/email.js)
+//   senders / saveSender / deleteSender / defaultSender / testSender —
+//                manage those mailboxes (Settings → Email)
 // No action = the original one-device create-and-send call, still accepted
 // so a browser running an older copy of the app keeps working.
 async function createAndDeliverInvoice(req, res) {
@@ -59,6 +64,29 @@ async function createAndDeliverInvoice(req, res) {
   if (action === "update") {
     const invoice = await updateInvoice(body.id, body.invoice || {});
     return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token) });
+  }
+  if (action === "senders") {
+    return res.status(200).json({ ok: true, senders: await listSenders() });
+  }
+  if (action === "saveSender") {
+    const sender = await saveSender(body.sender || {});
+    return res.status(200).json({ ok: true, sender, senders: await listSenders() });
+  }
+  if (action === "deleteSender") {
+    return res.status(200).json({ ok: true, senders: await deleteSender(body.id) });
+  }
+  if (action === "defaultSender") {
+    return res.status(200).json({ ok: true, senders: await setDefaultSender(body.id) });
+  }
+  if (action === "testSender") {
+    return res.status(200).json({ ok: true, ...(await testSender(body.id)), senders: await listSenders() });
+  }
+  if (action === "email") {
+    const invoice = await getInvoiceById(body.id);
+    const invoiceUrl = publicInvoiceUrl(req, invoice.token);
+    const sent = await sendInvoiceMail({ ...body, invoice, invoiceUrl });
+    const updated = await recordInvoiceEmail(invoice.id, sent);
+    return res.status(200).json({ ok: true, sent, invoice: updated, invoiceUrl });
   }
   if (action === "delete") {
     return res.status(200).json({ ok: true, ...(await deleteInvoice(body.id)) });

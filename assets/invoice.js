@@ -242,6 +242,7 @@
         <div class="invoice-card-actions">
           <button type="button" class="primary-btn" data-inv-card="pdf"><svg class="icon"><use href="#i-download"></use></svg>Download PDF</button>
           ${canSharePdf() ? `<button type="button" class="ghost-btn" data-inv-card="share"><svg class="icon"><use href="#i-chat"></use></svg>Share PDF</button>` : ""}
+          <button type="button" class="ghost-btn" data-inv-card="email"><svg class="icon"><use href="#i-mail"></use></svg>Email</button>
           <button type="button" class="ghost-btn" data-inv-card="edit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit invoice</button>
           ${url ? `<a class="ghost-btn" href="${esc(url)}" target="_blank" rel="noopener">Open link</a>` : ""}
         </div>
@@ -261,6 +262,7 @@
         const kind = btn.dataset.invCard;
         if (kind === "pdf") busy(btn, () => downloadPdf(invoice));
         if (kind === "share") busy(btn, () => sharePdf(invoice));
+        if (kind === "email") window.RPC_EMAIL?.openCompose(invoice, { onSent: (sent, sentUrl) => renderCard(el, sent, { url: sentUrl || url }) });
         if (kind === "edit") openEditor(invoice, {
           onSaved: (saved, savedUrl) => renderCard(el, saved, { url: savedUrl || url }),
           onDeleted: () => { el.innerHTML = `<div class="invoice-card"><p class="invoice-card-deleted">Invoice ${esc(invoice.number)} was deleted.</p></div>`; },
@@ -359,6 +361,7 @@
           <button type="button" class="ghost-btn danger-btn invoice-delete-btn" data-inv-delete aria-label="Delete invoice"><svg class="icon"><use href="#i-trash"></use></svg><span>Delete</span></button>
           <button type="button" class="ghost-btn" data-inv-close>Cancel</button>
           <button type="button" class="ghost-btn" data-inv-save="pdf"><svg class="icon"><use href="#i-download"></use></svg>Save &amp; PDF</button>
+          <button type="button" class="ghost-btn" data-inv-save="email"><svg class="icon"><use href="#i-mail"></use></svg>Save &amp; email</button>
           <button type="button" class="primary-btn" data-inv-save="only"><svg class="icon"><use href="#i-check"></use></svg>Save</button>
         </div></div>
       </div>`;
@@ -801,6 +804,9 @@
       if (btn.dataset.invSave === "pdf") await downloadPdf(res.invoice);
       closeEditor();
       if (onSaved) onSaved(res.invoice, res.invoiceUrl);
+      if (btn.dataset.invSave === "email") {
+        window.RPC_EMAIL?.openCompose(res.invoice, { onSent: (sent, url) => { if (onSaved) onSaved(sent, url); } });
+      }
     } catch (e) {
       err.textContent = "Couldn't save the invoice: " + (e.message || e);
       err.hidden = false;
@@ -929,7 +935,10 @@
             : `<span class="bal-pill is-paid"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Paid</span>`;
         return `<div class="inv-list-row" role="button" tabindex="0" data-inv-open="${esc(inv.id)}" aria-label="Open invoice ${esc(inv.number)} for ${who}">
           <span class="inv-c-inv">
-            <span class="inv-num-btn" title="Edit invoice ${esc(inv.number)}"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg><span>${esc(inv.number)}</span></span>
+            <span class="inv-num-line">
+              <span class="inv-num-btn" title="Edit invoice ${esc(inv.number)}"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg><span>${esc(inv.number)}</span></span>
+              ${(inv.emails || []).length ? `<span class="inv-sent" title="Emailed ${esc(new Date(inv.emails[inv.emails.length - 1].sentAt).toLocaleString())} to ${esc((inv.emails[inv.emails.length - 1].to || []).join(", "))}"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg><span class="visually-hidden">Emailed</span></span>` : ""}
+            </span>
             <small>${esc(displayDate(inv.invoiceDate))}${inv.dueDate && inv.dueDate !== inv.invoiceDate ? ` · Due ${esc(displayDate(inv.dueDate))}` : ""}</small>
           </span>
           <span class="inv-c-name">
@@ -944,6 +953,7 @@
           </span>
           <span class="inv-money inv-c-balance"><span class="sales-m-label">Balance</span>${balanceHtml}</span>
           <span class="inv-c-actions">
+            <button type="button" class="ghost-btn icon-btn inv-row-btn" data-inv-email="${esc(inv.id)}" aria-label="Email invoice ${esc(inv.number)}" title="Email invoice"><svg class="icon"><use href="#i-mail"></use></svg></button>
             <button type="button" class="ghost-btn icon-btn inv-row-btn" data-inv-pdf="${esc(inv.id)}" aria-label="Download PDF for ${esc(inv.number)}" title="Download PDF"><svg class="icon"><use href="#i-download"></use></svg></button>
             <button type="button" class="ghost-btn icon-btn inv-row-btn inv-row-delete" data-inv-del="${esc(inv.id)}" aria-label="Delete invoice ${esc(inv.number)}" title="Delete invoice"><svg class="icon"><use href="#i-trash"></use></svg></button>
           </span>
@@ -1080,6 +1090,13 @@
     const byId = (id) => list.invoices.find((x) => x.id === id);
     $("invList").addEventListener("click", async (e) => {
       if (e.target.closest(".money-field")) { e.stopPropagation(); return; }
+      const emailBtn = e.target.closest("[data-inv-email]");
+      if (emailBtn) {
+        e.stopPropagation();
+        const inv = byId(emailBtn.dataset.invEmail);
+        if (inv) window.RPC_EMAIL?.openCompose(inv, { onSent: (sent) => replaceInList(sent) });
+        return;
+      }
       const markPaid = e.target.closest("[data-inv-markpaid]");
       if (markPaid) {
         e.stopPropagation();
@@ -1139,5 +1156,6 @@
     loadInvoiceList();
   });
 
+  window.RPC_INVOICE_CLOSE_EDITOR = closeEditor;
   window.RPC_INVOICE = { buildPdf, downloadPdf, sharePdf, canSharePdf, renderCard, openEditor, totalsOf, invoiceStatus };
 })();

@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=inv-list-ux-2" />
+  <link rel="stylesheet" href="assets/style.css?v=invoice-email-2" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -152,6 +152,7 @@
         <button type="button" class="appt-subnav-btn" data-settings-panel="customers" aria-selected="false">Customers</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="prices" aria-selected="false">Prices</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="searches" aria-selected="false">Frequent searches</button>
+        <button type="button" class="appt-subnav-btn" data-settings-panel="email" aria-selected="false">Email</button>
       </div>
       <button class="nav-btn install-app-btn" id="installAppBtn" type="button" hidden><svg class="icon"><use href="#i-download"></use></svg>Install app</button>
     </nav>
@@ -1614,6 +1615,7 @@
           <button type="button" class="appt-subnav-btn" data-settings-panel="customers" role="tab" aria-selected="false">Customers</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="prices" role="tab" aria-selected="false">Prices</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="searches" role="tab" aria-selected="false">Frequent searches</button>
+          <button type="button" class="appt-subnav-btn" data-settings-panel="email" role="tab" aria-selected="false">Email</button>
         </div>
 
         <section class="appt-panel" data-settings-panel-section="general">
@@ -1657,6 +1659,70 @@
             <button id="saveOfflineBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-download"></use></svg>Save app for offline</button>
           </div>
           <p id="offlineStatus" class="settings-help"></p>
+        </section>
+
+        <section class="appt-panel" data-settings-panel-section="email" hidden>
+          <div class="email-settings">
+            <p class="field-label">Email</p>
+            <p class="settings-help">Link the mailbox invoices are sent from. Emails go out from your own address, show up in its Sent folder, and replies come straight back to you.</p>
+            <div id="emailSenderList" class="email-sender-list"></div>
+            <button type="button" id="emailAddSender" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>Add email account</button>
+
+            <form id="emailSenderForm" class="email-sender-form" hidden autocomplete="off">
+              <h4 id="emailSenderFormTitle">Add an email account</h4>
+              <div class="email-provider-row" role="radiogroup" aria-label="Email provider">
+                <button type="button" class="email-provider" role="radio" data-email-provider="gmail">Gmail</button>
+                <button type="button" class="email-provider" role="radio" data-email-provider="zoho">Zoho Mail</button>
+                <button type="button" class="email-provider" role="radio" data-email-provider="smtp">Other (SMTP)</button>
+              </div>
+              <div id="emailGmailHelp" class="email-help">
+                <p><strong>Gmail needs an app password</strong> (your normal password won't work):</p>
+                <ol>
+                  <li>Make sure <strong>2-Step Verification</strong> is on for the Google account.</li>
+                  <li>Open <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a>, name it “JQ Repair Hub” and click Create.</li>
+                  <li>Copy the 16-character password Google shows and paste it below.</li>
+                </ol>
+              </div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label class="field-label" for="emailFromName">Sender name</label>
+                  <input id="emailFromName" class="text-input" placeholder="JQ Electronics" />
+                </div>
+                <div class="form-field">
+                  <label class="field-label" for="emailFromAddress">Email address</label>
+                  <input id="emailFromAddress" class="text-input" type="email" inputmode="email" autocomplete="off" placeholder="jqelectronicstt@gmail.com" required />
+                </div>
+                <div class="form-field form-field-full">
+                  <label class="field-label" for="emailPassword" id="emailPasswordLabel">Google app password</label>
+                  <input id="emailPassword" class="text-input" type="password" autocomplete="new-password" spellcheck="false" />
+                </div>
+              </div>
+              <details id="emailServerFields" class="email-server-fields">
+                <summary>Server settings</summary>
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label class="field-label" for="emailHost">SMTP server</label>
+                    <input id="emailHost" class="text-input" autocomplete="off" placeholder="smtp.example.com" />
+                  </div>
+                  <div class="form-field">
+                    <label class="field-label" for="emailPort">Port</label>
+                    <input id="emailPort" class="text-input" type="number" inputmode="numeric" placeholder="465" />
+                  </div>
+                  <div class="form-field form-field-full">
+                    <label class="field-label" for="emailUsername">Username <span class="field-optional">(if different from the email address)</span></label>
+                    <input id="emailUsername" class="text-input" autocomplete="off" />
+                  </div>
+                </div>
+              </details>
+              <label class="email-check"><input type="checkbox" id="emailMakeDefault" /><span>Use this account by default</span></label>
+              <p id="emailFormError" class="field-error" hidden></p>
+              <div class="form-actions">
+                <button type="button" id="emailCancelSender" class="ghost-btn">Cancel</button>
+                <button type="submit" id="emailSaveSender" class="primary-btn"><svg class="icon"><use href="#i-check"></use></svg>Save &amp; send test</button>
+              </div>
+            </form>
+            <p id="emailSettingsError" class="field-error" hidden></p>
+          </div>
         </section>
 
         <section class="appt-panel" data-settings-panel-section="technicians" hidden>
@@ -2468,8 +2534,9 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=inv-one-job-1"></script>
-  <script defer src="assets/invoice.js?v=inv-list-ux-1"></script>
+  <script defer src="assets/intake.js?v=invoice-email-1"></script>
+  <script defer src="assets/invoice.js?v=invoice-email-1"></script>
+  <script defer src="assets/email.js?v=invoice-email-1"></script>
   <script defer src="assets/dashboard.js?v=sales-ux-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>

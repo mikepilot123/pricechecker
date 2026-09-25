@@ -36,6 +36,8 @@ const PORT = Number(process.env.PORT || 8123);
 const PIN = process.env.INTAKE_PIN || "0000";
 process.env.INTAKE_PIN = PIN;
 process.env.DATABASE_URL ||= "pglite://memory";
+// Invoice emails are captured, not sent — inspect them at /__dev/outbox.
+process.env.EMAIL_DRY_RUN ||= "1";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Every module hardcodes this origin (intake, prices, inventory, leads, …).
@@ -106,9 +108,15 @@ async function apiHandler(name) {
   return handlers.get(name);
 }
 
+const { dryRunOutbox } = await import("../lib/email.js");
+
 createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   try {
+    if (url.pathname === "/__dev/outbox") {
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify(dryRunOutbox, null, 2));
+    }
     if (url.pathname.startsWith("/api/")) {
       const name = url.pathname.slice(5).replace(/\/$/, "");
       let handler;
