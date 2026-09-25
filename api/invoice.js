@@ -1,5 +1,5 @@
 import { ensureSchema } from "../lib/db.js";
-import { createInvoice, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, invoiceHtml, invoiceWhatsAppUrl, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
+import { createInvoice, DEFAULT_INVOICE_NOTES, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
@@ -43,6 +43,8 @@ function escapeHtml(value) {
 //                `send: "email" | "whatsapp"` also delivers it.
 //   update     – { id, invoice: { …editable fields } }
 //   forTicket  – { ticketId } → the latest invoice containing that repair
+//   list       – every invoice (with its customer link), plus the defaults a
+//                brand-new invoice starts from
 //   send       – { id, delivery } re-delivers an existing invoice
 // No action = the original one-device create-and-send call, still accepted
 // so a browser running an older copy of the app keeps working.
@@ -56,6 +58,10 @@ async function createAndDeliverInvoice(req, res) {
   if (action === "update") {
     const invoice = await updateInvoice(body.id, body.invoice || {});
     return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token) });
+  }
+  if (action === "list") {
+    const invoices = (await listInvoices()).map((invoice) => ({ ...invoice, url: publicInvoiceUrl(req, invoice.token) }));
+    return res.status(200).json({ ok: true, invoices, defaults: { business: INVOICE_BUSINESS, notes: DEFAULT_INVOICE_NOTES } });
   }
   if (action === "forTicket") {
     const invoice = await getInvoiceForTicket(body.ticketId);

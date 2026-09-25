@@ -434,7 +434,8 @@
     const b = invoice.business || {};
     $("invFrom").innerHTML = `<p class="inv-from-name">${esc(b.name || "JQ Electronics Ltd.")}</p>`
       + [...(b.addressLines || []), b.email].filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("");
-    $("invoiceEditorTitle").textContent = `Edit invoice ${invoice.number || ""}`;
+    $("invoiceEditorTitle").textContent = invoice.id ? `Edit invoice ${invoice.number || ""}` : "New invoice";
+    $("invNumber").placeholder = invoice.id ? "" : "Auto on save";
     $("invNumber").value = invoice.number || "";
     $("invTerms").value = invoice.terms || "Due on Receipt";
     $("invDate").value = invoice.invoiceDate || "";
@@ -465,16 +466,14 @@
     const err = $("invError");
     err.hidden = true;
     const items = readItems();
-    if (!items.length) {
-      err.textContent = "Add at least one line item.";
+    const fail = (message, focusEl) => {
+      err.textContent = message;
       err.hidden = false;
-      return;
-    }
-    if (!$("invBillName").value.trim()) {
-      err.textContent = "Enter who the invoice is billed to.";
-      err.hidden = false;
-      return;
-    }
+      err.scrollIntoView({ block: "nearest" });
+      focusEl?.focus();
+    };
+    if (!$("invBillName").value.trim()) return fail("Enter who the invoice is billed to.", $("invBillName"));
+    if (!items.length) return fail("Add at least one line item.", document.querySelector("#invItems [data-item=description]"));
     const changes = {
       number: $("invNumber").value.trim(),
       terms: $("invTerms").value.trim(),
@@ -494,7 +493,11 @@
     const original = btn.innerHTML;
     btn.textContent = "Saving…";
     try {
-      const res = await request({ action: "update", id: editing.invoice.id, invoice: changes });
+      // No id yet = a new invoice from the Invoices tab; it's only created on
+      // save, so cancelling never leaves a blank invoice (or a used number).
+      const res = editing.invoice.id
+        ? await request({ action: "update", id: editing.invoice.id, invoice: changes })
+        : await request({ action: "create", ...changes });
       const { onSaved } = editing;
       if (btn.dataset.invSave === "pdf") await downloadPdf(res.invoice);
       closeEditor();
@@ -508,5 +511,263 @@
     }
   }
 
-  window.RPC_INVOICE = { buildPdf, downloadPdf, sharePdf, canSharePdf, renderCard, openEditor, totalsOf };
+  /* ---- Invoices tab ---------------------------------------------------- */
+  // Zoho-style list: payment summary, status filters, search, and one row per
+  // invoice with its status and balance. Row → editor; quick actions to record
+  // a payment or download the PDF.
+  const list = { invoices: [], defaults: null, filter: "all", query: "", loaded: false, loading: false };
+
+  const todayYmd = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const dayDiff = (fromYmd, toYmd) => Math.round((Date.parse(toYmd + "T00:00:00Z") - Date.parse(fromYmd + "T00:00:00Z")) / 86400000);
+
+  // Paid / partially paid / overdue / due — worked out from the balance and
+  // due date, the way Zoho labels them.
+  function invoiceStatus(inv, today = todayYmd()) {
+    const t = totalsOf(inv);
+    if (t.balanceDue <= 0.004) return { key: "paid", label: t.total > 0 ? "Paid" : "No charge", tone: "paid" };
+    const due = inv.dueDate || inv.invoiceDate || today;
+    const late = dayDiff(due, today);
+    const partial = t.paymentMade > 0;
+    if (late > 0) return { key: "overdue", partial, label: `Overdue by ${late} day${late === 1 ? "" : "s"}`, tone: "overdue" };
+    if (partial) return { key: "partial", partial, label: "Partially paid", tone: "partial" };
+    if (late === 0) return { key: "unpaid", label: "Due today", tone: "due" };
+    return { key: "unpaid", label: `Due in ${-late} day${late === -1 ? "" : "s"}`, tone: "due" };
+  }
+
+  const FILTERS = [
+    ["all", "All"],
+    ["unpaid", "Unpaid"],
+    ["overdue", "Overdue"],
+    ["partial", "Partially paid"],
+    ["paid", "Paid"],
+  ];
+  function matchesFilter(inv, filter) {
+    const s = invoiceStatus(inv);
+    if (filter === "all") return true;
+    if (filter === "unpaid") return s.key !== "paid";
+    if (filter === "partial") return !!s.partial;
+    return s.key === filter;
+  }
+
+  async function loadInvoiceList() {
+    if (list.loading) return;
+    list.loading = true;
+    if (!list.loaded) $("invListStatus").textContent = "Loading invoices…";
+    try {
+      const res = await request({ action: "list" });
+      list.invoices = res.invoices || [];
+      list.defaults = res.defaults || null;
+      list.loaded = true;
+      renderInvoiceList();
+    } catch (err) {
+      $("invListStatus").textContent = "Couldn't load invoices: " + (err.message || err);
+    } finally {
+      list.loading = false;
+    }
+  }
+
+  function renderInvoiceList() {
+    if (!$("invList")) return;
+    const today = todayYmd();
+    const cur = list.invoices[0]?.currency || "TTD";
+    const month = today.slice(0, 7);
+
+    // Summary
+    let outstanding = 0, dueToday = 0, soon = 0, overdue = 0, collected = 0;
+    for (const inv of list.invoices) {
+      const t = totalsOf(inv);
+      if ((inv.invoiceDate || "").startsWith(month)) collected += t.paymentMade;
+      if (t.balanceDue <= 0.004) continue;
+      outstanding += t.balanceDue;
+      const late = dayDiff(inv.dueDate || inv.invoiceDate || today, today);
+      if (late > 0) overdue += t.balanceDue;
+      else if (late === 0) dueToday += t.balanceDue;
+      else if (late >= -30) soon += t.balanceDue;
+    }
+    $("invSumOutstanding").textContent = `${cur}${money(outstanding)}`;
+    $("invSumToday").textContent = `${cur}${money(dueToday)}`;
+    $("invSumSoon").textContent = `${cur}${money(soon)}`;
+    $("invSumOverdue").textContent = `${cur}${money(overdue)}`;
+    $("invSumCollected").textContent = `${cur}${money(collected)}`;
+
+    // Filter chips with counts
+    $("invFilterChips").innerHTML = FILTERS.map(([key, label]) => {
+      const count = list.invoices.filter((inv) => matchesFilter(inv, key)).length;
+      return `<button type="button" class="inv-chip${list.filter === key ? " active" : ""}" role="tab" aria-selected="${list.filter === key}" data-inv-filter="${key}">${esc(label)} <span>${count}</span></button>`;
+    }).join("");
+
+    const q = list.query.trim().toLowerCase();
+    const rows = list.invoices
+      .filter((inv) => matchesFilter(inv, list.filter))
+      .filter((inv) => !q || [inv.number, inv.billTo?.name, inv.billTo?.phone, inv.billTo?.email, ...(inv.items || []).map((i) => i.description)]
+        .some((v) => String(v || "").toLowerCase().includes(q)))
+      .sort((a, b) => (b.invoiceDate || "").localeCompare(a.invoiceDate || "") || (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+    $("invListStatus").textContent = list.invoices.length
+      ? `${rows.length} of ${list.invoices.length} invoice${list.invoices.length === 1 ? "" : "s"}`
+      : "";
+
+    if (!rows.length) {
+      $("invList").innerHTML = `<div class="empty-state"><div class="empty-icon"><svg class="icon"><use href="#i-invoice"></use></svg></div>
+        <p class="empty-title">${list.invoices.length ? "No invoices match" : "No invoices yet"}</p>
+        <p class="empty-sub">${list.invoices.length ? "Try another filter or search." : "Invoices are created automatically when a device is logged."}</p></div>`;
+      return;
+    }
+
+    $("invList").innerHTML = `
+      <div class="inv-list-row inv-list-header" aria-hidden="true">
+        <span>Date</span><span>Invoice #</span><span>Customer</span><span>Status</span><span>Due date</span>
+        <span class="num">Amount</span><span class="num">Balance due</span><span></span>
+      </div>
+      ${rows.map((inv) => {
+        const t = totalsOf(inv);
+        const s = invoiceStatus(inv, today);
+        return `<div class="inv-list-row" role="button" tabindex="0" data-inv-open="${esc(inv.id)}" aria-label="Open invoice ${esc(inv.number)} for ${esc(inv.billTo?.name || "customer")}">
+          <span class="inv-c-date">${esc(displayDate(inv.invoiceDate))}</span>
+          <span class="inv-c-num">${esc(inv.number)}</span>
+          <span class="inv-c-name">${esc(inv.billTo?.name || "—")}</span>
+          <span class="inv-c-status"><span class="inv-status inv-status-${s.tone}">${esc(s.label)}</span></span>
+          <span class="inv-c-due"><span class="inv-m-label">Due </span>${esc(displayDate(inv.dueDate))}</span>
+          <span class="num inv-c-amount">${esc(cur)}${esc(money(t.total))}</span>
+          <span class="num inv-c-balance"><span class="inv-m-label">Balance </span>${esc(cur)}${esc(money(t.balanceDue))}</span>
+          <span class="inv-c-actions">
+            ${t.balanceDue > 0.004 ? `<button type="button" class="ghost-btn inv-row-btn" data-inv-pay="${esc(inv.id)}">Record payment</button>` : ""}
+            <button type="button" class="ghost-btn icon-btn inv-row-btn" data-inv-pdf="${esc(inv.id)}" aria-label="Download PDF for ${esc(inv.number)}"><svg class="icon"><use href="#i-download"></use></svg></button>
+          </span>
+        </div>`;
+      }).join("")}`;
+  }
+
+  function replaceInList(saved) {
+    const i = list.invoices.findIndex((x) => x.id === saved.id);
+    if (i >= 0) list.invoices[i] = { ...list.invoices[i], ...saved };
+    else list.invoices.unshift(saved);
+    renderInvoiceList();
+  }
+
+  // Record payment: a small sheet with the balance prefilled; the amount is
+  // added to the invoice's Payment Made.
+  function openPaymentDialog(inv) {
+    let modal = $("invPayModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "invPayModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel inv-pay-panel" role="dialog" aria-modal="true" aria-labelledby="invPayTitle">
+          <div class="modal-header">
+            <h3 id="invPayTitle">Record payment</h3>
+            <button type="button" class="modal-close" data-pay-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p id="invPaySummary" class="inv-pay-summary"></p>
+            <div class="form-field">
+              <label class="field-label" for="invPayAmount">Amount received</label>
+              <input id="invPayAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" />
+            </div>
+            <p id="invPayError" class="field-error" hidden></p>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-pay-close>Cancel</button>
+            <button type="button" class="primary-btn" id="invPaySave"><svg class="icon"><use href="#i-check"></use></svg>Record payment</button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.querySelectorAll("[data-pay-close]").forEach((b) => b.addEventListener("click", () => { modal.hidden = true; }));
+    }
+    const t = totalsOf(inv);
+    const cur = inv.currency || "TTD";
+    $("invPaySummary").innerHTML = `<strong>${esc(inv.number)}</strong> · ${esc(inv.billTo?.name || "")}<br>Total ${esc(cur)}${esc(money(t.total))} · Paid ${esc(cur)}${esc(money(t.paymentMade))} · <strong>Balance ${esc(cur)}${esc(money(t.balanceDue))}</strong>`;
+    $("invPayAmount").value = t.balanceDue.toFixed(2);
+    $("invPayError").hidden = true;
+    $("invPaySave").onclick = async () => {
+      const amount = num($("invPayAmount").value);
+      if (amount <= 0) {
+        $("invPayError").textContent = "Enter the amount received.";
+        $("invPayError").hidden = false;
+        return;
+      }
+      const btn = $("invPaySave");
+      btn.disabled = true;
+      try {
+        const res = await request({ action: "update", id: inv.id, invoice: { paymentMade: num(t.paymentMade + amount) } });
+        modal.hidden = true;
+        replaceInList(res.invoice);
+      } catch (err) {
+        $("invPayError").textContent = "Couldn't record the payment: " + (err.message || err);
+        $("invPayError").hidden = false;
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    modal.hidden = false;
+    $("invPayAmount").focus();
+    $("invPayAmount").select();
+  }
+
+  function newInvoiceDraft() {
+    const today = todayYmd();
+    return {
+      id: "",
+      number: "",
+      invoiceDate: today,
+      dueDate: today,
+      terms: "Due on Receipt",
+      billTo: { name: "", phone: "", email: "" },
+      items: [],
+      paymentMade: 0,
+      notes: list.defaults?.notes || "",
+      currency: "TTD",
+      business: list.defaults?.business || null,
+    };
+  }
+
+  function bindInvoiceList() {
+    const view = $("view-invoices");
+    if (!view || view.dataset.bound) return;
+    view.dataset.bound = "1";
+    $("invListRefresh").addEventListener("click", loadInvoiceList);
+    $("invListNew").addEventListener("click", () => {
+      openEditor(newInvoiceDraft(), { onSaved: (saved) => replaceInList(saved) });
+    });
+    $("invListSearch").addEventListener("input", (e) => { list.query = e.target.value; renderInvoiceList(); });
+    $("invFilterChips").addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-inv-filter]");
+      if (!chip) return;
+      list.filter = chip.dataset.invFilter;
+      renderInvoiceList();
+    });
+    const byId = (id) => list.invoices.find((x) => x.id === id);
+    $("invList").addEventListener("click", async (e) => {
+      const pay = e.target.closest("[data-inv-pay]");
+      const pdf = e.target.closest("[data-inv-pdf]");
+      const row = e.target.closest("[data-inv-open]");
+      if (pay) { e.stopPropagation(); openPaymentDialog(byId(pay.dataset.invPay)); return; }
+      if (pdf) {
+        e.stopPropagation();
+        pdf.disabled = true;
+        try { await downloadPdf(byId(pdf.dataset.invPdf)); } catch (err) { $("invListStatus").textContent = err.message || String(err); }
+        finally { pdf.disabled = false; }
+        return;
+      }
+      if (row) openEditor(byId(row.dataset.invOpen), { onSaved: (saved) => replaceInList(saved) });
+    });
+    $("invList").addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-inv-open]")) {
+        e.preventDefault();
+        e.target.click();
+      }
+    });
+  }
+
+  window.addEventListener("rpc-enter-invoices", () => {
+    bindInvoiceList();
+    loadInvoiceList();
+  });
+
+  window.RPC_INVOICE = { buildPdf, downloadPdf, sharePdf, canSharePdf, renderCard, openEditor, totalsOf, invoiceStatus };
 })();

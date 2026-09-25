@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=invoice-editor-1" />
+  <link rel="stylesheet" href="assets/style.css?v=invoice-list-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -49,6 +49,7 @@
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.2 4.2"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2h.01"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-invoice" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14l-2.2-1.3L14.6 21l-2.3-1.3L10 21l-2.2-1.3L5.5 21V4a1 1 0 0 1 .5-1Z"/><path d="M14.5 3v4.5H19M8.5 10.5h7M8.5 14h7M8.5 17.5h4"/></symbol>
     <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor"/></symbol>
     <symbol id="i-user-plus" viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></symbol>
@@ -125,7 +126,7 @@
       </div>
       <button class="nav-btn" data-target="reminders" role="tab" aria-selected="false"><svg class="icon icon-reminders"><use href="#i-clock"></use></svg>Reminders</button>
       <button class="nav-btn" data-target="partsOrders" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Parts orders</button>
-      <button class="nav-btn" data-target="parts-checker" role="tab" aria-selected="false"><svg class="icon"><use href="#i-laptop"></use></svg>Parts Checker</button>
+      <button class="nav-btn" data-target="invoices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-invoice"></use></svg>Invoices</button>
       <button class="nav-btn" data-target="dashboard" role="tab" aria-selected="false"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
       <button class="nav-btn" data-target="leads" role="tab" aria-selected="false"><svg class="icon"><use href="#i-user"></use></svg>Leads</button>
       <button class="nav-btn" data-target="appointments" role="tab" aria-selected="false"><svg class="icon"><use href="#i-calendar"></use></svg>Appointments</button>
@@ -1351,6 +1352,42 @@
     </section>
   </main>
 
+  <!-- ============ INVOICES VIEW (assets/invoice.js) ============ -->
+  <main class="container view" id="view-invoices" hidden>
+    <div class="inv-list-head">
+      <div>
+        <p class="dashboard-eyebrow">Sales</p>
+        <h2 class="inv-list-title">All invoices</h2>
+      </div>
+      <div class="inv-list-head-actions">
+        <button type="button" id="invListRefresh" class="ghost-btn icon-btn" aria-label="Refresh invoices"><svg class="icon"><use href="#i-refresh"></use></svg></button>
+        <button type="button" id="invListNew" class="primary-btn"><svg class="icon"><use href="#i-plus"></use></svg>New invoice</button>
+      </div>
+    </div>
+
+    <section class="inv-summary" aria-label="Payment summary">
+      <div class="inv-summary-main">
+        <span class="inv-summary-icon" aria-hidden="true"><svg class="icon"><use href="#i-cash"></use></svg></span>
+        <div><p>Total outstanding receivables</p><strong id="invSumOutstanding">—</strong></div>
+      </div>
+      <div class="inv-summary-stat"><p>Due today</p><strong id="invSumToday" class="inv-sum-warn">—</strong></div>
+      <div class="inv-summary-stat"><p>Due within 30 days</p><strong id="invSumSoon">—</strong></div>
+      <div class="inv-summary-stat"><p>Overdue</p><strong id="invSumOverdue" class="inv-sum-danger">—</strong></div>
+      <div class="inv-summary-stat"><p>Paid on this month’s invoices</p><strong id="invSumCollected" class="inv-sum-good">—</strong></div>
+    </section>
+
+    <div class="inv-list-toolbar">
+      <div class="inv-filter-chips" id="invFilterChips" role="tablist" aria-label="Filter invoices by status"></div>
+      <div class="leads-searchbar inv-list-search">
+        <svg class="icon"><use href="#i-search"></use></svg>
+        <input id="invListSearch" type="search" inputmode="search" autocomplete="off" placeholder="Search customer or invoice #" aria-label="Search invoices" />
+      </div>
+    </div>
+
+    <p id="invListStatus" class="result-count"></p>
+    <div class="inv-list" id="invList" aria-live="polite"></div>
+  </main>
+
   <main class="container view" id="view-parts-checker" hidden>
     <p class="info-banner">Build an exact laptop screen lookup packet from model, serial, and touch status.</p>
 
@@ -2430,8 +2467,8 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=invoice-pdf-1"></script>
-  <script defer src="assets/invoice.js?v=invoice-editor-1"></script>
+  <script defer src="assets/intake.js?v=invoice-list-1"></script>
+  <script defer src="assets/invoice.js?v=invoice-list-1"></script>
   <script defer src="assets/dashboard.js?v=mobile-layout-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>

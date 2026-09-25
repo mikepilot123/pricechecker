@@ -7236,6 +7236,143 @@ video.media-viewer-media {
   .invoice-editor-panel .form-actions .icon { display: none; }
 }
 
+/* ---------- Invoices tab (assets/invoice.js) ---------- */
+.inv-list-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.inv-list-title { margin: 2px 0 0; font-size: 1.4rem; }
+.inv-list-head-actions { display: flex; gap: 8px; }
+.inv-summary {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(4, 1fr);
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(100deg, var(--card) 60%, #fdf6ec);
+  box-shadow: var(--shadow);
+}
+.inv-summary p { margin: 0 0 4px; color: var(--text-dim); font-size: 0.8rem; }
+.inv-summary strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.inv-summary-main { display: flex; align-items: center; gap: 12px; }
+.inv-summary-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 50%; background: #f4d9a8; color: #8a4b0c; }
+.inv-summary-main strong { font-size: 1.3rem; }
+.inv-summary-stat { padding-left: 16px; border-left: 1px solid var(--border); }
+.inv-sum-warn { color: var(--warn); }
+.inv-sum-danger { color: var(--danger); }
+.inv-sum-good { color: var(--price); }
+.inv-list-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0 8px; }
+.inv-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.inv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font: 500 0.84rem var(--font-display);
+  cursor: pointer;
+}
+.inv-chip span { color: var(--text-dim); font-size: 0.75rem; }
+.inv-chip.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.inv-chip.active span { color: rgba(255, 255, 255, 0.85); }
+.inv-list-search { flex: 0 1 320px; }
+.inv-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.inv-list .empty-state { border: 0; box-shadow: none; }
+.inv-list-row {
+  display: grid;
+  grid-template-columns: 100px 110px minmax(0, 1.3fr) minmax(0, 1.2fr) 100px 110px 110px 170px;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.inv-list-row:first-child { border-top: 0; }
+.inv-list-row:not(.inv-list-header):hover { background: var(--card-hover); }
+.inv-list-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.inv-list-header {
+  min-height: 42px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: default;
+}
+.inv-list-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-c-num { color: var(--accent); font-weight: 600; }
+.inv-c-name { overflow-wrap: anywhere; }
+.inv-c-balance { font-weight: 600; }
+.inv-c-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.inv-row-btn { min-height: 36px; padding: 0 10px; font-size: 0.8rem; white-space: nowrap; }
+.inv-row-btn.icon-btn { width: 36px; padding: 0; justify-content: center; }
+.inv-m-label { display: none; }
+.inv-status { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+.inv-status-paid { color: var(--price); }
+.inv-status-overdue { color: #c2410c; }
+.inv-status-partial { color: var(--accent); }
+.inv-status-due { color: var(--text-dim); }
+.inv-pay-summary { margin: 0 0 14px; font-size: 0.88rem; line-height: 1.5; }
+
+@media (max-width: 1100px) {
+  .inv-summary { grid-template-columns: repeat(2, 1fr); }
+  .inv-summary-main { grid-column: 1 / -1; }
+  .inv-summary-stat:nth-child(2n) { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 900px) {
+  .inv-list { border: 0; background: transparent; box-shadow: none; overflow: visible; display: flex; flex-direction: column; gap: 10px; }
+  .inv-list-header { display: none; }
+  .inv-list-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name balance"
+      "num status"
+      "date due"
+      "actions actions";
+    gap: 4px 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  }
+  .inv-c-name { grid-area: name; font-weight: 600; font-size: 1rem; }
+  .inv-c-balance { grid-area: balance; font-size: 1rem; }
+  .inv-c-num { grid-area: num; font-size: 0.84rem; }
+  .inv-c-status { grid-area: status; text-align: right; }
+  .inv-c-date { grid-area: date; color: var(--text-dim); font-size: 0.8rem; }
+  .inv-c-due { grid-area: due; color: var(--text-dim); font-size: 0.8rem; text-align: right; }
+  .inv-c-amount { display: none; }
+  .inv-c-actions { grid-area: actions; justify-content: stretch; margin-top: 6px; }
+  .inv-c-actions:empty { display: none; }
+  .inv-row-btn { min-height: 44px; flex: 1; }
+  .inv-row-btn.icon-btn { flex: 0 0 44px; width: 44px; }
+  .inv-m-label { display: inline; }
+}
+@media (max-width: 559px) {
+  .inv-list-head { align-items: center; }
+  .inv-list-head .dashboard-eyebrow { display: none; }
+  .inv-summary { grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+  .inv-summary-stat { padding-left: 0; border-left: 0; }
+  .inv-list-toolbar { flex-direction: column; align-items: stretch; }
+  .inv-filter-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(-1 * var(--m-pad, 16px)); padding: 0 var(--m-pad, 16px) 2px; scrollbar-width: none; }
+  .inv-chip { flex: none; min-height: 40px; }
+  .inv-list-toolbar > * { min-width: 0; max-width: 100%; }
+  .inv-list-search { flex: 1 1 auto; width: 100%; min-width: 0; }
+  .inv-list-search input { font-size: 16px; min-width: 0; }
+}
+
 /* ---------- Repair cost suggested from the price list ---------- */
 .price-suggest-inline { margin: 8px 0 0; color: var(--price); font-weight: 500; }
 .price-suggest {

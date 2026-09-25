@@ -180,6 +180,7 @@
     prices: $("view-prices"),
     partsOrders: $("view-partsOrders"),
     "parts-checker": $("view-parts-checker"),
+    invoices: $("view-invoices"),
     intake: $("view-intake"),
     inventory: $("view-inventory"),
     account: $("view-account"),
@@ -226,6 +227,7 @@
     if (target === "appointments") window.dispatchEvent(new Event("rpc-enter-appointments"));
     if (target === "partsOrders") window.dispatchEvent(new Event("rpc-enter-parts-orders"));
     if (target === "parts-checker") window.dispatchEvent(new Event("rpc-enter-parts-checker"));
+    if (target === "invoices") window.dispatchEvent(new Event("rpc-enter-invoices"));
     if (target === "intake") enterIntake();
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
     if (target === "account") window.dispatchEvent(new Event("rpc-enter-account"));
