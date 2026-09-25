@@ -473,6 +473,18 @@
     $("invHeadBalance").textContent = `${cur}${money(t.balanceDue)}`;
   }
 
+  // Keeps linked repairs' sale/paid amounts in step with the invoice (see
+  // RPC_SYNC_REPAIRS_FROM_INVOICE in assets/intake.js). Never blocks a save.
+  async function syncRepairs(invoice) {
+    if (typeof window.RPC_SYNC_REPAIRS_FROM_INVOICE !== "function") return;
+    try {
+      const { updated } = await window.RPC_SYNC_REPAIRS_FROM_INVOICE(invoice);
+      if (updated) notify(`Invoice saved — ${updated} repair${updated === 1 ? "" : "s"} updated to match.`);
+    } catch (err) {
+      notify(`Invoice saved, but the repair couldn't be updated: ${err.message || err}`, "error");
+    }
+  }
+
   function notify(message, tone = "info") {
     if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message, { tone, duration: tone === "error" ? 9000 : 4000 });
   }
@@ -491,6 +503,9 @@
 
   function openEditor(invoice, { onSaved, onDeleted } = {}) {
     const modal = ensureEditor();
+    // Same layer as other windows, so move it last to open on top of
+    // whatever launched it (e.g. the dashboard's Sales breakdown).
+    document.body.appendChild(modal);
     editing = { invoice, onSaved, onDeleted };
     modal.querySelector("[data-inv-delete]").hidden = !invoice.id;
     const canLog = !invoice.id && typeof window.RPC_LOG_REPAIRS_FOR_INVOICE === "function";
@@ -566,6 +581,7 @@
       let res = isNew
         ? await request({ action: "create", ...changes })
         : await request({ action: "update", id: editing.invoice.id, invoice: changes });
+      if (!isNew) await syncRepairs(res.invoice);
       if (logRepairs) {
         // The invoice is saved either way; if logging a repair fails, say so
         // rather than losing the invoice.
@@ -824,6 +840,7 @@
         const res = await request({ action: "update", id: inv.id, invoice: { paymentMade: num(t.paymentMade + amount) } });
         modal.hidden = true;
         replaceInList(res.invoice);
+        await syncRepairs(res.invoice);
       } catch (err) {
         $("invPayError").textContent = "Couldn't record the payment: " + (err.message || err);
         $("invPayError").hidden = false;

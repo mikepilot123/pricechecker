@@ -2169,21 +2169,104 @@
 
   // Repair details → Invoice: open the invoice this repair was billed on, or
   // make one for it (checked in before invoices were automatic).
+  // An invoice for one repair that doesn't have one yet (repair details,
+  // dashboard Sales breakdown). Lines come from the price list like check-in.
+  function createInvoiceFromTicket(ticket) {
+    return createCheckinInvoice({
+      tickets: [ticket],
+      devices: [{ device: ticket.device, issues: ticket.issues, notes: "", repairCost: ticket.repairCost, amountPaid: ticket.amountPaid }],
+      customerName: ticket.customerName,
+      phone: ticket.phone,
+      email: ticket.email,
+      send: "",
+    });
+  }
+
+  window.RPC_CREATE_INVOICE_FOR_TICKET = async (ticketId) => {
+    if (!loadedOnce) await loadTickets();
+    const ticket = TICKETS.find((t) => t.id === ticketId);
+    if (!ticket) throw new Error("This repair couldn't be found — reload and try again.");
+    const existing = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId });
+    if (existing.invoice) return existing.invoice;
+    return (await createInvoiceFromTicket(ticket)).invoice;
+  };
+
+  // Invoice → repairs: after an invoice is edited (or a payment recorded on
+  // it), bring its linked repairs' sale amount and amount paid in line.
+  //  • One repair: sale = invoice total, paid = invoice payment made.
+  //  • Several: each repair's sale = the total of the lines for its device;
+  //    if any repair can't be matched to lines, sales are left alone.
+  //  • Paid: only the change in the invoice's payment is applied (added to
+  //    repairs still owing, or taken back from the last ones), so money
+  //    already recorded against a particular repair isn't moved around.
+  window.RPC_SYNC_REPAIRS_FROM_INVOICE = async (invoice) => {
+    if (!invoice || !(invoice.ticketIds || []).length) return { updated: 0 };
+    if (!loadedOnce) await loadTickets();
+    const linked = invoice.ticketIds.map((id) => TICKETS.find((t) => t.id === id)).filter(Boolean);
+    if (!linked.length) return { updated: 0 };
+    const round = (n) => Math.round(n * 100) / 100;
+    const items = invoice.items || [];
+    const invoiceTotal = round(items.reduce((s, it) => s + (Number(it.qty) || 1) * (Number(it.rate) || 0), 0));
+    const plans = linked.map((t) => ({ ticket: t, cost: Number(t.repairCost) || 0, paid: Number(t.amountPaid) || 0 }));
+    if (plans.length === 1) {
+      plans[0].cost = invoiceTotal;
+    } else {
+      const groups = repairsFromInvoiceItems(items);
+      const costFor = (t) => groups.find((g) => normalizeModelName(g.device) === normalizeModelName(t.device));
+      if (plans.every((p) => costFor(p.ticket))) plans.forEach((p) => { p.cost = costFor(p.ticket).cost; });
+    }
+    let delta = round((Number(invoice.paymentMade) || 0) - plans.reduce((s, p) => s + p.paid, 0));
+    if (plans.length === 1) {
+      plans[0].paid = round(plans[0].paid + delta);
+      delta = 0;
+    }
+    for (const p of plans) {
+      if (delta <= 0) break;
+      const room = Math.max(0, round(p.cost - p.paid));
+      const add = Math.min(room, delta);
+      p.paid = round(p.paid + add);
+      delta = round(delta - add);
+    }
+    if (delta > 0) plans[plans.length - 1].paid = round(plans[plans.length - 1].paid + delta);
+    for (const p of [...plans].reverse()) {
+      if (delta >= 0) break;
+      const take = Math.min(p.paid, -delta);
+      p.paid = round(p.paid - take);
+      delta = round(delta + take);
+    }
+    let updated = 0;
+    for (const p of plans) {
+      const t = p.ticket;
+      if (p.cost === (Number(t.repairCost) || 0) && p.paid === (Number(t.amountPaid) || 0)) continue;
+      const res = await api({
+        action: "update",
+        id: t.id,
+        status: t.status,
+        customerName: t.customerName,
+        client: t.customerName,
+        phone: t.phone,
+        email: t.email,
+        device: t.device,
+        issues: t.issues,
+        issue: t.issues,
+        notes: t.notes,
+        repairCost: String(p.cost),
+        amountPaid: String(Math.max(0, p.paid)),
+      });
+      if (!res.ok) throw new Error(res.error || "Couldn't update " + (t.device || "the repair"));
+      mergeTicket(res.ticket);
+      updated++;
+    }
+    if (updated) { renderStatusChips(); render(); }
+    return { updated };
+  };
+
   async function openInvoiceForTicket(ticket, btn) {
     const original = btn ? btn.innerHTML : "";
     if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
     try {
       let data = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId: ticket.id });
-      if (!data.invoice) {
-        data = await createCheckinInvoice({
-          tickets: [ticket],
-          devices: [{ device: ticket.device, issues: ticket.issues, notes: "", repairCost: ticket.repairCost, amountPaid: ticket.amountPaid }],
-          customerName: ticket.customerName,
-          phone: ticket.phone,
-          email: ticket.email,
-          send: "",
-        });
-      }
+      if (!data.invoice) data = await createInvoiceFromTicket(ticket);
       closeTicketModal();
       window.RPC_INVOICE.openEditor(data.invoice, {
         onSaved: () => toast("Invoice saved.", { tone: "info", duration: 2500 }),

@@ -1358,7 +1358,13 @@
       if (invBtn) {
         e.stopPropagation();
         const inv = salesInvoices.find((x) => x.id === invBtn.dataset.salesInvoice);
-        if (inv && window.RPC_INVOICE) window.RPC_INVOICE.openEditor(inv, { onSaved: () => loadSalesInvoices() });
+        if (inv) openSalesInvoice(inv);
+        return;
+      }
+      const createBtn = e.target.closest("[data-sales-create]");
+      if (createBtn) {
+        e.stopPropagation();
+        createSalesInvoice(createBtn);
         return;
       }
       const row = e.target.closest("[data-sales-ticket]");
@@ -1374,6 +1380,34 @@
       }
     });
     return modal;
+  }
+
+  // The invoice editor opens on top of the breakdown; saving it also updates
+  // the linked repair(s) (assets/invoice.js → RPC_SYNC_REPAIRS_FROM_INVOICE),
+  // after which the list and totals here refresh.
+  function openSalesInvoice(inv) {
+    if (!window.RPC_INVOICE) return;
+    window.RPC_INVOICE.openEditor(inv, {
+      onSaved: () => loadSalesInvoices(),
+      onDeleted: () => loadSalesInvoices(),
+    });
+  }
+
+  async function createSalesInvoice(btn) {
+    if (typeof window.RPC_CREATE_INVOICE_FOR_TICKET !== "function") return;
+    btn.disabled = true;
+    const original = btn.innerHTML;
+    btn.textContent = "Creating…";
+    try {
+      const invoice = await window.RPC_CREATE_INVOICE_FOR_TICKET(btn.dataset.salesCreate);
+      await loadSalesInvoices();
+      openSalesInvoice(salesInvoices.find((x) => x.id === invoice.id) || invoice);
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = original;
+      const message = "Couldn't create the invoice: " + (err.message || err);
+      if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message);
+    }
   }
 
   function invoiceForTicket(ticketId) {
@@ -1423,8 +1457,8 @@
           <span class="sales-c-main"><strong>${esc(t.customerName || "Unknown customer")}</strong><small>${esc(t.device || "—")}${t.issues ? " · " + esc(t.issues) : ""}</small></span>
           <span class="sales-c-status">${esc(t.status || "")}</span>
           <span class="sales-c-inv">${inv
-            ? `<button type="button" class="sales-inv-link" data-sales-invoice="${esc(inv.id)}">${esc(inv.number)}</button>`
-            : `<span class="sales-inv-none">No invoice</span>`}</span>
+            ? `<button type="button" class="sales-inv-link" data-sales-invoice="${esc(inv.id)}" aria-label="Edit invoice ${esc(inv.number)}" title="Edit invoice"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg>${esc(inv.number)}</button>`
+            : `<button type="button" class="sales-inv-create" data-sales-create="${esc(t.id)}" aria-label="Create an invoice for ${esc(t.customerName || "this repair")}"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>Create invoice</button>`}</span>
           <span class="num sales-c-paid">
             <input class="sales-amt" type="number" min="0" step="0.01" inputmode="decimal" data-amt="amountPaid" data-id="${esc(t.id)}" value="${esc(Number(t.amountPaid || 0).toFixed(2))}" aria-label="Amount paid by ${esc(t.customerName || "customer")}" />
             ${owed > 0
@@ -3061,6 +3095,11 @@
   window.addEventListener("rpc-tickets", (event) => {
     tickets = (event.detail?.tickets || []).map(normalizeTicket);
     render({});
+    // Refresh an open Sales breakdown too (e.g. after an invoice edit updated
+    // a repair) — unless an amount is mid-edit there.
+    const modal = $("salesBreakdownModal");
+    const typing = document.activeElement?.matches?.(".sales-amt") && modal?.contains(document.activeElement);
+    if (modal && !modal.hidden && !typing) renderSalesBreakdown();
   });
   window.addEventListener("rpc-inventory", (event) => {
     inventoryItems = (event.detail?.items || []).map(normalizeInventoryItem);
