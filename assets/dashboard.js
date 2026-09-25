@@ -1319,8 +1319,9 @@
       </div>`;
     document.body.appendChild(modal);
     const close = () => { modal.hidden = true; };
+    // Closes only via the X or Escape — a stray click outside must not throw
+    // away the list (or an amount being typed).
     modal.querySelector("[data-sales-close]").addEventListener("click", close);
-    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !modal.hidden && ($("invoiceEditorModal")?.hidden ?? true)) close();
     });
@@ -1508,7 +1509,9 @@
       row?.classList.remove("is-saving");
       if (input) input.value = input.defaultValue;
       if (direct?.button) direct.button.disabled = false;
-      alert("Couldn't save: " + (err.message || err));
+      const message = "Couldn't save: " + (err.message || err);
+      if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message);
+      else alert(message);
     }
   }
 

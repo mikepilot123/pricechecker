@@ -3384,8 +3384,11 @@
   // changes a repair's sale amount and/or amount paid in place. A higher
   // amount paid is also added to the repair's invoice. Throws on failure.
   window.RPC_UPDATE_TICKET_AMOUNTS = async (id, { repairCost, amountPaid } = {}) => {
+    // The Repairs list only loads when that tab is first opened, so when the
+    // app starts on the Dashboard it's still empty here — load it first.
+    if (!loadedOnce) await loadTickets();
     const ticket = TICKETS.find((t) => t.id === id);
-    if (!ticket) throw new Error("Repair not found — reload and try again");
+    if (!ticket) throw new Error("This repair couldn't be found — it may have been deleted. Reload and try again.");
     const before = Number(ticket.amountPaid) || 0;
     const res = await api({
       action: "update",
