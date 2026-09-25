@@ -212,25 +212,190 @@
     }
   }
   window.addEventListener("rpc-enter-email-settings", enterSettings);
+  window.addEventListener("rpc-enter-email-settings", enterDesign);
+
+  /* ---- Email design editor (Settings → Email) ------------------------- */
+  const design = { saved: null, current: null, placeholders: [], previewPaid: false, previewTimer: 0, lastField: null, bound: false };
+  const TEXT_FIELDS = { edSubject: "subject", edHeadingDue: "headingDue", edHeadingPaid: "headingPaid", edMessage: "message", edButton: "buttonText", edFooter: "footerText" };
+  const CHECK_FIELDS = { edShowLogo: "showLogo", edShowDueLine: "showDueLine", edShowSummary: "showSummary", edShowCustomer: "showCustomerInfo", edShowAddress: "showAddress" };
+
+  function fillDesignForm(t) {
+    Object.entries(TEXT_FIELDS).forEach(([id, key]) => { $(id).value = t[key] || ""; });
+    Object.entries(CHECK_FIELDS).forEach(([id, key]) => { $(id).checked = !!t[key]; });
+    $("edLogoUrl").value = t.logoUrl || "";
+    $("edLogoWidth").value = t.logoWidth;
+    $("edLogoWidthLabel").textContent = `${t.logoWidth}px`;
+    setAccent(t.accentColor, false);
+    setSeg("[data-ed-font]", "edFont", t.font);
+    setSeg("[data-ed-align]", "edAlign", t.logoAlign);
+  }
+
+  function setSeg(selector, dataKey, value) {
+    document.querySelectorAll(selector).forEach((b) => {
+      const on = Object.values(b.dataset)[0] === value;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-checked", on ? "true" : "false");
+    });
+  }
+
+  function setAccent(color, changed = true) {
+    $("edAccent").value = color;
+    $("edAccentHex").textContent = color;
+    document.querySelectorAll("[data-swatch]").forEach((s) => {
+      const on = s.dataset.swatch.toLowerCase() === color.toLowerCase();
+      s.classList.toggle("active", on);
+      s.setAttribute("aria-checked", on ? "true" : "false");
+    });
+    if (changed) designChanged();
+  }
+
+  function readDesignForm() {
+    const t = {};
+    Object.entries(TEXT_FIELDS).forEach(([id, key]) => { t[key] = $(id).value; });
+    Object.entries(CHECK_FIELDS).forEach(([id, key]) => { t[key] = $(id).checked; });
+    t.logoUrl = $("edLogoUrl").value.trim();
+    t.logoWidth = Number($("edLogoWidth").value);
+    t.accentColor = $("edAccent").value;
+    t.font = document.querySelector("[data-ed-font].active")?.dataset.edFont || "modern";
+    t.logoAlign = document.querySelector("[data-ed-align].active")?.dataset.edAlign || "left";
+    return t;
+  }
+
+  function setDesignStatus(text, tone = "") {
+    const el = $("emailDesignStatus");
+    el.textContent = text;
+    el.dataset.tone = tone;
+  }
+
+  function designChanged() {
+    design.current = readDesignForm();
+    const dirty = JSON.stringify(design.current) !== JSON.stringify(design.saved);
+    setDesignStatus(dirty ? "Unsaved changes" : "Saved", dirty ? "dirty" : "ok");
+    clearTimeout(design.previewTimer);
+    design.previewTimer = setTimeout(renderPreview, 350);
+  }
+
+  async function renderPreview() {
+    try {
+      const sender = senders.find((s) => s.isDefault) || senders[0];
+      const res = await request({ action: "previewEmail", template: design.current || readDesignForm(), paid: design.previewPaid, senderName: sender?.fromName || "" });
+      $("edPreviewSubject").textContent = res.subject;
+      $("edPreviewFrame").srcdoc = res.html;
+    } catch (ex) {
+      $("edPreviewSubject").textContent = "Couldn't render the preview: " + (ex.message || ex);
+    }
+  }
+
+  function insertPlaceholder(name) {
+    const field = design.lastField || $("edMessage");
+    const token = `{${name}}`;
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? field.value.length;
+    field.value = field.value.slice(0, start) + token + field.value.slice(end);
+    field.focus();
+    field.setSelectionRange(start + token.length, start + token.length);
+    designChanged();
+  }
+
+  function bindDesign() {
+    if (design.bound) return;
+    design.bound = true;
+    const form = $("emailDesignForm");
+    form.addEventListener("input", (e) => {
+      if (e.target.id === "edLogoWidth") $("edLogoWidthLabel").textContent = `${e.target.value}px`;
+      if (e.target.id === "edAccent") { setAccent(e.target.value); return; }
+      designChanged();
+    });
+    form.addEventListener("change", designChanged);
+    form.addEventListener("focusin", (e) => { if (e.target.matches(".ed-text")) design.lastField = e.target; });
+    document.querySelectorAll("[data-swatch]").forEach((b) => b.addEventListener("click", () => setAccent(b.dataset.swatch)));
+    document.querySelectorAll("[data-ed-font]").forEach((b) => b.addEventListener("click", () => { setSeg("[data-ed-font]", "edFont", b.dataset.edFont); designChanged(); }));
+    document.querySelectorAll("[data-ed-align]").forEach((b) => b.addEventListener("click", () => { setSeg("[data-ed-align]", "edAlign", b.dataset.edAlign); designChanged(); }));
+    document.querySelectorAll("[data-ed-preview]").forEach((b) => b.addEventListener("click", () => {
+      design.previewPaid = b.dataset.edPreview === "paid";
+      document.querySelectorAll("[data-ed-preview]").forEach((x) => x.classList.toggle("active", x === b));
+      renderPreview();
+    }));
+    document.querySelectorAll("[data-ed-device]").forEach((b) => b.addEventListener("click", () => {
+      $("edPreviewFrameWrap").classList.toggle("is-phone", b.dataset.edDevice === "phone");
+      document.querySelectorAll("[data-ed-device]").forEach((x) => x.classList.toggle("active", x === b));
+    }));
+    $("edPlaceholders").addEventListener("mousedown", (e) => {
+      const chip = e.target.closest("[data-ph]");
+      if (!chip) return;
+      e.preventDefault(); // keep the cursor in the field being edited
+      insertPlaceholder(chip.dataset.ph);
+    });
+    $("edPlaceholders").addEventListener("keydown", (e) => {
+      const chip = e.target.closest("[data-ph]");
+      if (chip && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); insertPlaceholder(chip.dataset.ph); }
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $("edSave");
+      btn.disabled = true;
+      $("emailDesignError").hidden = true;
+      try {
+        const res = await request({ action: "saveEmailTemplate", template: readDesignForm() });
+        design.saved = res.template;
+        fillDesignForm(res.template);
+        design.current = readDesignForm();
+        design.saved = design.current;
+        setDesignStatus("Saved", "ok");
+        notify("Email design saved — new invoice emails will use it.");
+        renderPreview();
+      } catch (ex) {
+        $("emailDesignError").textContent = "Couldn't save: " + (ex.message || ex);
+        $("emailDesignError").hidden = false;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    $("edReset").addEventListener("click", async () => {
+      if (!window.confirm("Reset the email design to the default? Your wording and style changes will be replaced.")) return;
+      try {
+        const res = await request({ action: "resetEmailTemplate" });
+        fillDesignForm(res.template);
+        design.current = readDesignForm();
+        design.saved = design.current;
+        setDesignStatus("Reset to default", "ok");
+        renderPreview();
+      } catch (ex) {
+        $("emailDesignError").textContent = "Couldn't reset: " + (ex.message || ex);
+        $("emailDesignError").hidden = false;
+      }
+    });
+  }
+
+  async function enterDesign() {
+    if (!$("emailDesignForm")) return;
+    bindDesign();
+    try {
+      const res = await request({ action: "emailTemplate" });
+      design.placeholders = res.placeholders || [];
+      $("edPlaceholders").innerHTML = design.placeholders.map((p) => `<button type="button" class="email-ph" data-ph="${esc(p)}">{${esc(p)}}</button>`).join("");
+      fillDesignForm(res.template);
+      design.current = readDesignForm();
+      design.saved = design.current;
+      setDesignStatus("Saved", "ok");
+      renderPreview();
+    } catch (ex) {
+      $("emailDesignError").textContent = "Couldn't load the email design: " + (ex.message || ex);
+      $("emailDesignError").hidden = false;
+    }
+  }
 
   /* ---- Send invoice dialog -------------------------------------------- */
   let composing = null; // { invoice, onSent }
 
-  function defaultMessage(invoice, senderName) {
-    const cur = invoice.currency || "TTD";
-    const name = (invoice.billTo?.name || "").trim().split(/\s+/)[0] || "there";
-    const balance = Number(invoice.balanceDue || 0);
-    const balanceLine = balance > 0.004
-      ? `A balance of ${cur}${money(balance)} is due${invoice.dueDate ? ` by ${displayDate(invoice.dueDate)}` : ""}.`
-      : "This invoice is paid in full — thank you!";
-    return `Dear ${name},
-
-Thank you for choosing JQ Electronics. Please find attached invoice ${invoice.number} for ${cur}${money(invoice.total)}. ${balanceLine}
-
-If you have any questions, just reply to this email.
-
-Regards,
-${senderName || "JQ Electronics"}`;
+  // Subject + message from the saved email design (Settings → Email →
+  // Email design), with this invoice's details filled in by the server.
+  async function draftFor(invoice, senderName) {
+    try {
+      return await request({ action: "emailDraft", id: invoice.id, senderName: senderName || "" });
+    } catch (_) {
+      return { subject: `Invoice ${invoice.number} from ${invoice.business?.name || "JQ Electronics Ltd."}`, message: "" };
+    }
   }
 
   function ensureCompose() {
@@ -289,12 +454,15 @@ ${senderName || "JQ Electronics"}`;
       $("emailComposeAddCc").hidden = true;
       $("emailComposeCc").focus();
     });
-    $("emailComposeFrom").addEventListener("change", () => {
+    $("emailComposeFrom").addEventListener("change", async () => {
       // Keep the sign-off in step with the chosen sender if it's untouched.
       const msg = $("emailComposeMessage");
       if (composing && msg.value === composing.lastDefault) {
-        composing.lastDefault = defaultMessage(composing.invoice, senderById($("emailComposeFrom").value)?.fromName);
-        msg.value = composing.lastDefault;
+        const draft = await draftFor(composing.invoice, senderById($("emailComposeFrom").value)?.fromName);
+        if (composing && msg.value === composing.lastDefault) {
+          composing.lastDefault = draft.message;
+          msg.value = draft.message;
+        }
       }
     });
     $("emailComposeSend").addEventListener("click", sendCompose);
@@ -332,9 +500,10 @@ ${senderName || "JQ Electronics"}`;
     $("emailComposeCc").value = "";
     $("emailComposeCcRow").hidden = true;
     $("emailComposeAddCc").hidden = false;
-    $("emailComposeSubject").value = `Invoice ${invoice.number} from ${invoice.business?.name || "JQ Electronics Ltd."}`;
-    composing.lastDefault = defaultMessage(invoice, chosen.fromName);
-    $("emailComposeMessage").value = composing.lastDefault;
+    const draft = await draftFor(invoice, chosen.fromName);
+    $("emailComposeSubject").value = draft.subject;
+    composing.lastDefault = draft.message;
+    $("emailComposeMessage").value = draft.message;
     $("emailComposeAttach").checked = true;
     $("emailComposeLink").checked = true;
     $("emailComposeFile").textContent = `(${String(invoice.number || "invoice").replace(/[^\w.-]+/g, "_")}.pdf)`;
@@ -408,13 +577,14 @@ ${senderName || "JQ Electronics"}`;
     const sender = senders.find((s) => s.isDefault) || senders[0];
     if (!sender) throw new Error("No email account linked — add one in Settings → Email");
     if (!invoice.billTo?.email) throw new Error("the client has no email address");
+    const draft = await draftFor(invoice, sender.fromName);
     const res = await request({
       action: "email",
       id: invoice.id,
       senderId: sender.id,
       to: invoice.billTo.email,
-      subject: `Invoice ${invoice.number} from ${invoice.business?.name || "JQ Electronics Ltd."}`,
-      message: defaultMessage(invoice, sender.fromName),
+      subject: draft.subject,
+      message: draft.message,
       includeLink: true,
       pdfBase64: await pdfBase64For(invoice),
     });

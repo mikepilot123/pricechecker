@@ -1,5 +1,5 @@
 import { ensureSchema } from "../lib/db.js";
-import { deleteSender, listSenders, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
+import { deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
 import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
@@ -52,6 +52,9 @@ function escapeHtml(value) {
 //                  includeLink } sends it from a linked mailbox (lib/email.js)
 //   senders / saveSender / deleteSender / defaultSender / testSender —
 //                manage those mailboxes (Settings → Email)
+//   emailTemplate / saveEmailTemplate / resetEmailTemplate / previewEmail —
+//                the customer email's design (Settings → Email → Email design)
+//   emailDraft – { id, senderName } → subject + message from the template
 // No action = the original one-device create-and-send call, still accepted
 // so a browser running an older copy of the app keeps working.
 async function createAndDeliverInvoice(req, res) {
@@ -64,6 +67,38 @@ async function createAndDeliverInvoice(req, res) {
   if (action === "update") {
     const invoice = await updateInvoice(body.id, body.invoice || {});
     return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token) });
+  }
+  if (action === "emailTemplate") {
+    return res.status(200).json({ ok: true, template: await getEmailTemplate(), defaults: EMAIL_TEMPLATE_DEFAULTS, placeholders: EMAIL_PLACEHOLDERS });
+  }
+  if (action === "saveEmailTemplate") {
+    return res.status(200).json({ ok: true, template: await saveEmailTemplate(body.template || {}) });
+  }
+  if (action === "resetEmailTemplate") {
+    return res.status(200).json({ ok: true, template: await resetEmailTemplate() });
+  }
+  if (action === "previewEmail") {
+    // Unsaved template from the editor, rendered with a sample invoice.
+    const invoice = sampleInvoice(INVOICE_BUSINESS);
+    if (body.paid) { invoice.paymentMade = invoice.total; invoice.balanceDue = 0; }
+    const template = body.template || (await getEmailTemplate());
+    const senderName = String(body.senderName || "JQ Electronics").slice(0, 120);
+    const message = fillPlaceholders(template.message ?? EMAIL_TEMPLATE_DEFAULTS.message, invoice, senderName);
+    return res.status(200).json({
+      ok: true,
+      subject: fillPlaceholders(template.subject ?? EMAIL_TEMPLATE_DEFAULTS.subject, invoice, senderName),
+      html: invoiceEmailHtml(invoice, message, "https://example.com/invoice", template, senderName),
+    });
+  }
+  if (action === "emailDraft") {
+    const invoice = await getInvoiceById(body.id);
+    const template = await getEmailTemplate();
+    const senderName = String(body.senderName || "").slice(0, 120);
+    return res.status(200).json({
+      ok: true,
+      subject: fillPlaceholders(template.subject, invoice, senderName),
+      message: fillPlaceholders(template.message, invoice, senderName),
+    });
   }
   if (action === "senders") {
     return res.status(200).json({ ok: true, senders: await listSenders() });

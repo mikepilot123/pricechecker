@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=settings-fix-1" />
+  <link rel="stylesheet" href="assets/style.css?v=email-design-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -1731,6 +1731,102 @@
               </div>
             </form>
             <p id="emailSettingsError" class="field-error" hidden></p>
+
+            <!-- Customer email design (assets/email.js) -->
+            <div class="email-design" id="emailDesign">
+              <div class="email-design-head">
+                <div>
+                  <p class="field-label">Email design</p>
+                  <p class="settings-help">Change how the email your customers receive looks and reads. The preview updates as you type.</p>
+                </div>
+                <span class="email-design-status" id="emailDesignStatus" aria-live="polite"></span>
+              </div>
+              <div class="email-design-grid">
+                <form class="email-design-form" id="emailDesignForm" autocomplete="off">
+                  <fieldset>
+                    <legend>Style</legend>
+                    <label class="field-label">Accent colour <span class="field-optional">(button and links)</span></label>
+                    <div class="email-swatches" role="radiogroup" aria-label="Accent colour">
+                      <button type="button" class="email-swatch" data-swatch="#1f5fbf" style="--sw:#1f5fbf" aria-label="JQ blue"></button>
+                      <button type="button" class="email-swatch" data-swatch="#111827" style="--sw:#111827" aria-label="Black"></button>
+                      <button type="button" class="email-swatch" data-swatch="#047857" style="--sw:#047857" aria-label="Green"></button>
+                      <button type="button" class="email-swatch" data-swatch="#6d28d9" style="--sw:#6d28d9" aria-label="Purple"></button>
+                      <button type="button" class="email-swatch" data-swatch="#c2410c" style="--sw:#c2410c" aria-label="Orange"></button>
+                      <label class="email-color-custom"><input type="color" id="edAccent" aria-label="Custom colour" /><span id="edAccentHex">#1f5fbf</span></label>
+                    </div>
+                    <label class="field-label">Font</label>
+                    <div class="email-seg" role="radiogroup" aria-label="Font">
+                      <button type="button" data-ed-font="modern">Modern</button>
+                      <button type="button" data-ed-font="classic" style="font-family:Georgia,serif">Classic</button>
+                      <button type="button" data-ed-font="friendly" style="font-family:'Trebuchet MS',Verdana,sans-serif">Friendly</button>
+                    </div>
+                  </fieldset>
+
+                  <fieldset>
+                    <legend>Logo</legend>
+                    <label class="email-check"><input type="checkbox" id="edShowLogo" /><span>Show the logo (otherwise the shop name)</span></label>
+                    <div class="email-seg" role="radiogroup" aria-label="Logo position">
+                      <button type="button" data-ed-align="left">Left</button>
+                      <button type="button" data-ed-align="center">Centred</button>
+                    </div>
+                    <label class="field-label" for="edLogoWidth">Logo size <span class="field-optional" id="edLogoWidthLabel">140px</span></label>
+                    <input type="range" id="edLogoWidth" min="60" max="260" step="10" />
+                    <label class="field-label" for="edLogoUrl">Logo image address <span class="field-optional">(optional — must start with https://)</span></label>
+                    <input id="edLogoUrl" class="text-input" type="url" placeholder="Leave blank to use the JQ Electronics logo" />
+                  </fieldset>
+
+                  <fieldset>
+                    <legend>Wording</legend>
+                    <p class="email-placeholder-help">Tap a placeholder to insert it where your cursor is:</p>
+                    <div class="email-placeholders" id="edPlaceholders"></div>
+                    <label class="field-label" for="edSubject">Subject</label>
+                    <input id="edSubject" class="text-input ed-text" />
+                    <label class="field-label" for="edHeadingDue">Heading — invoice with a balance</label>
+                    <input id="edHeadingDue" class="text-input ed-text" />
+                    <label class="field-label" for="edHeadingPaid">Heading — invoice paid in full</label>
+                    <input id="edHeadingPaid" class="text-input ed-text" />
+                    <label class="email-check"><input type="checkbox" id="edShowDueLine" /><span>Show the “balance is due by…” line under the heading</span></label>
+                    <label class="field-label" for="edMessage">Default message <span class="field-optional">(can still be changed per email)</span></label>
+                    <textarea id="edMessage" class="text-input ed-text" rows="6"></textarea>
+                    <label class="field-label" for="edButton">Button text</label>
+                    <input id="edButton" class="text-input ed-text" maxlength="40" />
+                    <label class="field-label" for="edFooter">Footer</label>
+                    <textarea id="edFooter" class="text-input ed-text" rows="3"></textarea>
+                  </fieldset>
+
+                  <fieldset>
+                    <legend>Sections</legend>
+                    <label class="email-check"><input type="checkbox" id="edShowSummary" /><span>Invoice summary (items and totals)</span></label>
+                    <label class="email-check"><input type="checkbox" id="edShowCustomer" /><span>Customer information</span></label>
+                    <label class="email-check"><input type="checkbox" id="edShowAddress" /><span>Shop name and address in the footer</span></label>
+                  </fieldset>
+
+                  <p id="emailDesignError" class="field-error" hidden></p>
+                  <div class="form-actions email-design-actions">
+                    <button type="button" class="ghost-btn" id="edReset">Reset to default</button>
+                    <button type="submit" class="primary-btn" id="edSave"><svg class="icon"><use href="#i-check"></use></svg>Save design</button>
+                  </div>
+                </form>
+
+                <div class="email-preview">
+                  <div class="email-preview-bar">
+                    <div class="email-seg email-seg-small" role="radiogroup" aria-label="Preview invoice">
+                      <button type="button" data-ed-preview="due" class="active">Unpaid</button>
+                      <button type="button" data-ed-preview="paid">Paid</button>
+                    </div>
+                    <div class="email-seg email-seg-small" role="radiogroup" aria-label="Preview size">
+                      <button type="button" data-ed-device="desktop" class="active">Desktop</button>
+                      <button type="button" data-ed-device="phone">Phone</button>
+                    </div>
+                  </div>
+                  <p class="email-preview-subject"><span>Subject:</span> <strong id="edPreviewSubject"></strong></p>
+                  <div class="email-preview-frame" id="edPreviewFrameWrap">
+                    <iframe id="edPreviewFrame" title="Email preview" sandbox=""></iframe>
+                  </div>
+                  <p class="email-preview-note">Preview uses a sample invoice. Real emails also attach the invoice PDF.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -2545,7 +2641,7 @@
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/intake.js?v=settings-fix-1"></script>
   <script defer src="assets/invoice.js?v=invoice-email-1"></script>
-  <script defer src="assets/email.js?v=invoice-email-1"></script>
+  <script defer src="assets/email.js?v=email-design-1"></script>
   <script defer src="assets/dashboard.js?v=sales-ux-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
