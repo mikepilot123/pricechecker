@@ -3050,6 +3050,24 @@
     // Editing an existing ticket is always a single device — keep that path
     // exactly as it was.
     if (editingId) {
+      // Changing the status to Picked Up here goes through the same balance
+      // check as the status picker.
+      const original = TICKETS.find((t) => t.id === editingId);
+      let pickupMethod = "";
+      let pickupBalance = 0;
+      if ($("fStatus").value === "Picked Up" && original && original.status !== "Picked Up") {
+        const draft = { ...original, customerName, device: currentDeviceValue, repairCost: $("fRepairCost").value.trim(), amountPaid: $("fAmountPaid").value.trim() };
+        pickupBalance = ticketBalance(draft);
+        if (pickupBalance > 0) {
+          pickupMethod = await confirmPickupPayment(draft);
+          if (!pickupMethod) {
+            err.textContent = "Not saved: confirm the balance was paid before marking it Picked Up (or choose another status).";
+            err.hidden = false;
+            return;
+          }
+          $("fAmountPaid").value = $("fRepairCost").value.trim();
+        }
+      }
       const payload = {
         action: "update",
         id: editingId,
@@ -3066,6 +3084,7 @@
         repairCost: $("fRepairCost").value.trim(),
         amountPaid: $("fAmountPaid").value.trim(),
         inventoryItemKey: $("fInventoryItem").value,
+        ...(pickupMethod ? { paymentMethod: pickupMethod } : {}),
       };
       saveBtn.disabled = true;
       saveBtn.textContent = "Saving…";
@@ -3073,6 +3092,7 @@
         const res = await api(payload);
         if (!res.ok) throw new Error(res.error || "Rejected");
         mergeTicket(res.ticket);
+        if (pickupMethod) await settleInvoiceForTicket(editingId, pickupBalance);
         refreshInventoryAfterStockChange();
         renderStatusChips();
         render();
@@ -3232,7 +3252,7 @@
   }
 
   // ---- Quick status change -------------------------------------------------
-  async function setStatus(ticket, status) {
+  async function setStatus(ticket, status, extra = {}) {
     try {
       const res = await api({
         action: "update",
@@ -3248,6 +3268,7 @@
         notes: ticket.notes,
         repairCost: ticket.repairCost,
         amountPaid: ticket.amountPaid,
+        ...extra,
       });
       if (!res.ok) throw new Error(res.error || "Rejected");
       mergeTicket(res.ticket);
@@ -3258,6 +3279,117 @@
       toast("Couldn't update status: " + e.message);
       return null;
     }
+  }
+
+  // ---- Pickup requires the balance to be settled ----------------------------
+  // Moving a repair to Picked Up means the client has paid in full. If money
+  // is still owed, staff must confirm it was collected (and how) before the
+  // status changes; the balance is then recorded as paid — on the repair and
+  // on its invoice.
+  function ticketBalance(t) {
+    const cost = Number(t.repairCost) || 0;
+    const paid = Number(t.amountPaid) || 0;
+    return Math.max(0, Math.round((cost - paid) * 100) / 100);
+  }
+
+  // Resolves to "cash" / "transfer" once staff confirm the balance was paid,
+  // or null if they back out (the status is then left as it was).
+  function confirmPickupPayment(ticket) {
+    let modal = $("pickupPayModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "pickupPayModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel pickup-pay-panel" role="dialog" aria-modal="true" aria-labelledby="pickupPayTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Before pickup</p><h3 id="pickupPayTitle">Confirm the balance is paid</h3></div>
+            <button type="button" class="modal-close" data-pickup-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p class="empty-sub" id="pickupPaySub"></p>
+            <div class="pickup-pay-sums" id="pickupPaySums"></div>
+            <p class="pickup-pay-question" id="pickupPayQuestion"></p>
+            <p class="field-label">How did they pay the balance?</p>
+            <div class="pickup-pay-methods" role="radiogroup" aria-label="Payment method">
+              <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pickup-method="cash"><svg class="icon"><use href="#i-cash"></use></svg>Cash</button>
+              <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pickup-method="transfer"><svg class="icon"><use href="#i-receipt"></use></svg>Bank transfer</button>
+            </div>
+            <p class="field-hint">Picked up means paid in full — the balance will be recorded as paid on the repair and its invoice.</p>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-pickup-cancel>Not paid yet</button>
+            <button type="button" class="primary-btn" id="pickupPayConfirm" disabled><svg class="icon"><use href="#i-check"></use></svg><span></span></button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const balance = ticketBalance(ticket);
+    const name = ticket.customerName || "the client";
+    $("pickupPaySub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
+    $("pickupPaySums").innerHTML = `
+      <div><span>Repair cost</span><strong>${esc(formatMoney(ticket.repairCost || 0))}</strong></div>
+      <div><span>Paid so far</span><strong>${esc(formatMoney(ticket.amountPaid || 0))}</strong></div>
+      <div class="is-due"><span>Balance due</span><strong>${esc(formatMoney(balance))}</strong></div>`;
+    $("pickupPayQuestion").textContent = `Has ${name} paid the remaining ${formatMoney(balance)}?`;
+    const confirmBtn = $("pickupPayConfirm");
+    confirmBtn.querySelector("span").textContent = `Balance paid — mark picked up`;
+    confirmBtn.disabled = true;
+    let method = "";
+    const methods = modal.querySelectorAll("[data-pickup-method]");
+    methods.forEach((btn) => {
+      btn.classList.remove("active");
+      btn.setAttribute("aria-checked", "false");
+      btn.onclick = () => {
+        method = btn.dataset.pickupMethod;
+        methods.forEach((b) => {
+          b.classList.toggle("active", b === btn);
+          b.setAttribute("aria-checked", b === btn ? "true" : "false");
+        });
+        confirmBtn.disabled = false;
+      };
+    });
+    modal.hidden = false;
+    methods[0].focus();
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        modal.hidden = true;
+        document.removeEventListener("keydown", onKey, true);
+        resolve(value);
+      };
+      const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); finish(null); } };
+      document.addEventListener("keydown", onKey, true);
+      modal.querySelectorAll("[data-pickup-cancel]").forEach((b) => { b.onclick = () => finish(null); });
+      confirmBtn.onclick = () => { if (method) finish(method); };
+    });
+  }
+
+  // Adds the settled balance to the repair's invoice, so the Invoices tab
+  // shows it paid too. Best effort: the repair itself is already updated.
+  async function settleInvoiceForTicket(ticketId, amount) {
+    if (!(amount > 0) || typeof window.RPC_INVOICE_REQUEST !== "function") return;
+    try {
+      const { invoice } = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId });
+      if (!invoice) return;
+      const paymentMade = Math.min(Number(invoice.total) || 0, Math.round(((Number(invoice.paymentMade) || 0) + amount) * 100) / 100);
+      if (paymentMade === Number(invoice.paymentMade)) return;
+      await window.RPC_INVOICE_REQUEST({ action: "update", id: invoice.id, invoice: { paymentMade } });
+    } catch (err) {
+      toast(`Picked up and paid — but invoice couldn't be updated: ${err.message}. Record the payment on the Invoices tab.`);
+    }
+  }
+
+  async function pickUpWithBalancePaid(ticket, method) {
+    const balance = ticketBalance(ticket);
+    const updated = await setStatus(ticket, "Picked Up", {
+      amountPaid: ticket.repairCost,
+      paymentMethod: method,
+    });
+    if (!updated) return null;
+    await settleInvoiceForTicket(ticket.id, balance);
+    toast(`${ticket.customerName || "Repair"} picked up — ${formatMoney(balance)} balance recorded as paid.`, { tone: "info", duration: 3500 });
+    return updated;
   }
 
   // Lets staff jump a ticket straight to a new status (e.g. Collected ->
@@ -3292,6 +3424,13 @@
     const ticket = statusModalTicket;
     if (!ticket || status === ticket.status) {
       closeStatusModal();
+      return;
+    }
+    if (status === "Picked Up" && ticketBalance(ticket) > 0) {
+      // Picked up = paid in full: confirm the balance was collected first.
+      closeStatusModal();
+      const method = await confirmPickupPayment(ticket);
+      if (method) await pickUpWithBalancePaid(ticket, method);
       return;
     }
     const box = $("statusModalOptions");

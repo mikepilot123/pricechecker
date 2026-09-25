@@ -7256,6 +7256,32 @@ video.media-viewer-media {
   .invoice-editor-panel .invoice-delete-btn { flex: 0 0 44px; padding: 0; justify-content: center; }
 }
 
+/* ---------- Pickup: confirm the balance is paid ---------- */
+.pickup-pay-sums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.pickup-pay-sums > div { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); }
+.pickup-pay-sums span { display: block; color: var(--text-dim); font-size: 0.72rem; }
+.pickup-pay-sums strong { font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+.pickup-pay-sums .is-due { border-color: #f1d3ab; background: #fdf3e6; }
+.pickup-pay-sums .is-due strong { color: var(--warn); font-size: 1.1rem; }
+.pickup-pay-question { margin: 4px 0 14px; font-weight: 600; }
+.pickup-pay-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 10px; }
+.pickup-pay-method {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--text);
+  font: 600 0.92rem var(--font-display);
+  cursor: pointer;
+}
+.pickup-pay-method:hover { border-color: var(--accent); }
+.pickup-pay-method.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.pickup-pay-panel .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* ---------- Dashboard: "Sales this month" breakdown ---------- */
 .sales-breakdown-panel { max-width: 920px; max-height: 92vh; }
 @media (min-width: 560px) { .sales-breakdown-panel { width: calc(100% - 32px); } }
