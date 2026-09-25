@@ -1288,6 +1288,28 @@
 
   let salesInvoices = [];
 
+  // Same status colours as the Repairs tab (style.css .st-*).
+  const SALES_STATUS_CLASS = {
+    "Received": "st-received",
+    "Diagnosing": "st-diagnosing",
+    "Waiting for Parts": "st-parts",
+    "Part to be Ordered": "st-parts-needed",
+    "Part Ordered": "st-parts-ordered",
+    "In Progress": "st-progress",
+    "Repaired": "st-repaired",
+    "Checked Out - Waiting on Client": "st-checked-out",
+    "No Fix": "st-no-fix",
+    "Picked Up": "st-pickedup",
+    "Cancelled": "st-cancelled",
+  };
+
+  // Amount fields show "1,100.00"; parsing accepts commas, "$" and spaces.
+  const amountText = (v) => Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const parseAmount = (raw) => {
+    const cleaned = String(raw ?? "").replace(/[$,\s]/g, "");
+    return cleaned === "" ? NaN : Math.round(Number(cleaned) * 100) / 100;
+  };
+
   function ensureSalesModal() {
     let modal = $("salesBreakdownModal");
     if (modal) return modal;
@@ -1306,7 +1328,7 @@
         </div>
         <div class="modal-body">
           <div class="sales-breakdown-stats" id="salesBreakdownStats"></div>
-          <p class="sales-breakdown-hint">Click a Paid or Sale amount to change it — it saves when you press Enter or click away. Click anywhere else on a row to open the repair.</p>
+          <p class="sales-breakdown-hint"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg>Sale and Paid can be edited right here — type an amount and press Enter. Click a row to open the repair.</p>
           <div class="sales-breakdown-tools">
             <div class="leads-searchbar sales-breakdown-search">
               <svg class="icon"><use href="#i-search"></use></svg>
@@ -1329,6 +1351,10 @@
     $("salesBreakdownExport").addEventListener("click", exportSalesCsv);
     // Paid / Sale are edited in place: saved when the field is left (or
     // Enter), without opening the repair. "Mark paid" settles the balance.
+    // Select the amount on focus so typing replaces it.
+    $("salesBreakdownList").addEventListener("focusin", (e) => {
+      if (e.target.matches(".sales-amt")) setTimeout(() => e.target.select(), 0);
+    });
     $("salesBreakdownList").addEventListener("change", (e) => {
       const input = e.target.closest(".sales-amt");
       if (input) saveSalesAmount(input);
@@ -1346,7 +1372,7 @@
       }
     }, true);
     $("salesBreakdownList").addEventListener("click", (e) => {
-      if (e.target.closest(".sales-amt")) { e.stopPropagation(); return; }
+      if (e.target.closest(".money-field")) { e.stopPropagation(); return; }
       const markPaid = e.target.closest("[data-mark-paid]");
       if (markPaid) {
         e.stopPropagation();
@@ -1446,27 +1472,42 @@
     }
     list.innerHTML = `
       <div class="sales-row sales-row-head" aria-hidden="true">
-        <span>Date</span><span>Customer &amp; device</span><span>Status</span><span>Invoice</span><span class="num">Paid</span><span class="num">Sale</span>
+        <span>Date</span><span>Customer &amp; repair</span><span>Status</span><span>Invoice</span>
+        <span class="num">Sale</span><span class="num">Paid</span><span class="num">Balance</span>
       </div>
       ${shown.map((t) => {
         const inv = invoiceForTicket(t.id);
         const date = ticketDate(t).toLocaleDateString([], { day: "numeric", month: "short" });
-        const owed = Math.max(0, t.repairCost - t.amountPaid);
-        return `<div class="sales-row" role="button" tabindex="0" data-sales-ticket="${esc(t.id)}" aria-label="Open repair for ${esc(t.customerName || "customer")}, ${esc(t.device || "device")}">
+        const balance = Math.round((t.repairCost - t.amountPaid) * 100) / 100;
+        const who = esc(t.customerName || "customer");
+        const balanceHtml = balance > 0
+          ? `<span class="bal-pill is-due">${esc(money2(balance))} due</span>
+             <button type="button" class="bal-mark" data-mark-paid="${esc(t.id)}" aria-label="Mark ${who}'s ${esc(money2(balance))} balance as paid"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Mark paid</button>`
+          : balance < 0
+            ? `<span class="bal-pill is-credit">${esc(money2(-balance))} over</span>`
+            : `<span class="bal-pill is-paid"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Paid</span>`;
+        return `<div class="sales-row" role="button" tabindex="0" data-sales-ticket="${esc(t.id)}" aria-label="Open repair for ${who}, ${esc(t.device || "device")}">
           <span class="sales-c-date">${esc(date)}</span>
-          <span class="sales-c-main"><strong>${esc(t.customerName || "Unknown customer")}</strong><small>${esc(t.device || "—")}${t.issues ? " · " + esc(t.issues) : ""}</small></span>
-          <span class="sales-c-status">${esc(t.status || "")}</span>
-          <span class="sales-c-inv">${inv
-            ? `<button type="button" class="sales-inv-link" data-sales-invoice="${esc(inv.id)}" aria-label="Edit invoice ${esc(inv.number)}" title="Edit invoice"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg>${esc(inv.number)}</button>`
-            : `<button type="button" class="sales-inv-create" data-sales-create="${esc(t.id)}" aria-label="Create an invoice for ${esc(t.customerName || "this repair")}"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>Create invoice</button>`}</span>
-          <span class="num sales-c-paid">
-            <input class="sales-amt" type="number" min="0" step="0.01" inputmode="decimal" data-amt="amountPaid" data-id="${esc(t.id)}" value="${esc(Number(t.amountPaid || 0).toFixed(2))}" aria-label="Amount paid by ${esc(t.customerName || "customer")}" />
-            ${owed > 0
-              ? `<small>${esc(money2(owed))} owed · <button type="button" class="sales-mark-paid" data-mark-paid="${esc(t.id)}">Mark paid</button></small>`
-              : `<small class="is-paid">Paid in full</small>`}
+          <span class="sales-c-main">
+            <strong>${esc(t.customerName || "Unknown customer")}</strong>
+            <span class="sales-c-device">${esc(t.device || "—")}</span>
+            ${t.issues ? `<small title="${esc(t.issues)}">${esc(t.issues)}</small>` : ""}
           </span>
-          <span class="num sales-c-sale">
-            <input class="sales-amt sales-amt-sale" type="number" min="0" step="0.01" inputmode="decimal" data-amt="repairCost" data-id="${esc(t.id)}" value="${esc(Number(t.repairCost || 0).toFixed(2))}" aria-label="Sale amount for ${esc(t.customerName || "customer")}" />
+          <span class="sales-c-status"><span class="sales-status ${SALES_STATUS_CLASS[t.status] || "st-received"}">${esc(t.status || "—")}</span></span>
+          <span class="sales-c-inv">${inv
+            ? `<button type="button" class="sales-inv-link" data-sales-invoice="${esc(inv.id)}" aria-label="Edit invoice ${esc(inv.number)}" title="Edit invoice ${esc(inv.number)}"><svg class="icon" aria-hidden="true"><use href="#i-pencil"></use></svg><span>${esc(inv.number)}</span></button>`
+            : `<button type="button" class="sales-inv-create" data-sales-create="${esc(t.id)}" aria-label="Create an invoice for ${who}"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span>Create invoice</span></button>`}</span>
+          <span class="sales-c-sale sales-money">
+            <span class="sales-m-label">Sale</span>
+            <label class="money-field money-field-strong"><span aria-hidden="true">$</span><input class="sales-amt" type="text" inputmode="decimal" autocomplete="off" data-amt="repairCost" data-id="${esc(t.id)}" value="${esc(amountText(t.repairCost))}" aria-label="Sale amount for ${who}" /></label>
+          </span>
+          <span class="sales-c-paid sales-money">
+            <span class="sales-m-label">Paid</span>
+            <label class="money-field"><span aria-hidden="true">$</span><input class="sales-amt" type="text" inputmode="decimal" autocomplete="off" data-amt="amountPaid" data-id="${esc(t.id)}" value="${esc(amountText(t.amountPaid))}" aria-label="Amount paid by ${who}" /></label>
+          </span>
+          <span class="sales-c-balance sales-money">
+            <span class="sales-m-label">Balance</span>
+            ${balanceHtml}
           </span>
         </div>`;
       }).join("")}`;
@@ -1517,16 +1558,16 @@
   async function saveSalesAmount(input, direct) {
     const id = direct ? direct.id : input.dataset.id;
     const field = direct ? direct.field : input.dataset.amt;
-    const raw = direct ? direct.value : input.value;
-    const value = Math.round(Number(raw) * 100) / 100;
+    const value = direct ? Math.round(Number(direct.value) * 100) / 100 : parseAmount(input.value);
     const row = $("salesBreakdownList").querySelector(`[data-sales-ticket="${CSS.escape(id)}"]`);
-    if (input && (input.value.trim() === "" || !Number.isFinite(value) || value < 0)) {
-      input.classList.add("is-invalid");
+    if (input && (!Number.isFinite(value) || value < 0)) {
+      const field = input.closest(".money-field") || input;
+      field.classList.add("is-invalid");
       input.value = input.defaultValue;
-      setTimeout(() => input.classList.remove("is-invalid"), 1500);
+      setTimeout(() => field.classList.remove("is-invalid"), 1500);
       return;
     }
-    if (input && value === Number(input.defaultValue)) return;
+    if (input && value === parseAmount(input.defaultValue)) { input.value = input.defaultValue; return; }
     if (typeof window.RPC_UPDATE_TICKET_AMOUNTS !== "function") return;
     row?.classList.add("is-saving");
     if (direct?.button) direct.button.disabled = true;

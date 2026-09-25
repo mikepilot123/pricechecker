@@ -7353,28 +7353,34 @@ video.media-viewer-media {
 .pickup-pay-method.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .pickup-pay-panel .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ---------- Dashboard: "Sales this month" breakdown ---------- */
-.sales-breakdown-panel { max-width: 920px; max-height: 92vh; }
+/* ---------- Dashboard: "Sales this month" breakdown ----------
+   Follows the platform table guidance: numbers right-aligned in tabular
+   figures under right-aligned headers; editable amounts shown as real
+   (outlined) fields; status and balance as coloured pills; one action per
+   owing row as a proper button. Becomes cards when the columns can't fit. */
+.sales-breakdown-panel { max-width: 1140px; max-height: 92vh; }
 @media (min-width: 560px) { .sales-breakdown-panel { width: calc(100% - 32px); } }
 .sales-breakdown-sub { margin: 2px 0 0; color: var(--text-dim); font-size: 0.8rem; }
-.sales-breakdown-hint { margin: 10px 0 0; color: var(--text-dim); font-size: 0.78rem; }
+.sales-breakdown-hint { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; color: var(--text-dim); font-size: 0.8rem; }
+.sales-breakdown-hint .icon { width: 13px; height: 13px; flex: none; }
 .sales-breakdown-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.sales-breakdown-stats > div { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); }
-.sales-breakdown-stats span { display: block; color: var(--text-dim); font-size: 0.75rem; }
-.sales-breakdown-stats strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.sales-breakdown-stats > div { padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-soft); }
+.sales-breakdown-stats span { display: block; color: var(--text-dim); font-size: 0.76rem; }
+.sales-breakdown-stats strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .sales-breakdown-stats .is-good { color: var(--price); }
 .sales-breakdown-stats .is-warn { color: var(--warn); }
 .sales-breakdown-tools { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
 .sales-breakdown-tools .sales-breakdown-search { flex: 1; min-width: 0; margin: 0; }
 .sales-breakdown-tools .ghost-btn { flex: none; min-height: 44px; white-space: nowrap; }
-.sales-breakdown-list { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.sales-breakdown-list { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+
 .sales-row {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 130px 110px 100px 100px;
+  grid-template-columns: 58px minmax(180px, 1fr) 150px 150px 116px 116px 136px;
   align-items: center;
-  gap: 10px;
-  min-height: 54px;
-  padding: 8px 12px;
+  column-gap: 14px;
+  min-height: 64px;
+  padding: 10px 16px;
   border-top: 1px solid var(--border);
   font-size: 0.86rem;
   cursor: pointer;
@@ -7382,80 +7388,178 @@ video.media-viewer-media {
 .sales-row:first-child { border-top: 0; }
 .sales-row:not(.sales-row-head):hover { background: var(--card-hover); }
 .sales-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.sales-row-head { min-height: 38px; background: var(--bg-soft); color: var(--text-dim); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; cursor: default; }
-.sales-row .num { text-align: right; font-variant-numeric: tabular-nums; }
-.sales-c-main { display: flex; flex-direction: column; min-width: 0; }
-.sales-c-main small { color: var(--text-dim); overflow-wrap: anywhere; }
-.sales-c-date, .sales-c-status { color: var(--text-dim); }
-.sales-c-sale { font-weight: 700; }
-.sales-c-paid small { display: block; color: var(--warn); font-size: 0.72rem; }
-.sales-c-paid small.is-paid { color: var(--price); }
-/* Paid / Sale edit in place: reads as a number, becomes a field on hover/focus. */
-.sales-amt {
-  width: 100%;
-  max-width: 110px;
-  margin-left: auto;
-  padding: 4px 6px;
-  border: 1px solid transparent;
-  border-bottom-color: #d5dbe4;
-  border-radius: 4px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  -moz-appearance: textfield;
+.sales-row-head {
+  min-height: 40px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: default;
 }
-.sales-amt::-webkit-outer-spin-button, .sales-amt::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.sales-amt:hover { border-color: #c3ccd8; background: var(--card); cursor: text; }
-.sales-amt:focus { outline: none; border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px rgba(31, 95, 191, 0.14); }
-.sales-amt.is-invalid { border-color: var(--danger); }
-.sales-amt-sale { font-weight: 700; }
-.sales-c-paid, .sales-c-sale { display: flex; flex-direction: column; align-items: flex-end; }
-.sales-mark-paid { padding: 2px 4px; border: 0; background: transparent; color: var(--accent); font: 600 0.72rem var(--font-display); text-decoration: underline; cursor: pointer; }
-.sales-row.is-saving { opacity: 0.55; pointer-events: none; }
-.sales-row.is-saved { background: #eaf7f0; transition: background 1s; }
+.sales-row .num { text-align: right; }
+.sales-row > * { min-width: 0; }
+.sales-c-date { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.sales-c-main { display: flex; flex-direction: column; gap: 1px; }
+.sales-c-main strong { font-size: 0.92rem; }
+.sales-c-device { color: var(--text); font-size: 0.82rem; }
+.sales-c-main small {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sales-status {
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--status-bg, var(--bg-soft));
+  color: var(--status-ink, var(--text));
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
 .sales-inv-link,
 .sales-inv-create {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 32px;
-  padding: 0 8px;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--card);
   color: var(--accent);
   font: 600 0.78rem var(--font-display);
-  white-space: nowrap;
   cursor: pointer;
 }
-.sales-inv-link .icon, .sales-inv-create .icon { width: 13px; height: 13px; }
-.sales-inv-link:hover, .sales-inv-create:hover { border-color: var(--accent); background: var(--accent-soft); }
+.sales-inv-link span, .sales-inv-create span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sales-inv-link .icon, .sales-inv-create .icon { width: 13px; height: 13px; flex: none; }
+.sales-inv-link:hover, .sales-inv-create:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .sales-inv-create { border-style: dashed; color: var(--text-dim); }
-.sales-inv-create:hover { color: var(--accent); }
-.sales-inv-none { color: var(--text-dim); font-size: 0.75rem; }
-@media (max-width: 700px) {
-  .sales-breakdown-stats { gap: 6px; }
-  .sales-breakdown-stats > div { padding: 8px; }
-  .sales-breakdown-stats strong { font-size: 0.92rem; }
-  .sales-breakdown-search input { font-size: 16px; }
+
+/* Money columns */
+.sales-money { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.sales-m-label { display: none; }
+.money-field {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 116px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  cursor: text;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.money-field > span { color: var(--text-dim); font-size: 0.8rem; }
+.money-field:hover { border-color: #b7c2d1; }
+.money-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(31, 95, 191, 0.14); }
+.money-field.is-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.14); }
+.sales-amt {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0 0 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 500 0.86rem var(--font-display);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  outline: none;
+}
+.money-field-strong .sales-amt { font-weight: 700; }
+.bal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bal-pill .icon { width: 12px; height: 12px; }
+.bal-pill.is-due { background: #fdf3e6; color: #8a4b0c; }
+.bal-pill.is-paid { background: #e7f6ef; color: #05603f; }
+.bal-pill.is-credit { background: var(--accent-soft); color: var(--accent); }
+.bal-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--accent);
+  font: 600 0.74rem var(--font-display);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bal-mark .icon { width: 12px; height: 12px; }
+.bal-mark:hover { background: var(--accent); color: #fff; }
+.bal-mark:disabled { opacity: 0.5; }
+.sales-row.is-saving { opacity: 0.55; pointer-events: none; }
+.sales-row.is-saved { background: #eaf7f0; transition: background 1s; }
+
+/* Cards when the seven columns don't fit: two across on tablets, one on
+   phones; Sale · Paid · Balance sit side by side with labels above. */
+@media (max-width: 1099px) {
+  .sales-breakdown-list { border: 0; border-radius: 0; overflow: visible; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
   .sales-row-head { display: none; }
   .sales-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "main sale" "status paid" "date inv";
-    gap: 4px 10px;
-    padding: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      "main main date"
+      "status inv inv"
+      "sale paid balance";
+    align-items: start;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
   }
+  .sales-row:first-child { border-top: 1px solid var(--border); }
   .sales-c-main { grid-area: main; }
-  .sales-c-sale { grid-area: sale; font-size: 1rem; }
-  .sales-c-status { grid-area: status; font-size: 0.78rem; }
-  .sales-c-paid { grid-area: paid; font-size: 0.8rem; }
-  .sales-c-date { grid-area: date; font-size: 0.78rem; align-self: center; }
+  .sales-c-date { grid-area: date; justify-self: end; font-size: 0.78rem; }
+  .sales-c-status { grid-area: status; align-self: center; }
   .sales-c-inv { grid-area: inv; justify-self: end; }
+  .sales-c-sale { grid-area: sale; }
+  .sales-c-paid { grid-area: paid; }
+  .sales-c-balance { grid-area: balance; }
+  .sales-c-sale, .sales-c-paid, .sales-c-balance {
+    align-items: stretch;
+    gap: 4px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+  }
+  .sales-c-balance { align-items: flex-end; }
+  .sales-m-label { display: block; color: var(--text-dim); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .sales-c-balance .sales-m-label { align-self: flex-end; }
+  .money-field { max-width: none; }
+}
+@media (max-width: 700px) {
+  .sales-breakdown-stats { gap: 6px; }
+  .sales-breakdown-stats > div { padding: 8px 10px; }
+  .sales-breakdown-stats strong { font-size: 0.95rem; }
+  .sales-breakdown-search input { font-size: 16px; }
+  .sales-amt { font-size: 16px; }
+  .money-field { min-height: 44px; }
+  .bal-mark { min-height: 40px; }
   .sales-inv-link, .sales-inv-create { min-height: 40px; }
-  .sales-amt { min-height: 40px; font-size: 16px; }
-  .sales-mark-paid { min-height: 32px; }
 }
 
 /* ---------- Invoices tab (assets/invoice.js) ---------- */
