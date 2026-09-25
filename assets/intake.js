@@ -2032,6 +2032,116 @@
     });
   }
 
+  // ---- Repairs from a new invoice -------------------------------------------
+  // An invoice made on the Invoices tab can log its devices as repairs. Each
+  // line is read as "<model> <repair>": the model is the longest price-list
+  // name the line starts with, the repair maps back to a check-in issue.
+  // Lines for the same device become one repair with all their issues.
+  const INVOICE_ISSUE_PATTERNS = [
+    [/back glass/i, "Back Glass Cracked"],
+    [/screen|display|lcd|front glass/i, "Screen Cracked / Broken"],
+    [/battery/i, "Battery Issue"],
+    [/charging|charge port/i, "Charging Port"],
+    [/water/i, "Water Damage"],
+    [/speaker|mic\b|microphone/i, "Speaker / Mic Issue"],
+    [/camera/i, "Camera Issue"],
+    [/software|restore|unlock|update/i, "Software Issue"],
+    [/diagnos/i, "Diagnostic Needed"],
+    [/power/i, "Won't Power On"],
+  ];
+
+  function repairFromInvoiceLine(description) {
+    const text = String(description || "").trim();
+    if (!text) return null;
+    const key = normalizeModelName(text);
+    const models = Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : [];
+    let model = null;
+    for (const m of models) {
+      const name = normalizeModelName(m.name);
+      if (name && key.startsWith(name) && (!model || name.length > normalizeModelName(model.name).length)) model = m;
+    }
+    let device;
+    let rest;
+    if (model) {
+      // Walk the original text until its letters/digits cover the model name.
+      const target = normalizeModelName(model.name).length;
+      let seen = 0;
+      let cut = 0;
+      while (cut < text.length && seen < target) {
+        if (/[a-z0-9]/i.test(text[cut])) seen++;
+        cut++;
+      }
+      device = model.name;
+      rest = text.slice(cut).trim();
+    } else {
+      // Not a price-list model: split at the first repair word, if any.
+      const hit = INVOICE_ISSUE_PATTERNS
+        .map(([re]) => re.exec(text))
+        .filter(Boolean)
+        .sort((a, b) => a.index - b.index)[0];
+      device = hit && hit.index > 0 ? text.slice(0, hit.index).trim() : text;
+      rest = hit && hit.index > 0 ? text.slice(hit.index).trim() : "";
+    }
+    const match = INVOICE_ISSUE_PATTERNS.find(([re]) => re.test(rest));
+    const issue = match ? match[1] : (rest ? `Other: ${rest}` : "Other: " + text);
+    return { device: device || text, issue };
+  }
+
+  function repairsFromInvoiceItems(items) {
+    const byDevice = new Map();
+    for (const item of items || []) {
+      const parsed = repairFromInvoiceLine(item.description);
+      if (!parsed) continue;
+      const amount = (Number(item.qty) || 1) * (Number(item.rate) || 0);
+      const key = normalizeModelName(parsed.device);
+      const entry = byDevice.get(key) || { device: parsed.device, issues: [], cost: 0, details: [] };
+      if (!entry.issues.includes(parsed.issue)) entry.issues.push(parsed.issue);
+      entry.cost += amount;
+      if (item.detail) entry.details.push(item.detail);
+      byDevice.set(key, entry);
+    }
+    return [...byDevice.values()].map((r) => ({ ...r, cost: Math.round(r.cost * 100) / 100 }));
+  }
+
+  // Preview for the editor: "Pixel 7 pro — Screen Cracked / Broken".
+  window.RPC_INVOICE_REPAIR_PREVIEW = (items) =>
+    repairsFromInvoiceItems(items).map((r) => `${r.device} — ${r.issues.map((i) => i.replace(/^Other:\s*/, "")).join(", ")}`);
+
+  // Logs the repairs for a just-created invoice and returns the new tickets.
+  // The payment on the invoice is applied to the repairs in order.
+  window.RPC_LOG_REPAIRS_FOR_INVOICE = async (invoice) => {
+    if (!isConfigured()) throw new Error("Set up the Check In PIN from the Repairs tab first");
+    const repairs = repairsFromInvoiceItems(invoice.items);
+    let unpaid = Number(invoice.paymentMade) || 0;
+    const tickets = [];
+    for (const r of repairs) {
+      const paid = Math.min(unpaid, r.cost);
+      unpaid = Math.round((unpaid - paid) * 100) / 100;
+      const issues = r.issues.join(", ");
+      const res = await api({
+        action: "add",
+        customerName: invoice.billTo?.name || "",
+        client: invoice.billTo?.name || "",
+        phone: invoice.billTo?.phone || "",
+        email: invoice.billTo?.email || "",
+        device: r.device,
+        issues,
+        issue: issues,
+        status: "Received",
+        notes: [`Logged from invoice ${invoice.number}.`, ...r.details].join("\n"),
+        repairCost: String(r.cost),
+        amountPaid: String(Math.round(paid * 100) / 100),
+        checkinGroup: tickets[0]?.id || "",
+      });
+      if (!res.ok) throw new Error(res.error || "Couldn't log " + r.device);
+      mergeTicket(res.ticket);
+      tickets.push(res.ticket);
+    }
+    renderStatusChips();
+    render();
+    return tickets;
+  };
+
   // The invoice card on the final "Device logged" step: PDF, share, edit.
   function renderSuccessInvoice(data, error, { retry } = {}) {
     const box = $("invoiceSuccessCard");

@@ -291,6 +291,13 @@
           <button type="button" class="modal-close" data-inv-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
         </div>
         <div class="modal-body invoice-editor-body">
+          <label class="inv-log-bar" id="invLogBar" hidden>
+            <input type="checkbox" id="invLogRepairs" checked />
+            <span>
+              <strong>Log these devices as repairs</strong>
+              <small id="invLogPreview">Add a line like “Pixel 7 Pro Screen Replacement” and the repair is logged on save.</small>
+            </span>
+          </label>
           <div class="inv-sheet">
             <section class="inv-top">
               <div class="inv-from" id="invFrom"></div>
@@ -362,7 +369,9 @@
     modal.querySelector("#invItems").addEventListener("input", (e) => {
       if (e.target.matches("textarea")) autoGrow(e.target);
       updateEditorTotals();
+      updateLogPreview();
     });
+    modal.querySelector("#invLogRepairs").addEventListener("change", updateLogPreview);
     modal.querySelector("#invItems").addEventListener("click", (e) => {
       const remove = e.target.closest("[data-item-remove]");
       if (!remove) return;
@@ -394,6 +403,21 @@
       if (e.key === "Escape" && !modal.hidden) { e.stopPropagation(); closeEditor(); }
     }, true);
     return modal;
+  }
+
+  // New invoices only: what "Log these devices as repairs" will create.
+  function updateLogPreview() {
+    const bar = $("invLogBar");
+    if (!bar || bar.hidden) return;
+    const preview = $("invLogPreview");
+    if (!$("invLogRepairs").checked) {
+      preview.textContent = "Only the invoice will be saved — no repair is logged.";
+      return;
+    }
+    const lines = typeof window.RPC_INVOICE_REPAIR_PREVIEW === "function" ? window.RPC_INVOICE_REPAIR_PREVIEW(readItems()) : [];
+    preview.textContent = lines.length
+      ? `On save, logs ${lines.length} repair${lines.length === 1 ? "" : "s"} (status Received): ${lines.join(" · ")}`
+      : "Add a line like “Pixel 7 Pro Screen Replacement” and the repair is logged on save.";
   }
 
   function autoGrow(el) {
@@ -449,6 +473,10 @@
     $("invHeadBalance").textContent = `${cur}${money(t.balanceDue)}`;
   }
 
+  function notify(message, tone = "info") {
+    if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message, { tone, duration: tone === "error" ? 9000 : 4000 });
+  }
+
   // Shared by the editor and the Invoices list. Returns true once deleted.
   async function deleteInvoiceWithConfirm(invoice) {
     const t = totalsOf(invoice);
@@ -465,6 +493,9 @@
     const modal = ensureEditor();
     editing = { invoice, onSaved, onDeleted };
     modal.querySelector("[data-inv-delete]").hidden = !invoice.id;
+    const canLog = !invoice.id && typeof window.RPC_LOG_REPAIRS_FOR_INVOICE === "function";
+    $("invLogBar").hidden = !canLog;
+    $("invLogRepairs").checked = canLog;
     const b = invoice.business || {};
     $("invFrom").innerHTML = `<p class="inv-from-name">${esc(b.name || "JQ Electronics Ltd.")}</p>`
       + [...(b.addressLines || []), b.email].filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("");
@@ -484,6 +515,7 @@
     if (!(invoice.items || []).length) addItemRow({ description: "", detail: "", qty: 1, rate: "" });
     $("invError").hidden = true;
     updateEditorTotals();
+    updateLogPreview();
     modal.hidden = false;
     modal.querySelector(".invoice-editor-body").scrollTop = 0;
     modal.querySelectorAll("textarea").forEach(autoGrow);
@@ -529,9 +561,25 @@
     try {
       // No id yet = a new invoice from the Invoices tab; it's only created on
       // save, so cancelling never leaves a blank invoice (or a used number).
-      const res = editing.invoice.id
-        ? await request({ action: "update", id: editing.invoice.id, invoice: changes })
-        : await request({ action: "create", ...changes });
+      const isNew = !editing.invoice.id;
+      const logRepairs = isNew && !$("invLogBar").hidden && $("invLogRepairs").checked;
+      let res = isNew
+        ? await request({ action: "create", ...changes })
+        : await request({ action: "update", id: editing.invoice.id, invoice: changes });
+      if (logRepairs) {
+        // The invoice is saved either way; if logging a repair fails, say so
+        // rather than losing the invoice.
+        try {
+          btn.textContent = "Logging repairs…";
+          const tickets = await window.RPC_LOG_REPAIRS_FOR_INVOICE(res.invoice);
+          if (tickets.length) {
+            res = await request({ action: "update", id: res.invoice.id, invoice: { ticketIds: tickets.map((t) => t.id) } });
+            notify(`Invoice ${res.invoice.number} saved and ${tickets.length} repair${tickets.length === 1 ? "" : "s"} logged.`);
+          }
+        } catch (logErr) {
+          notify(`Invoice ${res.invoice.number} was saved, but the repair couldn't be logged: ${logErr.message || logErr}. Log it from the Repairs tab.`, "error");
+        }
+      }
       const { onSaved } = editing;
       if (btn.dataset.invSave === "pdf") await downloadPdf(res.invoice);
       closeEditor();

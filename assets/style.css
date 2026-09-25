@@ -7076,6 +7076,22 @@ video.media-viewer-media {
 .invoice-editor-panel { max-width: 900px; max-height: 94vh; }
 @media (min-width: 560px) { .invoice-editor-panel { width: calc(100% - 32px); } }
 .invoice-editor-hint { margin: 2px 0 0; color: var(--text-dim); font-size: 0.78rem; }
+.inv-log-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 794px;
+  margin: 0 auto 14px;
+  padding: 12px 14px;
+  border: 1px solid #bcd0ee;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  cursor: pointer;
+}
+.inv-log-bar[hidden] { display: none; }
+.inv-log-bar input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+.inv-log-bar strong { display: block; font-size: 0.9rem; }
+.inv-log-bar small { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.8rem; line-height: 1.4; }
 .invoice-editor-body { background: #e9ecf1; padding: 20px; }
 .inv-sheet {
   --inv-ink: #333;
@@ -7338,8 +7354,12 @@ video.media-viewer-media {
   .inv-summary-main { grid-column: 1 / -1; }
   .inv-summary-stat:nth-child(2n) { padding-left: 0; border-left: 0; }
 }
-@media (max-width: 900px) {
-  .inv-list { border: 0; background: transparent; box-shadow: none; overflow: visible; display: flex; flex-direction: column; gap: 10px; }
+/* The full table needs ~1000px of content width (the sidebar takes the
+   rest), so below that invoices become cards: a grid on tablets/small
+   laptops, one column on phones. */
+@media (max-width: 1279px) {
+  .inv-list { border: 0; background: transparent; box-shadow: none; overflow: visible; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .inv-list .empty-state { grid-column: 1 / -1; }
   .inv-list-header { display: none; }
   .inv-list-row {
     grid-template-columns: minmax(0, 1fr) auto;
