@@ -312,7 +312,10 @@
             <section class="inv-meta">
               <div class="inv-bill">
                 <p class="inv-muted-label">Bill To</p>
-                <input id="invBillName" class="inv-inline inv-inline-bold" autocomplete="off" placeholder="Customer name" aria-label="Bill to name" />
+                <div class="inv-combo">
+                  <input id="invBillName" class="inv-inline inv-inline-bold" autocomplete="off" placeholder="Customer name or phone" aria-label="Bill to name" aria-autocomplete="list" aria-controls="invCustList" aria-expanded="false" />
+                  <div id="invCustList" class="inv-cust-list" role="listbox" hidden></div>
+                </div>
                 <input id="invBillPhone" class="inv-inline inv-inline-small" type="tel" autocomplete="off" placeholder="Phone (not printed)" aria-label="Phone" />
                 <input id="invBillEmail" class="inv-inline inv-inline-small" type="email" autocomplete="off" placeholder="Email (not printed)" aria-label="Email" />
               </div>
@@ -324,6 +327,7 @@
               </div>
             </section>
 
+            <div id="invSuggest" class="inv-suggest" hidden></div>
             <div class="inv-table" role="table" aria-label="Invoice items">
               <div class="inv-row inv-head" role="row">
                 <span role="columnheader">#</span>
@@ -380,6 +384,7 @@
       updateEditorTotals();
     });
     modal.querySelector("#invPaymentMade").addEventListener("input", updateEditorTotals);
+    bindCustomerSuggest();
     modal.querySelector("#invNotes").addEventListener("input", (e) => autoGrow(e.target));
     modal.querySelectorAll("[data-inv-save]").forEach((btn) => btn.addEventListener("click", () => saveEditor(btn)));
     modal.querySelector("[data-inv-delete]").addEventListener("click", async (e) => {
@@ -403,6 +408,148 @@
       if (e.key === "Escape" && !modal.hidden) { e.stopPropagation(); closeEditor(); }
     }, true);
     return modal;
+  }
+
+  /* ---- Customer lookup + repair suggestions ----------------------------
+     Typing in Bill To offers customers already in the system (saved
+     directory + past repairs). Picking one fills name, phone and email,
+     puts their device on the first empty line, and shows that device's
+     suggested repairs; clicking one fills the line with its name and price. */
+  const suggest = { devices: [], device: "", issues: "", matches: [], active: -1 };
+
+  function bindCustomerSuggest() {
+    const input = $("invBillName");
+    const listEl = $("invCustList");
+    const close = () => {
+      listEl.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      suggest.active = -1;
+    };
+    const show = () => {
+      if (typeof window.RPC_CUSTOMER_SUGGEST !== "function") return;
+      suggest.matches = window.RPC_CUSTOMER_SUGGEST(input.value);
+      if (!suggest.matches.length) return close();
+      listEl.innerHTML = suggest.matches.map((c, i) => `
+        <button type="button" class="inv-cust-option" role="option" data-cust="${i}" aria-selected="false">
+          <strong>${esc(c.name)}</strong>
+          <span>${esc([c.phone, c.devices[0] ? "Last: " + c.devices[0].device : ""].filter(Boolean).join(" · "))}</span>
+        </button>`).join("");
+      listEl.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    };
+    const highlight = (i) => {
+      suggest.active = i;
+      listEl.querySelectorAll(".inv-cust-option").forEach((el, j) => {
+        el.classList.toggle("active", j === i);
+        el.setAttribute("aria-selected", j === i ? "true" : "false");
+      });
+    };
+    input.addEventListener("input", show);
+    // If customers/repairs were still loading when typing started, show the
+    // matches as soon as they arrive.
+    suggest.refresh = () => { if (document.activeElement === input && input.value.trim().length >= 2) show(); };
+    input.addEventListener("keydown", (e) => {
+      if (listEl.hidden) return;
+      const n = suggest.matches.length;
+      if (e.key === "ArrowDown") { e.preventDefault(); highlight((suggest.active + 1) % n); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); highlight((suggest.active - 1 + n) % n); }
+      else if (e.key === "Enter" && suggest.active >= 0) { e.preventDefault(); pickCustomer(suggest.matches[suggest.active]); close(); }
+      else if (e.key === "Escape") { e.stopPropagation(); close(); }
+    });
+    input.addEventListener("blur", () => setTimeout(close, 150));
+    // mousedown so the choice lands before the input's blur closes the list.
+    listEl.addEventListener("mousedown", (e) => {
+      const opt = e.target.closest("[data-cust]");
+      if (!opt) return;
+      e.preventDefault();
+      pickCustomer(suggest.matches[Number(opt.dataset.cust)]);
+      close();
+    });
+    $("invSuggest").addEventListener("click", (e) => {
+      const dev = e.target.closest("[data-suggest-device]");
+      if (dev) {
+        const d = suggest.devices[Number(dev.dataset.suggestDevice)];
+        setSuggestDevice(d.device, d.issues);
+        return;
+      }
+      const rep = e.target.closest("[data-suggest-repair]");
+      if (rep) addSuggestedRepair(Number(rep.dataset.suggestRepair));
+    });
+  }
+
+  function pickCustomer(c) {
+    if (!c) return;
+    const set = (id, v) => { const el = $(id); el.value = v || ""; el.dispatchEvent(new Event("input", { bubbles: true })); };
+    $("invBillName").value = c.name;
+    set("invBillPhone", c.phone);
+    set("invBillEmail", c.email);
+    suggest.devices = c.devices || [];
+    if (suggest.devices.length) {
+      const first = suggest.devices[0];
+      // Their most recent device goes on the first empty line.
+      const empty = [...document.querySelectorAll("#invItems .invoice-item")]
+        .find((row) => !row.querySelector("[data-item=description]").value.trim());
+      if (empty) {
+        const desc = empty.querySelector("[data-item=description]");
+        desc.value = first.device;
+        desc.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      setSuggestDevice(first.device, first.issues);
+    } else {
+      renderSuggest();
+    }
+  }
+
+  function setSuggestDevice(device, issues) {
+    suggest.device = device;
+    suggest.issues = issues || "";
+    renderSuggest();
+  }
+
+  function currentRepairSuggestions() {
+    return suggest.device && typeof window.RPC_REPAIR_SUGGESTIONS === "function"
+      ? window.RPC_REPAIR_SUGGESTIONS(suggest.device, suggest.issues)
+      : [];
+  }
+
+  function renderSuggest() {
+    const box = $("invSuggest");
+    if (!box) return;
+    const repairs = currentRepairSuggestions();
+    if (!suggest.device) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = `
+      ${suggest.devices.length > 1 ? `<div class="inv-suggest-row"><span class="inv-suggest-label">Their devices</span>
+        ${suggest.devices.map((d, i) => `<button type="button" class="inv-suggest-chip${d.device === suggest.device ? " active" : ""}" data-suggest-device="${i}">${esc(d.device)}</button>`).join("")}</div>` : ""}
+      <div class="inv-suggest-row"><span class="inv-suggest-label">Suggested repairs · ${esc(suggest.device)}</span>
+        ${repairs.map((r, i) => `<button type="button" class="inv-suggest-chip inv-suggest-repair${r.fromRepair ? " is-match" : ""}" data-suggest-repair="${i}" title="${r.fromRepair ? "Matches the issue on their repair" : "Add this repair"}">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>${esc(r.label)}${r.rate != null ? ` <span>${esc(money(r.rate))}</span>` : ""}</button>`).join("")}
+      </div>
+      <p class="inv-suggest-note">Suggestions aren't printed. Click one to add it as a line${repairs.some((r) => r.fromRepair) ? " — highlighted ones match the issue they came in with" : ""}.</p>`;
+  }
+
+  // Fills the line that holds just this device's name (from picking the
+  // customer) or an empty one; otherwise adds a new line.
+  function addSuggestedRepair(index) {
+    const s = currentRepairSuggestions()[index];
+    if (!s) return;
+    const rows = [...document.querySelectorAll("#invItems .invoice-item")];
+    const deviceKey = suggest.device.trim().toLowerCase();
+    let row = rows.find((r) => {
+      const v = r.querySelector("[data-item=description]").value.trim().toLowerCase();
+      return v === deviceKey || v === "";
+    });
+    if (!row) {
+      addItemRow({ description: "", detail: "", qty: 1, rate: "" });
+      const all = document.querySelectorAll("#invItems .invoice-item");
+      row = all[all.length - 1];
+    }
+    const desc = row.querySelector("[data-item=description]");
+    desc.value = `${suggest.device} ${s.label}`;
+    const rate = row.querySelector("[data-item=rate]");
+    if (s.rate != null) rate.value = s.rate;
+    desc.dispatchEvent(new Event("input", { bubbles: true }));
+    if (s.rate == null) rate.focus();
   }
 
   // New invoices only: what "Log these devices as repairs" will create.
@@ -525,6 +672,13 @@
     $("invBillEmail").value = invoice.billTo?.email || "";
     $("invPaymentMade").value = num(invoice.paymentMade) || "";
     $("invNotes").value = invoice.notes || "";
+    suggest.devices = [];
+    suggest.device = "";
+    suggest.issues = "";
+    renderSuggest();
+    if (typeof window.RPC_PREPARE_CUSTOMER_SUGGEST === "function") {
+      Promise.resolve(window.RPC_PREPARE_CUSTOMER_SUGGEST()).then(() => suggest.refresh && suggest.refresh());
+    }
     $("invItems").innerHTML = "";
     (invoice.items || []).forEach(addItemRow);
     if (!(invoice.items || []).length) addItemRow({ description: "", detail: "", qty: 1, rate: "" });

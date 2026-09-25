@@ -2169,6 +2169,96 @@
 
   // Repair details → Invoice: open the invoice this repair was billed on, or
   // make one for it (checked in before invoices were automatic).
+  // ---- Customer + repair suggestions for the invoice editor ---------------
+  // Everyone the shop already knows — the saved customer directory plus every
+  // repair on file — merged by phone number (or name), each with the devices
+  // they've brought in, most recent first.
+  // Resolves once customers and repairs are loaded (both load lazily).
+  let suggestReady = null;
+  window.RPC_PREPARE_CUSTOMER_SUGGEST = () => {
+    if (!isConfigured()) return Promise.resolve();
+    if (!suggestReady || !loadedOnce) {
+      suggestReady = Promise.all([
+        customersLoadStarted ? Promise.resolve() : loadCustomers(),
+        loadedOnce ? Promise.resolve() : loadTickets(),
+      ]).catch(() => {});
+    }
+    return suggestReady;
+  };
+
+  window.RPC_CUSTOMER_SUGGEST = (query, limit = 8) => {
+    const q = String(query || "").trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, "");
+    if (q.length < 2) return [];
+    const people = new Map();
+    const keyOf = (name, phone) => {
+      const digits = String(phone || "").replace(/\D/g, "");
+      return digits.length >= 7 ? "p:" + digits.slice(-7) : "n:" + String(name || "").trim().toLowerCase();
+    };
+    const upsert = (name, phone, email) => {
+      if (!String(name || "").trim()) return null;
+      const key = keyOf(name, phone);
+      const p = people.get(key) || { name: name.trim(), phone: phone || "", email: email || "", devices: [], lastSeen: 0 };
+      if (!p.phone && phone) p.phone = phone;
+      if (!p.email && email) p.email = email;
+      people.set(key, p);
+      return p;
+    };
+    CUSTOMERS.forEach((c) => upsert(c.name, c.phone, c.email));
+    const byNewest = [...TICKETS].sort((a, b) => (new Date(b.created).getTime() || 0) - (new Date(a.created).getTime() || 0));
+    for (const t of byNewest) {
+      const p = upsert(t.customerName, t.phone, t.email);
+      if (!p) continue;
+      p.lastSeen = Math.max(p.lastSeen, new Date(t.created).getTime() || 0);
+      if (t.device && !p.devices.some((d) => normalizeModelName(d.device) === normalizeModelName(t.device))) {
+        p.devices.push({ device: t.device, issues: t.issues || "" });
+      }
+    }
+    return [...people.values()]
+      .filter((p) => p.name.toLowerCase().includes(q)
+        || (qDigits.length >= 3 && String(p.phone).replace(/\D/g, "").includes(qDigits))
+        || String(p.email).toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.name.toLowerCase().startsWith(q) ? 1 : 0;
+        const bStarts = b.name.toLowerCase().startsWith(q) ? 1 : 0;
+        return bStarts - aStarts || b.lastSeen - a.lastSeen;
+      })
+      .slice(0, limit);
+  };
+
+  // Repairs worth suggesting for a device: its price-list repairs (exact
+  // names, with prices) when it's on the list, otherwise common repairs for
+  // that kind of device. Ones matching the issues it came in with go first.
+  const COMMON_REPAIRS = ["Screen Replacement", "Battery Replacement", "Charging Port Repair", "Diagnostic", "Water Damage Repair", "Software Repair", "Camera Repair", "Speaker Repair", "Back Glass Replacement"];
+  const LAPTOP_REPAIRS = ["Screen Replacement", "Keyboard Replacement", "Battery Replacement", "Hinge Repair", "Charging Port Repair", "Diagnostic", "Water Damage Repair", "Software Repair", "Motherboard Repair"];
+  const GENERIC_REPAIR_WORDS = new Set(["replacement", "repair", "repairs", "issue", "needed", "fix", "cleaning", "service"]);
+  const titleCase = (s) => String(s || "").trim().split(/\s+/).map((w) =>
+    /^(OLED|LCD|OEM)$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+
+  window.RPC_REPAIR_SUGGESTIONS = (device, issuesStr = "") => {
+    const model = findPriceModel(device);
+    let list;
+    if (model) {
+      list = (model.prices || [])
+        .map((p) => ({ label: titleCase(p.type), rate: priceNumber(p.value) }))
+        .filter((p) => p.label);
+    } else {
+      const laptop = /laptop|book|probook|elitebook|thinkpad|ideapad|pavilion|inspiron|latitude|dell|lenovo|asus|acer|surface|\bhp\b/i.test(device || "");
+      list = (laptop ? LAPTOP_REPAIRS : COMMON_REPAIRS).map((label) => ({ label, rate: null }));
+    }
+    const issues = splitIssues(issuesStr);
+    const matchesIssue = (label) => issues.some((issue) => {
+      const hit = INVOICE_ISSUE_PATTERNS.find(([, name]) => name === issue);
+      if (hit) return hit[0].test(label);
+      // Free-text "Other:" issues match on the part named ("keyboard"),
+      // not on generic words like "replacement" that every repair shares.
+      return issue.startsWith("Other:") && label.toLowerCase().split(" ")
+        .some((w) => w.length > 3 && !GENERIC_REPAIR_WORDS.has(w) && issue.toLowerCase().includes(w));
+    });
+    list.forEach((s) => { s.fromRepair = matchesIssue(s.label); });
+    return [...list.filter((s) => s.fromRepair), ...list.filter((s) => !s.fromRepair)];
+  };
+
   // An invoice for one repair that doesn't have one yet (repair details,
   // dashboard Sales breakdown). Lines come from the price list like check-in.
   function createInvoiceFromTicket(ticket) {
