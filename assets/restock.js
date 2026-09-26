@@ -1,6 +1,7 @@
 /* ============================================================
    Smart restock (top of the Parts orders tab)
    ------------------------------------------------------------
+   Its own sub-tab under Parts orders ("Smart restock").
    Suggests which parts to order, and how many, from data the app already
    has — no AI service involved:
      • demand   repairs logged in the period (issue → part) and Prices-tab
@@ -17,7 +18,6 @@
   const INTAKE_URL = "https://pricechecker-cyan.vercel.app/api/intake";
   const PRICES_URL = "https://pricechecker-cyan.vercel.app/api/prices";
   const PREFS_KEY = "rpc_restock_prefs";
-  const COLLAPSE_KEY = "rpc_restock_collapsed";
   // Roughly how many price searches turn into a repair. Only searches that
   // clearly name one model count, and they're split across that model's parts.
   const SEARCH_CONVERSION = 0.3;
@@ -277,22 +277,21 @@
   function ensurePanel() {
     let panel = $("restockPanel");
     if (panel) return panel;
-    const anchor = $("partsOrderSummary");
-    if (!anchor) return null;
+    const mount = $("restockMount");
+    if (!mount) return null;
     panel = document.createElement("section");
     panel.id = "restockPanel";
     panel.className = "restock";
     panel.setAttribute("aria-labelledby", "restockTitle");
     panel.innerHTML = `
       <div class="restock-head">
-        <button type="button" class="restock-toggle" id="restockToggle" aria-expanded="true" aria-controls="restockBody">
+        <div class="restock-title">
           <span class="restock-icon" aria-hidden="true"><svg class="icon"><use href="#i-inventory-flow"></use></svg></span>
           <span>
             <strong id="restockTitle">Smart restock</strong>
             <small id="restockHeadline">Checking what to reorder…</small>
           </span>
-          <svg class="icon restock-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
-        </button>
+        </div>
         <div class="restock-controls">
           <label><span>Based on</span>
             <select id="restockDays" class="text-input">
@@ -324,7 +323,7 @@
         </details>
         <p class="field-error" id="restockError" hidden></p>
       </div>`;
-    anchor.parentNode.insertBefore(panel, anchor);
+    mount.appendChild(panel);
     bindPanel();
     return panel;
   }
@@ -332,14 +331,6 @@
   function bindPanel() {
     $("restockDays").value = String(state.prefs.days);
     $("restockCover").value = String(state.prefs.cover);
-    let collapsed = false;
-    try { collapsed = localStorage.getItem(COLLAPSE_KEY) === "1"; } catch (_) {}
-    setCollapsed(collapsed);
-    $("restockToggle").addEventListener("click", () => {
-      const next = $("restockToggle").getAttribute("aria-expanded") === "true";
-      setCollapsed(next);
-      try { localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0"); } catch (_) {}
-    });
     $("restockDays").addEventListener("change", () => { state.prefs.days = Number($("restockDays").value); savePrefs(); refresh(); });
     $("restockCover").addEventListener("change", () => { state.prefs.cover = Number($("restockCover").value); savePrefs(); refresh(); });
     $("restockRefresh").addEventListener("click", () => refresh({ force: true }));
@@ -361,12 +352,6 @@
     $("restockCopy").addEventListener("click", copyList);
     $("restockShare").addEventListener("click", shareList);
     $("restockRecord").addEventListener("click", recordOrdered);
-  }
-
-  function setCollapsed(collapsed) {
-    $("restockToggle").setAttribute("aria-expanded", collapsed ? "false" : "true");
-    $("restockBody").hidden = collapsed;
-    $("restockPanel").classList.toggle("is-collapsed", collapsed);
   }
 
   const qtyOf = (row) => state.qty.get(row.id) ?? row.qty;
@@ -568,7 +553,13 @@
     }
   }
 
-  window.addEventListener("rpc-enter-parts-orders", () => refresh());
+  const restockShown = () => {
+    const section = document.querySelector('[data-parts-panel-section="restock"]');
+    return !!section && !section.hidden;
+  };
+  window.addEventListener("rpc-enter-restock", () => refresh());
+  // Coming back to Parts orders while this sub-tab is the open one.
+  window.addEventListener("rpc-enter-parts-orders", () => { if (restockShown()) refresh(); });
   // For other screens (e.g. a dashboard nudge) and testing.
   window.RPC_RESTOCK = { refresh, compute, expandNames, modelForSearch };
 })();

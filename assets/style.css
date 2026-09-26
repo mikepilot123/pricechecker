@@ -5440,7 +5440,8 @@ video.media-viewer-media {
   #view-targets > .targets-content-subnav {
     display: none;
   }
-  #view-account > .account-content-subnav {
+  #view-account > .account-content-subnav,
+  #view-partsOrders > .parts-content-subnav {
     display: none;
   }
   /* Settings and Repairs show their sub-tabs in the sidebar (above) at this
@@ -8325,7 +8326,7 @@ video.media-viewer-media {
 
 /* ---------- Smart restock (top of Parts orders; assets/restock.js) ---------- */
 .restock {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -8340,24 +8341,16 @@ video.media-viewer-media {
   flex-wrap: wrap;
   padding: 12px 14px;
 }
-.restock.is-collapsed .restock-controls { display: none; }
-.restock-toggle {
+.restock-title {
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 44px;
   flex: 1 1 260px;
   min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
-.restock-toggle strong { display: block; font-size: 0.95rem; }
-.restock-toggle small { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 2px; }
+.restock-title strong { display: block; font-size: 0.95rem; }
+.restock-title small { display: block; color: var(--text-dim); font-size: 0.8rem; margin-top: 2px; }
 .restock-icon {
   display: grid;
   place-items: center;
@@ -8368,8 +8361,6 @@ video.media-viewer-media {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.restock-chevron { flex: none; margin-left: auto; color: var(--text-dim); transition: transform 0.15s ease; }
-.restock.is-collapsed .restock-chevron { transform: rotate(-90deg); }
 .restock-controls { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 .restock-controls label { display: grid; gap: 3px; font-size: 0.72rem; color: var(--text-dim); }
 .restock-controls select { min-height: 40px; padding: 6px 10px; font-size: 0.85rem; }

@@ -401,6 +401,29 @@
     });
   });
 
+  // ---- Parts orders sub-tabs ----------------------------------------------------
+  // "Orders" (the shipments table) / "Smart restock" (reorder suggestions,
+  // assets/restock.js — loads when its sub-tab opens).
+  function setPartsPanel(panel) {
+    document.querySelectorAll("[data-parts-panel-section]").forEach((section) => {
+      section.hidden = section.dataset.partsPanelSection !== panel;
+    });
+    document.querySelectorAll(".appt-subnav-btn[data-parts-panel]").forEach((btn) => {
+      const active = btn.dataset.partsPanel === panel;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    if (panel === "restock") window.dispatchEvent(new Event("rpc-enter-restock"));
+  }
+  document.querySelectorAll(".appt-subnav-btn[data-parts-panel]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      navigateTo("partsOrders");
+      setPartsPanel(btn.dataset.partsPanel);
+      closeNavDrawer();
+    });
+  });
+  window.RPC_SET_PARTS_PANEL = setPartsPanel;
+
   // prefill = opened as Settings (not the first-run "connect" screen).
   let settingsMode = false;
   function showSetup(prefill) {

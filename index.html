@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=restock-1" />
+  <link rel="stylesheet" href="assets/style.css?v=restock-tab-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -126,6 +126,10 @@
       </div>
       <button class="nav-btn" data-target="reminders" role="tab" aria-selected="false"><svg class="icon icon-reminders"><use href="#i-clock"></use></svg>Reminders</button>
       <button class="nav-btn" data-target="partsOrders" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Parts orders</button>
+      <div class="appt-sidebar-subnav" role="group" aria-label="Parts orders sections">
+        <button type="button" class="appt-subnav-btn active" data-parts-panel="orders" aria-selected="true">Orders</button>
+        <button type="button" class="appt-subnav-btn" data-parts-panel="restock" aria-selected="false">Smart restock</button>
+      </div>
       <button class="nav-btn" data-target="invoices" role="tab" aria-selected="false"><svg class="icon"><use href="#i-invoice"></use></svg>Invoices</button>
       <button class="nav-btn" data-target="dashboard" role="tab" aria-selected="false"><svg class="icon"><use href="#i-dashboard"></use></svg>Dashboard</button>
       <button class="nav-btn" data-target="leads" role="tab" aria-selected="false"><svg class="icon"><use href="#i-user"></use></svg>Leads</button>
@@ -554,6 +558,15 @@
        Accounting sub-panel) so tracking shipments doesn't require going
        through Accounting first. ---------- -->
   <main class="container view" id="view-partsOrders" hidden>
+    <div class="appt-subnav parts-content-subnav" role="tablist" aria-label="Parts orders sections">
+      <button type="button" class="appt-subnav-btn active" data-parts-panel="orders" role="tab" aria-selected="true">Orders</button>
+      <button type="button" class="appt-subnav-btn" data-parts-panel="restock" role="tab" aria-selected="false">Smart restock</button>
+    </div>
+    <section class="appt-panel" data-parts-panel-section="restock" hidden>
+      <p class="info-banner">What to reorder, worked out from repairs, price searches, stock in the inventory sheet and parts already on order.</p>
+      <div id="restockMount"></div>
+    </section>
+    <section class="appt-panel" data-parts-panel-section="orders">
     <p class="info-banner">Track parts ordered from suppliers, then assign them to a repair or add them to inventory.</p>
     <div class="inventory-add-row">
       <button type="button" id="partsOrderUploadBtn" class="ghost-btn"><svg class="icon"><use href="#i-upload"></use></svg>Upload order PDF</button>
@@ -597,6 +610,7 @@
       <p class="empty-title" id="partsOrderEmptyTitle">No parts ordered yet</p>
       <p class="empty-sub">Import an order Excel workbook without AI, upload a PDF, or add one by hand.</p>
     </div>
+    </section>
   </main>
 
   <!-- Expense form modal -->
@@ -2648,7 +2662,7 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
-  <script defer src="assets/intake.js?v=settings-fix-1"></script>
+  <script defer src="assets/intake.js?v=restock-tab-1"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/dashboard.js?v=sales-ux-1"></script>
@@ -2660,6 +2674,6 @@
   <script defer src="assets/account.js?v=cash-to-bank-1"></script>
   <script defer src="assets/parts-order-xlsx.js?v=pdf-text-extract-1"></script>
   <script defer src="assets/parts-orders.js?v=restock-1"></script>
-  <script defer src="assets/restock.js?v=restock-1"></script>
+  <script defer src="assets/restock.js?v=restock-tab-1"></script>
 </body>
 </html>
