@@ -3591,6 +3591,7 @@
       // matches this device's repair list, update the issue before saving.
       // Ambiguous matches ask staff which repair they meant.
       maybeInferIssueFromRepairCost({ promptOnAmbiguous: true });
+      const resolvedIssuesStr = buildIssuesString();
       // Changing the status to Picked Up here goes through the same balance
       // check as the status picker.
       const original = TICKETS.find((t) => t.id === editingId);
@@ -3617,8 +3618,8 @@
         phone,
         email,
         device: currentDeviceValue,
-        issues: currentIssuesStr,
-        issue: currentIssuesStr,
+        issues: resolvedIssuesStr,
+        issue: resolvedIssuesStr,
         status: $("fStatus").value,
         repairDueDate: $("fRepairDueDate").value,
         notes: $("fNotes").value.trim(),
