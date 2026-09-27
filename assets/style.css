@@ -7871,21 +7871,21 @@ video.media-viewer-media {
   /* Room for the bottom bar so the last card always scrolls fully clear. */
   body { padding-bottom: var(--bottom-nav-space); }
 
-  /* ---- Header: compact, logo only; "More" in the bottom bar replaces the
-     hamburger so there's one way into the full menu, not two. ---- */
+  /* ---- Header: hamburger back at top-left (mirrors tablet/desktop) so
+     there are two ways into the drawer on phone — the familiar top-left
+     spot, and "More" in the bottom bar for reaching it one-handed lower
+     on the screen. ---- */
   .app-header {
     padding: env(safe-area-inset-top, 0px) var(--m-pad) 0;
   }
   .header-row {
     min-height: var(--m-header-h);
-    grid-template-columns: 1fr;
+    grid-template-columns: 40px 1fr 40px;
   }
-  .brand { grid-column: 1; }
   .brand-logo { width: auto; height: 38px; }
   /* The drawer and its backdrop live inside the header's stacking context,
      so lift the whole header over the bottom bar while the drawer is open. */
   body.nav-open .app-header { z-index: 160; }
-  .nav-menu-toggle { display: none; }
 
   /* ---- Bottom navigation ---- */
   .bottom-nav {
