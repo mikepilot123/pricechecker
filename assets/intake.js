@@ -1628,6 +1628,12 @@
     if (e.target.closest("[data-save-issues]")) { saveIssuesEdit(); return; }
     if (e.target.closest("[data-cancel-issues]")) { renderIssuesSectionStatic(); return; }
   });
+  $("ticketModalBody").addEventListener("change", (e) => {
+    const select = e.target.closest("[data-issues-price-issue]");
+    if (!select) return;
+    issuesEditPriceChoices[select.dataset.issuesPriceIssue] = select.value;
+    refreshIssuesEditPrice();
+  });
 
   // ---- Inline issues editor -------------------------------------------------
   // The Issues section gets its own pencil, like the rows above it, so a
@@ -1644,18 +1650,72 @@
     if (section && currentModalTicket) section.innerHTML = issuesSectionStaticHtml(currentModalTicket);
   }
 
+  // Price-list option picked per issue while editing (e.g. OLED vs Incell
+  // screen), same as priceChoices on the check-in form.
+  let issuesEditPriceChoices = {};
+
+  function issuesEditSelection() {
+    const section = $("ticketIssuesSection");
+    return new Set([...(section?.querySelectorAll(".issue-toggle.active") || [])].map((b) => b.dataset.issueChoice));
+  }
+
+  // The repair cost the chosen issues come to on the price list, or null
+  // when none of them has a price for this device (cost is then left alone).
+  function issuesEditPriceSuggestion() {
+    if (!currentModalTicket) return null;
+    return priceSuggestionFor(currentModalTicket.device, [...issuesEditSelection()], issuesEditPriceChoices);
+  }
+
+  // Tells staff, before they save, what changing the issues does to the
+  // repair cost — so a new price is never a surprise, and an unpriced issue
+  // is flagged rather than silently left at the old cost.
+  function refreshIssuesEditPrice() {
+    const box = $("ticketIssuesPrice");
+    if (!box || !currentModalTicket) return;
+    const selected = issuesEditSelection();
+    const suggestion = issuesEditPriceSuggestion();
+    const currentCost = priceNumber(currentModalTicket.repairCost);
+    const priced = new Set(suggestion ? suggestion.lines.map((l) => l.issue) : []);
+    const unpriced = [...selected].filter((issue) => !priced.has(issue));
+    if (!suggestion) {
+      box.innerHTML = selected.size
+        ? `<p class="ticket-issues-price-note">No price-list price for these issues on ${esc(currentModalTicket.device || "this device")} — repair cost stays ${esc(formatMoney(currentModalTicket.repairCost))}. Use the Repair cost pencil to change it.</p>`
+        : "";
+      return;
+    }
+    const changes = currentCost !== suggestion.total;
+    box.innerHTML = `
+      <ul class="price-suggest-lines">
+        ${suggestion.lines.map((l) => `
+          <li>
+            ${l.options.length > 1
+              ? `<select class="price-suggest-select" data-issues-price-issue="${esc(l.issue)}" aria-label="Price option for ${esc(l.issue)}">
+                  ${l.options.map((o) => `<option value="${esc(o.type)}"${o.type === l.type ? " selected" : ""}>${esc(o.type)} — ${esc(formatMoney(o.value))}</option>`).join("")}
+                </select>`
+              : `<span class="price-suggest-type">${esc(l.type)}</span><strong>${esc(formatMoney(l.value))}</strong>`}
+          </li>`).join("")}
+      </ul>
+      <p class="ticket-issues-price-note">${changes
+        ? `Repair cost will change from ${esc(formatMoney(currentModalTicket.repairCost))} to <strong>${esc(formatMoney(suggestion.total))}</strong>.`
+        : `Repair cost stays <strong>${esc(formatMoney(suggestion.total))}</strong>.`}
+        ${unpriced.length ? ` ${esc(unpriced.join(", "))} ${unpriced.length === 1 ? "isn't" : "aren't"} on the price list — add ${unpriced.length === 1 ? "its" : "their"} charge with the Repair cost pencil after saving.` : ""}</p>`;
+  }
+
   function startIssuesEdit() {
     const section = $("ticketIssuesSection");
     if (!section || !currentModalTicket) return;
     const { selected, otherText } = parseIssuesString(currentModalTicket.issues);
+    issuesEditPriceChoices = {};
     section.innerHTML = `<p class="field-label">Issues</p>
       <div class="issue-tags">${ISSUES.map((issue) =>
         `<button type="button" class="issue-toggle${selected.has(issue) ? " active" : ""}" data-issue-choice="${esc(issue)}" aria-pressed="${selected.has(issue)}">${esc(issue)}</button>`).join("")}</div>
       <input type="text" class="text-input issue-other-input" id="ticketIssuesOther" placeholder="Describe the other issue" value="${esc(otherText)}"${selected.has("Other") ? "" : " hidden"} />
+      <div class="ticket-issues-price" id="ticketIssuesPrice"></div>
       <div class="ticket-issues-actions">
         <button type="button" class="ghost-btn" data-cancel-issues>Cancel</button>
         <button type="button" class="primary-btn" data-save-issues><svg class="icon"><use href="#i-check"></use></svg>Save issues</button>
       </div>`;
+    refreshIssuesEditPrice();
     section.querySelector(".issue-toggle")?.focus();
   }
 
@@ -1668,12 +1728,20 @@
       other.hidden = !on;
       if (on) other.focus();
     }
+    refreshIssuesEditPrice();
+  }
+
+  function findDetailRow(label) {
+    for (const el of document.querySelectorAll("#ticketModalBody .ticket-detail-label")) {
+      if (el.textContent.trim() === label) return el.closest(".ticket-detail-row");
+    }
+    return null;
   }
 
   async function saveIssuesEdit() {
     const section = $("ticketIssuesSection");
     if (!section || !currentModalTicket) return;
-    const selected = new Set([...section.querySelectorAll(".issue-toggle.active")].map((b) => b.dataset.issueChoice));
+    const selected = issuesEditSelection();
     const otherInput = $("ticketIssuesOther");
     otherInput.classList.remove("field-error-input");
     if (selected.has("Other") && !otherInput.value.trim()) {
@@ -1687,7 +1755,12 @@
       toast("Select at least one issue.");
       return;
     }
-    if (issues === (currentModalTicket.issues || "").trim()) {
+    // A new set of issues is a different repair, so it takes the price-list
+    // cost for them (the preview above showed staff this before saving).
+    // With no price-list match the cost is left as it was.
+    const suggestion = issuesEditPriceSuggestion();
+    const newCost = suggestion && suggestion.total !== priceNumber(currentModalTicket.repairCost) ? suggestion.total : null;
+    if (issues === (currentModalTicket.issues || "").trim() && newCost == null) {
       renderIssuesSectionStatic();
       return;
     }
@@ -1695,16 +1768,25 @@
     if (saveBtn) saveBtn.disabled = true;
     try {
       const previousTicket = { ...currentModalTicket };
-      const res = await api({ action: "update", id: currentModalTicket.id, issues, issue: issues });
+      const payload = { action: "update", id: currentModalTicket.id, issues, issue: issues };
+      if (newCost != null) payload.repairCost = newCost;
+      const res = await api(payload);
       if (!res.ok) throw new Error(res.error || "Save failed");
       mergeTicket(res.ticket);
       currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
       renderIssuesSectionStatic();
       const heroIssue = document.querySelector("#ticketModalBody .ticket-detail-issue");
       if (heroIssue) heroIssue.textContent = issueSummaryText(currentModalTicket.issues);
-      await syncLinkedInvoiceFromRepair(currentModalTicket, previousTicket);
+      if (newCost != null) {
+        const costRow = findDetailRow("Repair cost");
+        if (costRow) renderDetailRowStatic(costRow, "repairCost");
+      }
+      await syncLinkedInvoiceFromRepair(currentModalTicket, previousTicket, issuesEditPriceChoices);
       render();
-      toast("Issues saved.", { tone: "info", duration: 2500 });
+      toast(
+        newCost != null ? `Issues saved and repair cost updated to ${formatMoney(newCost)}.` : "Issues saved.",
+        { tone: "info", duration: 3000 }
+      );
     } catch (err) {
       if (saveBtn) saveBtn.disabled = false;
       toast(`Couldn't save issues: ${err.message}. Check your connection and try again.`);
@@ -1733,6 +1815,9 @@
   function renderDetailRowStatic(rowEl, field) {
     if (!rowEl || !currentModalTicket) return;
     rowEl.querySelector(".ticket-detail-value")?.remove();
+    // Also redrawn from outside its own editor (an issues edit re-prices the
+    // repair), when the row still has its pencil — drop it so it isn't doubled.
+    rowEl.querySelector("[data-edit-field]")?.remove();
     const valueClass = field === "repairCost" || field === "amountPaid"
       ? "money-positive"
       : field === "repairDueDate" && repairCheckAlertReason(currentModalTicket)
@@ -2310,7 +2395,9 @@
     }
   }
 
-  async function syncLinkedInvoiceFromRepair(updatedTicket, previousTicket) {
+  // priceChoices: the price-list option staff picked per issue (OLED vs
+  // Incell screen, …), so the invoice lines name the part actually used.
+  async function syncLinkedInvoiceFromRepair(updatedTicket, previousTicket, priceChoices = {}) {
     if (!repairInvoiceSyncNeeded(previousTicket, updatedTicket)) return { updated: false };
     const helper = window.RPC_REPAIR_INVOICE_SYNC;
     if (!helper || typeof window.RPC_INVOICE_REQUEST !== "function") return { updated: false };
@@ -2336,7 +2423,7 @@
           notes: "",
           repairCost: updatedTicket.repairCost,
           amountPaid: updatedTicket.amountPaid,
-          priceChoices: {},
+          priceChoices,
         });
         const result = helper.replaceRepairItems({
           items: linked.invoice.items,
