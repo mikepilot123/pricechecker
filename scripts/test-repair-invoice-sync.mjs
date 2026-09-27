@@ -38,6 +38,22 @@ assert.equal(multi.items[0].description, "Pixel 6 Battery Replacement");
 assert.equal(multi.items[1].description, "Pixel 6 Pro Screen Replacement");
 assert.equal(multi.items[2].description, "Delivery Fee");
 
+const deviceAccessory = sync.replaceRepairItems({
+  items: [
+    { description: "Pixel 6 Diagnostic", detail: "", qty: 1, rate: 150 },
+    { description: "Pixel 6 Tempered Glass", detail: "", qty: 1, rate: 80 },
+    { description: "Pixel 6 Delivery Fee", detail: "", qty: 1, rate: 50 },
+  ],
+  targetDevices: ["Pixel 6"],
+  knownDevices: ["Pixel 6"],
+  replacementItems: [{ description: "Pixel 6 Battery Replacement", detail: "", qty: 1, rate: 600 }],
+});
+assert.deepEqual(deviceAccessory.items, [
+  { description: "Pixel 6 Battery Replacement", detail: "", qty: 1, rate: 600 },
+  { description: "Pixel 6 Tempered Glass", detail: "", qty: 1, rate: 80 },
+  { description: "Pixel 6 Delivery Fee", detail: "", qty: 1, rate: 50 },
+]);
+
 const collapse = sync.replaceRepairItems({
   items: [
     { description: "Pixel 6 Screen Replacement", detail: "Keep this note", qty: 1, rate: 1050 },
