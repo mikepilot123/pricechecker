@@ -35,6 +35,14 @@
     return matches[0] || "";
   }
 
+  // Charges/accessories can also begin with the device model ("Pixel 6
+  // Tempered Glass"). They belong on the invoice but are not the repair line.
+  const NON_REPAIR_LINE = /\b(fee|fees|courier|delivery|shipping|transport|call[\s-]?out|travel|labou?r|deposit|tax|vat|discount|protector|tempered\s+glass|case|charger|adapter|cable|power\s*bank|earphones?|headphones?)\b/i;
+
+  function isNonRepairLine(description) {
+    return NON_REPAIR_LINE.test(String(description || ""));
+  }
+
   function replaceRepairItems({
     items,
     targetDevices,
@@ -55,6 +63,7 @@
 
     const matchedIndexes = [];
     source.forEach((item, index) => {
+      if (isNonRepairLine(item && item.description)) return;
       const match = bestDeviceMatch(item && item.description, devices);
       if (match && targetKeys.has(deviceKey(match))) matchedIndexes.push(index);
     });
@@ -89,6 +98,7 @@
     deviceKey,
     startsWithDevice,
     bestDeviceMatch,
+    isNonRepairLine,
     replaceRepairItems,
   };
 })(typeof window !== "undefined" ? window : globalThis);
