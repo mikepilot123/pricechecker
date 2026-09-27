@@ -7,7 +7,7 @@ assert.ok(sync);
 const base = [
   { description: "Pixel 6 Diagnostic", detail: "Customer reports random shutdowns", qty: 1, rate: 150 },
   { description: "Delivery Fee", detail: "", qty: 1, rate: 50 },
-  { description: "Tempered Glass", detail: "", qty: 1, rate: 80 },
+  { description: "Pixel 6 Tempered Glass", detail: "", qty: 1, rate: 80 },
 ];
 
 const one = sync.replaceRepairItems({
