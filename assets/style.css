@@ -4881,6 +4881,9 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .ticket-issues-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .ticket-detail-section .ticket-issues-head .field-label { margin-bottom: 0; }
 .ticket-issues-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.ticket-issues-price:not(:empty) { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-soft); }
+.ticket-issues-price-note { margin: 0; font-size: 0.84rem; color: var(--text-dim); }
+.ticket-issues-price .price-suggest-lines + .ticket-issues-price-note { margin-top: 8px; }
 .ticket-detail-value.ticket-detail-editing { grid-column: 3 / span 2; display: flex; align-items: center; gap: 6px; text-align: left; }
 .ticket-detail-value.ticket-detail-editing .ticket-inline-input { flex: 1; min-width: 0; padding: 6px 8px; font-size: 0.85rem; }
 .ticket-detail-value.ticket-detail-editing .icon-btn { width: 28px; height: 28px; padding: 0; flex: none; }
