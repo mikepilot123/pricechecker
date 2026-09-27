@@ -2395,6 +2395,21 @@
     }
   }
 
+  const roundMoney = (n) => Math.round(n * 100) / 100;
+
+  // What an invoice's Payment Made should be: the total its linked repairs
+  // have been paid — the same figure the server rebuilds on every Amount
+  // paid edit (syncInvoicePaymentForTicket in lib/invoices.js). null when a
+  // linked repair isn't loaded here, so a partial list never overwrites it.
+  function invoicePaymentFromTickets(invoice) {
+    const helper = window.RPC_REPAIR_INVOICE_SYNC;
+    const ids = invoice?.ticketIds || [];
+    if (!helper || !ids.length) return null;
+    const tickets = ids.map((id) => TICKETS.find((t) => t.id === id));
+    if (tickets.some((t) => !t)) return null;
+    return helper.linkedTicketPaymentTotal(tickets);
+  }
+
   // priceChoices: the price-list option staff picked per issue (OLED vs
   // Incell screen, …), so the invoice lines name the part actually used.
   async function syncLinkedInvoiceFromRepair(updatedTicket, previousTicket, priceChoices = {}) {
@@ -2923,12 +2938,28 @@
     return { updated };
   };
 
+  // The server only rebuilds an invoice's Payment Made when a repair's
+  // Amount paid is saved, so an invoice that went out of step before then
+  // (e.g. INV-000101: TT$100 vs the repair's TT$400) stays wrong until the
+  // next payment edit. Opening it from the repair corrects it on the spot,
+  // repair payments being the source of truth.
+  async function reconcileInvoicePayment(invoice) {
+    const expected = invoicePaymentFromTickets(invoice);
+    const current = roundMoney(Number(invoice.paymentMade) || 0);
+    if (expected == null || expected === current) return invoice;
+    const saved = await window.RPC_INVOICE_REQUEST({ action: "update", id: invoice.id, invoice: { paymentMade: expected } });
+    if (!saved.ok || !saved.invoice) throw new Error(saved.error || "Couldn't update the invoice's payment");
+    toast(`Invoice ${saved.invoice.number} Payment Made corrected from ${formatMoney(current)} to ${formatMoney(expected)} to match the repair.`, { tone: "info", duration: 4500 });
+    return saved.invoice;
+  }
+
   async function openInvoiceForTicket(ticket, btn) {
     const original = btn ? btn.innerHTML : "";
     if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
     try {
       let data = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId: ticket.id });
       if (!data.invoice) data = await createInvoiceFromTicket(ticket);
+      else data = { ...data, invoice: await reconcileInvoicePayment(data.invoice) };
       closeTicketModal();
       window.RPC_INVOICE.openEditor(data.invoice, {
         onSaved: () => toast("Invoice saved.", { tone: "info", duration: 2500 }),
@@ -3848,7 +3879,7 @@
         const res = await api(payload);
         if (!res.ok) throw new Error(res.error || "Rejected");
         mergeTicket(res.ticket);
-        if (pickupMethod) await settleInvoiceForTicket(editingId, pickupBalance);
+        if (pickupMethod) await settleInvoiceForTicket(editingId);
         refreshInventoryAfterStockChange();
         renderStatusChips();
         render();
@@ -4132,15 +4163,18 @@
     });
   }
 
-  // Adds the settled balance to the repair's invoice, so the Invoices tab
-  // shows it paid too. Best effort: the repair itself is already updated.
-  async function settleInvoiceForTicket(ticketId, amount) {
-    if (!(amount > 0) || typeof window.RPC_INVOICE_REQUEST !== "function") return;
+  // Makes sure the repair's invoice shows the settled payment too. Every
+  // caller has just saved the repair's Amount paid, which the server already
+  // copies onto the invoice — so this only sets the linked repairs' total,
+  // never adds the settled amount on top (that counted a pick-up twice).
+  // Best effort: the repair itself is already updated.
+  async function settleInvoiceForTicket(ticketId) {
+    if (typeof window.RPC_INVOICE_REQUEST !== "function") return;
     try {
       const { invoice } = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId });
       if (!invoice) return;
-      const paymentMade = Math.min(Number(invoice.total) || 0, Math.round(((Number(invoice.paymentMade) || 0) + amount) * 100) / 100);
-      if (paymentMade === Number(invoice.paymentMade)) return;
+      const paymentMade = invoicePaymentFromTickets(invoice);
+      if (paymentMade == null || paymentMade === roundMoney(Number(invoice.paymentMade) || 0)) return;
       await window.RPC_INVOICE_REQUEST({ action: "update", id: invoice.id, invoice: { paymentMade } });
     } catch (err) {
       toast(`Picked up and paid — but invoice couldn't be updated: ${err.message}. Record the payment on the Invoices tab.`);
@@ -4177,7 +4211,7 @@
     renderStatusChips();
     render();
     const added = Math.round(((Number(res.ticket.amountPaid) || 0) - before) * 100) / 100;
-    if (added > 0) await settleInvoiceForTicket(ticket.id, added);
+    if (added !== 0) await settleInvoiceForTicket(ticket.id);
     return normalizeTicket(res.ticket);
   };
 
@@ -4188,7 +4222,7 @@
       paymentMethod: method,
     });
     if (!updated) return null;
-    await settleInvoiceForTicket(ticket.id, balance);
+    await settleInvoiceForTicket(ticket.id);
     toast(`${ticket.customerName || "Repair"} picked up — ${formatMoney(balance)} balance recorded as paid.`, { tone: "info", duration: 3500 });
     return updated;
   }
