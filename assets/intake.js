@@ -1827,7 +1827,7 @@
       mergeTicket(res.ticket);
       currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
       renderDetailRowStatic(rowEl, field);
-      if (field === "repairCost" || field === "device") {
+      if (field === "repairCost" || field === "amountPaid" || field === "device") {
         await syncLinkedInvoiceFromRepair(currentModalTicket, previousTicket);
       }
       render();
@@ -2241,13 +2241,22 @@
     return [{ description, detail: [extra, detail].filter(Boolean).join("\n"), qty: 1, rate: cost }];
   }
 
-  function repairInvoiceSyncNeeded(before, after) {
+  function repairInvoiceLineSyncNeeded(before, after) {
     if (!before || !after) return false;
     const beforeCost = priceNumber(before.repairCost);
     const afterCost = priceNumber(after.repairCost);
     return String(before.device || "").trim() !== String(after.device || "").trim()
       || String(before.issues || "").trim() !== String(after.issues || "").trim()
       || beforeCost !== afterCost;
+  }
+
+  function repairInvoicePaymentSyncNeeded(before, after) {
+    if (!before || !after) return false;
+    return priceNumber(before.amountPaid) !== priceNumber(after.amountPaid);
+  }
+
+  function repairInvoiceSyncNeeded(before, after) {
+    return repairInvoiceLineSyncNeeded(before, after) || repairInvoicePaymentSyncNeeded(before, after);
   }
 
   function preferredInvoiceResendChannel(ticket, invoice) {
@@ -2310,35 +2319,51 @@
       const linked = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId: updatedTicket.id });
       if (!linked.ok || !linked.invoice) return { updated: false };
 
-      const knownDevices = [
-        ...(Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS.map((m) => m.name) : []),
-        ...TICKETS.map((ticket) => ticket.device),
-        previousTicket?.device,
-        updatedTicket.device,
-      ].filter(Boolean);
-      const replacementItems = invoiceItemsForDevice({
-        device: updatedTicket.device,
-        issues: updatedTicket.issues,
-        notes: "",
-        repairCost: updatedTicket.repairCost,
-        amountPaid: updatedTicket.amountPaid,
-        priceChoices: {},
-      });
-      const result = helper.replaceRepairItems({
-        items: linked.invoice.items,
-        targetDevices: [previousTicket?.device, updatedTicket.device],
-        knownDevices,
-        replacementItems,
-      });
-      if (!result.changed) {
-        toast(`Repair saved, but invoice ${linked.invoice.number} has a custom line that wasn't changed automatically.`, { tone: "info", duration: 5000 });
-        return { updated: false, invoice: linked.invoice };
+      const lineChanged = repairInvoiceLineSyncNeeded(previousTicket, updatedTicket);
+      const paymentChanged = repairInvoicePaymentSyncNeeded(previousTicket, updatedTicket);
+      let nextItems = linked.invoice.items;
+
+      if (lineChanged) {
+        const knownDevices = [
+          ...(Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS.map((m) => m.name) : []),
+          ...TICKETS.map((ticket) => ticket.device),
+          previousTicket?.device,
+          updatedTicket.device,
+        ].filter(Boolean);
+        const replacementItems = invoiceItemsForDevice({
+          device: updatedTicket.device,
+          issues: updatedTicket.issues,
+          notes: "",
+          repairCost: updatedTicket.repairCost,
+          amountPaid: updatedTicket.amountPaid,
+          priceChoices: {},
+        });
+        const result = helper.replaceRepairItems({
+          items: linked.invoice.items,
+          targetDevices: [previousTicket?.device, updatedTicket.device],
+          knownDevices,
+          replacementItems,
+        });
+        if (!result.changed && !paymentChanged) {
+          toast(`Repair saved, but invoice ${linked.invoice.number} has a custom line that wasn't changed automatically.`, { tone: "info", duration: 5000 });
+          return { updated: false, invoice: linked.invoice };
+        }
+        if (result.changed) nextItems = result.items;
+      }
+
+      const invoiceChanges = { items: nextItems };
+      if (paymentChanged) {
+        invoiceChanges.paymentMade = helper.paymentMadeAfterTicketEdit(
+          linked.invoice.paymentMade,
+          previousTicket?.amountPaid,
+          updatedTicket.amountPaid
+        );
       }
 
       const saved = await window.RPC_INVOICE_REQUEST({
         action: "update",
         id: linked.invoice.id,
-        invoice: { items: result.items },
+        invoice: invoiceChanges,
       });
       if (!saved.ok || !saved.invoice) throw new Error(saved.error || "Invoice update failed");
 
