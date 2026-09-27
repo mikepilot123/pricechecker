@@ -1,9 +1,9 @@
 /* ============================================================
    Repair -> invoice line synchronization.
 
-   Replaces only invoice repair lines belonging to one linked device. Other
-   device lines, delivery/accessory charges, notes, payments, and invoice
-   metadata are left alone.
+   Replaces only invoice repair lines belonging to one linked device and can
+   adjust that ticket's contribution to Payment Made. Other device lines,
+   delivery/accessory charges, notes, and invoice metadata are left alone.
    ============================================================ */
 (function (root) {
   "use strict";
