@@ -1,6 +1,7 @@
 import { ensureSchema } from "../lib/db.js";
 import { deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
-import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, updateInvoice } from "../lib/invoices.js";
+import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
+import { isRepairSyncPaymentUpdate } from "../lib/invoice-payment-sync.js";
 import { applyCors, checkPin } from "../lib/security.js";
 import { drawInvoicePdf, invoicePdfName } from "../lib/invoice-pdf.js";
 
@@ -86,7 +87,22 @@ async function createAndDeliverInvoice(req, res) {
   }
   const action = body.action || "legacy";
   if (action === "update") {
-    const invoice = await updateInvoice(body.id, body.invoice || {});
+    let changes = body.invoice || {};
+    // A cached older repair-card bundle may still calculate paymentMade as a
+    // delta from an already-stale invoice. Before accepting that repair-sync
+    // shape, rebuild Payment Made from the linked ticket records. This keeps
+    // the database correct even before the phone refreshes its JS bundle.
+    if (isRepairSyncPaymentUpdate(changes)) {
+      const current = await getInvoiceById(body.id);
+      const anchorTicketId = Array.isArray(current.ticketIds) ? current.ticketIds[0] : "";
+      if (anchorTicketId) {
+        const reconciled = await syncInvoicePaymentForTicket(anchorTicketId);
+        if (reconciled.invoice) {
+          changes = { ...changes, paymentMade: reconciled.invoice.paymentMade };
+        }
+      }
+    }
+    const invoice = await updateInvoice(body.id, changes);
     return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token) });
   }
   if (action === "emailTemplate") {

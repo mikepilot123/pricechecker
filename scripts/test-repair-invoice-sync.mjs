@@ -80,19 +80,21 @@ assert.equal(none.items[0].description, "iPhone 13 Screen Replacement");
 
 // Regression: a TT$600 invoice starts unpaid, then Check In records a payment.
 // The invoice must mirror Payment Made so its derived Balance Due is correct.
-const fullPayment = sync.paymentMadeAfterTicketEdit(0, 0, 600);
+const fullPayment = sync.linkedTicketPaymentTotal([{ id: "A", amountPaid: 600 }]);
 assert.equal(fullPayment, 600);
 assert.equal(600 - fullPayment, 0);
 
 // Partial payment: TT$200 paid against the same TT$600 repair leaves TT$400.
-const partialPayment = sync.paymentMadeAfterTicketEdit(0, 0, 200);
+const partialPayment = sync.linkedTicketPaymentTotal([{ id: "A", amountPaid: 200 }]);
 assert.equal(partialPayment, 200);
 assert.equal(600 - partialPayment, 400);
 
-// Shared invoice: TT$300 previously paid = TT$100 on this repair + TT$200
-// elsewhere. Raising this repair's payment from TT$100 to TT$250 must retain
-// the other TT$200, producing TT$450 total paid rather than overwriting it.
-const sharedPayment = sync.paymentMadeAfterTicketEdit(300, 100, 250);
+// Shared invoice: rebuild from both repair cards instead of trusting a stale
+// invoice total. TT$250 + TT$200 = TT$450.
+const sharedPayment = sync.linkedTicketPaymentTotal([
+  { id: "A", amountPaid: 250 },
+  { id: "B", amountPaid: 200 },
+]);
 assert.equal(sharedPayment, 450);
 
 console.log("repair invoice sync tests passed");

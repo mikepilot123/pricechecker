@@ -31,6 +31,7 @@ import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBan
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
+import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, createBrowserCredential } from "../lib/security.js";
 
 // Default is 10s, which isn't enough for extractPartsOrderPdf: Gemini answers
@@ -72,7 +73,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, ticket: await addTicket(body) });
     }
     if (action === "update") {
-      return res.status(200).json({ ok: true, ticket: await updateTicket(body) });
+      const ticket = await updateTicket(body);
+      let invoiceSync = null;
+      // Amount Paid is a source-of-truth field for the linked invoice. Run
+      // this on the server so an older/cached browser cannot leave the invoice
+      // stale. Empty string is a real edit (clear payment), so check presence
+      // rather than truthiness.
+      if (body.amountPaid !== undefined || body.paid !== undefined) {
+        try {
+          invoiceSync = await syncInvoicePaymentForTicket(ticket.id);
+        } catch (syncError) {
+          // Never lose the repair edit because invoice reconciliation failed.
+          // Return the warning so the current UI can surface it when supported.
+          invoiceSync = { changed: false, error: String(syncError?.message || syncError) };
+        }
+      }
+      return res.status(200).json({ ok: true, ticket, invoiceSync });
     }
     if (action === "delete") {
       return res.status(200).json({ ok: true, deletedId: await deleteTicket(body) });

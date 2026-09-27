@@ -2398,22 +2398,16 @@
   const roundMoney = (n) => Math.round(n * 100) / 100;
 
   // What an invoice's Payment Made should be: the total its linked repairs
-  // have been paid (the invoice → repairs sync puts every invoice payment on
-  // a repair, so the two always add up). It is set outright rather than
-  // nudged by the change in one repair — nudging let an old mismatch live
-  // on forever, and let a pick-up count the same payment twice when two
-  // sync paths both added it. null when a linked repair isn't loaded (e.g.
-  // deleted), so callers fall back to adjusting by the change.
+  // have been paid — the same figure the server rebuilds on every Amount
+  // paid edit (syncInvoicePaymentForTicket in lib/invoices.js). null when a
+  // linked repair isn't loaded here, so a partial list never overwrites it.
   function invoicePaymentFromTickets(invoice) {
+    const helper = window.RPC_REPAIR_INVOICE_SYNC;
     const ids = invoice?.ticketIds || [];
-    if (!ids.length) return null;
-    let sum = 0;
-    for (const id of ids) {
-      const ticket = TICKETS.find((t) => t.id === id);
-      if (!ticket) return null;
-      sum += priceNumber(ticket.amountPaid) || 0;
-    }
-    return roundMoney(sum);
+    if (!helper || !ids.length) return null;
+    const tickets = ids.map((id) => TICKETS.find((t) => t.id === id));
+    if (tickets.some((t) => !t)) return null;
+    return helper.linkedTicketPaymentTotal(tickets);
   }
 
   // priceChoices: the price-list option staff picked per issue (OLED vs
@@ -2428,11 +2422,7 @@
       if (!linked.ok || !linked.invoice) return { updated: false };
 
       const lineChanged = repairInvoiceLineSyncNeeded(previousTicket, updatedTicket);
-      const paymentTarget = invoicePaymentFromTickets(linked.invoice)
-        ?? (repairInvoicePaymentSyncNeeded(previousTicket, updatedTicket)
-          ? helper.paymentMadeAfterTicketEdit(linked.invoice.paymentMade, previousTicket?.amountPaid, updatedTicket.amountPaid)
-          : null);
-      const paymentChanged = paymentTarget != null && paymentTarget !== roundMoney(priceNumber(linked.invoice.paymentMade) || 0);
+      const paymentChanged = repairInvoicePaymentSyncNeeded(previousTicket, updatedTicket);
       let nextItems = linked.invoice.items;
 
       if (lineChanged) {
@@ -2464,7 +2454,21 @@
       }
 
       const invoiceChanges = { items: nextItems };
-      if (paymentChanged) invoiceChanges.paymentMade = paymentTarget;
+      if (paymentChanged) {
+        const linkedIds = (Array.isArray(linked.invoice.ticketIds) && linked.invoice.ticketIds.length)
+          ? linked.invoice.ticketIds
+          : [updatedTicket.id];
+        const linkedTickets = linkedIds.map((id) => {
+          if (id === updatedTicket.id) return updatedTicket;
+          return TICKETS.find((ticket) => ticket.id === id) || null;
+        }).filter(Boolean);
+        // Only calculate locally when every linked repair is loaded. The intake
+        // API already reconciles payment server-side, so a partial browser list
+        // must never overwrite that authoritative total.
+        if (linkedTickets.length === linkedIds.length) {
+          invoiceChanges.paymentMade = helper.linkedTicketPaymentTotal(linkedTickets);
+        }
+      }
 
       const saved = await window.RPC_INVOICE_REQUEST({
         action: "update",
@@ -2934,24 +2938,18 @@
     return { updated };
   };
 
-  // Invoices whose Payment Made already disagrees with their repairs' amount
-  // paid (from before the two were kept in step) are caught when opened
-  // from the repair. Staff pick which figure is right: OK updates the
-  // invoice; Cancel leaves it, and saving the invoice then updates the
-  // repair to match it.
+  // The server only rebuilds an invoice's Payment Made when a repair's
+  // Amount paid is saved, so an invoice that went out of step before then
+  // (e.g. INV-000101: TT$100 vs the repair's TT$400) stays wrong until the
+  // next payment edit. Opening it from the repair corrects it on the spot,
+  // repair payments being the source of truth.
   async function reconcileInvoicePayment(invoice) {
     const expected = invoicePaymentFromTickets(invoice);
     const current = roundMoney(Number(invoice.paymentMade) || 0);
     if (expected == null || expected === current) return invoice;
-    const fix = window.confirm(
-      `Invoice ${invoice.number} shows ${formatMoney(current)} paid, but its repair shows ${formatMoney(expected)} paid.\n\n`
-      + `OK: update the invoice to ${formatMoney(expected)}.\n`
-      + `Cancel: keep the invoice's ${formatMoney(current)} — then Save the invoice to update the repair to match.`
-    );
-    if (!fix) return invoice;
     const saved = await window.RPC_INVOICE_REQUEST({ action: "update", id: invoice.id, invoice: { paymentMade: expected } });
     if (!saved.ok || !saved.invoice) throw new Error(saved.error || "Couldn't update the invoice's payment");
-    toast(`Invoice ${saved.invoice.number} payment updated to ${formatMoney(expected)}.`, { tone: "info", duration: 3500 });
+    toast(`Invoice ${saved.invoice.number} Payment Made corrected from ${formatMoney(current)} to ${formatMoney(expected)} to match the repair.`, { tone: "info", duration: 4500 });
     return saved.invoice;
   }
 
@@ -3881,7 +3879,7 @@
         const res = await api(payload);
         if (!res.ok) throw new Error(res.error || "Rejected");
         mergeTicket(res.ticket);
-        if (pickupMethod) await settleInvoiceForTicket(editingId, pickupBalance);
+        if (pickupMethod) await settleInvoiceForTicket(editingId);
         refreshInventoryAfterStockChange();
         renderStatusChips();
         render();
@@ -4165,19 +4163,18 @@
     });
   }
 
-  // Brings the repair's invoice Payment Made in line after the repair's
-  // amount paid changed, so the Invoices tab shows the same balance. Best
-  // effort: the repair itself is already updated. `amount` (the change) is
-  // only used when the invoice's repairs can't all be totalled.
-  async function settleInvoiceForTicket(ticketId, amount) {
+  // Makes sure the repair's invoice shows the settled payment too. Every
+  // caller has just saved the repair's Amount paid, which the server already
+  // copies onto the invoice — so this only sets the linked repairs' total,
+  // never adds the settled amount on top (that counted a pick-up twice).
+  // Best effort: the repair itself is already updated.
+  async function settleInvoiceForTicket(ticketId) {
     if (typeof window.RPC_INVOICE_REQUEST !== "function") return;
     try {
       const { invoice } = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId });
       if (!invoice) return;
-      const fromTickets = invoicePaymentFromTickets(invoice);
-      if (fromTickets == null && !(amount > 0)) return;
-      const paymentMade = fromTickets ?? Math.min(Number(invoice.total) || 0, roundMoney((Number(invoice.paymentMade) || 0) + amount));
-      if (paymentMade === roundMoney(Number(invoice.paymentMade) || 0)) return;
+      const paymentMade = invoicePaymentFromTickets(invoice);
+      if (paymentMade == null || paymentMade === roundMoney(Number(invoice.paymentMade) || 0)) return;
       await window.RPC_INVOICE_REQUEST({ action: "update", id: invoice.id, invoice: { paymentMade } });
     } catch (err) {
       toast(`Picked up and paid — but invoice couldn't be updated: ${err.message}. Record the payment on the Invoices tab.`);
@@ -4213,10 +4210,8 @@
     mergeTicket(res.ticket);
     renderStatusChips();
     render();
-    // A lower amount paid (a correction) must reach the invoice too, not
-    // only a higher one, or the two balances drift apart.
     const added = Math.round(((Number(res.ticket.amountPaid) || 0) - before) * 100) / 100;
-    if (added !== 0) await settleInvoiceForTicket(ticket.id, added);
+    if (added !== 0) await settleInvoiceForTicket(ticket.id);
     return normalizeTicket(res.ticket);
   };
 
@@ -4227,7 +4222,7 @@
       paymentMethod: method,
     });
     if (!updated) return null;
-    await settleInvoiceForTicket(ticket.id, balance);
+    await settleInvoiceForTicket(ticket.id);
     toast(`${ticket.customerName || "Repair"} picked up — ${formatMoney(balance)} balance recorded as paid.`, { tone: "info", duration: 3500 });
     return updated;
   }
