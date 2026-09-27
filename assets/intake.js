@@ -1734,11 +1734,15 @@
       ? { paymentMethod: raw.startsWith("card") ? "card" : raw, cardType: raw.startsWith("card") ? raw.split(":")[1] : "" }
       : { [field]: value, ...(inferredIssues ? { issues: inferredIssues, issue: inferredIssues } : {}) };
     try {
+      const previousTicket = { ...currentModalTicket };
       const res = await api(Object.assign({ action: "update", id: currentModalTicket.id }, payload));
       if (!res.ok) throw new Error(res.error || "Save failed");
       mergeTicket(res.ticket);
       currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
       renderDetailRowStatic(rowEl, field);
+      if (field === "repairCost" || field === "device") {
+        await syncLinkedInvoiceFromRepair(currentModalTicket, previousTicket);
+      }
       render();
       // A card payment (or a change to one) has just moved money in the
       // takings ledger, so don't leave the Account tab showing a stale balance.
@@ -2148,6 +2152,117 @@
       : `${dev.device} Repair`;
     const extra = labels.length > 2 ? labels.join(", ") : "";
     return [{ description, detail: [extra, detail].filter(Boolean).join("\n"), qty: 1, rate: cost }];
+  }
+
+  function repairInvoiceSyncNeeded(before, after) {
+    if (!before || !after) return false;
+    const beforeCost = priceNumber(before.repairCost);
+    const afterCost = priceNumber(after.repairCost);
+    return String(before.device || "").trim() !== String(after.device || "").trim()
+      || String(before.issues || "").trim() !== String(after.issues || "").trim()
+      || beforeCost !== afterCost;
+  }
+
+  function preferredInvoiceResendChannel(ticket, invoice) {
+    const notes = String(ticket?.notes || "");
+    if (/invoice requested by whatsapp/i.test(notes) && (invoice?.billTo?.phone || ticket?.phone)) return "whatsapp";
+    if (/invoice requested by email/i.test(notes) && invoice?.billTo?.email) return "email";
+    if (Array.isArray(invoice?.emails) && invoice.emails.length && invoice?.billTo?.email) return "email";
+    if (invoice?.billTo?.email) return "email";
+    if (invoice?.billTo?.phone || ticket?.phone) return "whatsapp";
+    return "";
+  }
+
+  async function offerUpdatedInvoiceResend(invoice, ticket) {
+    if (!invoice) return;
+    const channel = preferredInvoiceResendChannel(ticket, invoice);
+    if (!channel) {
+      toast(`Invoice ${invoice.number} was updated, but there is no email address or WhatsApp number to resend it to.`, { tone: "info", duration: 5000 });
+      return;
+    }
+
+    if (channel === "email") {
+      const email = invoice.billTo?.email || "";
+      const yes = window.confirm(
+        `Invoice ${invoice.number} was updated to match this repair.\n\nResend the updated invoice to ${email} now?`
+      );
+      if (!yes) return;
+      try {
+        if (!window.RPC_EMAIL?.sendDefault) throw new Error("Email sending is not ready");
+        const sent = await window.RPC_EMAIL.sendDefault(invoice);
+        toast(`Updated invoice ${invoice.number} emailed to ${email}.`, { tone: "info", duration: 4000 });
+        return sent;
+      } catch (err) {
+        toast(`The invoice was updated, but couldn't be resent automatically: ${err.message || err}`, { duration: 8000 });
+        if (window.RPC_EMAIL?.openCompose) window.RPC_EMAIL.openCompose(invoice);
+        return;
+      }
+    }
+
+    const phone = invoice.billTo?.phone || ticket?.phone || "";
+    const yes = window.confirm(
+      `Invoice ${invoice.number} was updated to match this repair.\n\nOpen WhatsApp to resend the updated invoice to ${phone}?`
+    );
+    if (!yes) return;
+    try {
+      const data = await window.RPC_INVOICE_REQUEST({ action: "send", id: invoice.id, delivery: "whatsapp" });
+      if (!data.ok) throw new Error(data.error || "Couldn't prepare WhatsApp");
+      if (!data.whatsappUrl) throw new Error("No WhatsApp number is available");
+      window.open(data.whatsappUrl, "_blank", "noopener");
+    } catch (err) {
+      toast(`The invoice was updated, but WhatsApp couldn't be opened: ${err.message || err}`, { duration: 8000 });
+    }
+  }
+
+  async function syncLinkedInvoiceFromRepair(updatedTicket, previousTicket) {
+    if (!repairInvoiceSyncNeeded(previousTicket, updatedTicket)) return { updated: false };
+    const helper = window.RPC_REPAIR_INVOICE_SYNC;
+    if (!helper || typeof window.RPC_INVOICE_REQUEST !== "function") return { updated: false };
+
+    try {
+      const linked = await window.RPC_INVOICE_REQUEST({ action: "forTicket", ticketId: updatedTicket.id });
+      if (!linked.ok || !linked.invoice) return { updated: false };
+
+      const knownDevices = [
+        ...(Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS.map((m) => m.name) : []),
+        ...TICKETS.map((ticket) => ticket.device),
+        previousTicket?.device,
+        updatedTicket.device,
+      ].filter(Boolean);
+      const replacementItems = invoiceItemsForDevice({
+        device: updatedTicket.device,
+        issues: updatedTicket.issues,
+        notes: "",
+        repairCost: updatedTicket.repairCost,
+        amountPaid: updatedTicket.amountPaid,
+        priceChoices: {},
+      });
+      const result = helper.replaceRepairItems({
+        items: linked.invoice.items,
+        targetDevices: [previousTicket?.device, updatedTicket.device],
+        knownDevices,
+        replacementItems,
+      });
+      if (!result.changed) {
+        toast(`Repair saved, but invoice ${linked.invoice.number} has a custom line that wasn't changed automatically.`, { tone: "info", duration: 5000 });
+        return { updated: false, invoice: linked.invoice };
+      }
+
+      const saved = await window.RPC_INVOICE_REQUEST({
+        action: "update",
+        id: linked.invoice.id,
+        invoice: { items: result.items },
+      });
+      if (!saved.ok || !saved.invoice) throw new Error(saved.error || "Invoice update failed");
+
+      toast(`Invoice ${saved.invoice.number} updated to match the repair.`, { tone: "info", duration: 3500 });
+      window.dispatchEvent(new Event("rpc-enter-invoices"));
+      await offerUpdatedInvoiceResend(saved.invoice, updatedTicket);
+      return { updated: true, invoice: saved.invoice };
+    } catch (err) {
+      toast(`Repair saved, but its linked invoice couldn't be updated: ${err.message || err}`, { duration: 8000 });
+      return { updated: false, error: err };
+    }
   }
 
   // One invoice per check-in, covering every device logged together.
@@ -3529,6 +3644,7 @@
         $("doneForm").focus();
         uploadMediaQueueForTicket(res.ticket, pendingFormMedia.slice(), { narrate: true });
         pendingFormMedia = [];
+        await syncLinkedInvoiceFromRepair(res.ticket, original);
       } catch (ex) {
         err.textContent = "Couldn't save: " + ex.message;
         err.hidden = false;
