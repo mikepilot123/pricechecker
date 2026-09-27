@@ -43,6 +43,20 @@
     return NON_REPAIR_LINE.test(String(description || ""));
   }
 
+  function moneyNumber(value) {
+    const amount = Number(String(value == null ? "" : value).replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;
+  }
+
+  // Adjust only the edited repair's contribution to an invoice payment.
+  // This preserves payments belonging to other devices on a shared invoice.
+  function paymentMadeAfterTicketEdit(invoicePaymentMade, beforeAmountPaid, afterAmountPaid) {
+    const current = moneyNumber(invoicePaymentMade);
+    const before = moneyNumber(beforeAmountPaid);
+    const after = moneyNumber(afterAmountPaid);
+    return Math.round((current - before + after) * 100) / 100;
+  }
+
   function replaceRepairItems({
     items,
     targetDevices,
@@ -99,6 +113,7 @@
     startsWithDevice,
     bestDeviceMatch,
     isNonRepairLine,
+    paymentMadeAfterTicketEdit,
     replaceRepairItems,
   };
 })(typeof window !== "undefined" ? window : globalThis);
