@@ -2440,11 +2440,19 @@
 
       const invoiceChanges = { items: nextItems };
       if (paymentChanged) {
-        invoiceChanges.paymentMade = helper.paymentMadeAfterTicketEdit(
-          linked.invoice.paymentMade,
-          previousTicket?.amountPaid,
-          updatedTicket.amountPaid
-        );
+        const linkedIds = (Array.isArray(linked.invoice.ticketIds) && linked.invoice.ticketIds.length)
+          ? linked.invoice.ticketIds
+          : [updatedTicket.id];
+        const linkedTickets = linkedIds.map((id) => {
+          if (id === updatedTicket.id) return updatedTicket;
+          return TICKETS.find((ticket) => ticket.id === id) || null;
+        }).filter(Boolean);
+        // Only calculate locally when every linked repair is loaded. The intake
+        // API already reconciles payment server-side, so a partial browser list
+        // must never overwrite that authoritative total.
+        if (linkedTickets.length === linkedIds.length) {
+          invoiceChanges.paymentMade = helper.linkedTicketPaymentTotal(linkedTickets);
+        }
       }
 
       const saved = await window.RPC_INVOICE_REQUEST({
