@@ -1558,7 +1558,7 @@
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
         ${detailRow("i-cash", "Paid by", fieldDisplayHtml("paymentMethod", ticket), "", "paymentMethod")}
       </div></section>
-      <section class="ticket-detail-section"><p class="field-label">Issues</p><div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div></section>
+      <section class="ticket-detail-section" id="ticketIssuesSection">${issuesSectionStaticHtml(ticket)}</section>
       <section class="ticket-detail-section"><p class="field-label">Photos & videos</p>
         <div class="ticket-media-gallery" id="ticketMediaGallery"><p class="ops-empty ticket-media-loading">Loading…</p></div>
         <label class="ghost-btn ticket-media-add-btn" id="ticketMediaAddBtn">
@@ -1622,7 +1622,94 @@
     if (saveBtn) { saveInlineEdit(saveBtn.closest(".ticket-detail-row"), saveBtn.dataset.saveField); return; }
     const cancelBtn = e.target.closest("[data-cancel-field]");
     if (cancelBtn) { renderDetailRowStatic(cancelBtn.closest(".ticket-detail-row"), cancelBtn.dataset.cancelField); return; }
+    if (e.target.closest("[data-edit-issues]")) { startIssuesEdit(); return; }
+    const issueChoice = e.target.closest("[data-issue-choice]");
+    if (issueChoice) { toggleIssueChoice(issueChoice); return; }
+    if (e.target.closest("[data-save-issues]")) { saveIssuesEdit(); return; }
+    if (e.target.closest("[data-cancel-issues]")) { renderIssuesSectionStatic(); return; }
   });
+
+  // ---- Inline issues editor -------------------------------------------------
+  // The Issues section gets its own pencil, like the rows above it, so a
+  // repair's issues can be corrected after check-in (e.g. once a diagnostic
+  // finds the real fault) without reopening the whole edit form.
+  function issuesSectionStaticHtml(ticket) {
+    return `<div class="ticket-issues-head"><p class="field-label">Issues</p>
+      <button type="button" class="icon-btn ghost-btn ticket-detail-edit-btn" data-edit-issues aria-label="Edit issues"><svg class="icon"><use href="#i-pencil"></use></svg></button></div>
+      <div class="issue-tags issue-tags-readonly">${issueTagsHtml(ticket.issues)}</div>`;
+  }
+
+  function renderIssuesSectionStatic() {
+    const section = $("ticketIssuesSection");
+    if (section && currentModalTicket) section.innerHTML = issuesSectionStaticHtml(currentModalTicket);
+  }
+
+  function startIssuesEdit() {
+    const section = $("ticketIssuesSection");
+    if (!section || !currentModalTicket) return;
+    const { selected, otherText } = parseIssuesString(currentModalTicket.issues);
+    section.innerHTML = `<p class="field-label">Issues</p>
+      <div class="issue-tags">${ISSUES.map((issue) =>
+        `<button type="button" class="issue-toggle${selected.has(issue) ? " active" : ""}" data-issue-choice="${esc(issue)}" aria-pressed="${selected.has(issue)}">${esc(issue)}</button>`).join("")}</div>
+      <input type="text" class="text-input issue-other-input" id="ticketIssuesOther" placeholder="Describe the other issue" value="${esc(otherText)}"${selected.has("Other") ? "" : " hidden"} />
+      <div class="ticket-issues-actions">
+        <button type="button" class="ghost-btn" data-cancel-issues>Cancel</button>
+        <button type="button" class="primary-btn" data-save-issues><svg class="icon"><use href="#i-check"></use></svg>Save issues</button>
+      </div>`;
+    section.querySelector(".issue-toggle")?.focus();
+  }
+
+  function toggleIssueChoice(btn) {
+    const on = !btn.classList.contains("active");
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-pressed", String(on));
+    if (btn.dataset.issueChoice === "Other") {
+      const other = $("ticketIssuesOther");
+      other.hidden = !on;
+      if (on) other.focus();
+    }
+  }
+
+  async function saveIssuesEdit() {
+    const section = $("ticketIssuesSection");
+    if (!section || !currentModalTicket) return;
+    const selected = new Set([...section.querySelectorAll(".issue-toggle.active")].map((b) => b.dataset.issueChoice));
+    const otherInput = $("ticketIssuesOther");
+    otherInput.classList.remove("field-error-input");
+    if (selected.has("Other") && !otherInput.value.trim()) {
+      otherInput.classList.add("field-error-input");
+      otherInput.focus();
+      toast("Describe the other issue, or untick Other.");
+      return;
+    }
+    const issues = joinIssues(selected, otherInput.value);
+    if (!issues) {
+      toast("Select at least one issue.");
+      return;
+    }
+    if (issues === (currentModalTicket.issues || "").trim()) {
+      renderIssuesSectionStatic();
+      return;
+    }
+    const saveBtn = section.querySelector("[data-save-issues]");
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      const previousTicket = { ...currentModalTicket };
+      const res = await api({ action: "update", id: currentModalTicket.id, issues, issue: issues });
+      if (!res.ok) throw new Error(res.error || "Save failed");
+      mergeTicket(res.ticket);
+      currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
+      renderIssuesSectionStatic();
+      const heroIssue = document.querySelector("#ticketModalBody .ticket-detail-issue");
+      if (heroIssue) heroIssue.textContent = issueSummaryText(currentModalTicket.issues);
+      await syncLinkedInvoiceFromRepair(currentModalTicket, previousTicket);
+      render();
+      toast("Issues saved.", { tone: "info", duration: 2500 });
+    } catch (err) {
+      if (saveBtn) saveBtn.disabled = false;
+      toast(`Couldn't save issues: ${err.message}. Check your connection and try again.`);
+    }
+  }
 
   function startInlineEdit(rowEl, field) {
     if (!rowEl || !currentModalTicket) return;
@@ -2795,45 +2882,52 @@
     return balance > 0 ? "money-due" : "money-positive";
   }
 
-  function setIssueTags(issuesStr) {
-    selectedIssues = new Set();
-    $("issueTags").querySelectorAll(".issue-toggle").forEach((b) => b.classList.remove("active"));
-    $("fIssueOther").hidden = true;
-    $("fIssueOther").value = "";
-    const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
+  /** Splits a saved issues string into preset tags plus any "Other" free text. */
+  function parseIssuesString(issuesStr) {
+    const selected = new Set();
     let otherText = "";
-    parts.forEach((part) => {
+    (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((part) => {
       const match = ISSUES.find((preset) => preset !== "Other" && preset === part);
       if (match) {
-        selectedIssues.add(match);
-        const btn = $("issueTags").querySelector(`[data-issue="${CSS.escape(match)}"]`);
-        if (btn) btn.classList.add("active");
+        selected.add(match);
       } else if (part.startsWith("Other:")) {
         otherText = part.slice(6).trim();
       } else {
         otherText = otherText ? otherText + "; " + part : part;
       }
     });
-    if (otherText) {
-      selectedIssues.add("Other");
-      const otherBtn = $("issueTags").querySelector('[data-issue="Other"]');
-      if (otherBtn) otherBtn.classList.add("active");
-      $("fIssueOther").hidden = false;
-      $("fIssueOther").value = otherText;
+    if (otherText) selected.add("Other");
+    return { selected, otherText };
+  }
+
+  /** The inverse of parseIssuesString: the string saved on the ticket. */
+  function joinIssues(selected, otherText) {
+    const parts = [];
+    selected.forEach((s) => {
+      if (s !== "Other") parts.push(s);
+    });
+    if (selected.has("Other")) {
+      const text = (otherText || "").trim();
+      if (text) parts.push("Other: " + text);
     }
+    return parts.join(", ");
+  }
+
+  function setIssueTags(issuesStr) {
+    $("issueTags").querySelectorAll(".issue-toggle").forEach((b) => b.classList.remove("active"));
+    const { selected, otherText } = parseIssuesString(issuesStr);
+    selectedIssues = selected;
+    selectedIssues.forEach((issue) => {
+      const btn = $("issueTags").querySelector(`[data-issue="${CSS.escape(issue)}"]`);
+      if (btn) btn.classList.add("active");
+    });
+    $("fIssueOther").hidden = !otherText;
+    $("fIssueOther").value = otherText;
     updateIssueSummary();
   }
 
   function buildIssuesString() {
-    const parts = [];
-    selectedIssues.forEach((s) => {
-      if (s !== "Other") parts.push(s);
-    });
-    if (selectedIssues.has("Other")) {
-      const text = $("fIssueOther").value.trim();
-      if (text) parts.push("Other: " + text);
-    }
-    return parts.join(", ");
+    return joinIssues(selectedIssues, $("fIssueOther").value);
   }
 
   function setQuickLogMode(on) {
