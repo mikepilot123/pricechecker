@@ -25,6 +25,8 @@
     return dev.every((part, index) => desc[index] === part);
   }
 
+  const NON_REPAIR_LINE_PATTERN = /\b(fee|fees|courier|delivery|shipping|transport|call[\s-]?out|travel|labou?r|deposit|tax|vat|discount|protector|tempered\s+glass|charger|adapter|cable|power\s*bank|earphones?|headphones?|accessor(?:y|ies)|case)\b/i;
+
   function bestDeviceMatch(description, devices) {
     const matches = [...new Set((devices || []).map((d) => String(d || "").trim()).filter(Boolean))]
       .filter((device) => startsWithDevice(description, device))
@@ -33,6 +35,10 @@
         return tokenDiff || b.length - a.length;
       });
     return matches[0] || "";
+  }
+
+  function isProtectedNonRepairLine(description) {
+    return NON_REPAIR_LINE_PATTERN.test(String(description || ""));
   }
 
   // Charges/accessories can also begin with the device model ("Pixel 6
@@ -64,8 +70,9 @@
     const matchedIndexes = [];
     source.forEach((item, index) => {
       if (isNonRepairLine(item && item.description)) return;
-      const match = bestDeviceMatch(item && item.description, devices);
-      if (match && targetKeys.has(deviceKey(match))) matchedIndexes.push(index);
+      const description = item && item.description;
+      const match = bestDeviceMatch(description, devices);
+      if (match && targetKeys.has(deviceKey(match)) && !isProtectedNonRepairLine(description)) matchedIndexes.push(index);
     });
 
     if (!matchedIndexes.length) {
