@@ -1177,7 +1177,60 @@
     autoRepairCost = String(suggestion.total);
     refreshPriceSuggestion();
   });
-  $("fRepairCost")?.addEventListener("input", () => refreshPriceSuggestion());
+  function applyInferredIssue(issue) {
+    if (!issue) return false;
+    selectedIssues = new Set([issue]);
+    $("issueTags").querySelectorAll(".issue-toggle").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.issue === issue);
+    });
+    $("fIssueOther").hidden = true;
+    $("fIssueOther").value = "";
+    updateIssueSummary();
+    return true;
+  }
+
+  function maybeInferIssueFromRepairCost({ promptOnAmbiguous = true } = {}) {
+    const helper = window.RPC_REPAIR_TYPE_INFERENCE;
+    if (!helper) return { handled: false };
+    const currentIssues = buildIssuesString();
+    if (!helper.isDiagnosticOnly(currentIssues)) return { handled: false };
+    const result = helper.inferRepairType({
+      device: $("fDevice").value.trim(),
+      price: $("fRepairCost").value.trim(),
+      models: window.RPC_PRICE_MODELS,
+    });
+    if (result.status === "unique") {
+      const changed = applyInferredIssue(result.candidate.issue);
+      if (changed) {
+        toast(`Repair type updated to ${result.candidate.issue} from the price list.`, { tone: "info", duration: 3200 });
+        return { handled: true, changed: true, result };
+      }
+    } else if (result.status === "ambiguous" && promptOnAmbiguous) {
+      const choices = [...new Set(result.candidates.map((candidate) => candidate.issue))];
+      const choiceText = choices.map((choice, index) => `${index + 1}. ${choice}`).join("\n");
+      const entered = window.prompt(
+        `This ${result.model.name} price matches more than one repair:\n\n${choiceText}\n\nEnter the number for the repair type, or Cancel to keep Diagnostic Needed.`
+      );
+      const index = Number(entered) - 1;
+      if (Number.isInteger(index) && choices[index]) {
+        const changed = applyInferredIssue(choices[index]);
+        if (changed) {
+          toast(`Repair type updated to ${choices[index]}.`, { tone: "info", duration: 3200 });
+          return { handled: true, changed: true, result };
+        }
+      }
+      return { handled: true, changed: false, result };
+    }
+    return { handled: false, result };
+  }
+
+  $("fRepairCost")?.addEventListener("input", () => {
+    refreshPriceSuggestion();
+    if (editingId) maybeInferIssueFromRepairCost({ promptOnAmbiguous: false });
+  });
+  $("fRepairCost")?.addEventListener("change", () => {
+    if (editingId) maybeInferIssueFromRepairCost({ promptOnAmbiguous: true });
+  });
   // The price list loads in the background. If it lands while a new check-in
   // is already open, fill the cost then (an empty or auto-filled one only).
   window.addEventListener("rpc-price-models", () => {
@@ -1651,13 +1704,35 @@
       return;
     }
     const value = cfg.type === "number" ? (raw === "" ? null : Number(raw)) : raw;
+    let inferredIssues = "";
+    if (field === "repairCost") {
+      const helper = window.RPC_REPAIR_TYPE_INFERENCE;
+      if (helper && helper.isDiagnosticOnly(currentModalTicket.issues)) {
+        const inferred = helper.inferRepairType({
+          device: currentModalTicket.device,
+          price: value,
+          models: window.RPC_PRICE_MODELS,
+        });
+        if (inferred.status === "unique") {
+          inferredIssues = inferred.candidate.issue;
+        } else if (inferred.status === "ambiguous") {
+          const choices = [...new Set(inferred.candidates.map((candidate) => candidate.issue))];
+          const choiceText = choices.map((choice, index) => `${index + 1}. ${choice}`).join("\n");
+          const entered = window.prompt(
+            `This ${inferred.model.name} price matches more than one repair:\n\n${choiceText}\n\nEnter the number for the repair type, or Cancel to keep Diagnostic Needed.`
+          );
+          const index = Number(entered) - 1;
+          if (Number.isInteger(index) && choices[index]) inferredIssues = choices[index];
+        }
+      }
+    }
     const saveBtn = rowEl.querySelector("[data-save-field]");
     if (saveBtn) saveBtn.disabled = true;
     // "card:credit" is one choice on screen but paymentMethod + cardType to
     // the API, which is what drives the card takings ledger.
     const payload = field === "paymentMethod"
       ? { paymentMethod: raw.startsWith("card") ? "card" : raw, cardType: raw.startsWith("card") ? raw.split(":")[1] : "" }
-      : { [field]: value };
+      : { [field]: value, ...(inferredIssues ? { issues: inferredIssues, issue: inferredIssues } : {}) };
     try {
       const res = await api(Object.assign({ action: "update", id: currentModalTicket.id }, payload));
       if (!res.ok) throw new Error(res.error || "Save failed");
@@ -1670,7 +1745,12 @@
       if (field === "paymentMethod" || field === "amountPaid") {
         if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
       }
-      toast(`${FIELD_LABELS[field] || "Change"} saved.`, { tone: "info", duration: 2500 });
+      toast(
+        inferredIssues
+          ? `Repair cost saved and repair type updated to ${inferredIssues}.`
+          : `${FIELD_LABELS[field] || "Change"} saved.`,
+        { tone: "info", duration: 2500 }
+      );
     } catch (err) {
       if (saveBtn) saveBtn.disabled = false;
       input.classList.add("field-error-input");
@@ -3390,9 +3470,12 @@
     const saveBtn = $("saveForm");
     const original = saveBtn.textContent;
 
-    // Editing an existing ticket is always a single device — keep that path
-    // exactly as it was.
+    // Editing an existing ticket is always a single device.
     if (editingId) {
+      // If a diagnostic-only ticket's price is changed to a price that exactly
+      // matches this device's repair list, update the issue before saving.
+      // Ambiguous matches ask staff which repair they meant.
+      maybeInferIssueFromRepairCost({ promptOnAmbiguous: true });
       // Changing the status to Picked Up here goes through the same balance
       // check as the status picker.
       const original = TICKETS.find((t) => t.id === editingId);
