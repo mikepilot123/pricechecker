@@ -785,30 +785,40 @@
   // already logs a shipment's cost by hand (an expense, a bank withdrawal)
   // without ever uploading the shipment itself here, and this is the moment
   // that would otherwise silently create a second record for the same money.
-  // Resolves true to go ahead and create/sync it, false to skip and leave
-  // the payment status change as the only thing that happens.
-  function confirmCreateExpense({ label, amountTtd }) {
+  // Resolves true to create/sync it, false to skip it. With `cancellable`
+  // (the Pending collection toggle, where nothing has changed yet) the ✕ and
+  // Escape resolve null so the caller can back out entirely; after a save
+  // they just mean "don't add".
+  function confirmCreateExpense({ label, amountTtd, cancellable = false }) {
     return new Promise((resolve) => {
       const modal = $("partsOrderExpenseConfirmModal");
       const skipBtn = $("partsOrderExpenseConfirmSkip");
       const createBtn = $("partsOrderExpenseConfirmCreate");
       const closeBtn = $("closePartsOrderExpenseConfirmModal");
       if (!modal || !skipBtn || !createBtn) { resolve(true); return; }
-      $("partsOrderExpenseConfirmText").textContent =
-        `Track ${money(amountTtd)} TTD for ${label} as a collect-back expense? This adds it to Accounting and creates a reminder to chase it.`;
+      const returnFocus = document.activeElement;
+      $("partsOrderExpenseConfirmLabel").textContent = label;
+      $("partsOrderExpenseConfirmAmount").textContent = `${money(amountTtd)} TTD`;
+      $("partsOrderExpenseConfirmEither").hidden = !cancellable;
+      closeBtn?.setAttribute("aria-label", cancellable ? "Cancel" : "Close");
       modal.hidden = false;
+      createBtn.focus();
       function cleanup(result) {
         modal.hidden = true;
         skipBtn.removeEventListener("click", onSkip);
         createBtn.removeEventListener("click", onCreate);
-        closeBtn?.removeEventListener("click", onSkip);
+        closeBtn?.removeEventListener("click", onDismiss);
+        modal.removeEventListener("rpc-dismiss", onDismiss);
+        if (returnFocus && document.contains(returnFocus)) returnFocus.focus();
         resolve(result);
       }
       function onSkip() { cleanup(false); }
       function onCreate() { cleanup(true); }
+      function onDismiss() { cleanup(cancellable ? null : false); }
       skipBtn.addEventListener("click", onSkip);
       createBtn.addEventListener("click", onCreate);
-      closeBtn?.addEventListener("click", onSkip);
+      closeBtn?.addEventListener("click", onDismiss);
+      modal.addEventListener("rpc-dismiss", onDismiss);
     });
   }
 
@@ -829,7 +839,11 @@
     const paymentStatus = group[0].paymentStatus === "collected" ? "pending" : "collected";
     // Reopening a settled shipment back to "pending" is the only toggle
     // direction that would (re-)create an expense — settling one never does.
-    const shouldSync = paymentStatus !== "pending" || await confirmCreateExpense(shipmentLabelAndTotalTtd(group));
+    let shouldSync = true;
+    if (paymentStatus === "pending") {
+      shouldSync = await confirmCreateExpense({ ...shipmentLabelAndTotalTtd(group), cancellable: true });
+      if (shouldSync === null) return; // cancelled — leave the status as it was
+    }
     try {
       await partsOrderApi({ action: "setPartsShipmentPaymentStatus", batchId, paymentStatus });
       PARTS_ORDERS = PARTS_ORDERS.map((item) =>
@@ -1387,7 +1401,7 @@
       if (!$("partsOrderInventoryModal")?.hidden) closeInventoryModal();
       if (!$("partsOrderReviewModal")?.hidden) closeReviewModal();
       if (!$("partsOrderLinkModal")?.hidden) closeLinkModal();
-      if (!$("partsOrderExpenseConfirmModal")?.hidden) $("partsOrderExpenseConfirmSkip")?.click();
+      if (!$("partsOrderExpenseConfirmModal")?.hidden) $("partsOrderExpenseConfirmModal").dispatchEvent(new Event("rpc-dismiss"));
     });
   }
 
