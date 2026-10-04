@@ -2278,7 +2278,7 @@
   const ISSUE_INVOICE_LABEL = {
     "Screen Cracked / Broken": "Screen Replacement",
     "Battery Issue": "Battery Replacement",
-    "Charging Port": "Charging Port Repair",
+    "Charging Port": "Charging Port Replacement",
     "Won't Power On": "Power Issue Repair",
     "Water Damage": "Water Damage Repair",
     "Camera Issue": "Camera Repair",
@@ -2817,8 +2817,8 @@
   // Repairs worth suggesting for a device: its price-list repairs (exact
   // names, with prices) when it's on the list, otherwise common repairs for
   // that kind of device. Ones matching the issues it came in with go first.
-  const COMMON_REPAIRS = ["Screen Replacement", "Battery Replacement", "Charging Port Repair", "Diagnostic", "Water Damage Repair", "Software Repair", "Camera Repair", "Speaker Repair", "Back Glass Replacement"];
-  const LAPTOP_REPAIRS = ["Screen Replacement", "Keyboard Replacement", "Battery Replacement", "Hinge Repair", "Charging Port Repair", "Diagnostic", "Water Damage Repair", "Software Repair", "Motherboard Repair"];
+  const COMMON_REPAIRS = ["Screen Replacement", "Battery Replacement", "Charging Port Replacement", "Diagnostic", "Water Damage Repair", "Software Repair", "Camera Repair", "Speaker Repair", "Back Glass Replacement"];
+  const LAPTOP_REPAIRS = ["Screen Replacement", "Keyboard Replacement", "Battery Replacement", "Hinge Repair", "Charging Port Replacement", "Diagnostic", "Water Damage Repair", "Software Repair", "Motherboard Repair"];
   const GENERIC_REPAIR_WORDS = new Set(["replacement", "repair", "repairs", "issue", "needed", "fix", "cleaning", "service"]);
   const titleCase = (s) => String(s || "").trim().split(/\s+/).map((w) =>
     /^(OLED|LCD|OEM)$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
