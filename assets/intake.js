@@ -3279,6 +3279,49 @@
     if (multi) currentLabel.innerHTML = paymentDeviceLabelHtml($("fDevice").value.trim(), buildIssuesString());
   }
 
+  // ---- How the client paid, on the Payment step ----------------------------
+  // Money taken here goes straight to the Account tab (cash to cash on hand,
+  // a bank transfer to the bank balance), so staff confirm how it was paid
+  // whenever anything is being collected.
+  let formPaymentMethod = "";
+
+  // What's being collected on this save: every device's Amount paid for a
+  // new check-in, or only the increase when editing (earlier payments were
+  // deposited when they were taken).
+  function formAmountCollected() {
+    const paid = (v) => Number(String(v ?? "").trim()) || 0;
+    if (editingId) {
+      const original = TICKETS.find((t) => t.id === editingId);
+      return roundMoney(paid($("fAmountPaid").value) - paid(original?.amountPaid));
+    }
+    const added = formDevices.reduce((sum, d, i) => sum + paid($("devAmountPaid_" + i)?.value ?? d.amountPaid), 0);
+    const current = formDevices.length && pendingDeviceIsBlank() ? 0 : paid($("fAmountPaid").value);
+    return roundMoney(added + current);
+  }
+
+  function refreshPaymentMethodField() {
+    const field = $("paymentMethodField");
+    if (!field) return;
+    const collected = formAmountCollected();
+    field.hidden = collected <= 0;
+    $("paymentMethodQuestion").textContent = `How did the client pay the ${formatMoney(collected)}?`;
+  }
+
+  function setFormPaymentMethod(method) {
+    formPaymentMethod = method;
+    document.querySelectorAll("[data-pay-method]").forEach((btn) => {
+      const on = btn.dataset.payMethod === method;
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+    });
+  }
+
+  $("paymentMethodField")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-pay-method]");
+    if (btn) setFormPaymentMethod(btn.dataset.payMethod);
+  });
+  document.querySelector('[data-form-step="3"]')?.addEventListener("input", refreshPaymentMethodField);
+
   // Persists whatever staff typed into the dynamic per-device payment cards
   // back onto formDevices before they're rebuilt or the step is left.
   function syncPaymentCardsToFormDevices() {
@@ -3313,6 +3356,8 @@
     $("fNotes").value = ticket ? ticket.notes || "" : "";
     $("fRepairCost").value = ticket ? ticket.repairCost ?? "" : "";
     $("fAmountPaid").value = ticket ? ticket.amountPaid ?? "" : "";
+    setFormPaymentMethod("");
+    refreshPaymentMethodField();
     $("fSendInvoice").checked = !ticket;
     $("fInvoiceDelivery").value = "email";
     $("fInvoiceDelivery").closest(".invoice-delivery-field").hidden = Boolean(ticket);
@@ -3392,6 +3437,7 @@
     $("formError").hidden = true;
     if (step === 3) {
       renderPaymentCards();
+      refreshPaymentMethodField();
       // Safety net: if the cost is still blank (or auto-filled) on arrival,
       // fill it from the price list now rather than relying on the earlier
       // device/issue events having fired with the list already loaded.
@@ -3804,6 +3850,12 @@
       err.hidden = false;
       return;
     }
+    const amountCollected = formAmountCollected();
+    if (amountCollected > 0 && !formPaymentMethod) {
+      err.textContent = "Choose how the client paid — cash or bank transfer.";
+      err.hidden = false;
+      return;
+    }
     const currentDeviceValue = $("fDevice").value.trim();
     const currentIssuesStr = buildIssuesString();
     // A second device is optional: once one's already been added, leaving
@@ -3855,6 +3907,9 @@
           $("fAmountPaid").value = $("fRepairCost").value.trim();
         }
       }
+      // The pickup dialog's answer covers the whole balance; otherwise it's
+      // whatever was picked on the Payment step for the extra amount paid.
+      const paidMethod = pickupMethod || (amountCollected > 0 ? formPaymentMethod : "");
       const payload = {
         action: "update",
         id: editingId,
@@ -3871,7 +3926,7 @@
         repairCost: $("fRepairCost").value.trim(),
         amountPaid: $("fAmountPaid").value.trim(),
         inventoryItemKey: $("fInventoryItem").value,
-        ...(pickupMethod ? { paymentMethod: pickupMethod } : {}),
+        ...(paidMethod ? { paymentMethod: paidMethod, depositToAccount: true } : {}),
       };
       saveBtn.disabled = true;
       saveBtn.textContent = "Saving…";
@@ -3879,6 +3934,7 @@
         const res = await api(payload);
         if (!res.ok) throw new Error(res.error || "Rejected");
         mergeTicket(res.ticket);
+        reportAccountDeposits([res.accountDeposit]);
         if (pickupMethod) await settleInvoiceForTicket(editingId);
         refreshInventoryAfterStockChange();
         renderStatusChips();
@@ -3941,6 +3997,7 @@
       : "";
     saveBtn.disabled = true;
     const savedTickets = [];
+    const accountDeposits = [];
     let failureMessage = "";
     for (let i = 0; i < devices.length; i++) {
       const dev = devices[i];
@@ -3962,10 +4019,12 @@
           amountPaid: dev.amountPaid,
           inventoryItemKey: dev.inventoryItemKey,
           checkinGroup: addToCheckinGroup,
+          ...(formPaymentMethod && Number(dev.amountPaid) > 0 ? { paymentMethod: formPaymentMethod, depositToAccount: true } : {}),
         });
         if (!res.ok) throw new Error(res.error || "Rejected");
         mergeTicket(res.ticket);
         savedTickets.push(res.ticket);
+        accountDeposits.push(res.accountDeposit);
       } catch (ex) {
         failureMessage = `Couldn't save ${dev.device || "a device"}: ${ex.message}`;
         break;
@@ -4005,6 +4064,7 @@
     refreshInventoryAfterStockChange();
     renderStatusChips();
     render();
+    reportAccountDeposits(accountDeposits);
     saveBtn.disabled = false;
     saveBtn.textContent = original;
 
@@ -4050,7 +4110,7 @@
   }
 
   // ---- Quick status change -------------------------------------------------
-  async function setStatus(ticket, status, extra = {}) {
+  async function setStatus(ticket, status, extra = {}, { onSaved } = {}) {
     try {
       const res = await api({
         action: "update",
@@ -4072,6 +4132,7 @@
       mergeTicket(res.ticket);
       renderStatusChips();
       render();
+      if (onSaved) onSaved(res);
       return normalizeTicket(res.ticket);
     } catch (e) {
       toast("Couldn't update status: " + e.message);
@@ -4088,6 +4149,29 @@
     const cost = Number(t.repairCost) || 0;
     const paid = Number(t.amountPaid) || 0;
     return Math.max(0, Math.round((cost - paid) * 100) / 100);
+  }
+
+  function refreshAccountTab() {
+    if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
+  }
+
+  function accountDepositPlace(deposit) {
+    return deposit.accountType === "cash" ? "cash on hand" : "the bank account";
+  }
+
+  // The server deposits repair payments to the Account tab as part of the
+  // save; say where the money went, or that it didn't make it there.
+  function reportAccountDeposits(results) {
+    const list = results.filter(Boolean);
+    if (!list.length) return;
+    refreshAccountTab();
+    const failed = list.find((r) => !r.ok);
+    if (failed) {
+      toast(`Payment saved on the repair, but it couldn't be added to the Account tab: ${failed.error}. Add the deposit there by hand.`);
+      return;
+    }
+    const total = roundMoney(list.reduce((sum, r) => sum + (Number(r.deposit.amount) || 0), 0));
+    toast(`${formatMoney(total)} deposited to ${accountDepositPlace(list[0].deposit)}.`, { tone: "info", duration: 3500 });
   }
 
   // Resolves to "cash" / "transfer" once staff confirm the balance was paid,
@@ -4114,7 +4198,7 @@
               <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pickup-method="cash"><svg class="icon"><use href="#i-cash"></use></svg>Cash</button>
               <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pickup-method="transfer"><svg class="icon"><use href="#i-receipt"></use></svg>Bank transfer</button>
             </div>
-            <p class="field-hint">Picked up means paid in full — the balance will be recorded as paid on the repair and its invoice.</p>
+            <p class="field-hint">Picked up means paid in full — the balance will be recorded as paid on the repair and its invoice, and deposited on the Account tab (cash to cash on hand, a bank transfer to the bank account).</p>
           </div>
           <div class="modal-footer"><div class="form-actions">
             <button type="button" class="ghost-btn" data-pickup-cancel>Not paid yet</button>
@@ -4217,13 +4301,19 @@
 
   async function pickUpWithBalancePaid(ticket, method) {
     const balance = ticketBalance(ticket);
+    let accountDeposit = null;
     const updated = await setStatus(ticket, "Picked Up", {
       amountPaid: ticket.repairCost,
       paymentMethod: method,
-    });
+      depositToAccount: true,
+    }, { onSaved: (res) => { accountDeposit = res.accountDeposit; } });
     if (!updated) return null;
     await settleInvoiceForTicket(ticket.id);
-    toast(`${ticket.customerName || "Repair"} picked up — ${formatMoney(balance)} balance recorded as paid.`, { tone: "info", duration: 3500 });
+    if (accountDeposit && !accountDeposit.ok) reportAccountDeposits([accountDeposit]);
+    else {
+      if (accountDeposit) refreshAccountTab();
+      toast(`${ticket.customerName || "Repair"} picked up — ${formatMoney(balance)} balance recorded as paid${accountDeposit ? ` and deposited to ${accountDepositPlace(accountDeposit.deposit)}` : ""}.`, { tone: "info", duration: 3500 });
+    }
     return updated;
   }
 

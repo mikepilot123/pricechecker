@@ -1,5 +1,6 @@
 import {
   listTickets,
+  getTicketById,
   addTicket,
   updateTicket,
   deleteTicket,
@@ -27,7 +28,7 @@ import { listReminders, addReminder, updateReminder, deleteReminder } from "../l
 // accountSummary survives, for the Dashboard's residual "card takings owed"
 // tile; the historical data and library code are otherwise untouched.
 import { accountSummary } from "../lib/card-payments.js";
-import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction, addCashDepositToBank } from "../lib/bank-transactions.js";
+import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction, addCashDepositToBank, depositRepairPayment } from "../lib/bank-transactions.js";
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
@@ -70,10 +71,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, tickets: await listTickets({ includeDeleted: !!body.includeDeleted }) });
     }
     if (action === "add") {
-      return res.status(200).json({ ok: true, ticket: await addTicket(body) });
+      const ticket = await addTicket(body);
+      const accountDeposit = body.depositToAccount
+        ? await depositForRepair(ticket, body.paymentMethod, Number(ticket.amountPaid) || 0)
+        : null;
+      return res.status(200).json({ ok: true, ticket, accountDeposit });
     }
     if (action === "update") {
+      const before = body.depositToAccount ? await getTicketById(body.id) : null;
       const ticket = await updateTicket(body);
+      // Only what was newly collected goes to the account, never the total
+      // paid so far — earlier payments were deposited when they were taken.
+      const accountDeposit = before
+        ? await depositForRepair(ticket, body.paymentMethod, (Number(ticket.amountPaid) || 0) - (Number(before.amountPaid) || 0))
+        : null;
       let invoiceSync = null;
       // Amount Paid is a source-of-truth field for the linked invoice. Run
       // this on the server so an older/cached browser cannot leave the invoice
@@ -88,7 +99,7 @@ export default async function handler(req, res) {
           invoiceSync = { changed: false, error: String(syncError?.message || syncError) };
         }
       }
-      return res.status(200).json({ ok: true, ticket, invoiceSync });
+      return res.status(200).json({ ok: true, ticket, invoiceSync, accountDeposit });
     }
     if (action === "delete") {
       return res.status(200).json({ ok: true, deletedId: await deleteTicket(body) });
@@ -240,6 +251,24 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
     return res.status(200).json({ ok: false, error: String((err && err.message) || err), ...(err?.code ? { code: err.code } : {}) });
+  }
+}
+
+// A repair payment staff confirmed as cash or bank transfer is deposited to
+// the Account tab automatically. Never fails the repair save — the repair is
+// the record that matters; a failed deposit comes back so the UI can say so.
+async function depositForRepair(ticket, method, amount) {
+  try {
+    const deposit = await depositRepairPayment({
+      method,
+      amount,
+      ticketId: ticket.id,
+      customerName: ticket.customerName,
+      device: ticket.device,
+    });
+    return deposit ? { ok: true, deposit } : null;
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
   }
 }
 

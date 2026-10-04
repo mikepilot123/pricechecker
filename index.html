@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=confirm-dialog-5" />
+  <link rel="stylesheet" href="assets/style.css?v=repair-deposit-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -2244,6 +2244,14 @@
                 </div>
               </div>
             </div>
+            <div class="payment-method-field" id="paymentMethodField" hidden>
+              <p class="field-label" id="paymentMethodQuestion">How did the client pay?</p>
+              <div class="pickup-pay-methods" role="radiogroup" aria-labelledby="paymentMethodQuestion">
+                <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pay-method="cash"><svg class="icon"><use href="#i-cash"></use></svg>Cash</button>
+                <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pay-method="transfer"><svg class="icon"><use href="#i-receipt"></use></svg>Bank transfer</button>
+              </div>
+              <p class="field-hint">Recorded on the Account tab automatically — cash to cash on hand, a bank transfer to the bank balance.</p>
+            </div>
           </section>
           <section class="form-step form-success" data-form-step="4" hidden aria-live="polite">
             <div class="success-check" aria-hidden="true">✓</div>
@@ -2669,7 +2677,7 @@
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=payment-sync-3"></script>
+  <script defer src="assets/intake.js?v=repair-deposit-1"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/dashboard.js?v=sales-ux-1"></script>
