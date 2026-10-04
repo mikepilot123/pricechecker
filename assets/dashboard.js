@@ -1718,9 +1718,11 @@
         const data = await remindersApi({ action: "listReminders" });
         setReminders(data.reminders || []);
         renderReminders();
+        return true;
       } catch (err) {
         console.warn("Couldn't sync reminders:", err);
         if (!quiet) notifyReminderError("Couldn't sync reminders — showing this device's last saved copy.");
+        return false;
       } finally {
         remindersLoadInFlight = null;
       }
@@ -3095,8 +3097,12 @@
     // someone comes back, and an embedded/webview context that never reports
     // itself visible still gets its alerts. No PIN means the API would reject
     // us anyway; the cached list is rendered either way.
-    if (!document.hidden && pin()) await loadReminders({ quiet: true });
-    pruneSnoozes();
+    const fresh = !document.hidden && pin() ? await loadReminders({ quiet: true }) : false;
+    // Only prune against a list this tab just fetched. A background tab skips
+    // the fetch and still holds the list from when it was opened, so it
+    // doesn't know about reminders created since — pruning there wiped the
+    // snoozes other tabs had just taken on them, and they popped right back.
+    if (fresh) pruneSnoozes();
     renderAlerts();
   }
 
