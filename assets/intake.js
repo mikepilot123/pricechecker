@@ -4677,12 +4677,25 @@
   function buildStatusSections(list) {
     const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up" && s !== "No Fix");
     const order = [...repairStatusOrder, ...filterableStatuses.filter((status) => !repairStatusOrder.includes(status))];
-    return order
+    const sections = order
       .map((status) => {
         const statusList = list.filter((t) => t.status === status);
-        return { status, count: statusList.length, groups: groupTicketsByCheckin(statusList) };
+        return { status, count: statusList.length, groups: partsAlertsFirst(groupTicketsByCheckin(statusList)) };
       })
       .filter((section) => section.count > 0);
+    // A group with a "waiting on parts" warning jumps to the top so it can't
+    // be missed; otherwise the dragged order stands (sort is stable).
+    const hasAlert = (section) => section.groups.some((group) => group.some(showsPartsAlert));
+    return sections.sort((a, b) => hasAlert(b) - hasAlert(a));
+  }
+
+  // Check-ins with a "waiting on parts" warning first, longest wait first.
+  function partsAlertsFirst(groups) {
+    const wait = (group) => Math.max(-1, ...group.filter(showsPartsAlert).map((t) => daysSince(t.waitingForPartsSince)));
+    return groups
+      .map((group, i) => ({ group, i, w: wait(group) }))
+      .sort((a, b) => (b.w >= 0) - (a.w >= 0) || b.w - a.w || a.i - b.i)
+      .map((x) => x.group);
   }
 
   function statusSectionHeaderEl(status, count, collapsed) {
@@ -4758,7 +4771,7 @@
     const list = currentList();
     const sections = statusFilter === "all"
       ? buildStatusSections(list)
-      : [{ status: null, groups: groupTicketsByCheckin(list) }];
+      : [{ status: null, groups: partsAlertsFirst(groupTicketsByCheckin(list)) }];
     // Paginate by device count, but never split one client's check-in across
     // the "View more" boundary — a section header only prints once its first
     // card actually makes the cut.
