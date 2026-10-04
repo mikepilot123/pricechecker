@@ -2366,7 +2366,7 @@
       list = list.filter((item) => item.assignee === reminderAssigneeFilterValue);
     }
     if (reminderSearchText) {
-      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority], item.kind === "cash_reclaim" ? "cash to collect" : "", item.kind === "card_takings" ? "card takings to collect" : "", item.kind === "appointment" ? "appointment" : ""]
+      list = list.filter((item) => [item.title, item.notes, item.assignee, item.ticketLabel, REMINDER_PRIORITIES[item.priority], item.kind === "cash_reclaim" ? "cash to collect" : "", item.kind === "card_takings" ? "card takings to collect" : "", item.kind === "appointment" ? "appointment" : "", item.kind === "collection" ? "client collecting" : ""]
         .some((v) => String(v || "").toLowerCase().includes(reminderSearchText)));
     }
     return list;
@@ -2407,6 +2407,9 @@
     const tags = [];
     if (item.kind === "cash_reclaim") {
       tags.push(`<span class="rem-tag rem-tag-cash"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-cash"></use></svg>Cash to collect</span>`);
+    }
+    if (item.kind === "collection") {
+      tags.push(`<span class="rem-tag rem-tag-appointment"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-calendar"></use></svg>Client collecting</span>`);
     }
     if (item.kind === "appointment") {
       tags.push(`<span class="rem-tag rem-tag-appointment"><svg class="icon" aria-hidden="true" style="width:11px;height:11px"><use href="#i-calendar"></use></svg>Appointment</span>`);
@@ -2721,6 +2724,7 @@
     const lead = item.kind === "card_takings" ? "Here's your reminder to collect the card takings"
       : item.kind === "cash_reclaim" ? "Here's your reminder to collect cash"
       : item.kind === "appointment" ? "Here's your reminder about an upcoming appointment"
+      : item.kind === "collection" ? "A client has booked to collect their device"
       : "Here's your reminder";
     return `${lead}. ${spoken}.`;
   }

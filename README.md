@@ -279,16 +279,24 @@ INVOICE_CURRENCY=TTD
 ### Ready for collection → client picks a day
 
 The "ready for collection" email (offered when a repair is marked
-**Repaired**) has a **When will you collect it?** row of day buttons, plus an
-"Another day" link. They open a small page where the client picks one of the
-next two weeks of opening days (Mon–Sat) and, optionally, a rough time. Opening
-the link books nothing — only the page's **Confirm** does, so email scanners
-that follow links can't make bookings.
+**Repaired**) opens with a **Pick your collection day** card: calendar-style
+tiles for the next six opening days (Mon–Sat), plus "Another day" for the
+next two weeks. Tapping a day books it for any time that day (8:30 AM–4:30
+PM). There's no form to fill in: the page that opens sends the booking and shows
+a confirmation with an **Add to Google Calendar** button. The link alone
+books nothing (the page sends the booking from the client's browser), so
+email scanners that only fetch links don't create bookings.
 
-Confirming adds the collection to **Appointments**, tagged *Client booked
-collection*, with the usual reminder 30 minutes before. It also leaves a note
-on the repair. If the client picks again, the same appointment moves rather
-than a second one being added. The link is signed per repair (with
+Each booking:
+- adds the collection to **Appointments**, tagged *Client booked
+  collection*, with a "Client collecting today" reminder that morning;
+- pops up an alert in the app straight away (Reminders, *Client collecting*);
+- leaves a note on the repair;
+- emails the shop's default linked mailbox (or `SHOP_NOTIFY_EMAIL`, if set),
+  with an **Add to Google Calendar** button.
+
+If the client picks again, the same appointment and alert are updated rather
+than new ones added. The link is signed per repair (with
 `BROWSER_CREDENTIAL_SECRET`, or `DATABASE_URL` if that isn't set). Once the
 repair is Picked Up or Cancelled, the link says it has already been collected.
 Links point at `PUBLIC_APP_URL`.

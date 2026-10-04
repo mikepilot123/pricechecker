@@ -22,7 +22,8 @@ await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
 const { addTicket, listTicketNotes, getTicketById, updateTicket } = await import("../lib/tickets.js");
 const { listAppointments } = await import("../lib/appointments.js");
-const { openDays, timeSlots, collectionToken } = await import("../lib/collection-booking.js");
+const { listReminders } = await import("../lib/reminders.js");
+const { openDays, collectionToken } = await import("../lib/collection-booking.js");
 const { saveSender, dryRunOutbox } = await import("../lib/email.js");
 const { default: handler } = await import("../api/invoice.js");
 
@@ -36,10 +37,10 @@ async function api(body) {
 }
 // The client's collection-day page: a browser GET, or the page's form POST.
 async function page(method, query, form) {
-  let code = 200, html = "";
-  const response = { setHeader() {}, status(c) { code = c; return this; }, json(v) { html = JSON.stringify(v); return this; }, send(v) { html = String(v); return this; } };
+  let code = 200, html = "", location = "";
+  const response = { setHeader(k, v) { if (k === "Location") location = v; }, status(c) { code = c; return this; }, json(v) { html = JSON.stringify(v); return this; }, send(v) { html = String(v); return this; } };
   await handler({ method, headers: {}, query, body: form ? new URLSearchParams(form).toString() : undefined }, response);
-  return { code, html };
+  return { code, html, location };
 }
 
 const ticket = await addTicket({ customerName: "Anita Singh", phone: "8687123456", email: "anita@example.com", device: "iPhone 13", issues: "Battery Issue", repairCost: "550", amountPaid: "200", status: "Repaired" });
@@ -111,27 +112,29 @@ await test("a bad address is refused before anything is sent", async () => {
   assert.equal(dryRunOutbox.length, before);
 });
 
-/* ---- the client chooses their collection day ---- */
+/* ---- the client picks their collection day ---- */
 
-await test("the email carries day buttons and a link for the client to pick a collection day", async () => {
+await test("the email opens with calendar day tiles for the client to pick a collection day", async () => {
   await api({ action: "sendReadyEmail", ticketId: ticket.id, to: "anita@example.com" });
   const mail = dryRunOutbox.at(-1);
-  assert.match(mail.html, /When will you collect it\?/);
+  assert.match(mail.html, /Pick your collection day/);
+  assert.ok(mail.html.indexOf("Pick your collection day") < mail.html.indexOf("Great news!"), "the day picker comes before the message");
   const links = [...mail.html.matchAll(/href="(https:\/\/repairs\.example\/api\/invoice\?pickup=[^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
-  assert.equal(links.length, 7, "six day buttons plus 'Another day'");
+  assert.equal(links.length, 7, "six day tiles plus 'Another day'");
   assert.match(links[0], /&day=\d{4}-\d{2}-\d{2}$/);
-  assert.match(mail.text, /Let us know which day you'll collect it: https:\/\/repairs\.example\/api\/invoice\?pickup=/);
+  assert.match(mail.text, /Pick your collection day: https:\/\/repairs\.example\/api\/invoice\?pickup=/);
 });
 
 const token = collectionToken(ticket.id);
 const [day1, day2] = openDays(2);
 
-await test("opening the link shows the page but books nothing (email scanners follow links)", async () => {
+await test("tapping a day opens a page that books it straight away — the link alone books nothing", async () => {
   const res = await page("GET", { pickup: token, day: day2 });
   assert.equal(res.code, 200);
-  assert.match(res.html, /when will you collect your iPhone 13\?/);
-  assert.match(res.html, new RegExp(`value="${day2}" checked`), "the day tapped in the email is preselected");
-  assert.equal((await listAppointments()).length, 0);
+  assert.match(res.html, /Booking \w+day \d+ \w+…/);
+  assert.match(res.html, new RegExp(`name="day" value="${day2}"`));
+  assert.match(res.html, /getElementById\("book"\)\.submit\(\)/, "the page posts the booking itself");
+  assert.equal((await listAppointments()).length, 0, "email scanners that only fetch the link book nothing");
 });
 
 await test("an altered link is refused", async () => {
@@ -143,10 +146,11 @@ await test("an altered link is refused", async () => {
   }
 });
 
-await test("confirming books an appointment, with a note on the repair and a reminder", async () => {
-  const time = timeSlots(day1).at(-1);
-  const res = await page("POST", { pickup: token }, { day: day1, time });
-  assert.match(res.html, /see you then!/, res.html);
+await test("booking makes an appointment, an alert in the app, a note on the repair and an email to the shop", async () => {
+  const before = dryRunOutbox.length;
+  const res = await page("POST", { pickup: token }, { day: day1 });
+  assert.equal(res.code, 303);
+  assert.match(res.location, /&booked=1$/);
   const [appt] = await listAppointments();
   assert.equal(appt.id, `COLLECT-${ticket.id}`);
   assert.equal(appt.client, "Anita Singh");
@@ -155,52 +159,73 @@ await test("confirming books an appointment, with a note on the repair and a rem
   assert.equal(appt.issue, "Collection, Battery Replacement");
   assert.equal(appt.source, "Ready email");
   assert.equal(appt.date, day1);
-  assert.equal(appt.time, time);
-  assert.equal(appt.status, "scheduled");
+  assert.equal(appt.time, "08:30");
+  assert.match(appt.notes, /any time that day/);
   const notes = await listTicketNotes(ticket.id);
-  assert.match(notes[0].note, /^Client chose to collect on \w+day \d+ \w+, \d+:\d\d [AP]M \(from the ready email\)\.$/);
-  const [reminder] = await db.query(`SELECT * FROM reminders WHERE appointment_id = $1`, [appt.id]).then((r) => r.rows);
-  assert.ok(reminder, "the usual appointment reminder is raised");
+  assert.match(notes[0].note, /^Client chose to collect on \w+day \d+ \w+, any time 8:30 AM–4:30 PM \(from the ready email\)\.$/);
+  const reminders = await listReminders();
+  const notice = reminders.find((r) => r.kind === "collection");
+  assert.ok(notice, "an alert is raised in the app");
+  assert.match(notice.title, /^Client coming to collect: Anita Singh — iPhone 13, \w{3} \d+ \w{3}$/);
+  assert.ok(new Date(notice.dueAt).getTime() <= Date.now(), "due now, so it pops up straight away");
+  assert.equal(notice.done, false);
+  assert.equal(notice.priority, "pickup");
+  assert.ok(reminders.find((r) => r.id === `APPT:${appt.id}` && /^Client collecting today:/.test(r.title)), "and the day-of reminder");
+  assert.equal(dryRunOutbox.length, before + 1);
+  const mail = dryRunOutbox.at(-1);
+  assert.deepEqual(mail.to, ["jqelectronicstt@gmail.com"], "the shop's own mailbox");
+  assert.match(mail.subject, /^Collection booked: Anita Singh — iPhone 13, \w{3} \d+ \w{3}$/);
+  assert.match(mail.html, /Add to Google Calendar/);
+  assert.match(mail.html, /calendar\.google\.com\/calendar\/render\?action=TEMPLATE/);
+  assert.match(mail.html, new RegExp(`dates=${day1.replace(/-/g, "")}T083000%2F${day1.replace(/-/g, "")}T163000`));
+  assert.match(mail.html, /TTD \$350\.00/);
+  assert.match(mail.text, /Phone: 8687123456/);
 });
 
-await test("choosing again moves the booking instead of adding a second one", async () => {
+await test("the confirmation shows the day and an Add to Google Calendar button for the client", async () => {
+  const res = await page("GET", { pickup: token, booked: "1" });
+  assert.match(res.html, /see you then!/);
+  assert.match(res.html, /any time 8:30 AM–4:30 PM/);
+  assert.match(res.html, /Add to Google Calendar/);
+});
+
+await test("picking again moves the booking and refreshes the alert instead of adding more", async () => {
+  await db.query(`UPDATE reminders SET done = TRUE WHERE kind = 'collection'`);
   const shown = await page("GET", { pickup: token });
   assert.match(shown.html, /You're booked for/);
-  const res = await page("POST", { pickup: token }, { day: day2, time: "any" });
-  assert.match(res.html, /any time, 8:30 AM–4:30 PM/);
+  await page("POST", { pickup: token }, { day: day2 });
   const all = await listAppointments();
   assert.equal(all.length, 1);
   assert.equal(all[0].date, day2);
-  assert.equal(all[0].time, "08:30");
-  assert.match(all[0].notes, /Any time that day/);
+  const notices = (await listReminders()).filter((r) => r.kind === "collection");
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0].done, false, "a new pick alerts staff again");
 });
 
-await test("a closed day or a made-up time is refused, and the booking stays put", async () => {
+await test("a closed or past day is refused, and the booking stays put", async () => {
   const sunday = new Date(`${day1}T12:00:00Z`);
   sunday.setUTCDate(sunday.getUTCDate() + ((7 - sunday.getUTCDay()) % 7 || 7));
-  for (const form of [{ day: sunday.toISOString().slice(0, 10), time: "any" }, { day: "2020-01-01", time: "any" }, { day: day2, time: "03:00" }]) {
-    const res = await page("POST", { pickup: token }, form);
-    assert.match(res.html, /Please choose one of the (days|times) shown/);
+  for (const day of [sunday.toISOString().slice(0, 10), "2020-01-01"]) {
+    const shown = await page("GET", { pickup: token, day });
+    assert.match(shown.html, /isn(?:'|&#39;)t available any more/);
+    const res = await page("POST", { pickup: token }, { day });
+    assert.match(res.html, /isn(?:'|&#39;)t available any more/);
   }
-  const [appt] = await listAppointments();
-  assert.equal(appt.date, day2);
+  assert.equal((await listAppointments())[0].date, day2);
 });
 
-await test("days skip Sundays, and today drops off once the last slot has passed", () => {
+await test("days skip Sundays, and today drops off at 4 PM", () => {
   // Saturday 3 Oct 2026, 5 PM in Trinidad (21:00 UTC).
   assert.deepEqual(openDays(3, new Date("2026-10-03T21:00:00Z")), ["2026-10-05", "2026-10-06", "2026-10-07"]);
-  // Friday 2 Oct 2026, 3:10 PM: today still has 3:30 and 4:00.
-  const now = new Date("2026-10-02T19:10:00Z");
-  assert.equal(openDays(1, now)[0], "2026-10-02");
-  assert.deepEqual(timeSlots("2026-10-02", now), ["15:30", "16:00"]);
-  assert.equal(timeSlots("2026-10-03", now).length, 16);
+  // Friday 2 Oct 2026, 3:10 PM: still today.
+  assert.equal(openDays(1, new Date("2026-10-02T19:10:00Z"))[0], "2026-10-02");
 });
 
 await test("once the device is picked up, the link says so and books nothing", async () => {
   await updateTicket({ id: ticket.id, status: "Picked Up" });
-  const res = await page("GET", { pickup: token });
+  const res = await page("GET", { pickup: token, day: day1 });
   assert.match(res.html, /Already collected/);
-  await page("POST", { pickup: token }, { day: day1, time: "any" });
+  await page("POST", { pickup: token }, { day: day1 });
   assert.equal((await listAppointments())[0].date, day2);
 });
 

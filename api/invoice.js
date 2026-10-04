@@ -1,5 +1,5 @@
 import { ensureSchema } from "../lib/db.js";
-import { readyEmailDraft, sendReadyEmail, deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
+import { readyEmailDraft, sendReadyEmail, sendShopNotice, deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
 import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
 import { isRepairSyncPaymentUpdate } from "../lib/invoice-payment-sync.js";
 import { applyCors, checkPin } from "../lib/security.js";
@@ -7,7 +7,7 @@ import { getTicketById, listTicketNotes, addTicketNote, updateTicket } from "../
 import { repairLabels } from "../lib/repair-labels.js";
 import { connectZoho, disconnectZoho, dismissZohoWarning, retryZohoSync, zohoStatus } from "../lib/zoho.js";
 import { drawInvoicePdf, invoicePdfName } from "../lib/invoice-pdf.js";
-import { bookCollection, collectionPageHtml, collectionUnavailableHtml, collectionUrl, currentCollection, ticketIdFromToken } from "../lib/collection-booking.js";
+import { bookCollection, collectionBookingHtml, collectionConfirmedHtml, collectionNoticeEmail, collectionPageHtml, collectionUnavailableHtml, collectionUrl, currentCollection, isBookableDay, ticketIdFromToken } from "../lib/collection-booking.js";
 
 export default async function handler(req, res) {
   // GET serves the customer-facing invoice page as a top-level navigation,
@@ -17,8 +17,8 @@ export default async function handler(req, res) {
 
   try {
     await ensureSchema();
-    // ?pickup= is the client's "choose your collection day" link from the
-    // ready-for-collection email: GET shows the page, POST books the day.
+    // ?pickup= is the client's "pick your collection day" link from the
+    // ready-for-collection email.
     if (req.query?.pickup && (req.method === "GET" || req.method === "POST")) return await collectionDay(req, res);
     // Awaited so a rejection inside either handler is caught here instead of
     // escaping as an unhandled rejection (which Vercel turns into a raw
@@ -59,8 +59,12 @@ async function viewInvoice(req, res) {
   return res.status(200).send(invoiceHtml(invoice));
 }
 
-// The client's collection-day page (lib/collection-booking.js). No PIN: the
+// The client's collection-day links (lib/collection-booking.js). No PIN: the
 // signed link is the client's access, and it only reaches their own repair.
+//   GET            – "Another day": every opening day, one tap each
+//   GET &day=      – a tapped day: a page that books it straight away
+//   POST day=      – books it, tells the shop, then shows the confirmation
+//   GET &booked=1  – the confirmation (after the POST, so a refresh is harmless)
 async function collectionDay(req, res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "private, no-store");
@@ -69,19 +73,31 @@ async function collectionDay(req, res) {
   const ticket = ticketId ? await getTicketById(ticketId) : null;
   if (!ticket) return res.status(404).send(collectionUnavailableHtml(INVOICE_BUSINESS, accent));
   const repair = repairLabels(ticket.issues).join(", ");
-  const page = { ticket, repair, business: INVOICE_BUSINESS, accent, selfUrl: collectionUrl(publicBaseUrl(req), ticket.id) };
-  if (req.method === "GET") {
-    const booked = await currentCollection(ticket.id);
-    return res.status(200).send(collectionPageHtml({ ...page, booked, chosenDay: String(req.query.day || "") }));
+  const selfUrl = collectionUrl(publicBaseUrl(req), ticket.id);
+  const page = { ticket, repair, business: INVOICE_BUSINESS, accent, selfUrl };
+  if (req.method === "POST") {
+    const { day } = formBody(req);
+    try {
+      await bookCollection({ ticket, repair, day });
+    } catch (err) {
+      return res.status(200).send(collectionPageHtml({ ...page, booked: await currentCollection(ticket.id), error: err.message }));
+    }
+    // Best effort: the booking already stands (and is in the app) if the
+    // shop's mailbox can't send right now.
+    try {
+      await sendShopNotice(collectionNoticeEmail({ ticket, repair, day, business: INVOICE_BUSINESS, accent }));
+    } catch (err) {
+      await addTicketNote({ ticketId: ticket.id, note: `Couldn't email the shop about this collection booking: ${String(err.message || err)}` });
+    }
+    res.setHeader("Location", `${selfUrl}&booked=1`);
+    return res.status(303).send("");
   }
-  const form = formBody(req);
-  try {
-    const { when } = await bookCollection({ ticket, repair, day: form.day, time: form.time });
-    return res.status(200).send(collectionPageHtml({ ...page, confirmed: when }));
-  } catch (err) {
-    const booked = await currentCollection(ticket.id);
-    return res.status(200).send(collectionPageHtml({ ...page, booked, chosenDay: form.day, chosenTime: form.time, error: err.message }));
-  }
+  const booked = await currentCollection(ticket.id);
+  if (req.query.booked && booked) return res.status(200).send(collectionConfirmedHtml({ ...page, booked }));
+  const day = String(req.query.day || "");
+  if (day && isBookableDay(day)) return res.status(200).send(collectionBookingHtml({ ...page, day }));
+  const error = day ? "That day isn't available any more — please pick another." : "";
+  return res.status(200).send(collectionPageHtml({ ...page, booked, error }));
 }
 
 // The collection page posts a plain HTML form (works without JavaScript).
@@ -90,7 +106,7 @@ function formBody(req) {
   const fields = body && typeof body === "object" && !Buffer.isBuffer(body)
     ? body
     : Object.fromEntries(new URLSearchParams(String(body || "")));
-  return { day: String(fields.day || ""), time: String(fields.time || "") };
+  return { day: String(fields.day || "") };
 }
 
 async function invoicePdfBuffer(invoice) {
