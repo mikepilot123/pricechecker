@@ -264,6 +264,7 @@ async function depositForRepair(ticket, method, amount) {
       amount,
       ticketId: ticket.id,
       customerName: ticket.customerName,
+      issues: ticket.issues,
       device: ticket.device,
     });
     return deposit ? { ok: true, deposit } : null;

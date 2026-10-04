@@ -35,11 +35,12 @@ await test("a cash payment at check-in goes to cash on hand", async () => {
   assert.equal(ticket.paymentMethod, "cash", "the repair records how it was paid");
   assert.equal(accountDeposit.ok, true);
   assert.deepEqual(
-    [accountDeposit.deposit.kind, accountDeposit.deposit.accountType, accountDeposit.deposit.amount, accountDeposit.deposit.category],
-    ["deposit", "cash", 300, "Repair payment"],
+    [accountDeposit.deposit.kind, accountDeposit.deposit.accountType, accountDeposit.deposit.amount],
+    ["deposit", "cash", 300],
   );
+  assert.equal(accountDeposit.deposit.category, "Anita Singh — Cash payment", "titled with the client and how they paid");
   assert.equal(accountDeposit.deposit.reference, `Repair #${ticket.id}`);
-  assert.equal(accountDeposit.deposit.notes, "Anita Singh · iPhone 13");
+  assert.equal(accountDeposit.deposit.notes, "Screen Cracked · iPhone 13", "the repair type and device go in the notes");
   const summary = await bankAccountSummary();
   assert.deepEqual([summary.cash.balance, summary.balance], [300, 0]);
 });
@@ -48,6 +49,7 @@ await test("picking up with a bank transfer deposits only the balance, to the ba
   const { ticket } = await checkIn({ amountPaid: "200", paymentMethod: "cash", depositToAccount: true });
   const { accountDeposit } = await api({ action: "update", id: ticket.id, status: "Picked Up", amountPaid: "800", paymentMethod: "transfer", depositToAccount: true });
   assert.deepEqual([accountDeposit.deposit.accountType, accountDeposit.deposit.amount], ["bank", 600]);
+  assert.equal(accountDeposit.deposit.category, "Anita Singh — Bank transfer");
   const summary = await bankAccountSummary();
   assert.deepEqual([summary.cash.balance, summary.balance], [500, 600]);
 });
