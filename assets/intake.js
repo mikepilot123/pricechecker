@@ -3299,12 +3299,20 @@
     return roundMoney(added + current);
   }
 
+  // Always on screen for a new check-in so staff see it before typing an
+  // amount; when editing, only once Amount paid goes up (nothing new to
+  // deposit otherwise).
   function refreshPaymentMethodField() {
     const field = $("paymentMethodField");
     if (!field) return;
     const collected = formAmountCollected();
-    field.hidden = collected <= 0;
-    $("paymentMethodQuestion").textContent = `How did the client pay the ${formatMoney(collected)}?`;
+    field.hidden = Boolean(editingId) && collected <= 0;
+    $("paymentMethodQuestion").textContent = collected > 0
+      ? `How did the client pay the ${formatMoney(collected)}?`
+      : "How did the client pay?";
+    $("paymentMethodHint").textContent = collected > 0
+      ? "Recorded on the Account tab automatically — cash to cash on hand, a bank transfer to the bank balance."
+      : "Enter the amount paid above — it's then recorded on the Account tab automatically (cash to cash on hand, a bank transfer to the bank balance).";
   }
 
   function setFormPaymentMethod(method) {
