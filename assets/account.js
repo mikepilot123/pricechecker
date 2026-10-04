@@ -36,7 +36,8 @@
   // Bank and cash are the same ledger (bank_transactions.account_type),
   // browsed one side at a time — "bank" is the default so nothing changes
   // for anyone who never touches cash.
-  let bankAccountFilter = "bank";
+  // "all" shows bank and cash together; Bank/Cash narrow to one ledger.
+  let bankAccountFilter = "all";
   let bankKindFilter = "all";
   let bankSearchQuery = "";
   let bankEditingId = null;
@@ -187,15 +188,17 @@
       tile.classList.toggle("is-active-filter", active);
     });
     const eyebrow = $("bankLedgerEyebrow");
-    if (eyebrow) eyebrow.textContent = bankAccountFilter === "cash" ? "Cash ledger" : "Bank ledger";
+    if (eyebrow) eyebrow.textContent = bankAccountFilter === "cash" ? "Cash ledger" : bankAccountFilter === "bank" ? "Bank ledger" : "All transactions";
 
     const query = bankSearchQuery.trim().toLowerCase();
-    const scoped = BANK_TRANSACTIONS.filter((item) => (item.accountType || "bank") === bankAccountFilter);
+    const scoped = bankAccountFilter === "all"
+      ? BANK_TRANSACTIONS
+      : BANK_TRANSACTIONS.filter((item) => (item.accountType || "bank") === bankAccountFilter);
     const visible = scoped.filter((item) => {
       if (bankKindFilter !== "all" && item.kind !== bankKindFilter) return false;
       return !query || [item.category, item.reference, item.notes].some((value) => String(value || "").toLowerCase().includes(query));
     });
-    setText("bankTransactionCount", scoped.length ? `${visible.length} of ${scoped.length} transaction${scoped.length === 1 ? "" : "s"}` : `No ${bankAccountFilter} transactions yet`);
+    setText("bankTransactionCount", scoped.length ? `${visible.length} of ${scoped.length} transaction${scoped.length === 1 ? "" : "s"}` : (bankAccountFilter === "all" ? "No transactions yet" : `No ${bankAccountFilter} transactions yet`));
     const list = $("bankTransactionList");
     if (!list) return;
     if (!visible.length) {
@@ -238,7 +241,7 @@
     updateBankTransactionKindUI(selectedKind);
     // New entries default to whichever ledger is currently on screen — the
     // common case is adding to the one you're already looking at.
-    setBankTransactionAccountType(transaction ? transaction.accountType || "bank" : bankAccountFilter);
+    setBankTransactionAccountType(transaction ? transaction.accountType || "bank" : bankAccountFilter === "cash" ? "cash" : "bank");
     $("bankTransactionAmount").value = transaction ? Number(transaction.amount).toFixed(2) : "";
     $("bankTransactionDate").value = toDateInput(transaction?.occurredAt || new Date());
     $("bankTransactionCategory").value = transaction?.category || (BANK_TRANSACTIONS.length ? "" : "Opening balance");

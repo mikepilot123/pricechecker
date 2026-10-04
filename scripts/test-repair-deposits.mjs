@@ -28,7 +28,7 @@ async function api(body) {
   assert.equal(payload.ok, true, payload.error);
   return payload;
 }
-const checkIn = (extra) => api({ action: "add", customerName: "Anita Singh", phone: "8687123456", device: "iPhone 13", issues: "Screen Cracked", repairCost: "800", ...extra });
+const checkIn = (extra) => api({ action: "add", customerName: "Anita Singh", phone: "8687123456", device: "iPhone 13", issues: "Screen Cracked / Broken", repairCost: "800", ...extra });
 
 await test("a cash payment at check-in goes to cash on hand", async () => {
   const { ticket, accountDeposit } = await checkIn({ amountPaid: "300", paymentMethod: "cash", depositToAccount: true });
@@ -40,7 +40,7 @@ await test("a cash payment at check-in goes to cash on hand", async () => {
   );
   assert.equal(accountDeposit.deposit.category, "Anita Singh — Cash payment", "titled with the client and how they paid");
   assert.equal(accountDeposit.deposit.reference, `Repair #${ticket.id}`);
-  assert.equal(accountDeposit.deposit.notes, "Screen Cracked · iPhone 13", "the repair type and device go in the notes");
+  assert.equal(accountDeposit.deposit.notes, "iPhone 13 Screen Replacement", "the repair done, named as on the invoice, goes in the notes");
   const summary = await bankAccountSummary();
   assert.deepEqual([summary.cash.balance, summary.balance], [300, 0]);
 });

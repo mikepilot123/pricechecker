@@ -2274,6 +2274,7 @@
 
   // How each check-in issue reads as an invoice line ("Pixel 7 Pro Screen
   // Replacement", "Nintendo Switch Diagnostic"), as on the shop's Zoho invoices.
+  // Keep in sync with lib/repair-labels.js (Account tab deposits use it too).
   const ISSUE_INVOICE_LABEL = {
     "Screen Cracked / Broken": "Screen Replacement",
     "Battery Issue": "Battery Replacement",

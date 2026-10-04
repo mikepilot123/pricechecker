@@ -489,8 +489,9 @@
           <input id="bankSearch" type="search" placeholder="Search merchant, reference, notes…" aria-label="Search bank transactions" />
             <button id="clearBankSearch" class="inventory-clear-search" aria-label="Clear search" hidden><svg class="icon"><use href="#i-xmark"></use></svg></button>
           </div>
-          <div id="bankAccountChips" class="filter-chips" role="tablist" aria-label="Bank or cash">
-            <button type="button" class="chip active" data-bank-account="bank" role="tab" aria-selected="true">Bank</button>
+          <div id="bankAccountChips" class="filter-chips" role="tablist" aria-label="All, bank or cash">
+            <button type="button" class="chip active" data-bank-account="all" role="tab" aria-selected="true">All</button>
+            <button type="button" class="chip" data-bank-account="bank" role="tab" aria-selected="false">Bank</button>
             <button type="button" class="chip" data-bank-account="cash" role="tab" aria-selected="false">Cash</button>
           </div>
           <div id="bankKindChips" class="filter-chips" role="tablist" aria-label="Filter bank transactions">
@@ -501,7 +502,7 @@
         </div>
         <div class="leads-heading-row">
           <div>
-            <p class="dashboard-eyebrow" id="bankLedgerEyebrow">Bank ledger</p>
+            <p class="dashboard-eyebrow" id="bankLedgerEyebrow">All transactions</p>
             <h3>Transaction history</h3>
           </div>
         </div>
@@ -2677,7 +2678,7 @@
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=repair-deposit-2"></script>
+  <script defer src="assets/intake.js?v=repair-deposit-3"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/dashboard.js?v=snooze-prune-1"></script>
@@ -2686,7 +2687,7 @@
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
   <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
-  <script defer src="assets/account.js?v=cash-to-bank-1"></script>
+  <script defer src="assets/account.js?v=all-ledger-1"></script>
   <script defer src="assets/parts-order-xlsx.js?v=pdf-text-extract-1"></script>
   <script defer src="assets/parts-orders.js?v=confirm-dialog-1"></script>
   <script defer src="assets/restock.js?v=restock-tab-1"></script>
