@@ -50,8 +50,15 @@ await test("the draft is prefilled from the repair", async () => {
   assert.equal(draft.to, "anita@example.com");
   assert.equal(draft.subject, "Your iPhone 13 is ready for collection — JQ Electronics Ltd.");
   assert.match(draft.message, /^Hi Anita,/);
-  assert.match(draft.message, /The balance due on collection is TTD350\.00/);
-  assert.match(draft.message, new RegExp(`ticket #${ticket.id}`));
+  assert.equal(draft.message, [
+    "Hi Anita,",
+    "Great news! Your iPhone 13 has been repaired and is ready for collection.",
+    "The remaining balance is TTD $350.00, payable by cash or bank transfer upon collection.",
+    "Our opening hours are 8:30 AM–4:30 PM, Monday to Saturday.",
+    "If you have any questions, feel free to contact us at 482-0451 or 613-7993.",
+    "Thank you for choosing JQ Electronics.",
+    "Regards,\nJQ Electronics",
+  ].join("\n\n"));
   assert.equal(draft.lastSent, null);
 });
 
@@ -75,7 +82,7 @@ await test("sending emails the client and leaves a note on the repair", async ()
 await test("a fully paid repair says there's nothing to pay", async () => {
   const paid = await addTicket({ customerName: "Ravi", phone: "8680000001", device: "Pixel 7", issues: "Charging Port", repairCost: "300", amountPaid: "300", status: "Repaired" });
   const draft = await api({ action: "readyEmailDraft", ticketId: paid.id });
-  assert.match(draft.message, /fully paid, so there's nothing to pay/);
+  assert.match(draft.message, /fully paid, so there's nothing to pay upon collection/);
 });
 
 await test("an address typed for a client without one is saved to the repair", async () => {
