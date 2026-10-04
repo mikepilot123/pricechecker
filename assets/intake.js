@@ -329,6 +329,7 @@
       section.hidden = section.dataset.settingsPanelSection !== panel;
     });
     if (panel === "email") window.dispatchEvent(new Event("rpc-enter-email-settings"));
+    if (panel === "zoho") window.dispatchEvent(new Event("rpc-enter-zoho-settings"));
     document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
       const active = btn.dataset.settingsPanel === panel;
       btn.classList.toggle("active", active);

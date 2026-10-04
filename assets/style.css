@@ -8506,3 +8506,25 @@ video.media-viewer-media {
   .restock-vendor input { flex: 1; width: auto; }
   .restock-actions button { flex: 1 1 auto; }
 }
+
+/* ---------- Settings → Zoho Books ---------- */
+.zoho-settings { display: flex; flex-direction: column; gap: 12px; }
+.zoho-connect-form[hidden] { display: none; }
+.zoho-scope { display: inline-block; margin: 4px 0; padding: 4px 6px; border-radius: 6px; background: #fff; border: 1px solid #bcd0ee; font-size: 0.74rem; word-break: break-all; user-select: all; }
+.zoho-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); }
+.zoho-card-head { display: flex; align-items: center; gap: 10px; }
+.zoho-card-head .icon { width: 20px; height: 20px; flex: none; }
+.zoho-card-head p { margin: 2px 0 0; color: var(--text-dim); font-size: 0.82rem; }
+.zoho-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-dim); flex: none; }
+.zoho-dot.is-on { background: var(--price); }
+.zoho-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.zoho-stats > div { padding: 10px; border-radius: var(--radius-md); background: var(--bg-soft); }
+.zoho-stats span { display: block; color: var(--text-dim); font-size: 0.74rem; }
+.zoho-stats strong { font-size: 0.95rem; }
+.zoho-stats .has-failed strong { color: var(--danger, #b42318); }
+.zoho-issues { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.zoho-issue { padding: 10px 12px; border: 1px solid #f1d3ab; border-radius: 10px; background: #fdf6ec; font-size: 0.84rem; }
+.zoho-issue.is-failed { border-color: #f3c2bd; background: #fdf1f0; }
+.zoho-issue strong { display: block; }
+.zoho-issue p { margin: 2px 0 0; color: var(--text-dim); }
+.zoho-issue button { margin-top: 6px; }

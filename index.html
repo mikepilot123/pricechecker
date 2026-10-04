@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=repair-deposit-1" />
+  <link rel="stylesheet" href="assets/style.css?v=zoho-1" />
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -157,6 +157,7 @@
         <button type="button" class="appt-subnav-btn" data-settings-panel="prices" aria-selected="false">Prices</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="searches" aria-selected="false">Frequent searches</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="email" aria-selected="false">Email</button>
+        <button type="button" class="appt-subnav-btn" data-settings-panel="zoho" aria-selected="false">Zoho Books</button>
       </div>
       <button class="nav-btn install-app-btn" id="installAppBtn" type="button" hidden><svg class="icon"><use href="#i-download"></use></svg>Install app</button>
     </nav>
@@ -1645,6 +1646,7 @@
           <button type="button" class="appt-subnav-btn" data-settings-panel="prices" role="tab" aria-selected="false">Prices</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="searches" role="tab" aria-selected="false">Frequent searches</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="email" role="tab" aria-selected="false">Email</button>
+          <button type="button" class="appt-subnav-btn" data-settings-panel="zoho" role="tab" aria-selected="false">Zoho Books</button>
         </div>
 
         <section class="appt-panel" data-settings-panel-section="general">
@@ -1856,6 +1858,54 @@
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="appt-panel" data-settings-panel-section="zoho" hidden>
+          <div class="zoho-settings">
+            <p class="field-label">Zoho Books</p>
+            <p class="settings-help">New invoices (with their cash and bank-transfer payments) and new expenses are copied to Zoho Books as they're saved. Records from before you connect are left alone.</p>
+            <div id="zohoStatusBox"></div>
+
+            <form id="zohoConnectForm" class="email-sender-form zoho-connect-form" hidden autocomplete="off">
+              <h4>Connect Zoho Books</h4>
+              <div class="email-help">
+                <p><strong>About 5 minutes, once:</strong></p>
+                <ol>
+                  <li>Open <a href="https://api-console.zoho.com/" target="_blank" rel="noopener">api-console.zoho.com</a> (signed in to the Zoho account that owns your books), click <strong>Add Client → Self Client → Create</strong>. Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> into the boxes below.</li>
+                  <li>In the Self Client, open <strong>Generate Code</strong>. Paste this into Scope:<br><code class="zoho-scope">ZohoBooks.invoices.ALL,ZohoBooks.contacts.ALL,ZohoBooks.customerpayments.ALL,ZohoBooks.expenses.ALL,ZohoBooks.accountants.READ,ZohoBooks.settings.READ</code><br>Pick 10 minutes, type "JQ Repair Hub" as the description, click <strong>Create</strong>, choose your Zoho Books organisation, and copy the code it shows.</li>
+                  <li>Your <strong>Organization ID</strong> is in Zoho Books under <strong>Settings → Organization Profile</strong>.</li>
+                </ol>
+              </div>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label class="field-label" for="zohoClientId">Client ID</label>
+                  <input id="zohoClientId" class="text-input" placeholder="1000.XXXXXXXX" spellcheck="false" />
+                </div>
+                <div class="form-field">
+                  <label class="field-label" for="zohoClientSecret">Client Secret</label>
+                  <input id="zohoClientSecret" class="text-input" type="password" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="form-field">
+                  <label class="field-label" for="zohoOrgId">Organization ID</label>
+                  <input id="zohoOrgId" class="text-input" inputmode="numeric" placeholder="e.g. 60012345678" />
+                </div>
+                <div class="form-field">
+                  <label class="field-label" for="zohoDataCenter">Zoho account region</label>
+                  <select id="zohoDataCenter" class="text-input select-input"></select>
+                </div>
+                <div class="form-field form-field-full">
+                  <label class="field-label" for="zohoCode">Code from "Generate Code"</label>
+                  <input id="zohoCode" class="text-input" placeholder="1000.xxxxxxxx.xxxxxxxx" spellcheck="false" />
+                  <p class="field-hint">Codes expire after the time you picked — paste it and connect straight away.</p>
+                </div>
+              </div>
+              <p id="zohoConnectError" class="field-error" hidden></p>
+              <div class="form-actions">
+                <button type="button" id="zohoConnectCancel" class="ghost-btn">Cancel</button>
+                <button type="submit" id="zohoConnectSubmit" class="primary-btn">Connect</button>
+              </div>
+            </form>
           </div>
         </section>
 
@@ -2678,9 +2728,10 @@
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=repair-deposit-4"></script>
+  <script defer src="assets/intake.js?v=zoho-1"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
+  <script defer src="assets/zoho.js?v=zoho-1"></script>
   <script defer src="assets/dashboard.js?v=snooze-prune-1"></script>
   <script defer src="assets/appointments.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>

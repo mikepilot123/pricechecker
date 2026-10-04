@@ -3,6 +3,7 @@ import { deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlacehol
 import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
 import { isRepairSyncPaymentUpdate } from "../lib/invoice-payment-sync.js";
 import { applyCors, checkPin } from "../lib/security.js";
+import { connectZoho, disconnectZoho, dismissZohoWarning, retryZohoSync, zohoStatus } from "../lib/zoho.js";
 import { drawInvoicePdf, invoicePdfName } from "../lib/invoice-pdf.js";
 
 export default async function handler(req, res) {
@@ -136,6 +137,23 @@ async function createAndDeliverInvoice(req, res) {
       subject: fillPlaceholders(template.subject, invoice, senderName),
       message: fillPlaceholders(template.message, invoice, senderName),
     });
+  }
+  // Settings → Zoho Books (lib/zoho.js).
+  if (action === "zohoStatus") {
+    return res.status(200).json({ ok: true, zoho: await zohoStatus() });
+  }
+  if (action === "zohoConnect") {
+    return res.status(200).json({ ok: true, zoho: await connectZoho(body) });
+  }
+  if (action === "zohoDisconnect") {
+    return res.status(200).json({ ok: true, zoho: await disconnectZoho() });
+  }
+  if (action === "zohoRetry") {
+    const result = await retryZohoSync();
+    return res.status(200).json({ ok: true, ...result, zoho: await zohoStatus() });
+  }
+  if (action === "zohoDismiss") {
+    return res.status(200).json({ ok: true, zoho: await dismissZohoWarning(body.type, body.id) });
   }
   if (action === "senders") {
     return res.status(200).json({ ok: true, senders: await listSenders() });
