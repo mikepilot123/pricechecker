@@ -53,7 +53,8 @@ globalThis.fetch = async (url, init = {}) => {
   if (path === "/chartofaccounts") return ok({ chartofaccounts: zoho.accounts });
   if (path === "/contacts" && method === "GET") {
     const q = Object.fromEntries(u.searchParams);
-    const hit = zoho.contacts.find((c) => (q.email && c.email === q.email) || (q.phone && c.phone === q.phone) || (q.contact_name && c.contact_name === q.contact_name));
+    const person = (c) => c.contact_persons?.[0] || {};
+    const hit = zoho.contacts.find((c) => (q.email && person(c).email === q.email) || (q.phone && person(c).phone === q.phone) || (q.contact_name && c.contact_name === q.contact_name));
     return ok({ contacts: hit ? [hit] : [] });
   }
   if (path === "/contacts" && method === "POST") {
@@ -63,12 +64,14 @@ globalThis.fetch = async (url, init = {}) => {
     return ok({ contact });
   }
   if (path === "/invoices" && method === "POST") {
+    if (!zoho.contacts.some((c) => c.contact_id === body.customer_id)) return fail("Customer does not exist.", 1002);
     if (body.invoice_number && zoho.takenNumbers.has(body.invoice_number)) return fail("Invoice number already exists.", 1001);
     const invoice = { invoice_id: "Z" + zoho.seq++, status: "draft", invoice_number: body.invoice_number || "ZINV-" + zoho.seq, ...body };
     zoho.invoices.set(invoice.invoice_id, invoice);
     return ok({ invoice });
   }
   if ((m = path.match(/^\/invoices\/(\w+)\/status\/(sent|void)$/))) {
+    if (!zoho.invoices.has(m[1])) return fail("Invoice does not exist.", 1002);
     zoho.invoices.get(m[1]).status = m[2] === "sent" ? "sent" : "void";
     if (m[2] === "void") zoho.voided.push(m[1]);
     return ok({});
@@ -147,6 +150,8 @@ await test("a new invoice is created in Zoho with its customer, number and lines
   assert.deepEqual(z.line_items, [{ name: "iPhone 13 Battery Replacement", description: "", rate: 550, quantity: 1 }]);
   assert.equal(zoho.contacts.length, 1);
   assert.equal(z.customer_id, zoho.contacts[0].contact_id);
+  assert.deepEqual(zoho.contacts[0].contact_persons, [{ first_name: "Anita Singh", email: "anita@example.com", phone: "868 712 3456", is_primary_contact: true }],
+    "email and phone go on the primary contact person, where Zoho shows them");
   assert.equal(zoho.payments.length, 1, "the check-in payment goes with it");
   assert.deepEqual([zoho.payments[0].amount, zoho.payments[0].payment_mode, zoho.payments[0].account_id], [200, "cash", "A-PETTY"]);
 });
@@ -191,6 +196,24 @@ await test("deleting an invoice voids it in Zoho", async () => {
   const zid = [...zoho.invoices.values()].at(-1).invoice_id;
   await deleteInvoice(inv.id);
   assert.ok(zoho.voided.includes(zid));
+});
+
+await test("an invoice already deleted in Zoho counts as voided, not a problem", async () => {
+  const inv = await createInvoice(invoiceInput({ customerName: "Gone already", phone: "", email: "" }));
+  const zid = [...zoho.invoices.values()].at(-1).invoice_id;
+  zoho.invoices.delete(zid); // removed by hand in Zoho
+  await deleteInvoice(inv.id);
+  assert.equal((await zohoStatus()).issues.length, 0);
+});
+
+await test("a customer deleted in Zoho is recreated on their next invoice", async () => {
+  const gone = zoho.contacts.findIndex((c) => c.contact_name === "Anita Singh");
+  zoho.contacts.splice(gone, 1);
+  await createInvoice(invoiceInput());
+  const z = [...zoho.invoices.values()].at(-1);
+  const anita = zoho.contacts.find((c) => c.contact_name === "Anita Singh");
+  assert.ok(anita, "recreated");
+  assert.equal(z.customer_id, anita.contact_id);
 });
 
 let expense;
