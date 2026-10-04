@@ -1573,6 +1573,7 @@
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       ${notifyUrl ? `<a class="ghost-btn whatsapp-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : ""}
+      ${ticket.status === "Repaired" ? `<button type="button" class="ghost-btn" id="ticketModalReadyEmail"><svg class="icon"><use href="#i-mail"></use></svg>Ready email</button>` : ""}
       <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
       <button type="button" class="ghost-btn" id="ticketModalInvoice"><svg class="icon"><use href="#i-receipt"></use></svg>Invoice</button>
       <button type="button" class="ghost-btn" id="ticketModalEdit"><svg class="icon"><use href="#i-pencil"></use></svg>Edit</button>
@@ -1583,6 +1584,7 @@
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalInvoice").onclick = (e) => openInvoiceForTicket(ticket, e.currentTarget);
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
+    if ($("ticketModalReadyEmail")) $("ticketModalReadyEmail").onclick = () => { closeTicketModal(); offerReadyNotice(ticket); };
     bindTicketMediaControls(ticket);
     loadTicketMedia(ticket);
     $("ticketModal").hidden = false;
@@ -3957,6 +3959,7 @@
         uploadMediaQueueForTicket(res.ticket, pendingFormMedia.slice(), { narrate: true });
         pendingFormMedia = [];
         await syncLinkedInvoiceFromRepair(res.ticket, original);
+        if (res.ticket.status === "Repaired" && original?.status !== "Repaired") offerReadyNotice(normalizeTicket(res.ticket));
       } catch (ex) {
         err.textContent = "Couldn't save: " + ex.message;
         err.hidden = false;
@@ -4257,6 +4260,117 @@
     });
   }
 
+  // ---- "Ready for collection" notice ------------------------------------------
+  // Opens when a repair is marked Repaired (or from Ready email on the repair):
+  // a prefilled email from the shop's linked mailbox, editable before it goes.
+  // Email only — the shop doesn't send this notice on WhatsApp. Nothing is
+  // sent without staff pressing Send.
+  async function offerReadyNotice(ticket) {
+    let modal = $("readyNoticeModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "readyNoticeModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel ready-notice-panel" role="dialog" aria-modal="true" aria-labelledby="readyNoticeTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Repaired</p><h3 id="readyNoticeTitle">Let the client know</h3></div>
+            <button type="button" class="modal-close" data-ready-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body" id="readyNoticeBody"></div>
+          <div class="modal-footer"><div class="form-actions" id="readyNoticeActions"></div></div>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener("click", (e) => { if (e.target === modal || e.target.closest("[data-ready-close]")) modal.hidden = true; });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) { e.stopPropagation(); modal.hidden = true; } }, true);
+    }
+    const body = $("readyNoticeBody");
+    const actions = $("readyNoticeActions");
+    const name = ticket.customerName || "the client";
+    body.innerHTML = `<p class="empty-sub">${esc(ticket.customerName || "Customer")} · ${esc(ticket.device || "Device")} · #${esc(ticket.id || "")}</p><p class="settings-help">Loading the email…</p>`;
+    actions.innerHTML = `<button type="button" class="ghost-btn" data-ready-close>Not now</button>`;
+    modal.hidden = false;
+
+    let draft;
+    try {
+      draft = await window.RPC_INVOICE_REQUEST({ action: "readyEmailDraft", ticketId: ticket.id });
+    } catch (err) {
+      body.innerHTML += `<p class="field-error">Couldn't prepare the email: ${esc(err.message || err)}</p>`;
+      return;
+    }
+    if (modal.hidden) return;
+    const senders = draft.senders || [];
+    if (!senders.length) {
+      body.innerHTML = `
+        <p class="empty-sub">${esc(ticket.customerName || "Customer")} · ${esc(ticket.device || "Device")} · #${esc(ticket.id || "")}</p>
+        <p class="info-banner">No email account is linked yet, so the app can't email ${esc(name)}. Link the shop's mailbox once and every ready email goes out from it.</p>`;
+      actions.innerHTML = `<button type="button" class="ghost-btn" data-ready-close>Not now</button><button type="button" class="primary-btn" id="readyLinkEmail">Link email account</button>`;
+      $("readyLinkEmail").onclick = () => { modal.hidden = true; window.RPC_OPEN_SETTINGS_PANEL?.("email"); };
+      return;
+    }
+    const sentBefore = draft.lastSent
+      ? `<p class="info-banner ready-notice-sent">Already emailed ${esc(fmtDate(draft.lastSent.at))} — ${esc(draft.lastSent.note.replace(/^Ready-for-collection email sent to /, "to "))}</p>` : "";
+    body.innerHTML = `
+      <p class="empty-sub">${esc(ticket.customerName || "Customer")} · ${esc(ticket.device || "Device")} · #${esc(ticket.id || "")}</p>
+      ${sentBefore}
+      <div class="form-grid">
+        <div class="form-field form-field-full">
+          <label class="field-label" for="readyTo">To</label>
+          <input id="readyTo" class="text-input" type="email" autocomplete="off" value="${esc(draft.to || "")}" placeholder="client@example.com" />
+          ${draft.to ? "" : `<p class="field-hint">No email on file for ${esc(name)} — type it here and it'll be saved to the repair.</p>`}
+        </div>
+        ${senders.length > 1 ? `
+        <div class="form-field form-field-full">
+          <label class="field-label" for="readyFrom">From</label>
+          <select id="readyFrom" class="text-input select-input">${senders.map((s) => `<option value="${esc(s.id)}"${s.isDefault ? " selected" : ""}>${esc(s.fromName ? `${s.fromName} <${s.fromEmail}>` : s.fromEmail)}</option>`).join("")}</select>
+        </div>` : ""}
+        <div class="form-field form-field-full">
+          <label class="field-label" for="readySubject">Subject</label>
+          <input id="readySubject" class="text-input" value="${esc(draft.subject)}" />
+        </div>
+        <div class="form-field form-field-full">
+          <label class="field-label" for="readyMessage">Message</label>
+          <textarea id="readyMessage" class="text-input" rows="8">${esc(draft.message)}</textarea>
+          <p class="field-hint">Sent from ${esc((senders.find((s) => s.isDefault) || senders[0]).fromEmail)} with the device, repair, balance and where to collect it underneath.</p>
+        </div>
+      </div>
+      <p id="readyError" class="field-error" hidden></p>`;
+    actions.innerHTML = `<button type="button" class="ghost-btn" data-ready-close>Not now</button><button type="button" class="primary-btn" id="readySend"><svg class="icon"><use href="#i-mail"></use></svg><span>${draft.lastSent ? "Send again" : "Send email"}</span></button>`;
+    if (!draft.to) $("readyTo").focus();
+    $("readySend").onclick = async () => {
+      const btn = $("readySend");
+      const err = $("readyError");
+      const to = $("readyTo").value.trim();
+      err.hidden = true;
+      if (!to) { err.textContent = `Enter ${name}'s email address.`; err.hidden = false; $("readyTo").focus(); return; }
+      btn.disabled = true;
+      btn.querySelector("span").textContent = "Sending…";
+      try {
+        const res = await window.RPC_INVOICE_REQUEST({
+          action: "sendReadyEmail",
+          ticketId: ticket.id,
+          to,
+          senderId: $("readyFrom")?.value || "",
+          subject: $("readySubject").value,
+          message: $("readyMessage").value,
+          saveEmail: !draft.to,
+        });
+        modal.hidden = true;
+        if (!draft.to) {
+          const local = TICKETS.find((t) => t.id === ticket.id);
+          if (local) { local.email = res.sent.to[0]; publishTickets(); }
+        }
+        toast(`Ready email sent to ${res.sent.to.join(", ")}.`, { tone: "info", duration: 3500 });
+      } catch (ex) {
+        err.textContent = `Not sent: ${ex.message || ex}`;
+        err.hidden = false;
+        btn.disabled = false;
+        btn.querySelector("span").textContent = draft.lastSent ? "Send again" : "Send email";
+      }
+    };
+  }
+
   // Makes sure the repair's invoice shows the settled payment too. Every
   // caller has just saved the repair's Amount paid, which the server already
   // copies onto the invoice — so this only sets the linked repairs' total,
@@ -4375,20 +4489,11 @@
       box.querySelectorAll("[data-status]").forEach((btn) => { btn.disabled = false; });
       return;
     }
+    closeStatusModal();
     // Marking a device Repaired is the moment the client needs to hear from
-    // the shop — offer the prefilled WhatsApp message right here instead of
-    // making staff remember to call (see the dashboard's default action list).
-    const notifyUrl = status === "Repaired" ? whatsAppNotifyUrl(updated) : "";
-    if (notifyUrl) {
-      box.innerHTML = `
-        <p class="status-notify-copy">Marked repaired. Let ${esc(updated.customerName || "the client")} know it's ready for pickup?</p>
-        <a class="primary-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener" id="statusNotifyWhatsApp"><svg class="icon"><use href="#i-chat"></use></svg>Notify on WhatsApp</a>
-        <button type="button" class="ghost-btn" id="statusNotifySkip">Skip</button>`;
-      $("statusNotifyWhatsApp").addEventListener("click", () => closeStatusModal());
-      $("statusNotifySkip").addEventListener("click", () => closeStatusModal());
-    } else {
-      closeStatusModal();
-    }
+    // the shop — offer the ready email right here instead of making staff
+    // remember to call.
+    if (status === "Repaired") offerReadyNotice(updated);
   }
 
   $("closeStatusModal")?.addEventListener("click", closeStatusModal);

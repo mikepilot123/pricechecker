@@ -1,8 +1,10 @@
 import { ensureSchema } from "../lib/db.js";
-import { deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
+import { readyEmailDraft, sendReadyEmail, deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
 import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
 import { isRepairSyncPaymentUpdate } from "../lib/invoice-payment-sync.js";
 import { applyCors, checkPin } from "../lib/security.js";
+import { getTicketById, listTicketNotes, addTicketNote, updateTicket } from "../lib/tickets.js";
+import { repairLabels } from "../lib/repair-labels.js";
 import { connectZoho, disconnectZoho, dismissZohoWarning, retryZohoSync, zohoStatus } from "../lib/zoho.js";
 import { drawInvoicePdf, invoicePdfName } from "../lib/invoice-pdf.js";
 
@@ -138,6 +140,23 @@ async function createAndDeliverInvoice(req, res) {
       message: fillPlaceholders(template.message, invoice, senderName),
     });
   }
+  // "Ready for collection" email, offered when a repair is marked Repaired.
+  if (action === "readyEmailDraft" || action === "sendReadyEmail") {
+    const ticket = await getTicketById(body.ticketId);
+    if (!ticket) throw new Error("This repair couldn't be found — it may have been deleted.");
+    const forEmail = { ...ticket, repair: repairLabels(ticket.issues).join(", ") };
+    if (action === "readyEmailDraft") {
+      const draft = await readyEmailDraft(forEmail, INVOICE_BUSINESS);
+      const sent = (await listTicketNotes(ticket.id)).find((n) => n.note.startsWith(READY_NOTE));
+      return res.status(200).json({ ok: true, to: ticket.email || "", ...draft, lastSent: sent ? { at: sent.created, note: sent.note } : null });
+    }
+    const sent = await sendReadyEmail({ ...body, ticket: forEmail, business: INVOICE_BUSINESS });
+    // Kept on the repair so staff can see it went out (and not send twice).
+    await addTicketNote({ ticketId: ticket.id, note: `${READY_NOTE} ${sent.to.join(", ")} from ${sent.from}.` });
+    // A client with no email on file gets the one staff just typed.
+    if (!ticket.email && body.saveEmail) await updateTicket({ id: ticket.id, email: sent.to[0] });
+    return res.status(200).json({ ok: true, sent });
+  }
   // Settings → Zoho Books (lib/zoho.js).
   if (action === "zohoStatus") {
     return res.status(200).json({ ok: true, zoho: await zohoStatus() });
@@ -224,6 +243,8 @@ async function createAndDeliverInvoice(req, res) {
     whatsappUrl: invoiceWhatsAppUrl(invoice, invoiceUrl),
   });
 }
+
+const READY_NOTE = "Ready-for-collection email sent to";
 
 function publicInvoiceUrl(req, token) {
   const base = process.env.PUBLIC_APP_URL || `${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host}`;

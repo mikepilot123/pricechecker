@@ -8528,3 +8528,9 @@ video.media-viewer-media {
 .zoho-issue strong { display: block; }
 .zoho-issue p { margin: 2px 0 0; color: var(--text-dim); }
 .zoho-issue button { margin-top: 6px; }
+
+/* ---------- "Ready for collection" notice ---------- */
+.ready-notice-panel { max-width: 560px; }
+.ready-notice-panel textarea { resize: vertical; min-height: 150px; line-height: 1.5; }
+.ready-notice-panel .form-actions { flex-wrap: wrap; }
+.ready-notice-sent { margin-bottom: 12px; }
