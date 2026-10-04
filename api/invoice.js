@@ -7,6 +7,7 @@ import { getTicketById, listTicketNotes, addTicketNote, updateTicket } from "../
 import { repairLabels } from "../lib/repair-labels.js";
 import { connectZoho, disconnectZoho, dismissZohoWarning, retryZohoSync, zohoStatus } from "../lib/zoho.js";
 import { drawInvoicePdf, invoicePdfName } from "../lib/invoice-pdf.js";
+import { bookCollection, collectionPageHtml, collectionUnavailableHtml, collectionUrl, currentCollection, ticketIdFromToken } from "../lib/collection-booking.js";
 
 export default async function handler(req, res) {
   // GET serves the customer-facing invoice page as a top-level navigation,
@@ -16,6 +17,9 @@ export default async function handler(req, res) {
 
   try {
     await ensureSchema();
+    // ?pickup= is the client's "choose your collection day" link from the
+    // ready-for-collection email: GET shows the page, POST books the day.
+    if (req.query?.pickup && (req.method === "GET" || req.method === "POST")) return await collectionDay(req, res);
     // Awaited so a rejection inside either handler is caught here instead of
     // escaping as an unhandled rejection (which Vercel turns into a raw
     // FUNCTION_INVOCATION_FAILED 500 with no useful error message).
@@ -53,6 +57,40 @@ async function viewInvoice(req, res) {
   }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   return res.status(200).send(invoiceHtml(invoice));
+}
+
+// The client's collection-day page (lib/collection-booking.js). No PIN: the
+// signed link is the client's access, and it only reaches their own repair.
+async function collectionDay(req, res) {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "private, no-store");
+  const accent = (await getEmailTemplate()).accentColor;
+  const ticketId = ticketIdFromToken(req.query.pickup);
+  const ticket = ticketId ? await getTicketById(ticketId) : null;
+  if (!ticket) return res.status(404).send(collectionUnavailableHtml(INVOICE_BUSINESS, accent));
+  const repair = repairLabels(ticket.issues).join(", ");
+  const page = { ticket, repair, business: INVOICE_BUSINESS, accent, selfUrl: collectionUrl(publicBaseUrl(req), ticket.id) };
+  if (req.method === "GET") {
+    const booked = await currentCollection(ticket.id);
+    return res.status(200).send(collectionPageHtml({ ...page, booked, chosenDay: String(req.query.day || "") }));
+  }
+  const form = formBody(req);
+  try {
+    const { when } = await bookCollection({ ticket, repair, day: form.day, time: form.time });
+    return res.status(200).send(collectionPageHtml({ ...page, confirmed: when }));
+  } catch (err) {
+    const booked = await currentCollection(ticket.id);
+    return res.status(200).send(collectionPageHtml({ ...page, booked, chosenDay: form.day, chosenTime: form.time, error: err.message }));
+  }
+}
+
+// The collection page posts a plain HTML form (works without JavaScript).
+function formBody(req) {
+  const body = req.body;
+  const fields = body && typeof body === "object" && !Buffer.isBuffer(body)
+    ? body
+    : Object.fromEntries(new URLSearchParams(String(body || "")));
+  return { day: String(fields.day || ""), time: String(fields.time || "") };
 }
 
 async function invoicePdfBuffer(invoice) {
@@ -150,7 +188,7 @@ async function createAndDeliverInvoice(req, res) {
       const sent = (await listTicketNotes(ticket.id)).find((n) => n.note.startsWith(READY_NOTE));
       return res.status(200).json({ ok: true, to: ticket.email || "", ...draft, lastSent: sent ? { at: sent.created, note: sent.note } : null });
     }
-    const sent = await sendReadyEmail({ ...body, ticket: forEmail, business: INVOICE_BUSINESS });
+    const sent = await sendReadyEmail({ ...body, ticket: forEmail, business: INVOICE_BUSINESS, collectionBaseUrl: publicBaseUrl(req) });
     // Kept on the repair so staff can see it went out (and not send twice).
     await addTicketNote({ ticketId: ticket.id, note: `${READY_NOTE} ${sent.to.join(", ")} from ${sent.from}.` });
     // A client with no email on file gets the one staff just typed.
@@ -246,9 +284,13 @@ async function createAndDeliverInvoice(req, res) {
 
 const READY_NOTE = "Ready-for-collection email sent to";
 
-function publicInvoiceUrl(req, token) {
+function publicBaseUrl(req) {
   const base = process.env.PUBLIC_APP_URL || `${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host}`;
-  return `${base.replace(/\/$/, "")}/api/invoice?token=${encodeURIComponent(token)}`;
+  return base.replace(/\/$/, "");
+}
+
+function publicInvoiceUrl(req, token) {
+  return `${publicBaseUrl(req)}/api/invoice?token=${encodeURIComponent(token)}`;
 }
 
 function safeJson(str) {

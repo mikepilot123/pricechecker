@@ -11,6 +11,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 process.env.DATABASE_URL = "pglite://memory";
 process.env.INTAKE_PIN = "0000";
 process.env.EMAIL_DRY_RUN = "1";
+process.env.PUBLIC_APP_URL = "https://repairs.example";
 delete process.env.RESEND_API_KEY;
 const { db } = await import("./testing/neon-pglite.mjs");
 const { ensureSchema } = await import("../lib/db.js");
@@ -19,7 +20,9 @@ const files = readdirSync(migrations).filter((f) => f.endsWith(".sql")).sort();
 await db.exec(readFileSync(new URL(files[0], migrations), "utf8"));
 await ensureSchema();
 for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migrations), "utf8"));
-const { addTicket, listTicketNotes, getTicketById } = await import("../lib/tickets.js");
+const { addTicket, listTicketNotes, getTicketById, updateTicket } = await import("../lib/tickets.js");
+const { listAppointments } = await import("../lib/appointments.js");
+const { openDays, timeSlots, collectionToken } = await import("../lib/collection-booking.js");
 const { saveSender, dryRunOutbox } = await import("../lib/email.js");
 const { default: handler } = await import("../api/invoice.js");
 
@@ -30,6 +33,13 @@ async function api(body) {
   const response = { setHeader() {}, status() { return this; }, json(value) { payload = value; return this; }, send() { return this; } };
   await handler({ method: "POST", headers: {}, body: JSON.stringify({ pin: "0000", ...body }) }, response);
   return payload;
+}
+// The client's collection-day page: a browser GET, or the page's form POST.
+async function page(method, query, form) {
+  let code = 200, html = "";
+  const response = { setHeader() {}, status(c) { code = c; return this; }, json(v) { html = JSON.stringify(v); return this; }, send(v) { html = String(v); return this; } };
+  await handler({ method, headers: {}, query, body: form ? new URLSearchParams(form).toString() : undefined }, response);
+  return { code, html };
 }
 
 const ticket = await addTicket({ customerName: "Anita Singh", phone: "8687123456", email: "anita@example.com", device: "iPhone 13", issues: "Battery Issue", repairCost: "550", amountPaid: "200", status: "Repaired" });
@@ -99,6 +109,99 @@ await test("a bad address is refused before anything is sent", async () => {
   assert.equal(res.ok, false);
   assert.match(res.error, /isn't a valid To address/);
   assert.equal(dryRunOutbox.length, before);
+});
+
+/* ---- the client chooses their collection day ---- */
+
+await test("the email carries day buttons and a link for the client to pick a collection day", async () => {
+  await api({ action: "sendReadyEmail", ticketId: ticket.id, to: "anita@example.com" });
+  const mail = dryRunOutbox.at(-1);
+  assert.match(mail.html, /When will you collect it\?/);
+  const links = [...mail.html.matchAll(/href="(https:\/\/repairs\.example\/api\/invoice\?pickup=[^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+  assert.equal(links.length, 7, "six day buttons plus 'Another day'");
+  assert.match(links[0], /&day=\d{4}-\d{2}-\d{2}$/);
+  assert.match(mail.text, /Let us know which day you'll collect it: https:\/\/repairs\.example\/api\/invoice\?pickup=/);
+});
+
+const token = collectionToken(ticket.id);
+const [day1, day2] = openDays(2);
+
+await test("opening the link shows the page but books nothing (email scanners follow links)", async () => {
+  const res = await page("GET", { pickup: token, day: day2 });
+  assert.equal(res.code, 200);
+  assert.match(res.html, /when will you collect your iPhone 13\?/);
+  assert.match(res.html, new RegExp(`value="${day2}" checked`), "the day tapped in the email is preselected");
+  assert.equal((await listAppointments()).length, 0);
+});
+
+await test("an altered link is refused", async () => {
+  const forged = Buffer.from("T-SOMEONE-ELSE").toString("base64url") + "." + token.split(".")[1];
+  for (const pickup of [forged, token + "x", "nonsense"]) {
+    const res = await page("GET", { pickup });
+    assert.equal(res.code, 404);
+    assert.match(res.html, /no longer available/);
+  }
+});
+
+await test("confirming books an appointment, with a note on the repair and a reminder", async () => {
+  const time = timeSlots(day1).at(-1);
+  const res = await page("POST", { pickup: token }, { day: day1, time });
+  assert.match(res.html, /see you then!/, res.html);
+  const [appt] = await listAppointments();
+  assert.equal(appt.id, `COLLECT-${ticket.id}`);
+  assert.equal(appt.client, "Anita Singh");
+  assert.equal(appt.phone, "8687123456");
+  assert.equal(appt.device, "iPhone 13");
+  assert.equal(appt.issue, "Collection, Battery Replacement");
+  assert.equal(appt.source, "Ready email");
+  assert.equal(appt.date, day1);
+  assert.equal(appt.time, time);
+  assert.equal(appt.status, "scheduled");
+  const notes = await listTicketNotes(ticket.id);
+  assert.match(notes[0].note, /^Client chose to collect on \w+day \d+ \w+, \d+:\d\d [AP]M \(from the ready email\)\.$/);
+  const [reminder] = await db.query(`SELECT * FROM reminders WHERE appointment_id = $1`, [appt.id]).then((r) => r.rows);
+  assert.ok(reminder, "the usual appointment reminder is raised");
+});
+
+await test("choosing again moves the booking instead of adding a second one", async () => {
+  const shown = await page("GET", { pickup: token });
+  assert.match(shown.html, /You're booked for/);
+  const res = await page("POST", { pickup: token }, { day: day2, time: "any" });
+  assert.match(res.html, /any time, 8:30 AM–4:30 PM/);
+  const all = await listAppointments();
+  assert.equal(all.length, 1);
+  assert.equal(all[0].date, day2);
+  assert.equal(all[0].time, "08:30");
+  assert.match(all[0].notes, /Any time that day/);
+});
+
+await test("a closed day or a made-up time is refused, and the booking stays put", async () => {
+  const sunday = new Date(`${day1}T12:00:00Z`);
+  sunday.setUTCDate(sunday.getUTCDate() + ((7 - sunday.getUTCDay()) % 7 || 7));
+  for (const form of [{ day: sunday.toISOString().slice(0, 10), time: "any" }, { day: "2020-01-01", time: "any" }, { day: day2, time: "03:00" }]) {
+    const res = await page("POST", { pickup: token }, form);
+    assert.match(res.html, /Please choose one of the (days|times) shown/);
+  }
+  const [appt] = await listAppointments();
+  assert.equal(appt.date, day2);
+});
+
+await test("days skip Sundays, and today drops off once the last slot has passed", () => {
+  // Saturday 3 Oct 2026, 5 PM in Trinidad (21:00 UTC).
+  assert.deepEqual(openDays(3, new Date("2026-10-03T21:00:00Z")), ["2026-10-05", "2026-10-06", "2026-10-07"]);
+  // Friday 2 Oct 2026, 3:10 PM: today still has 3:30 and 4:00.
+  const now = new Date("2026-10-02T19:10:00Z");
+  assert.equal(openDays(1, now)[0], "2026-10-02");
+  assert.deepEqual(timeSlots("2026-10-02", now), ["15:30", "16:00"]);
+  assert.equal(timeSlots("2026-10-03", now).length, 16);
+});
+
+await test("once the device is picked up, the link says so and books nothing", async () => {
+  await updateTicket({ id: ticket.id, status: "Picked Up" });
+  const res = await page("GET", { pickup: token });
+  assert.match(res.html, /Already collected/);
+  await page("POST", { pickup: token }, { day: day1, time: "any" });
+  assert.equal((await listAppointments())[0].date, day2);
 });
 
 console.log(`PASS — ${passed} ready-for-collection email scenarios`);

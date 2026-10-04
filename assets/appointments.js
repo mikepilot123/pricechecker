@@ -618,11 +618,17 @@
 
   // ---------- appointment lists ----------
 
+  // A collection day the client picked from their ready-for-collection email
+  // (lib/collection-booking.js) rather than one staff booked.
+  function collectionTagHtml(item) {
+    return item.source === "Ready email" ? `<span class="source-tag source-tag-collection">Client booked collection</span>` : "";
+  }
+
   function appointmentRowHtml(item) {
     return `
       <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}" data-open-detail="${esc(item.id)}" role="button" tabindex="0">
         <div class="booking-row-main">
-          <strong>${esc(item.client)}</strong>
+          <strong>${esc(item.client)}${collectionTagHtml(item)}</strong>
           <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
           <small class="booking-row-datetime">
             <span>${esc(formatDateTime(item.date, item.time))}</span>

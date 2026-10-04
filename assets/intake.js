@@ -4332,7 +4332,7 @@
         <div class="form-field form-field-full">
           <label class="field-label" for="readyMessage">Message</label>
           <textarea id="readyMessage" class="text-input" rows="8">${esc(draft.message)}</textarea>
-          <p class="field-hint">Sent from ${esc((senders.find((s) => s.isDefault) || senders[0]).fromEmail)} with the device, repair, balance and where to collect it underneath.</p>
+          <p class="field-hint">Sent from ${esc((senders.find((s) => s.isDefault) || senders[0]).fromEmail)} with the device, repair, balance and where to collect it underneath, plus day buttons for ${esc(name)} to choose when they'll collect — their choice shows up in Appointments.</p>
         </div>
       </div>
       <p id="readyError" class="field-error" hidden></p>`;

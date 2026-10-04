@@ -5406,6 +5406,7 @@ video.media-viewer-media {
 }
 .source-tag-checkin { background: var(--accent-soft); color: var(--accent); }
 .source-tag-appointment { background: #fdf2e9; color: #b9650a; }
+.source-tag-collection { background: #e8f5ec; color: #1d7a3e; }
 
 .booking-wizard-card {
   max-width: min(1200px, 100%);
