@@ -210,6 +210,9 @@
   }
   const LS_LAST_VIEW = "rpc_last_view";
   function navigateTo(target) {
+    // A section the owner has hidden on this device (assets/device-access.js)
+    // can't be opened from anywhere — a nav button, a link, the saved last view.
+    if (window.RPC_DEVICE_ACCESS?.blocksView(target)) target = "prices";
     // Expenses used to be a top-level tab and is now a panel under Account.
     // Keep the old name working: it's stored in localStorage as the last view
     // on every device that has used the app so far.
@@ -313,7 +316,10 @@
     if (!saved || isBrowserCredential(saved)) return;
     try {
       const registration = await api({ action: "registerBrowser" }, { url: SCRIPT_URL, pin: saved });
-      if (registration.ok && registration.credential) localStorage.setItem(LS_PIN, registration.credential);
+      if (registration.ok && registration.credential) {
+        localStorage.setItem(LS_PIN, registration.credential);
+        window.RPC_DEVICE_ACCESS?.signedIn();
+      }
     } catch (_) {
       // Keep the old PIN in place; a temporary network failure should never
       // sign a working device out.
@@ -354,6 +360,7 @@
   // Expenses / Bank account (balance). Sidebar's "Account sections" group on
   // desktop, in-page pill row on mobile — same split as Appointments/Targets.
   function setAccountPanel(panel) {
+    if (window.RPC_DEVICE_ACCESS?.blocksView("account")) return;
     document.querySelectorAll("[data-account-panel-section]").forEach((section) => {
       section.hidden = section.dataset.accountPanelSection !== panel;
     });
@@ -467,6 +474,7 @@
       const registration = await api({ action: "registerBrowser" }, { url: SCRIPT_URL, pin });
       if (!registration.ok || !registration.credential) throw new Error(registration.error || "Rejected");
       localStorage.setItem(LS_PIN, registration.credential);
+      window.RPC_DEVICE_ACCESS?.signedIn();
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);

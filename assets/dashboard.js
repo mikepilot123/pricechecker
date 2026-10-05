@@ -3077,8 +3077,9 @@
       setReminders(REMINDERS.map((r) => (r.id === item.id ? data.reminder : r)));
       renderReminders();
       renderAlerts();
-      // A cash reclaim just settled its expense server-side.
-      if (item.kind === "cash_reclaim") loadExpenses();
+      // A cash reclaim just settled its expense server-side. A device without
+      // Accounting can't load expenses, and has no list to refresh anyway.
+      if (item.kind === "cash_reclaim" && !window.RPC_DEVICE_ACCESS?.isHidden("accounting")) loadExpenses();
       if (typeof window.RPC_TOAST === "function") {
         window.RPC_TOAST(item.kind === "cash_reclaim" ? "Cash marked as collected" : "Reminder done", { tone: "info", duration: 3000 });
       }

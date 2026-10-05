@@ -33,7 +33,30 @@ import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, ren
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
-import { applyCors, checkPin, createBrowserCredential } from "../lib/security.js";
+import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential, ownerPinConfigured } from "../lib/security.js";
+import { registerDevice, effectiveHidden, listDevices, updateDevice } from "../lib/devices.js";
+
+// Data behind a section the owner can hide per device (lib/devices.js). An
+// action is refused only when EVERY section listed for it is hidden, since
+// the Dashboard and Targets share the monthly sales history. What the
+// sections show is computed from data the rest of the app also needs
+// (tickets, invoices), so the app hides those parts too
+// (assets/device-access.js); this keeps the figures that exist only for
+// these sections off a restricted device.
+const SECTION_GUARDED_ACTIONS = {
+  listMonthlySales: ["dashboard", "targets"],
+  accountSummary: ["dashboard"],
+  listBankTransactions: ["accounting"],
+  bankAccountSummary: ["accounting"],
+  addBankTransaction: ["accounting"],
+  updateBankTransaction: ["accounting"],
+  deleteBankTransaction: ["accounting"],
+  addCashDepositToBank: ["accounting"],
+  listExpenses: ["accounting"],
+  deleteExpense: ["accounting"],
+  addExpenseCollection: ["accounting"],
+  undoExpenseCollection: ["accounting"],
+};
 
 // Default is 10s, which isn't enough for extractPartsOrderPdf: Gemini answers
 // "503 high demand" often enough that the retry chain in
@@ -64,9 +87,36 @@ export default async function handler(req, res) {
     if (action === "registerBrowser") {
       const credential = createBrowserCredential(body.pin);
       if (!credential) return res.status(200).json({ ok: false, error: "Invalid PIN" });
+      // Recorded before the credential is handed out: a credential with no
+      // device row is treated as one from before devices were tracked, which
+      // keeps full access (lib/devices.js's getDevice).
+      await ensureSchema();
+      await registerDevice(deviceIdForCredential(credential), { managed: ownerPinConfigured(), userAgent: req.headers["user-agent"] });
       return res.status(200).json({ ok: true, credential });
     }
     await ensureSchema();
+    const deviceId = deviceIdForCredential(body.pin);
+    const managed = ownerPinConfigured();
+    const guardedSections = SECTION_GUARDED_ACTIONS[action];
+    if (guardedSections && managed) {
+      const hidden = await effectiveHidden(deviceId, { managed, userAgent: req.headers["user-agent"] });
+      if (guardedSections.every((section) => hidden.includes(section))) {
+        return res.status(403).json({ ok: false, error: "This device doesn't have access to that. Ask the owner to allow it in Settings → Devices." });
+      }
+    }
+    if (action === "deviceAccess") {
+      const hidden = await effectiveHidden(deviceId, { managed, userAgent: req.headers["user-agent"] });
+      return res.status(200).json({ ok: true, deviceId, managed, hidden });
+    }
+    if (action === "listDevices" || action === "updateDevice") {
+      const ownerDenied = checkOwnerPin(req, body.ownerPin);
+      if (ownerDenied) return res.status(ownerDenied.status).json({ ok: false, error: ownerDenied.error });
+      if (action === "updateDevice") {
+        const device = await updateDevice({ id: body.id, name: body.name, hidden: body.hidden });
+        return res.status(200).json({ ok: true, device });
+      }
+      return res.status(200).json({ ok: true, deviceId, devices: await listDevices() });
+    }
     if (action === "list") {
       return res.status(200).json({ ok: true, tickets: await listTickets({ includeDeleted: !!body.includeDeleted }) });
     }

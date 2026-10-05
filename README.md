@@ -59,6 +59,24 @@ registered browsers. Set `BROWSER_CREDENTIAL_SECRET` to a long random server
 secret if desired; otherwise the server uses its existing `DATABASE_URL`
 secret for signing.
 
+### Device permissions
+
+The owner can choose what each signed-in device may see: the **invoice
+totals** at the top of Invoices, the **Dashboard**, **Targets** and
+**Accounting**. Manage it from **Settings → Devices**, which asks for a
+separate **owner PIN**, so staff who know the team PIN can't lift their own
+restrictions.
+
+To turn it on, add `OWNER_PIN` to the Vercel project's environment variables
+and redeploy. Every device already signed in at that point keeps full access.
+Any device that signs in with the team PIN after that starts with all four
+hidden until the owner allows them. Without `OWNER_PIN` nothing is hidden.
+
+The app hides those sections on a restricted device, and the server refuses
+the bank, expense and sales-history data behind them. Invoice totals are
+worked out from the invoice list, which the device still needs, so hiding
+them is a screen-level control.
+
 There's also a Chrome extension (`extension/`) for the counter/office laptop:
 click its toolbar icon on *any* site — Facebook, WhatsApp Web, email — to open
 the live app in the side panel alongside whatever page you're already on. It's

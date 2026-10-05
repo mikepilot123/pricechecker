@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "mcp": "node mcp/server.js",
-    "test": "node scripts/test-repair-type-inference.mjs && node scripts/test-repair-invoice-sync.mjs && node scripts/test-invoice-payment-sync.mjs && node scripts/test-mcp.mjs && node scripts/test-browser-credentials.mjs && node scripts/test-card-payments.mjs && node scripts/test-expense-collections.mjs && node scripts/test-parts-orders.mjs && node scripts/test-bank-transactions.mjs && node scripts/test-repair-deposits.mjs && node scripts/test-sales-on-delete.mjs && node scripts/test-zoho.mjs && node scripts/test-ready-email.mjs && node scripts/test-price-seed.mjs"
+    "test": "node scripts/test-repair-type-inference.mjs && node scripts/test-repair-invoice-sync.mjs && node scripts/test-invoice-payment-sync.mjs && node scripts/test-mcp.mjs && node scripts/test-browser-credentials.mjs && node scripts/test-card-payments.mjs && node scripts/test-expense-collections.mjs && node scripts/test-parts-orders.mjs && node scripts/test-bank-transactions.mjs && node scripts/test-repair-deposits.mjs && node scripts/test-sales-on-delete.mjs && node scripts/test-zoho.mjs && node scripts/test-ready-email.mjs && node scripts/test-price-seed.mjs && node scripts/test-device-access.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17"

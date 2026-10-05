@@ -34,7 +34,22 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=collection-day-1" />
+  <link rel="stylesheet" href="assets/style.css?v=device-access-1" />
+  <!-- Device permissions (assets/device-access.js): apply this browser's last
+       known restrictions before first paint, so a restricted device never
+       flashes the figures it isn't allowed to see. A signed-in browser with no
+       answer yet for its credential starts with everything hidden. -->
+  <script>
+    (function () {
+      try {
+        var all = ["invoiceFigures", "dashboard", "targets", "accounting"];
+        var cred = localStorage.getItem("rpc_intake_pin") || "";
+        var cached = JSON.parse(localStorage.getItem("rpc_device_access") || "null");
+        var hidden = cached && cached.k === cred.slice(-16) ? cached.hidden : (cred ? all : []);
+        hidden.forEach(function (s) { document.documentElement.classList.add("hide-" + s); });
+      } catch (_) {}
+    })();
+  </script>
 </head>
 <body>
   <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -158,6 +173,7 @@
         <button type="button" class="appt-subnav-btn" data-settings-panel="searches" aria-selected="false">Frequent searches</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="email" aria-selected="false">Email</button>
         <button type="button" class="appt-subnav-btn" data-settings-panel="zoho" aria-selected="false">Zoho Books</button>
+        <button type="button" class="appt-subnav-btn" data-settings-panel="devices" aria-selected="false">Devices</button>
       </div>
       <button class="nav-btn install-app-btn" id="installAppBtn" type="button" hidden><svg class="icon"><use href="#i-download"></use></svg>Install app</button>
     </nav>
@@ -1647,6 +1663,7 @@
           <button type="button" class="appt-subnav-btn" data-settings-panel="searches" role="tab" aria-selected="false">Frequent searches</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="email" role="tab" aria-selected="false">Email</button>
           <button type="button" class="appt-subnav-btn" data-settings-panel="zoho" role="tab" aria-selected="false">Zoho Books</button>
+          <button type="button" class="appt-subnav-btn" data-settings-panel="devices" role="tab" aria-selected="false">Devices</button>
         </div>
 
         <section class="appt-panel" data-settings-panel-section="general">
@@ -1907,6 +1924,27 @@
                 <button type="submit" id="zohoConnectSubmit" class="primary-btn">Connect</button>
               </div>
             </form>
+          </div>
+        </section>
+
+        <section class="appt-panel" data-settings-panel-section="devices" hidden>
+          <div class="devices-settings">
+            <p class="field-label">Devices</p>
+            <p class="settings-help">Choose what each phone, tablet or computer signed in to the app can see. New devices start with all four hidden until you allow them here.</p>
+            <p id="devicesNotManaged" class="settings-help devices-note" hidden>Device permissions are off. Add an <strong>OWNER_PIN</strong> setting on the server (Vercel → Settings → Environment Variables) and redeploy to turn them on. Until then every device sees everything.</p>
+            <div id="devicesUnlock" class="devices-unlock">
+              <label class="field-label" for="devicesOwnerPin">Owner PIN</label>
+              <div class="technician-create-row">
+                <input id="devicesOwnerPin" class="text-input" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
+                <button id="devicesUnlockBtn" class="primary-btn" type="button">Unlock</button>
+              </div>
+            </div>
+            <div id="devicesLock" class="settings-actions" hidden>
+              <button id="devicesRefreshBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
+              <button id="devicesLockBtn" class="ghost-btn" type="button">Lock</button>
+            </div>
+            <p id="devicesError" class="field-error" hidden></p>
+            <div id="devicesList" class="devices-list" hidden></div>
           </div>
         </section>
 
@@ -2725,15 +2763,16 @@
        DOMContentLoaded restore runs), and defer preserves it — deferred
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
+  <script defer src="assets/device-access.js?v=device-access-1"></script>
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=collection-day-3"></script>
+  <script defer src="assets/intake.js?v=device-access-1"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>
-  <script defer src="assets/dashboard.js?v=collection-day-3"></script>
+  <script defer src="assets/dashboard.js?v=device-access-1"></script>
   <script defer src="assets/appointments.js?v=collection-day-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
