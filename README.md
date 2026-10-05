@@ -84,6 +84,10 @@ Two layers, merged in the browser on every sync:
    `price_entries`), which holds every price edited in the app plus models the
    sheet never had — Pixel is entirely here, since that tab was never wired
    into the list above.
+   It also ships the Samsung Galaxy A-series screen prices (OLED / Incell /
+   Original grades) as seed data in [`lib/price-seed.js`](lib/price-seed.js),
+   loaded on the first request after a deploy; they land on the sheet's own
+   `Samsung A…` cards where the names match.
 
 Catalog rows win: they override a sheet model's repair price, add repair types
 to it, add models the sheet doesn't list, or hide a model entirely. A price
