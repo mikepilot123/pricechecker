@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=device-access-1" />
+  <link rel="stylesheet" href="assets/style.css?v=device-access-2" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -1930,19 +1930,39 @@
         <section class="appt-panel" data-settings-panel-section="devices" hidden>
           <div class="devices-settings">
             <p class="field-label">Devices</p>
-            <p class="settings-help">Choose what each phone, tablet or computer signed in to the app can see. New devices start with all four hidden until you allow them here.</p>
-            <p id="devicesNotManaged" class="settings-help devices-note" hidden>Device permissions are off. Add an <strong>OWNER_PIN</strong> setting on the server (Vercel → Settings → Environment Variables) and redeploy to turn them on. Until then every device sees everything.</p>
-            <div id="devicesUnlock" class="devices-unlock">
+            <p class="settings-help">Choose what each phone, tablet or computer signed in to the app can see: invoice totals, Dashboard, Targets and Accounting.</p>
+
+            <div id="devicesCreate" class="devices-form" hidden>
+              <p class="devices-note">Device permissions are off, so every device sees everything. Create an owner PIN to turn them on. Only you should know it — it's separate from the team PIN, so staff can't change their own access. Devices already signed in keep full access; any device that signs in after this starts with all four hidden until you allow it here.</p>
+              <label class="field-label" for="devicesNewPin">New owner PIN</label>
+              <input id="devicesNewPin" class="text-input" type="password" inputmode="numeric" autocomplete="new-password" placeholder="At least 4 digits" />
+              <label class="field-label" for="devicesNewPinConfirm">Type it again</label>
+              <input id="devicesNewPinConfirm" class="text-input" type="password" inputmode="numeric" autocomplete="new-password" />
+              <button id="devicesCreateBtn" class="primary-btn" type="button">Create owner PIN</button>
+            </div>
+
+            <div id="devicesUnlock" class="devices-form" hidden>
               <label class="field-label" for="devicesOwnerPin">Owner PIN</label>
               <div class="technician-create-row">
                 <input id="devicesOwnerPin" class="text-input" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
                 <button id="devicesUnlockBtn" class="primary-btn" type="button">Unlock</button>
               </div>
             </div>
+
             <div id="devicesLock" class="settings-actions" hidden>
               <button id="devicesRefreshBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
+              <button id="devicesChangePinToggle" class="ghost-btn" type="button">Change owner PIN</button>
               <button id="devicesLockBtn" class="ghost-btn" type="button">Lock</button>
             </div>
+
+            <div id="devicesChangePin" class="devices-form" hidden>
+              <label class="field-label" for="devicesChangeNew">New owner PIN</label>
+              <input id="devicesChangeNew" class="text-input" type="password" inputmode="numeric" autocomplete="new-password" placeholder="At least 4 digits" />
+              <label class="field-label" for="devicesChangeConfirm">Type it again</label>
+              <input id="devicesChangeConfirm" class="text-input" type="password" inputmode="numeric" autocomplete="new-password" />
+              <button id="devicesChangeBtn" class="primary-btn" type="button">Save new owner PIN</button>
+            </div>
+
             <p id="devicesError" class="field-error" hidden></p>
             <div id="devicesList" class="devices-list" hidden></div>
           </div>
@@ -2763,7 +2783,7 @@
        DOMContentLoaded restore runs), and defer preserves it — deferred
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
-  <script defer src="assets/device-access.js?v=device-access-1"></script>
+  <script defer src="assets/device-access.js?v=device-access-2"></script>
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>

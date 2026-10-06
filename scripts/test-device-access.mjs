@@ -1,5 +1,5 @@
 // Device permissions, through the real api/intake.js handler: nothing changes
-// until an owner PIN is set; then browsers registered from now on start with
+// until the owner creates an owner PIN in Settings → Devices; then browsers registered from now on start with
 // every section hidden while ones signed in before keep full access, the data
 // behind a hidden section is refused, and only the owner PIN can change it.
 import { registerHooks } from "node:module";
@@ -51,11 +51,23 @@ const ALL = ["invoiceFigures", "dashboard", "targets", "accounting"];
 const early = await register();
 let access = await call({ action: "deviceAccess", pin: early });
 assert.equal(access.managed, false);
+assert.equal(access.ownerPin, "");
 assert.deepEqual(access.hidden, []);
 assert.equal((await call({ action: "listMonthlySales", pin: early })).ok, true);
+assert.match((await call({ action: "listDevices", pin: early, ownerPin: "9999" })).error, /owner PIN/i);
 
-// --- Owner PIN set: permissions are on ---
-process.env.OWNER_PIN = "9999";
+// --- The owner creates the owner PIN in the app: permissions are on ---
+assert.match((await call({ action: "setOwnerPin", pin: early, newOwnerPin: "12" })).error, /at least 4/);
+assert.match((await call({ action: "setOwnerPin", pin: early, newOwnerPin: "1234" })).error, /different PIN from the team PIN/);
+assert.match((await call({ action: "setOwnerPin", pin: "wrong", newOwnerPin: "9999" })).error, /Invalid PIN/);
+const created = await call({ action: "setOwnerPin", pin: early, newOwnerPin: "9999" });
+assert.equal(created.ok, true, created.error);
+assert.equal(created.ownerPin, "app");
+const [{ value: storedOwnerPin }] = await db.query("SELECT value FROM app_settings WHERE key = 'owner_pin'").then((r) => r.rows);
+assert.ok(storedOwnerPin.hash && !JSON.stringify(storedOwnerPin).includes("9999"), "only a hash of the owner PIN is stored");
+// Once it exists, nobody can create another over it without the current one.
+assert.match((await call({ action: "setOwnerPin", pin: early, newOwnerPin: "5555" })).error, /Wrong owner PIN/);
+assert.equal((await call({ action: "deviceAccess", pin: early })).ownerPin, "app");
 
 // A browser registered from now on starts with everything hidden...
 const staff = await register("Mozilla/5.0 (Linux; Android 14; SM-A155F) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36");
@@ -112,6 +124,20 @@ assert.equal((await call({ action: "listBankTransactions", pin: staff })).status
 const legacyId = (await call({ action: "deviceAccess", pin: legacy })).deviceId;
 await call({ action: "updateDevice", pin: legacy, ownerPin: "9999", id: legacyId, hidden: ["accounting"] });
 assert.equal((await call({ action: "listBankTransactions", pin: legacy })).status, 403);
+
+// The owner PIN can be changed with the current one; the old one stops working.
+assert.equal((await call({ action: "setOwnerPin", pin: legacy, ownerPin: "9999", newOwnerPin: "4321" })).ok, true);
+assert.match((await call({ action: "listDevices", pin: legacy, ownerPin: "9999" })).error, /Wrong owner PIN/);
+assert.equal((await call({ action: "listDevices", pin: legacy, ownerPin: "4321" })).ok, true);
+
+// An OWNER_PIN on the server takes over, as the way back in if the app's
+// owner PIN is forgotten; it can't then be changed from the app.
+process.env.OWNER_PIN = "8888";
+assert.equal((await call({ action: "deviceAccess", pin: legacy })).ownerPin, "server");
+assert.equal((await call({ action: "listDevices", pin: legacy, ownerPin: "8888" })).ok, true);
+assert.match((await call({ action: "listDevices", pin: legacy, ownerPin: "4321" })).error, /Wrong owner PIN/);
+assert.match((await call({ action: "setOwnerPin", pin: legacy, ownerPin: "8888", newOwnerPin: "7777" })).error, /set on the server/);
+delete process.env.OWNER_PIN;
 
 // Signing the same browser in again is a new device: it starts restricted.
 const again = await register();

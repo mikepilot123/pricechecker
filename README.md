@@ -63,14 +63,18 @@ secret for signing.
 
 The owner can choose what each signed-in device may see: the **invoice
 totals** at the top of Invoices, the **Dashboard**, **Targets** and
-**Accounting**. Manage it from **Settings → Devices**, which asks for a
-separate **owner PIN**, so staff who know the team PIN can't lift their own
-restrictions.
+**Accounting**. It's all done from **Settings → Devices**.
 
-To turn it on, add `OWNER_PIN` to the Vercel project's environment variables
-and redeploy. Every device already signed in at that point keeps full access.
+To turn it on, open Settings → Devices and **create an owner PIN**. Keep it to
+yourself: it's separate from the team PIN, so staff can't lift their own
+restrictions. Every device already signed in at that point keeps full access.
 Any device that signs in with the team PIN after that starts with all four
-hidden until the owner allows them. Without `OWNER_PIN` nothing is hidden.
+hidden until the owner allows them. Unlock the same screen with the owner PIN
+to rename devices, change what each can see, or change the owner PIN.
+
+The owner PIN is stored only as a salted hash. If it's ever forgotten, set an
+`OWNER_PIN` environment variable in Vercel and redeploy: that PIN then takes
+over (and can only be changed there) until the variable is removed.
 
 The app hides those sections on a restricted device, and the server refuses
 the bank, expense and sales-history data behind them. Invoice totals are

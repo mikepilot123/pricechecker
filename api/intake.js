@@ -33,7 +33,8 @@ import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, ren
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
-import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential, ownerPinConfigured } from "../lib/security.js";
+import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
+import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
 import { registerDevice, effectiveHidden, listDevices, updateDevice } from "../lib/devices.js";
 
 // Data behind a section the owner can hide per device (lib/devices.js). An
@@ -91,25 +92,38 @@ export default async function handler(req, res) {
       // device row is treated as one from before devices were tracked, which
       // keeps full access (lib/devices.js's getDevice).
       await ensureSchema();
-      await registerDevice(deviceIdForCredential(credential), { managed: ownerPinConfigured(), userAgent: req.headers["user-agent"] });
+      await registerDevice(deviceIdForCredential(credential), { managed: !!(await ownerPinSource()), userAgent: req.headers["user-agent"] });
       return res.status(200).json({ ok: true, credential });
     }
     await ensureSchema();
     const deviceId = deviceIdForCredential(body.pin);
-    const managed = ownerPinConfigured();
     const guardedSections = SECTION_GUARDED_ACTIONS[action];
-    if (guardedSections && managed) {
-      const hidden = await effectiveHidden(deviceId, { managed, userAgent: req.headers["user-agent"] });
+    if (guardedSections) {
+      const hidden = await effectiveHidden(deviceId, { managed: !!(await ownerPinSource()), userAgent: req.headers["user-agent"] });
       if (guardedSections.every((section) => hidden.includes(section))) {
         return res.status(403).json({ ok: false, error: "This device doesn't have access to that. Ask the owner to allow it in Settings → Devices." });
       }
     }
     if (action === "deviceAccess") {
-      const hidden = await effectiveHidden(deviceId, { managed, userAgent: req.headers["user-agent"] });
-      return res.status(200).json({ ok: true, deviceId, managed, hidden });
+      // ownerPin: where the owner PIN comes from — "" until the owner creates
+      // one in Settings → Devices, which is what turns permissions on.
+      const ownerPin = await ownerPinSource();
+      const hidden = await effectiveHidden(deviceId, { managed: !!ownerPin, userAgent: req.headers["user-agent"] });
+      return res.status(200).json({ ok: true, deviceId, managed: !!ownerPin, ownerPin, hidden });
+    }
+    if (action === "setOwnerPin") {
+      // Creating the first owner PIN needs only the team PIN (checked above);
+      // replacing it needs the current one.
+      const replacing = !!(await ownerPinSource());
+      if (replacing) {
+        const ownerDenied = await checkOwnerPin(req, body.ownerPin, verifyOwnerPin);
+        if (ownerDenied) return res.status(ownerDenied.status).json({ ok: false, error: ownerDenied.error });
+      }
+      await saveOwnerPin(body.newOwnerPin, { replacing });
+      return res.status(200).json({ ok: true, ownerPin: await ownerPinSource() });
     }
     if (action === "listDevices" || action === "updateDevice") {
-      const ownerDenied = checkOwnerPin(req, body.ownerPin);
+      const ownerDenied = await checkOwnerPin(req, body.ownerPin, verifyOwnerPin);
       if (ownerDenied) return res.status(ownerDenied.status).json({ ok: false, error: ownerDenied.error });
       if (action === "updateDevice") {
         const device = await updateDevice({ id: body.id, name: body.name, hidden: body.hidden });

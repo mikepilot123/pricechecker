@@ -8555,12 +8555,16 @@ html.hide-accounting #view-account {
 html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 .devices-note {
+  margin: 0 0 6px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--accent-soft);
 }
-.devices-unlock { max-width: 460px; margin-bottom: 8px; }
+/* These rows set their own display, which would otherwise beat [hidden]. */
+.devices-settings [hidden] { display: none !important; }
+.devices-form { display: flex; flex-direction: column; gap: 6px; max-width: 460px; margin-bottom: 12px; }
+.devices-form .primary-btn { align-self: flex-start; margin-top: 6px; }
 .devices-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .device-card {
   padding: 14px;

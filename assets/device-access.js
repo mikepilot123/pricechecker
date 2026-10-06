@@ -35,6 +35,7 @@
   let hidden = currentClasses();
   let lastRefresh = 0;
   let ownerPin = ""; // memory only: re-entered whenever the page reloads
+  let ownerPinSource = null; // "" none yet · "app" set in Settings · "server" OWNER_PIN; null = not known yet
   let devices = [];
   let thisDeviceId = "";
 
@@ -82,7 +83,8 @@
       thisDeviceId = data.deviceId || "";
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ k: credentialTag(cred), hidden: list })); } catch (_) {}
       apply(list);
-      renderDevicesIntro(data.managed);
+      ownerPinSource = data.ownerPin || "";
+      renderPanel();
     } catch (_) {
       // Keep whatever is applied: the cached answer, or — for a signed-in
       // device that has never had one — everything hidden until it does.
@@ -112,12 +114,17 @@
   refresh({ force: true });
 
   // ---- Settings → Devices -------------------------------------------------
-  function renderDevicesIntro(managed) {
-    const note = $("devicesNotManaged");
-    const unlock = $("devicesUnlock");
-    if (!note || !unlock) return;
-    note.hidden = !!managed;
-    unlock.hidden = !managed || !!ownerPin;
+  // Which of the panel's states shows: create an owner PIN (permissions
+  // off), unlock with it, or the device list once unlocked.
+  function renderPanel() {
+    if (!$("devicesCreate")) return;
+    const known = ownerPinSource !== null;
+    $("devicesCreate").hidden = !known || ownerPinSource !== "";
+    $("devicesUnlock").hidden = !known || ownerPinSource === "" || !!ownerPin;
+    $("devicesLock").hidden = !ownerPin;
+    $("devicesChangePinToggle").hidden = ownerPinSource !== "app";
+    if (!ownerPin) $("devicesChangePin").hidden = true;
+    renderDevices();
   }
 
   function showError(message) {
@@ -147,7 +154,6 @@
     const list = $("devicesList");
     if (!list) return;
     list.hidden = !ownerPin;
-    $("devicesLock").hidden = !ownerPin;
     if (!ownerPin) { list.innerHTML = ""; return; }
     if (!devices.length) {
       list.innerHTML = '<p class="settings-help">No devices have signed in yet.</p>';
@@ -214,22 +220,78 @@
       try {
         await loadDevices();
         input.value = "";
-        $("devicesUnlock").hidden = true;
       } catch (err) {
         ownerPin = "";
         showError(err.message);
       } finally {
         unlockBtn.disabled = false;
+        renderPanel();
       }
     };
+
+    // Reads a new PIN and its confirmation; null (with the error shown) if
+    // they don't make a usable pair.
+    const readNewPin = (fieldId, confirmId) => {
+      const pin = String($(fieldId).value || "").trim();
+      if (pin.length < 4) { showError("The owner PIN needs at least 4 digits."); return null; }
+      if (pin !== String($(confirmId).value || "").trim()) { showError("The two PINs don't match."); return null; }
+      return pin;
+    };
+
+    $("devicesCreateBtn").addEventListener("click", async () => {
+      showError("");
+      const pin = readNewPin("devicesNewPin", "devicesNewPinConfirm");
+      if (!pin) return;
+      const btn = $("devicesCreateBtn");
+      btn.disabled = true;
+      try {
+        const data = await post({ action: "setOwnerPin", newOwnerPin: pin });
+        ownerPinSource = data.ownerPin || "app";
+        ownerPin = pin;
+        $("devicesNewPin").value = "";
+        $("devicesNewPinConfirm").value = "";
+        await loadDevices();
+        window.RPC_TOAST?.("Owner PIN created. Device permissions are on.", { tone: "info", duration: 3500 });
+      } catch (err) {
+        showError(err.message);
+        refresh({ force: true }); // someone may have created one first
+      } finally {
+        btn.disabled = false;
+        renderPanel();
+      }
+    });
+
+    $("devicesChangePinToggle").addEventListener("click", () => {
+      $("devicesChangePin").hidden = !$("devicesChangePin").hidden;
+      showError("");
+    });
+    $("devicesChangeBtn").addEventListener("click", async () => {
+      showError("");
+      const pin = readNewPin("devicesChangeNew", "devicesChangeConfirm");
+      if (!pin) return;
+      const btn = $("devicesChangeBtn");
+      btn.disabled = true;
+      try {
+        await post({ action: "setOwnerPin", ownerPin, newOwnerPin: pin });
+        ownerPin = pin;
+        $("devicesChangeNew").value = "";
+        $("devicesChangeConfirm").value = "";
+        $("devicesChangePin").hidden = true;
+        window.RPC_TOAST?.("Owner PIN changed.", { tone: "info", duration: 2500 });
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
     unlockBtn.addEventListener("click", unlock);
     $("devicesOwnerPin").addEventListener("keydown", (e) => { if (e.key === "Enter") unlock(); });
 
     $("devicesLockBtn").addEventListener("click", () => {
       ownerPin = "";
       devices = [];
-      renderDevices();
-      $("devicesUnlock").hidden = false;
+      showError("");
+      renderPanel();
     });
     $("devicesRefreshBtn").addEventListener("click", () => loadDevices().catch((err) => showError(err.message)));
 
@@ -252,7 +314,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     bindDevicesPanel();
-    renderDevices();
+    renderPanel();
   });
   if (document.readyState !== "loading") bindDevicesPanel();
 })();
