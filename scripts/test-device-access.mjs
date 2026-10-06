@@ -56,6 +56,11 @@ assert.deepEqual(access.hidden, []);
 assert.equal((await call({ action: "listMonthlySales", pin: early })).ok, true);
 assert.match((await call({ action: "listDevices", pin: early, ownerPin: "9999" })).error, /owner PIN/i);
 
+// A device from before every device was hidden by default, still on file
+// with full access: the switch to hidden-by-default resets it.
+const earlyId = (await call({ action: "deviceAccess", pin: early })).deviceId;
+await db.query("UPDATE devices SET hidden_sections = '{}' WHERE id = $1", [earlyId]);
+
 // --- The owner creates the owner PIN in the app: permissions are on ---
 assert.match((await call({ action: "setOwnerPin", pin: early, newOwnerPin: "12" })).error, /at least 4/);
 assert.match((await call({ action: "setOwnerPin", pin: early, newOwnerPin: "1234" })).error, /different PIN from the team PIN/);
@@ -69,20 +74,21 @@ assert.ok(storedOwnerPin.hash && !JSON.stringify(storedOwnerPin).includes("9999"
 assert.match((await call({ action: "setOwnerPin", pin: early, newOwnerPin: "5555" })).error, /Wrong owner PIN/);
 assert.equal((await call({ action: "deviceAccess", pin: early })).ownerPin, "app");
 
-// A browser registered from now on starts with everything hidden...
+// Every device starts with everything hidden until the owner allows it:
+// one registered now...
 const staff = await register("Mozilla/5.0 (Linux; Android 14; SM-A155F) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36");
 access = await call({ action: "deviceAccess", pin: staff });
 assert.equal(access.managed, true);
 assert.deepEqual(access.hidden, ALL);
 assert.ok(access.deviceId.startsWith("D"));
-// ...while one signed in before the owner PIN was set keeps full access.
-assert.deepEqual((await call({ action: "deviceAccess", pin: early })).hidden, []);
-
-// A credential from before devices were tracked (no row) keeps full access.
+// ...one that had full access before (reset once, and the reset recorded)...
+assert.deepEqual((await call({ action: "deviceAccess", pin: early })).hidden, ALL);
+assert.equal((await db.query("SELECT 1 FROM app_settings WHERE key = 'device_hidden_by_default'")).rows.length, 1);
+// ...and one from before devices were tracked at all (no row yet).
 const legacy = createBrowserCredential("1234");
 access = await call({ action: "deviceAccess", pin: legacy });
-assert.deepEqual(access.hidden, []);
-assert.equal((await call({ action: "listBankTransactions", pin: legacy })).ok, true);
+assert.deepEqual(access.hidden, ALL);
+assert.equal((await call({ action: "listBankTransactions", pin: legacy })).status, 403);
 
 // A raw team PIN identifies no device, so it's treated as a new one.
 assert.deepEqual((await call({ action: "deviceAccess", pin: "1234" })).hidden, ALL);
@@ -120,8 +126,12 @@ assert.equal((await call({ action: "listMonthlySales", pin: staff })).ok, true);
 assert.equal((await call({ action: "accountSummary", pin: staff })).ok, true);
 assert.equal((await call({ action: "listBankTransactions", pin: staff })).status, 403);
 
-// Restricting the device that used to have full access applies at once.
+// Allowing everything shows it; hiding a section again applies at once, and
+// the one-time reset never undoes what the owner allowed.
 const legacyId = (await call({ action: "deviceAccess", pin: legacy })).deviceId;
+await call({ action: "updateDevice", pin: legacy, ownerPin: "9999", id: legacyId, hidden: [] });
+assert.equal((await call({ action: "listBankTransactions", pin: legacy })).ok, true);
+assert.deepEqual((await call({ action: "listDevices", pin: legacy, ownerPin: "9999" })).devices.find((d) => d.id === legacyId).hidden, []);
 await call({ action: "updateDevice", pin: legacy, ownerPin: "9999", id: legacyId, hidden: ["accounting"] });
 assert.equal((await call({ action: "listBankTransactions", pin: legacy })).status, 403);
 
@@ -139,9 +149,8 @@ assert.match((await call({ action: "listDevices", pin: legacy, ownerPin: "4321" 
 assert.match((await call({ action: "setOwnerPin", pin: legacy, ownerPin: "8888", newOwnerPin: "7777" })).error, /set on the server/);
 delete process.env.OWNER_PIN;
 
-// "Restrict all other devices": every listed device but the owner's is
-// restricted, and so is a browser from before devices were tracked that
-// hasn't been seen yet — the owner never got to review it.
+// "Restrict all other devices" hides everything again on every device but
+// the owner's; a browser not seen before is hidden as always.
 const unseen = createBrowserCredential("1234");
 const ownerId = (await call({ action: "deviceAccess", pin: early })).deviceId;
 await call({ action: "updateDevice", pin: early, ownerPin: "4321", id: ownerId, hidden: [] });

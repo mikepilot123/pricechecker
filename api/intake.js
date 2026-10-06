@@ -88,11 +88,10 @@ export default async function handler(req, res) {
     if (action === "registerBrowser") {
       const credential = createBrowserCredential(body.pin);
       if (!credential) return res.status(200).json({ ok: false, error: "Invalid PIN" });
-      // Recorded before the credential is handed out: a credential with no
-      // device row is treated as one from before devices were tracked, which
-      // keeps full access (lib/devices.js's getDevice).
+      // Recorded before the credential is handed out, hidden until the owner
+      // allows it (lib/devices.js).
       await ensureSchema();
-      await registerDevice(deviceIdForCredential(credential), { managed: !!(await ownerPinSource()), userAgent: req.headers["user-agent"] });
+      await registerDevice(deviceIdForCredential(credential), { userAgent: req.headers["user-agent"] });
       return res.status(200).json({ ok: true, credential });
     }
     await ensureSchema();

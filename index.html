@@ -1933,7 +1933,7 @@
             <p class="settings-help">Choose what each phone, tablet or computer signed in to the app can see: invoice figures, Dashboard, Targets and Accounting.</p>
 
             <div id="devicesCreate" class="devices-form" hidden>
-              <p class="devices-note">Device permissions are off, so every device sees everything. Create an owner PIN to turn them on. Only you should know it — it's separate from the team PIN, so staff can't change their own access. Devices already signed in keep full access; any device that signs in after this starts with all four hidden until you allow it here.</p>
+              <p class="devices-note">Device permissions are off, so every device sees everything. Create an owner PIN to turn them on. Only you should know it — it's separate from the team PIN, so staff can't change their own access. Once it's on, every device — this one included — has all four hidden until you allow them for that device here.</p>
               <label class="field-label" for="devicesNewPin">New owner PIN</label>
               <input id="devicesNewPin" class="text-input" type="password" inputmode="numeric" autocomplete="new-password" placeholder="At least 4 digits" />
               <label class="field-label" for="devicesNewPinConfirm">Type it again</label>
@@ -1965,7 +1965,7 @@
             </div>
 
             <p id="devicesError" class="field-error" hidden></p>
-            <p id="devicesListHelp" class="settings-help" hidden>A device appears here once it has opened the app since this feature was added. <strong>Restrict all other devices</strong> also covers any that haven't shown up yet: they're restricted the moment they do.</p>
+            <p id="devicesListHelp" class="settings-help" hidden>Every device starts with all four hidden; tick what each one may see. A device appears here once it has opened the app since this feature was added, and starts hidden too.</p>
             <div id="devicesList" class="devices-list" hidden></div>
           </div>
         </section>
@@ -2785,7 +2785,7 @@
        DOMContentLoaded restore runs), and defer preserves it — deferred
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
-  <script defer src="assets/device-access.js?v=record-payment-1"></script>
+  <script defer src="assets/device-access.js?v=hidden-by-default-1"></script>
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>

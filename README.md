@@ -67,9 +67,8 @@ totals** at the top of Invoices, the **Dashboard**, **Targets** and
 
 To turn it on, open Settings → Devices and **create an owner PIN**. Keep it to
 yourself: it's separate from the team PIN, so staff can't lift their own
-restrictions. Every device already signed in at that point keeps full access.
-Any device that signs in with the team PIN after that starts with all four
-hidden until the owner allows them. Unlock the same screen with the owner PIN
+restrictions. From then on every device, the owner's included, has all four
+hidden until the owner allows them for that device. Unlock the same screen with the owner PIN
 to rename devices, change what each can see, or change the owner PIN.
 
 The owner PIN is stored only as a salted hash. If it's ever forgotten, set an
