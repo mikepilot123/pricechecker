@@ -168,6 +168,10 @@
           <span><strong>${section.label}</strong><small>${section.help}</small></span>
         </label>`).join("");
       const restricted = device.hidden.length;
+      // Master switch: on = every section shown, off = every section hidden.
+      // "Partly" shows as the dash state, set after the markup is in place.
+      const allOn = restricted === 0;
+      const partly = restricted > 0 && restricted < SECTIONS.length;
       return `
         <article class="device-card" data-device-card="${escapeHtml(device.id)}">
           <div class="device-card-head">
@@ -179,10 +183,17 @@
             Last opened ${escapeHtml(relativeTime(device.lastSeenAt))} · signed in ${escapeHtml(relativeTime(device.createdAt))}
             · <strong>${restricted ? (restricted === SECTIONS.length ? "Restricted" : "Partly restricted") : "Full access"}</strong>
           </p>
+          <label class="device-master" title="Show or hide all four sections on this device">
+            <input type="checkbox" class="device-master-input" data-device-all="${escapeHtml(device.id)}" ${allOn ? "checked" : ""} ${partly ? 'data-partly="1"' : ""} />
+            <span class="device-master-track" aria-hidden="true"></span>
+            <span class="device-master-text"><strong>Show everything on this device</strong><small>${allOn ? "All four sections are on." : partly ? "Some sections are on. Switch on to show all four." : "All four sections are hidden."}</small></span>
+          </label>
           <p class="field-label device-can-see">Can see</p>
           <div class="alert-prefs device-toggles">${toggles}</div>
         </article>`;
     }).join("");
+    // A switch with some sections on and some off reads as "partly".
+    list.querySelectorAll("input[data-partly]").forEach((input) => { input.indeterminate = true; });
   }
 
   async function loadDevices() {
@@ -318,6 +329,12 @@
     $("devicesRefreshBtn").addEventListener("click", () => loadDevices().catch((err) => showError(err.message)));
 
     $("devicesList").addEventListener("change", (e) => {
+      const master = e.target.closest("input[data-device-all]");
+      if (master) {
+        // Switching on shows all four sections; switching off hides them all.
+        saveDevice(master.dataset.deviceAll, { hidden: master.checked ? [] : ALL_KEYS });
+        return;
+      }
       const box = e.target.closest("input[type=checkbox][data-section]");
       if (box) {
         const id = box.dataset.deviceId;
