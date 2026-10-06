@@ -69,5 +69,20 @@ await test("nothing is deposited without the flag, a method, or new money", asyn
   assert.equal((await listBankTransactions()).length, before);
 });
 
+await test("recording a balance payment from Device details deposits each part as it's paid", async () => {
+  // What the Record payment button sends: only the new Amount paid, how it
+  // was paid, and the deposit flag — the status and everything else stay put.
+  const { ticket } = await checkIn({ amountPaid: "400", paymentMethod: "cash", depositToAccount: true, status: "In Progress" });
+  const before = await bankAccountSummary();
+  const part = await api({ action: "update", id: ticket.id, amountPaid: 650, paymentMethod: "transfer", cardType: "", depositToAccount: true });
+  assert.deepEqual([part.accountDeposit.deposit.accountType, part.accountDeposit.deposit.amount], ["bank", 250]);
+  assert.deepEqual([Number(part.ticket.amountPaid), part.ticket.paymentMethod, part.ticket.status], [650, "transfer", "In Progress"]);
+  const rest = await api({ action: "update", id: ticket.id, amountPaid: 800, paymentMethod: "cash", cardType: "", depositToAccount: true });
+  assert.deepEqual([rest.accountDeposit.deposit.accountType, rest.accountDeposit.deposit.amount], ["cash", 150]);
+  assert.equal(Number(rest.ticket.amountPaid), 800, "paid in full");
+  const after = await bankAccountSummary();
+  assert.deepEqual([after.balance - before.balance, after.cash.balance - before.cash.balance], [250, 150]);
+});
+
 console.log(`PASS — ${passed} repair deposit scenarios`);
 await db.close();

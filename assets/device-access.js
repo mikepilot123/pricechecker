@@ -15,7 +15,7 @@
   // Read by the inline script in index.html's <head> too — keep them in step.
   const CACHE_KEY = "rpc_device_access";
   const SECTIONS = [
-    { key: "invoiceFigures", label: "Invoice totals", help: "The figures at the top of Invoices." },
+    { key: "invoiceFigures", label: "Invoice figures", help: "Outstanding, overdue and paid-this-month totals. The invoice list itself stays visible." },
     { key: "dashboard", label: "Dashboard", help: "Business overview and KPIs." },
     { key: "targets", label: "Targets", help: "Sales targets and progress." },
     { key: "accounting", label: "Accounting", help: "Bank account and expenses." },
@@ -264,7 +264,7 @@
 
     $("devicesRestrictOthersBtn").addEventListener("click", async () => {
       showError("");
-      if (!window.confirm("Hide invoice totals, Dashboard, Targets and Accounting on every device except this one? You can allow them again one by one.")) return;
+      if (!window.confirm("Hide invoice figures, Dashboard, Targets and Accounting on every device except this one? You can allow them again one by one.")) return;
       const btn = $("devicesRestrictOthersBtn");
       btn.disabled = true;
       try {

@@ -1566,7 +1566,7 @@
         ${detailRow("i-cash", "Amount paid", fieldDisplayHtml("amountPaid", ticket), "money-positive", "amountPaid")}
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
         ${detailRow("i-cash", "Paid by", fieldDisplayHtml("paymentMethod", ticket), "", "paymentMethod")}
-      </div></section>
+      </div><div id="ticketRecordPayment">${recordPaymentButtonHtml(ticket)}</div></section>
       <section class="ticket-detail-section" id="ticketIssuesSection">${issuesSectionStaticHtml(ticket)}</section>
       <section class="ticket-detail-section"><p class="field-label">Photos & videos</p>
         <div class="ticket-media-gallery" id="ticketMediaGallery"><p class="ops-empty ticket-media-loading">Loading…</p></div>
@@ -1633,6 +1633,7 @@
     if (saveBtn) { saveInlineEdit(saveBtn.closest(".ticket-detail-row"), saveBtn.dataset.saveField); return; }
     const cancelBtn = e.target.closest("[data-cancel-field]");
     if (cancelBtn) { renderDetailRowStatic(cancelBtn.closest(".ticket-detail-row"), cancelBtn.dataset.cancelField); return; }
+    if (e.target.closest("[data-record-payment]")) { recordTicketPayment(); return; }
     if (e.target.closest("[data-edit-issues]")) { startIssuesEdit(); return; }
     const issueChoice = e.target.closest("[data-issue-choice]");
     if (issueChoice) { toggleIssueChoice(issueChoice); return; }
@@ -1838,7 +1839,11 @@
     // Balance due has no pencil of its own — it's derived from these two
     // fields, so it must be recomputed whenever either one saves, or it's
     // left showing stale math that looks like the edit didn't take.
-    if (field === "repairCost" || field === "amountPaid") refreshBalanceDueRow();
+    if (field === "repairCost" || field === "amountPaid") {
+      refreshBalanceDueRow();
+      const slot = $("ticketRecordPayment");
+      if (slot) slot.innerHTML = recordPaymentButtonHtml(currentModalTicket);
+    }
   }
 
   function refreshBalanceDueRow() {
@@ -4266,6 +4271,175 @@
       modal.querySelectorAll("[data-pickup-cancel]").forEach((b) => { b.onclick = () => finish(null); });
       confirmBtn.onclick = () => { if (method) finish(method); };
     });
+  }
+
+  // ---- Record a payment from Device details -----------------------------------
+  // The client pays some or all of what's owed: Amount paid goes up on the
+  // repair (and its invoice, which the server keeps in step), and the money
+  // is deposited on the Account tab — cash to cash on hand, a bank transfer to
+  // the bank account. Only the amount just received is deposited; earlier
+  // payments were deposited when they were taken.
+  function recordPaymentButtonHtml(ticket) {
+    const balance = ticketBalance(ticket);
+    if (!(balance > 0)) return "";
+    return `<button type="button" class="primary-btn ticket-record-payment-btn" data-record-payment>
+      <svg class="icon"><use href="#i-cash"></use></svg><span>Record payment</span><small>${esc(formatMoney(balance))} due</small>
+    </button>`;
+  }
+
+  // Resolves to { amount, method } once staff confirm, or null if they back out.
+  function askPaymentReceived(ticket) {
+    let modal = $("recordPayModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "recordPayModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel pickup-pay-panel" role="dialog" aria-modal="true" aria-labelledby="recordPayTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Payment</p><h3 id="recordPayTitle">Record a payment</h3></div>
+            <button type="button" class="modal-close" data-record-pay-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p class="empty-sub" id="recordPaySub"></p>
+            <div class="pickup-pay-sums" id="recordPaySums"></div>
+            <label class="field-label" for="recordPayAmount">Amount received</label>
+            <input id="recordPayAmount" class="text-input record-pay-amount" type="number" inputmode="decimal" min="0" step="0.01" />
+            <p class="field-hint" id="recordPayAmountHint"></p>
+            <p class="field-label">How did they pay?</p>
+            <div class="pickup-pay-methods" role="radiogroup" aria-label="Payment method">
+              <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-record-method="cash"><svg class="icon"><use href="#i-cash"></use></svg>Cash</button>
+              <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-record-method="transfer"><svg class="icon"><use href="#i-receipt"></use></svg>Bank transfer</button>
+            </div>
+            <p class="field-hint">Recorded as paid on the repair and its invoice, and deposited on the Accounting tab — cash to cash on hand, a bank transfer to the bank account.</p>
+            <p class="field-error" id="recordPayError" hidden></p>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-record-pay-cancel>Cancel</button>
+            <button type="button" class="primary-btn" id="recordPayConfirm" disabled><svg class="icon"><use href="#i-check"></use></svg><span></span></button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const balance = ticketBalance(ticket);
+    $("recordPaySub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
+    $("recordPaySums").innerHTML = `
+      <div><span>Repair cost</span><strong>${esc(formatMoney(ticket.repairCost || 0))}</strong></div>
+      <div><span>Paid so far</span><strong>${esc(formatMoney(ticket.amountPaid || 0))}</strong></div>
+      <div class="is-due"><span>Balance due</span><strong>${esc(formatMoney(balance))}</strong></div>`;
+    const amountInput = $("recordPayAmount");
+    const confirmBtn = $("recordPayConfirm");
+    const error = $("recordPayError");
+    amountInput.value = balance.toFixed(2);
+    error.hidden = true;
+    let method = "";
+
+    // The amount as entered, or null when it isn't a payment that can be taken.
+    const enteredAmount = () => {
+      const raw = String(amountInput.value || "").trim();
+      if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) return null;
+      const amount = roundMoney(Number(raw));
+      return amount > 0 && amount <= balance ? amount : null;
+    };
+    const refresh = () => {
+      const amount = enteredAmount();
+      const left = amount == null ? balance : roundMoney(balance - amount);
+      $("recordPayAmountHint").textContent = amount == null
+        ? `Enter an amount up to the ${formatMoney(balance)} balance.`
+        : left > 0 ? `${formatMoney(left)} will still be owed after this.` : "This pays the balance in full.";
+      confirmBtn.querySelector("span").textContent = amount == null ? "Record payment" : `Record ${formatMoney(amount)} payment`;
+      confirmBtn.disabled = !method || amount == null;
+    };
+    amountInput.oninput = refresh;
+
+    const methods = modal.querySelectorAll("[data-record-method]");
+    methods.forEach((btn) => {
+      btn.classList.remove("active");
+      btn.setAttribute("aria-checked", "false");
+      btn.onclick = () => {
+        method = btn.dataset.recordMethod;
+        methods.forEach((b) => {
+          b.classList.toggle("active", b === btn);
+          b.setAttribute("aria-checked", b === btn ? "true" : "false");
+        });
+        refresh();
+      };
+    });
+    refresh();
+    modal.hidden = false;
+    amountInput.focus();
+    amountInput.select();
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        modal.hidden = true;
+        document.removeEventListener("keydown", onKey, true);
+        resolve(value);
+      };
+      const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); finish(null); } };
+      document.addEventListener("keydown", onKey, true);
+      modal.querySelectorAll("[data-record-pay-cancel]").forEach((b) => { b.onclick = () => finish(null); });
+      confirmBtn.onclick = () => {
+        const amount = enteredAmount();
+        if (method && amount != null) finish({ amount, method });
+      };
+    });
+  }
+
+  async function recordTicketPayment() {
+    const ticket = currentModalTicket;
+    if (!ticket) return;
+    const payment = await askPaymentReceived(ticket);
+    if (!payment) return;
+    const btn = document.querySelector("#ticketRecordPayment [data-record-payment]");
+    if (btn) btn.disabled = true;
+    try {
+      const res = await api({
+        action: "update",
+        id: ticket.id,
+        amountPaid: roundMoney((Number(ticket.amountPaid) || 0) + payment.amount),
+        paymentMethod: payment.method,
+        cardType: "",
+        depositToAccount: true,
+      });
+      if (!res.ok) throw new Error(res.error || "Save failed");
+      mergeTicket(res.ticket);
+      const updated = TICKETS.find((t) => t.id === ticket.id) || normalizeTicket(res.ticket);
+      if (currentModalTicket && currentModalTicket.id === ticket.id) {
+        currentModalTicket = updated;
+        refreshPaymentRows();
+      }
+      render();
+      await settleInvoiceForTicket(ticket.id);
+      const left = ticketBalance(updated);
+      const deposit = res.accountDeposit;
+      if (deposit && !deposit.ok) {
+        reportAccountDeposits([deposit]);
+      } else {
+        if (deposit) refreshAccountTab();
+        toast(
+          `${formatMoney(payment.amount)} payment recorded${deposit ? ` and deposited to ${accountDepositPlace(deposit.deposit)}` : ""}. ` +
+            (left > 0 ? `${formatMoney(left)} still owed.` : "Paid in full."),
+          { tone: "info", duration: 4000 }
+        );
+      }
+    } catch (err) {
+      if (btn) btn.disabled = false;
+      toast(`Couldn't record the payment: ${err.message}. Nothing was deposited — check your connection and try again.`);
+    }
+  }
+
+  // Redraws Amount paid, Paid by, Balance due and the Record payment button
+  // in the open Device details after a payment.
+  function refreshPaymentRows() {
+    document.querySelectorAll("#ticketModalBody .ticket-detail-row").forEach((row) => {
+      const label = row.querySelector(".ticket-detail-label")?.textContent.trim();
+      if (label === "Amount paid") renderDetailRowStatic(row, "amountPaid");
+      if (label === "Paid by") renderDetailRowStatic(row, "paymentMethod");
+    });
+    refreshBalanceDueRow();
+    const slot = $("ticketRecordPayment");
+    if (slot && currentModalTicket) slot.innerHTML = recordPaymentButtonHtml(currentModalTicket);
   }
 
   // ---- "Ready for collection" notice ------------------------------------------

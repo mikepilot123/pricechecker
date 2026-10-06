@@ -8587,3 +8587,16 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .device-meta { margin: 8px 0 4px; }
 .device-can-see { margin-top: 10px; }
 .device-toggles { max-width: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+
+/* ---------- Record payment (Device details, assets/intake.js) ---------- */
+.ticket-record-payment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+}
+.ticket-record-payment-btn small { font-size: 0.78rem; font-weight: 500; opacity: 0.85; }
+.ticket-record-payment-btn small::before { content: "·"; margin-right: 8px; }
+.record-pay-amount { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
