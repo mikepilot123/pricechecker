@@ -139,6 +139,25 @@ assert.match((await call({ action: "listDevices", pin: legacy, ownerPin: "4321" 
 assert.match((await call({ action: "setOwnerPin", pin: legacy, ownerPin: "8888", newOwnerPin: "7777" })).error, /set on the server/);
 delete process.env.OWNER_PIN;
 
+// "Restrict all other devices": every listed device but the owner's is
+// restricted, and so is a browser from before devices were tracked that
+// hasn't been seen yet — the owner never got to review it.
+const unseen = createBrowserCredential("1234");
+const ownerId = (await call({ action: "deviceAccess", pin: early })).deviceId;
+await call({ action: "updateDevice", pin: early, ownerPin: "4321", id: ownerId, hidden: [] });
+assert.match((await call({ action: "restrictOtherDevices", pin: early, ownerPin: "0000" })).error, /Wrong owner PIN/);
+assert.match((await call({ action: "restrictOtherDevices", pin: "1234", ownerPin: "4321" })).error, /Sign this browser in again/);
+const restrictedAll = await call({ action: "restrictOtherDevices", pin: early, ownerPin: "4321" });
+assert.equal(restrictedAll.ok, true, restrictedAll.error);
+assert.ok(restrictedAll.restricted >= 2, "the legacy device and the partly restricted staff phone");
+for (const device of restrictedAll.devices) {
+  assert.deepEqual(device.hidden, device.id === ownerId ? [] : ALL, device.name);
+}
+assert.deepEqual((await call({ action: "deviceAccess", pin: early })).hidden, []);
+assert.deepEqual((await call({ action: "deviceAccess", pin: staff })).hidden, ALL);
+assert.deepEqual((await call({ action: "deviceAccess", pin: unseen })).hidden, ALL);
+assert.equal((await call({ action: "listBankTransactions", pin: unseen })).status, 403);
+
 // Signing the same browser in again is a new device: it starts restricted.
 const again = await register();
 assert.notEqual(again, staff);

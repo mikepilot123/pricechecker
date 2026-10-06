@@ -35,7 +35,7 @@ import { ensureSchema } from "../lib/db.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
-import { registerDevice, effectiveHidden, listDevices, updateDevice } from "../lib/devices.js";
+import { registerDevice, effectiveHidden, listDevices, updateDevice, restrictOtherDevices } from "../lib/devices.js";
 
 // Data behind a section the owner can hide per device (lib/devices.js). An
 // action is refused only when EVERY section listed for it is hidden, since
@@ -122,9 +122,13 @@ export default async function handler(req, res) {
       await saveOwnerPin(body.newOwnerPin, { replacing });
       return res.status(200).json({ ok: true, ownerPin: await ownerPinSource() });
     }
-    if (action === "listDevices" || action === "updateDevice") {
+    if (action === "listDevices" || action === "updateDevice" || action === "restrictOtherDevices") {
       const ownerDenied = await checkOwnerPin(req, body.ownerPin, verifyOwnerPin);
       if (ownerDenied) return res.status(ownerDenied.status).json({ ok: false, error: ownerDenied.error });
+      if (action === "restrictOtherDevices") {
+        const restricted = await restrictOtherDevices(deviceId);
+        return res.status(200).json({ ok: true, restricted, deviceId, devices: await listDevices() });
+      }
       if (action === "updateDevice") {
         const device = await updateDevice({ id: body.id, name: body.name, hidden: body.hidden });
         return res.status(200).json({ ok: true, device });

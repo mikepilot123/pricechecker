@@ -1951,6 +1951,7 @@
 
             <div id="devicesLock" class="settings-actions" hidden>
               <button id="devicesRefreshBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
+              <button id="devicesRestrictOthersBtn" class="ghost-btn danger-btn" type="button">Restrict all other devices</button>
               <button id="devicesChangePinToggle" class="ghost-btn" type="button">Change owner PIN</button>
               <button id="devicesLockBtn" class="ghost-btn" type="button">Lock</button>
             </div>
@@ -1964,6 +1965,7 @@
             </div>
 
             <p id="devicesError" class="field-error" hidden></p>
+            <p id="devicesListHelp" class="settings-help" hidden>A device appears here once it has opened the app since this feature was added. <strong>Restrict all other devices</strong> also covers any that haven't shown up yet: they're restricted the moment they do.</p>
             <div id="devicesList" class="devices-list" hidden></div>
           </div>
         </section>
@@ -2783,7 +2785,7 @@
        DOMContentLoaded restore runs), and defer preserves it — deferred
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
-  <script defer src="assets/device-access.js?v=device-access-2"></script>
+  <script defer src="assets/device-access.js?v=device-access-3"></script>
   <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>

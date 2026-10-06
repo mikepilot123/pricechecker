@@ -122,6 +122,7 @@
     $("devicesCreate").hidden = !known || ownerPinSource !== "";
     $("devicesUnlock").hidden = !known || ownerPinSource === "" || !!ownerPin;
     $("devicesLock").hidden = !ownerPin;
+    $("devicesListHelp").hidden = !ownerPin;
     $("devicesChangePinToggle").hidden = ownerPinSource !== "app";
     if (!ownerPin) $("devicesChangePin").hidden = true;
     renderDevices();
@@ -258,6 +259,27 @@
       } finally {
         btn.disabled = false;
         renderPanel();
+      }
+    });
+
+    $("devicesRestrictOthersBtn").addEventListener("click", async () => {
+      showError("");
+      if (!window.confirm("Hide invoice totals, Dashboard, Targets and Accounting on every device except this one? You can allow them again one by one.")) return;
+      const btn = $("devicesRestrictOthersBtn");
+      btn.disabled = true;
+      try {
+        const data = await post({ action: "restrictOtherDevices", ownerPin });
+        devices = data.devices || [];
+        if (data.deviceId) thisDeviceId = data.deviceId;
+        renderDevices();
+        window.RPC_TOAST?.(
+          `Restricted ${data.restricted} device${data.restricted === 1 ? "" : "s"}. Any device not listed yet is restricted as soon as it opens the app.`,
+          { tone: "info", duration: 5000 }
+        );
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
       }
     });
 
