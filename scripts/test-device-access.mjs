@@ -172,4 +172,17 @@ const again = await register();
 assert.notEqual(again, staff);
 assert.deepEqual((await call({ action: "deviceAccess", pin: again })).hidden, ALL);
 
+// The nightly backup (apps-script/NightlyBackup.gs) signs in as its own device
+// from Apps Script: named as such, refused Accounting until the owner allows
+// it, and nothing else needs allowing.
+const backup = await register("Mozilla/5.0 (compatible; Google-Apps-Script)");
+const backupAccess = await call({ action: "deviceAccess", pin: backup });
+assert.deepEqual(backupAccess.hidden, ALL);
+for (const action of ["listExpenses", "listBankTransactions"]) assert.equal((await call({ action, pin: backup })).status, 403, action);
+for (const action of ["list", "listAllTicketNotes", "listAppointments", "listReminders", "listCustomers"]) assert.equal((await call({ action, pin: backup })).ok, true, action);
+const backupDevice = (await call({ action: "listDevices", pin: early, ownerPin: "4321" })).devices.find((d) => d.id === backupAccess.deviceId);
+assert.equal(backupDevice.name, "Nightly backup");
+await call({ action: "updateDevice", pin: early, ownerPin: "4321", id: backupDevice.id, hidden: ["invoiceFigures", "dashboard", "targets"] });
+for (const action of ["listExpenses", "listBankTransactions"]) assert.equal((await call({ action, pin: backup })).ok, true, action);
+
 console.log("device access tests passed");

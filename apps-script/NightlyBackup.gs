@@ -15,6 +15,11 @@
  *  3. Project Settings -> set the timezone to (GMT-04:00) Atlantic Time —
  *     Trinidad, or the 9pm trigger will fire on the wrong clock.
  *  4. Run installBackupTrigger() once and approve the permission prompt.
+ *  5. Run a backup once ("Repair Hub Backup" menu -> Back up now). The script
+ *     signs itself in to the app as a device named "Nightly backup". In the
+ *     app, open Settings -> Devices, unlock with the owner PIN, and tick
+ *     Accounting for that device so Expenses and Bank transactions can be
+ *     backed up. Nothing else needs allowing.
  *
  * After that it runs itself at 9pm nightly. runBackupNow() does an immediate
  * backup if you ever want to force one.
@@ -34,6 +39,12 @@ var SNAPSHOTS_TO_KEEP = 14;
 
 var LOG_SHEET = "Backup Log";
 
+// Script property holding this backup's own device credential. The app hides
+// Accounting from every device until the owner allows it (Settings -> Devices),
+// and the plain team PIN identifies no device, so the backup registers once
+// and keeps the credential it's given.
+var CREDENTIAL_PROPERTY = "BACKUP_CREDENTIAL";
+
 /** Each dataset: sheet tab, request, and the columns to write. */
 function datasets() {
   return [
@@ -46,6 +57,8 @@ function datasets() {
       cols: ["id","created","client","phone","device","issue","technician","date","time","source","status","notes"] },
     { tab: "Expenses", url: API_URL, payload: { action: "listExpenses" }, key: "expenses",
       cols: ["id","date","category","vendor","amount","notes","cashReclaim","reclaimFrom","reclaimDueAt","reclaimedAt"] },
+    { tab: "Bank transactions", url: API_URL, payload: { action: "listBankTransactions" }, key: "transactions",
+      cols: ["id","occurredAt","kind","accountType","amount","category","reference","notes","expenseId","transferId","created","updated"] },
     { tab: "Reminders", url: API_URL, payload: { action: "listReminders" }, key: "reminders",
       cols: ["id","title","notes","dueAt","done","doneAt","assignee","priority","kind","ticketId","expenseId"] },
     { tab: "Customers", url: API_URL, payload: { action: "listCustomers" }, key: "customers",
@@ -63,11 +76,32 @@ function pin_() {
   return value;
 }
 
+/**
+ * What the backup sends as its "pin": its own device credential, registered
+ * with the team PIN the first time and kept in Script Properties. Rotating the
+ * team PIN revokes it, in which case fetchDataset_ registers a fresh one.
+ */
+function credential_(forceNew) {
+  var props = PropertiesService.getScriptProperties();
+  var saved = forceNew ? "" : props.getProperty(CREDENTIAL_PROPERTY);
+  if (saved) return saved;
+  var res = UrlFetchApp.fetch(API_URL, {
+    method: "post",
+    contentType: "text/plain;charset=utf-8",
+    payload: JSON.stringify({ action: "registerBrowser", pin: pin_() }),
+    muteHttpExceptions: true
+  });
+  var body = JSON.parse(res.getContentText());
+  if (!body.ok || !body.credential) throw new Error("Couldn't register the backup with the app: " + (body.error || "HTTP " + res.getResponseCode()));
+  props.setProperty(CREDENTIAL_PROPERTY, body.credential);
+  return body.credential;
+}
+
 /** One API call. The API returns { ok: false, error } rather than an HTTP error for a bad PIN. */
-function fetchDataset_(dataset) {
+function fetchDataset_(dataset, retried) {
   var payload = {};
   for (var k in dataset.payload) payload[k] = dataset.payload[k];
-  payload.pin = pin_();
+  payload.pin = credential_(retried);
   var res = UrlFetchApp.fetch(dataset.url, {
     method: "post",
     contentType: "text/plain;charset=utf-8",
@@ -75,8 +109,14 @@ function fetchDataset_(dataset) {
     muteHttpExceptions: true
   });
   var code = res.getResponseCode();
+  if (code === 403) {
+    // The app refuses Accounting data to a device the owner hasn't allowed it for.
+    throw new Error(dataset.tab + ": not allowed yet. In the app, open Settings -> Devices, unlock, and tick Accounting for the device named \"Nightly backup\"");
+  }
   if (code !== 200) throw new Error(dataset.tab + ": HTTP " + code);
   var body = JSON.parse(res.getContentText());
+  // A credential revoked by a team PIN change: register again, once.
+  if (!body.ok && !retried && body.error === "Invalid PIN") return fetchDataset_(dataset, true);
   if (!body.ok) throw new Error(dataset.tab + ": " + (body.error || "rejected"));
   return body[dataset.key] || [];
 }
