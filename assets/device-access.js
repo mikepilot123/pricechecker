@@ -178,6 +178,7 @@
             <input class="text-input device-name" type="text" maxlength="60" value="${escapeHtml(device.name)}"
                    data-device-name="${escapeHtml(device.id)}" aria-label="Device name" />
             ${isThis ? '<span class="device-badge">This device</span>' : ""}
+            ${device.purpose === "backup" ? '<span class="device-badge">Backup · read-only</span>' : ""}
           </div>
           <p class="settings-help device-meta">
             Last opened ${escapeHtml(relativeTime(device.lastSeenAt))} · signed in ${escapeHtml(relativeTime(device.createdAt))}

@@ -15,11 +15,10 @@
  *  3. Project Settings -> set the timezone to (GMT-04:00) Atlantic Time —
  *     Trinidad, or the 9pm trigger will fire on the wrong clock.
  *  4. Run installBackupTrigger() once and approve the permission prompt.
- *  5. Run a backup once ("Repair Hub Backup" menu -> Back up now). The script
- *     signs itself in to the app as a device named "Nightly backup". In the
- *     app, open Settings -> Devices, unlock with the owner PIN, and tick
- *     Accounting for that device so Expenses and Bank transactions can be
- *     backed up. Nothing else needs allowing.
+ *  5. Nothing to allow in the app. On its first run the script signs itself
+ *     in as a read-only device named "Nightly backup" (visible in Settings ->
+ *     Devices), which can read everything the backup needs, Accounting
+ *     included, and change nothing.
  *
  * After that it runs itself at 9pm nightly. runBackupNow() does an immediate
  * backup if you ever want to force one.
@@ -39,11 +38,11 @@ var SNAPSHOTS_TO_KEEP = 14;
 
 var LOG_SHEET = "Backup Log";
 
-// Script property holding this backup's own device credential. The app hides
-// Accounting from every device until the owner allows it (Settings -> Devices),
-// and the plain team PIN identifies no device, so the backup registers once
-// and keeps the credential it's given.
-var CREDENTIAL_PROPERTY = "BACKUP_CREDENTIAL";
+// Script property holding this backup's own device credential. The plain team
+// PIN identifies no device, and the app hides Accounting from those, so the
+// backup registers once as a read-only backup device and keeps the credential.
+// (A new name from the first version, which registered as an ordinary device.)
+var CREDENTIAL_PROPERTY = "BACKUP_DEVICE";
 
 /** Each dataset: sheet tab, request, and the columns to write. */
 function datasets() {
@@ -88,7 +87,7 @@ function credential_(forceNew) {
   var res = UrlFetchApp.fetch(API_URL, {
     method: "post",
     contentType: "text/plain;charset=utf-8",
-    payload: JSON.stringify({ action: "registerBrowser", pin: pin_() }),
+    payload: JSON.stringify({ action: "registerBrowser", purpose: "backup", pin: pin_() }),
     muteHttpExceptions: true
   });
   var body = JSON.parse(res.getContentText());
@@ -110,8 +109,8 @@ function fetchDataset_(dataset, retried) {
   });
   var code = res.getResponseCode();
   if (code === 403) {
-    // The app refuses Accounting data to a device the owner hasn't allowed it for.
-    throw new Error(dataset.tab + ": not allowed yet. In the app, open Settings -> Devices, unlock, and tick Accounting for the device named \"Nightly backup\"");
+    // Only if the owner hid a section from the "Nightly backup" device.
+    throw new Error(dataset.tab + ": refused. In the app, open Settings -> Devices, unlock, and make sure the device named \"Nightly backup\" is allowed to see everything");
   }
   if (code !== 200) throw new Error(dataset.tab + ": HTTP " + code);
   var body = JSON.parse(res.getContentText());

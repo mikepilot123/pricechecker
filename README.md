@@ -85,12 +85,10 @@ them is a screen-level control.
 [`apps-script/NightlyBackup.gs`](apps-script/NightlyBackup.gs) copies the app's
 data (repairs, notes, appointments, expenses, bank transactions, reminders,
 customers, leads) into a Google Sheet every night at 9pm; its setup steps are
-at the top of the file. It signs in to the app as its own device, named
-**Nightly backup**. Because Accounting is hidden on every device until allowed,
-open **Settings → Devices** once after its first run and tick **Accounting**
-for that device, or Expenses and Bank transactions will be reported as "not
-allowed yet" in the failure email. If the team PIN is ever changed, the backup
-registers a fresh device the next night and Accounting needs allowing again.
+at the top of the file. It signs itself in to the app as a read-only device named **Nightly backup**
+(listed in Settings → Devices): it can read everything the backup needs,
+Accounting included, without anyone allowing it, and it can't change anything.
+If the team PIN is ever changed, it registers a fresh device the next night.
 
 There's also a Chrome extension (`extension/`) for the counter/office laptop:
 click its toolbar icon on *any* site — Facebook, WhatsApp Web, email — to open

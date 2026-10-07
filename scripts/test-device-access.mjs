@@ -172,17 +172,33 @@ const again = await register();
 assert.notEqual(again, staff);
 assert.deepEqual((await call({ action: "deviceAccess", pin: again })).hidden, ALL);
 
-// The nightly backup (apps-script/NightlyBackup.gs) signs in as its own device
-// from Apps Script: named as such, refused Accounting until the owner allows
-// it, and nothing else needs allowing.
-const backup = await register("Mozilla/5.0 (compatible; Google-Apps-Script)");
+// The nightly backup (apps-script/NightlyBackup.gs) registers as a read-only
+// backup device: it sees everything it needs without the owner allowing
+// anything, and can't change anything.
+async function registerBackup() {
+  const data = await call({ action: "registerBrowser", purpose: "backup", pin: "1234" }, { ua: "Mozilla/5.0 (compatible; Google-Apps-Script)" });
+  assert.equal(data.ok, true, data.error);
+  return data.credential;
+}
+const backup = await registerBackup();
 const backupAccess = await call({ action: "deviceAccess", pin: backup });
-assert.deepEqual(backupAccess.hidden, ALL);
-for (const action of ["listExpenses", "listBankTransactions"]) assert.equal((await call({ action, pin: backup })).status, 403, action);
-for (const action of ["list", "listAllTicketNotes", "listAppointments", "listReminders", "listCustomers"]) assert.equal((await call({ action, pin: backup })).ok, true, action);
-const backupDevice = (await call({ action: "listDevices", pin: early, ownerPin: "4321" })).devices.find((d) => d.id === backupAccess.deviceId);
-assert.equal(backupDevice.name, "Nightly backup");
-await call({ action: "updateDevice", pin: early, ownerPin: "4321", id: backupDevice.id, hidden: ["invoiceFigures", "dashboard", "targets"] });
-for (const action of ["listExpenses", "listBankTransactions"]) assert.equal((await call({ action, pin: backup })).ok, true, action);
+assert.deepEqual(backupAccess.hidden, [], "nothing hidden from the backup");
+for (const action of ["list", "listAllTicketNotes", "listAppointments", "listExpenses", "listBankTransactions", "listReminders", "listCustomers"]) {
+  assert.equal((await call({ action, pin: backup })).ok, true, action);
+}
+for (const action of ["add", "update", "delete", "addExpense", "addBankTransaction", "clear", "restoreBackup", "setOwnerPin", "updateDevice", "restrictOtherDevices"]) {
+  const refused = await call({ action, pin: backup, ownerPin: "4321" });
+  assert.equal(refused.status, 403, action);
+  assert.match(refused.error, /read-only/);
+}
+// Listed in Settings → Devices, labelled as the backup.
+const listedBackup = (await call({ action: "listDevices", pin: early, ownerPin: "4321" })).devices.find((d) => d.id === backupAccess.deviceId);
+assert.deepEqual([listedBackup.name, listedBackup.purpose], ["Nightly backup", "backup"]);
+// "Restrict all other devices" and the hidden-by-default reset leave it alone,
+// but the owner can still hide a section from it.
+await call({ action: "restrictOtherDevices", pin: early, ownerPin: "4321" });
+assert.equal((await call({ action: "listBankTransactions", pin: backup })).ok, true);
+await call({ action: "updateDevice", pin: early, ownerPin: "4321", id: listedBackup.id, hidden: ["accounting"] });
+assert.equal((await call({ action: "listBankTransactions", pin: backup })).status, 403);
 
 console.log("device access tests passed");

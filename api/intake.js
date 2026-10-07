@@ -35,7 +35,7 @@ import { ensureSchema } from "../lib/db.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
-import { registerDevice, effectiveHidden, listDevices, updateDevice, restrictOtherDevices } from "../lib/devices.js";
+import { registerDevice, isBackupDevice, effectiveHidden, listDevices, updateDevice, restrictOtherDevices } from "../lib/devices.js";
 
 // Data behind a section the owner can hide per device (lib/devices.js). An
 // action is refused only when EVERY section listed for it is hidden, since
@@ -44,6 +44,8 @@ import { registerDevice, effectiveHidden, listDevices, updateDevice, restrictOth
 // (tickets, invoices), so the app hides those parts too
 // (assets/device-access.js); this keeps the figures that exist only for
 // these sections off a restricted device.
+const BACKUP_READ_ACTIONS = new Set(["deviceAccess", "accountSummary", "bankAccountSummary"]);
+
 const SECTION_GUARDED_ACTIONS = {
   listMonthlySales: ["dashboard", "targets"],
   accountSummary: ["dashboard"],
@@ -91,11 +93,16 @@ export default async function handler(req, res) {
       // Recorded before the credential is handed out, hidden until the owner
       // allows it (lib/devices.js).
       await ensureSchema();
-      await registerDevice(deviceIdForCredential(credential), { userAgent: req.headers["user-agent"] });
+      await registerDevice(deviceIdForCredential(credential), { userAgent: req.headers["user-agent"], purpose: body.purpose });
       return res.status(200).json({ ok: true, credential });
     }
     await ensureSchema();
     const deviceId = deviceIdForCredential(body.pin);
+    // The nightly backup's device can read anything the backup needs without
+    // the owner allowing it, but can't change anything.
+    if (deviceId && !/^list/.test(action) && !BACKUP_READ_ACTIONS.has(action) && await isBackupDevice(deviceId)) {
+      return res.status(403).json({ ok: false, error: "The backup device is read-only." });
+    }
     const guardedSections = SECTION_GUARDED_ACTIONS[action];
     if (guardedSections) {
       const hidden = await effectiveHidden(deviceId, { managed: !!(await ownerPinSource()), userAgent: req.headers["user-agent"] });
