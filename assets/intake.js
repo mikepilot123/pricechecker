@@ -94,7 +94,6 @@
 
   const LS_PIN = "rpc_intake_pin";
   const BROWSER_CREDENTIAL_PREFIX = "rpcb1.";
-  const TICKET_PAGE_SIZE = 12;
   const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
 
   const $ = (id) => document.getElementById(id);
@@ -126,7 +125,6 @@
   // issue are already known, so the wizard skips straight to Payment.
   let quickLogMode = false;
   let loadedOnce = false;
-  let visibleTicketCount = TICKET_PAGE_SIZE;
   // Which status sections are collapsed on the Repairs list, keyed by
   // status name — expanded by default, same as Parts Orders' shipment
   // groups (collapsedShipments there).
@@ -478,7 +476,6 @@
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
-      visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       renderStatusChips();
       render();
@@ -557,7 +554,6 @@
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
       await loadTechnicians();
-      visibleTicketCount = TICKET_PAGE_SIZE;
       loadedOnce = true;
       renderStatusChips();
       render();
@@ -939,7 +935,6 @@
       const res = await api({ action: "clear" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = [];
-      visibleTicketCount = TICKET_PAGE_SIZE;
       statusFilter = "all";
       refreshInventoryAfterStockChange();
       closeForm();
@@ -1004,7 +999,6 @@
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
       statusFilter = "all";
-      visibleTicketCount = TICKET_PAGE_SIZE;
       refreshInventoryAfterStockChange();
       renderStatusChips();
       render();
@@ -4703,12 +4697,10 @@
 
   // ---- Filtering / search --------------------------------------------------
   $("intakeSearch").addEventListener("input", () => {
-    visibleTicketCount = TICKET_PAGE_SIZE;
     render();
   });
   $("statusFilterSelect")?.addEventListener("change", () => {
     statusFilter = $("statusFilterSelect").value || "all";
-    visibleTicketCount = TICKET_PAGE_SIZE;
     render();
   });
 
@@ -4737,7 +4729,6 @@
     setRepairsPanel("existing"); // these filters (active/ready/etc) only apply to in-progress repairs
     statusFilter = filter === "active" ? "__active" : filter === "ready" ? "Repaired" : filter;
     if ($("intakeSearch")) $("intakeSearch").value = "";
-    visibleTicketCount = TICKET_PAGE_SIZE;
     if (loadedOnce) {
       renderStatusChips();
       render();
@@ -4954,14 +4945,12 @@
     const sections = statusFilter === "all"
       ? buildStatusSections(list)
       : [{ status: null, groups: partsAlertsFirst(groupTicketsByCheckin(list)) }];
-    // Paginate by device count, but never split one client's check-in across
-    // the "View more" boundary — a section header only prints once its first
-    // card actually makes the cut.
+    // One continuous list — every open repair renders, no "View more" paging.
+    // A section header only prints once its first card is added.
     $("intakeList").innerHTML = "";
     $("intakeEmpty").hidden = list.length > 0;
     $("intakeError").hidden = true;
     const frag = document.createDocumentFragment();
-    let shownCount = 0;
     const grouped = statusFilter === "all" && sections.length > 0;
     // Lets phone CSS drop each row's status badge when the section header
     // above it already names the status.
@@ -4974,20 +4963,16 @@
       for (const section of sections) {
         frag.appendChild(statusSectionHeaderEl(section.status, section.count, true));
       }
-      shownCount = list.length;
     } else {
       for (const section of sections) {
-        if (shownCount >= visibleTicketCount) break;
         let headerAdded = false;
         const collapsed = !!(section.status && collapsedRepairStatuses.has(section.status));
         for (const group of section.groups) {
-          if (shownCount >= visibleTicketCount) break;
           if (section.status && !headerAdded) {
             frag.appendChild(statusSectionHeaderEl(section.status, section.count, collapsed));
             headerAdded = true;
           }
           if (!collapsed) frag.appendChild(checkinCard(group));
-          shownCount += group.length;
         }
       }
     }
@@ -4996,23 +4981,12 @@
       ? filterSelect.options[filterSelect.selectedIndex].text.replace(/\s*\(\d+\)$/, "").replace(/^⚠\s*/, "")
       : "";
     $("intakeCount").textContent = list.length
-      ? `Showing ${shownCount} of ${list.length} device${list.length === 1 ? "" : "s"}${filterName ? ` · ${filterName}` : ""}`
+      ? `${list.length} device${list.length === 1 ? "" : "s"}${filterName ? ` · ${filterName}` : ""}`
       : "";
     const toggleAll = $("repairsToggleAll");
     toggleAll.hidden = !grouped;
     toggleAll.textContent = allCollapsed ? "Expand all" : "Collapse all";
     toggleAll.setAttribute("aria-expanded", allCollapsed ? "false" : "true");
-    if (!allCollapsed && shownCount < list.length) {
-      const more = document.createElement("button");
-      const remaining = list.length - shownCount;
-      more.className = "view-more-btn";
-      more.innerHTML = `View ${Math.min(TICKET_PAGE_SIZE, remaining)} more <span aria-hidden="true">↓</span>`;
-      more.onclick = () => {
-        visibleTicketCount += TICKET_PAGE_SIZE;
-        render();
-      };
-      frag.appendChild(more);
-    }
     $("intakeList").appendChild(frag);
     renderCompletedTickets();
   }

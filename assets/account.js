@@ -102,6 +102,10 @@
   function loadAll(force) {
     if (loadInFlight) return loadInFlight;
     if (loadedOnce && !force) return Promise.resolve();
+    // This device has Accounting switched off (Settings → Devices): the API
+    // refuses these calls with a 403, and other tabs (e.g. recording a repair
+    // payment) trigger a refresh here, so don't ask — and don't show an error.
+    if (window.RPC_DEVICE_ACCESS?.isHidden?.("accounting")) return Promise.resolve();
     loadInFlight = (async () => {
       const [bankTransactions, bankSummary] = await Promise.allSettled([
         api({ action: "listBankTransactions" }),
@@ -113,7 +117,8 @@
       }
       if (bankSummary.status === "fulfilled") BANK_SUMMARY = bankSummary.value.summary;
       const failure = [bankTransactions, bankSummary].find((r) => r.status === "rejected");
-      if (failure && !BANK_TRANSACTIONS.length) toast("Couldn't load the account: " + failure.reason.message);
+      // A 403 means the owner hasn't allowed Accounting here — expected, not an error.
+      if (failure && !BANK_TRANSACTIONS.length && !/HTTP 403/.test(failure.reason.message)) toast("Couldn't load the account: " + failure.reason.message);
       loadedOnce = true;
       renderAll();
     })().finally(() => { loadInFlight = null; });
