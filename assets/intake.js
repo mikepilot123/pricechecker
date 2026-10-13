@@ -110,6 +110,13 @@
   let CUSTOMERS = [];
   let customersLoadStarted = false;
   let statusFilter = "all";
+  // Order and intake-date filter for the Repairs list. Kept per device, so
+  // each counter screen or phone stays the way its user set it.
+  const LS_REPAIRS_DATE = "rpc_repairs_date_view";
+  const repairsDateView = (() => {
+    const fallback = { sort: "newest", range: "all", from: "", to: "" };
+    try { return Object.assign(fallback, JSON.parse(localStorage.getItem(LS_REPAIRS_DATE) || "{}")); } catch (_) { return fallback; }
+  })();
   let editingId = null;
   let formStep = 1;
   // Ticket a new device is being added alongside (the "+" on a client's
@@ -4704,6 +4711,92 @@
     render();
   });
 
+  // ---- Order / date logged ------------------------------------------------------
+  function saveRepairsDateView() {
+    try { localStorage.setItem(LS_REPAIRS_DATE, JSON.stringify(repairsDateView)); } catch (_) {}
+  }
+  function syncRepairsDateControls() {
+    if ($("repairsSort")) $("repairsSort").value = repairsDateView.sort;
+    if ($("repairsDateRange")) $("repairsDateRange").value = repairsDateView.range;
+    if ($("repairsDateFrom")) $("repairsDateFrom").value = repairsDateView.from;
+    if ($("repairsDateTo")) $("repairsDateTo").value = repairsDateView.to;
+    if ($("repairsCustomDates")) $("repairsCustomDates").hidden = repairsDateView.range !== "custom";
+  }
+  syncRepairsDateControls();
+  $("repairsSort")?.addEventListener("change", (e) => {
+    repairsDateView.sort = e.target.value === "oldest" ? "oldest" : "newest";
+    saveRepairsDateView();
+    render();
+  });
+  $("repairsDateRange")?.addEventListener("change", (e) => {
+    repairsDateView.range = e.target.value || "all";
+    // Picking dates starts from today, ready to widen.
+    if (repairsDateView.range === "custom" && !repairsDateView.from && !repairsDateView.to) {
+      repairsDateView.from = repairsDateView.to = localDateKey(new Date());
+    }
+    saveRepairsDateView();
+    syncRepairsDateControls();
+    render();
+  });
+  ["repairsDateFrom", "repairsDateTo"].forEach((id) => {
+    $(id)?.addEventListener("change", () => {
+      repairsDateView.from = $("repairsDateFrom").value || "";
+      repairsDateView.to = $("repairsDateTo").value || "";
+      saveRepairsDateView();
+      render();
+    });
+  });
+
+  function localDateKey(date) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  }
+  function startOfLocalDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  }
+  // [from, to) in ms for the chosen "Logged" range, or null for any time.
+  // Custom dates are whole days in the device's own time zone, either end
+  // optional, and swapped if entered backwards.
+  function repairsDateBounds() {
+    const now = new Date();
+    const today = startOfLocalDay(now);
+    const day = 24 * 60 * 60 * 1000;
+    switch (repairsDateView.range) {
+      case "today": return [today, Infinity];
+      case "7": return [startOfLocalDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)), Infinity];
+      case "30": return [startOfLocalDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29)), Infinity];
+      case "month": return [new Date(now.getFullYear(), now.getMonth(), 1).getTime(), Infinity];
+      case "custom": {
+        const parse = (key) => {
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || "");
+          return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : null;
+        };
+        let from = parse(repairsDateView.from);
+        let to = parse(repairsDateView.to);
+        if (from == null && to == null) return null;
+        if (from != null && to != null && from > to) [from, to] = [to, from];
+        return [from ?? -Infinity, to == null ? Infinity : to + day];
+      }
+      default: return null;
+    }
+  }
+  // "logged today", "logged 3 Oct – 9 Oct"… for the count line; "" for any time.
+  function repairsDateLabel() {
+    const fixed = { today: "logged today", 7: "logged in the last 7 days", 30: "logged in the last 30 days", month: "logged this month" };
+    if (repairsDateView.range === "all") return "";
+    if (repairsDateView.range !== "custom") return fixed[repairsDateView.range] || "";
+    const fmt = (key) => {
+      const [y, m, d] = key.split("-").map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    };
+    const { from, to } = repairsDateView;
+    const [a, b] = from && to && from > to ? [to, from] : [from, to];
+    if (a && b) return a === b ? `logged ${fmt(a)}` : `logged ${fmt(a)} – ${fmt(b)}`;
+    if (a) return `logged from ${fmt(a)}`;
+    if (b) return `logged up to ${fmt(b)}`;
+    return "";
+  }
+
   $("completedSearch")?.addEventListener("input", () => {
     const clear = $("clearCompletedSearch");
     if (clear) clear.hidden = !$("completedSearch").value;
@@ -4762,8 +4855,13 @@
 
   function currentList() {
     const q = $("intakeSearch").value.trim().toLowerCase();
+    const bounds = repairsDateBounds();
     const list = TICKETS.filter((t) => {
       if (t.status === "Picked Up" || t.status === "No Fix") return false; // moved to the Completed Repairs tab
+      if (bounds) {
+        const logged = new Date(t.created).getTime();
+        if (!(logged >= bounds[0] && logged < bounds[1])) return false;
+      }
       if (statusFilter === "__active") {
         if (!ACTIVE_REPAIR_STATUSES.has(t.status)) return false;
       } else if (statusFilter === "__parts_needed") {
@@ -4774,10 +4872,11 @@
         .map((x) => (x || "").toLowerCase())
         .some((x) => x.includes(q));
     });
-    // Newest logged device first — TICKETS itself comes from the API sorted
-    // by updated_at, which would otherwise bump a device to the top just for
-    // getting a status change, not for being new.
-    list.sort((a, b) => (new Date(b.created).getTime() || 0) - (new Date(a.created).getTime() || 0));
+    // By date logged, newest first unless Order says otherwise — TICKETS
+    // itself comes from the API sorted by updated_at, which would otherwise
+    // bump a device to the top just for getting a status change.
+    const direction = repairsDateView.sort === "oldest" ? -1 : 1;
+    list.sort((a, b) => direction * ((new Date(b.created).getTime() || 0) - (new Date(a.created).getTime() || 0)));
     return list;
   }
 
@@ -4949,6 +5048,12 @@
     // A section header only prints once its first card is added.
     $("intakeList").innerHTML = "";
     $("intakeEmpty").hidden = list.length > 0;
+    // "Nothing logged yet" would be wrong when a date or filter is hiding repairs.
+    const narrowed = !!repairsDateBounds() || statusFilter !== "all" || !!$("intakeSearch").value.trim();
+    $("intakeEmptyTitle").textContent = narrowed ? "No repairs match" : "No devices logged yet";
+    $("intakeEmptySub").textContent = narrowed
+      ? "Try another date, status or search."
+      : "Tap “+ Log device” to add the first one.";
     $("intakeError").hidden = true;
     const frag = document.createDocumentFragment();
     const grouped = statusFilter === "all" && sections.length > 0;
@@ -4980,8 +5085,9 @@
     const filterName = statusFilter !== "all" && filterSelect && filterSelect.selectedIndex >= 0
       ? filterSelect.options[filterSelect.selectedIndex].text.replace(/\s*\(\d+\)$/, "").replace(/^⚠\s*/, "")
       : "";
+    const dateName = repairsDateLabel();
     $("intakeCount").textContent = list.length
-      ? `${list.length} device${list.length === 1 ? "" : "s"}${filterName ? ` · ${filterName}` : ""}`
+      ? `${list.length} device${list.length === 1 ? "" : "s"}${filterName ? ` · ${filterName}` : ""}${dateName ? ` · ${dateName}` : ""}${repairsDateView.sort === "oldest" ? " · oldest first" : ""}`
       : "";
     const toggleAll = $("repairsToggleAll");
     toggleAll.hidden = !grouped;
