@@ -1,5 +1,11 @@
 /* ============================================================
-   Visual diagnostics — test a device before and after a repair.
+   Visual diagnostics — test a repair's device before and after the fix.
+
+   Every test belongs to a repair: staff pick the ticket first (from the
+   repairs in the shop, or by search), and the results are saved to that
+   ticket as they go — no save button to forget. The repair's detail view
+   (assets/intake.js) shows the same results back, with a button to carry
+   on testing here.
 
    The tool is a *picture*, not a checklist: each testable part is a
    hotspot sitting where it physically lives (charging port on the bottom
@@ -17,19 +23,25 @@
    panel calls out anything that regressed, which is the thing you never
    want to hand back to a client unnoticed.
 
-   Client details can be typed free-hand for a walk-in, or the report can
-   be tagged to a device already logged in Repairs, in which case the
-   name/contact/device are pulled from that ticket and the report keeps a
-   reference to it.
-
-   Storage is local to the device (localStorage) — same as the rest of
-   the shop tools' offline drafts; nothing here needs the team PIN.
+   Storage is the ticket_diagnostics table (lib/diagnostics.js). Changes
+   that haven't reached the server yet are kept in localStorage and
+   retried, so a dropped connection mid-test loses nothing.
    ============================================================ */
 
 (function () {
-  const LS_DRAFT = "rpc_diagnostics_draft";
-  const LS_REPORTS = "rpc_diagnostics_reports";
-  const MAX_REPORTS = 60;
+  const SCRIPT_URL = "https://pricechecker-cyan.vercel.app/api/intake";
+  const LS_PIN = "rpc_intake_pin";
+  const LS_STATE = "rpc_diagnostics_state";     // which repair/stage/section was open
+  const LS_PENDING = "rpc_diagnostics_pending"; // { ticketId: record } not yet saved
+  const SAVE_DELAY = 700;
+  const RETRY_DELAY = 8000;
+  const PICKER_LIMIT = 40;
+
+  // "In the shop" is everything not yet handed back.
+  const INACTIVE_STATUSES = new Set(["Picked Up", "Cancelled"]);
+  // A repair already at one of these with nothing tested yet opens straight
+  // on the after-repair pass — there's no "before" left to record.
+  const REPAIRED_STATUSES = new Set(["Repaired", "Checked Out - Waiting on Client", "Picked Up", "No Fix"]);
 
   const STATES = ["untested", "pass", "fail", "na"];
   const STATE_LABEL = { untested: "Untested", pass: "Pass", fail: "Fail", na: "N/A" };
@@ -106,30 +118,36 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  let draft = newDraft();
-  let reports = [];
+  let draft = null;          // the repair being tested — null while picking one
+  let records = new Map();   // ticketId → saved diagnostic, for the picker's badges
+  let pickerFilter = "active";
+  let saveState = "idle";    // idle | dirty | saving | saved | error
+  let saveError = "";
+  let saveTimer = null;
+  let retryTimer = null;
+  let saving = null;
+  let saveAgain = false;
+  let selectSeq = 0;
+  let openRequest = null;    // a repair asked for by RPC_OPEN_DIAGNOSTICS
+  let ticketsRequested = false;
+  let recordsPromise = null;
   let bound = false;
-  let comboOpen = false;
 
-  function newDraft() {
+  function newDraft(ticketId, deviceType) {
     return {
-      id: "",
-      clientName: "",
-      clientContact: "",
-      device: "",
-      deviceType: "phone",
-      ticketId: "",
-      ticketLabel: "",
+      ticketId,
+      deviceType: LAYOUTS[deviceType] ? deviceType : "phone",
       stage: "before",
       section: 0,
       before: {},
       after: {},
       notes: "",
-      created: "",
+      updated: "",
     };
   }
 
-  const layout = () => LAYOUTS[draft.deviceType] || LAYOUTS.phone;
+  const layoutFor = (type) => LAYOUTS[type] || LAYOUTS.phone;
+  const layout = () => layoutFor(draft && draft.deviceType);
   const groups = () => layout().groups;
   const partByKey = (key) => layout().parts.find((p) => p.key === key);
 
@@ -147,47 +165,36 @@
       : "phone";
   }
 
-  // ---- Persistence ---------------------------------------------------------
-
-  function loadStored() {
-    try {
-      const rawDraft = localStorage.getItem(LS_DRAFT);
-      if (rawDraft) draft = Object.assign(newDraft(), JSON.parse(rawDraft));
-    } catch (_) { /* ignore malformed draft */ }
-    if (!LAYOUTS[draft.deviceType]) draft.deviceType = "phone";
-    if (draft.stage !== "after") draft.stage = "before";
-    if (!draft.before || typeof draft.before !== "object") draft.before = {};
-    if (!draft.after || typeof draft.after !== "object") draft.after = {};
-    draft.section = sectionIndex();
-
-    try {
-      const rawReports = localStorage.getItem(LS_REPORTS);
-      reports = rawReports ? JSON.parse(rawReports) : [];
-      if (!Array.isArray(reports)) reports = [];
-    } catch (_) { reports = []; }
-  }
-
-  function saveDraft() {
-    try { localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); }
-    catch (_) { /* storage full/unavailable — non-fatal */ }
-  }
-
-  function saveReports() {
-    try { localStorage.setItem(LS_REPORTS, JSON.stringify(reports.slice(0, MAX_REPORTS))); }
-    catch (_) { /* non-fatal */ }
-  }
-
   // ---- Derived data --------------------------------------------------------
+  // These take any record (the draft, a saved diagnostic, a pending one) so
+  // the repair modal's summary is drawn by exactly the same rules.
 
-  const stateOf = (stage, key) => (draft[stage] && draft[stage][key]) || "untested";
+  const resultOf = (rec, stage, key) => (rec && rec[stage] && rec[stage][key]) || "untested";
 
-  function tally(stage) {
-    const parts = layout().parts;
+  function tallyOf(rec, stage) {
+    const parts = layoutFor(rec && rec.deviceType).parts;
     const out = { pass: 0, fail: 0, na: 0, untested: 0, total: parts.length };
-    parts.forEach((p) => { out[stateOf(stage, p.key)] += 1; });
+    parts.forEach((p) => { out[resultOf(rec, stage, p.key)] += 1; });
     out.tested = out.total - out.untested;
     return out;
   }
+
+  // fail → pass is the win; pass → fail is the one that must never ship.
+  function comparisonOf(rec) {
+    const out = { fixed: [], stillFaulty: [], newIssues: [] };
+    layoutFor(rec && rec.deviceType).parts.forEach((p) => {
+      const before = resultOf(rec, "before", p.key);
+      const after = resultOf(rec, "after", p.key);
+      if (before === "fail" && after === "pass") out.fixed.push(p);
+      else if (before === "fail" && after === "fail") out.stillFaulty.push(p);
+      else if (before === "pass" && after === "fail") out.newIssues.push(p);
+    });
+    return out;
+  }
+
+  const stateOf = (stage, key) => resultOf(draft, stage, key);
+  const tally = (stage) => tallyOf(draft, stage);
+  const comparison = () => comparisonOf(draft);
 
   function groupTally(group, stage) {
     const out = { tested: 0, fail: 0, total: group.parts.length };
@@ -200,20 +207,406 @@
     return out;
   }
 
-  // fail → pass is the win; pass → fail is the one that must never ship.
-  function comparison() {
-    const out = { fixed: [], stillFaulty: [], newIssues: [] };
-    layout().parts.forEach((p) => {
-      const before = stateOf("before", p.key);
-      const after = stateOf("after", p.key);
-      if (before === "fail" && after === "pass") out.fixed.push(p);
-      else if (before === "fail" && after === "fail") out.stillFaulty.push(p);
-      else if (before === "pass" && after === "fail") out.newIssues.push(p);
+  function pickStage(rec, ticket) {
+    const before = tallyOf(rec, "before");
+    const after = tallyOf(rec, "after");
+    if (after.tested) return "after";
+    if (before.tested && before.tested === before.total) return "after";
+    if (!before.tested && ticket && REPAIRED_STATUSES.has(ticket.status)) return "after";
+    return "before";
+  }
+
+  function firstOpenSection(stage) {
+    const i = groups().findIndex((g) => !groupTally(g, stage).complete);
+    return i < 0 ? 0 : i;
+  }
+
+  function whenLabel(iso) {
+    const d = new Date(iso);
+    if (!iso || isNaN(d)) return "";
+    return d.toDateString() === new Date().toDateString()
+      ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : d.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+
+  // ---- Repairs ---------------------------------------------------------------
+  // The ticket list is owned by assets/intake.js; it publishes a copy on
+  // window.RPC_INTAKE_TICKETS whenever it loads.
+
+  const allTickets = () => (Array.isArray(window.RPC_INTAKE_TICKETS) ? window.RPC_INTAKE_TICKETS : []);
+  const findTicket = (id) => allTickets().find((t) => t.id === id);
+  const statusClass = (status) => (window.RPC_STATUS_CLASS && window.RPC_STATUS_CLASS[status]) || "st-received";
+  const deviceIcon = (type) => (type === "laptop" ? "i-laptop" : "i-smartphone");
+
+  function storedPin() {
+    try { return localStorage.getItem(LS_PIN) || ""; } catch (_) { return ""; }
+  }
+
+  // Repairs only loads its list when that tab is opened, so ask it to if
+  // this tab is reached first.
+  async function ensureTickets() {
+    if (Array.isArray(window.RPC_INTAKE_TICKETS) || ticketsRequested || !storedPin()) return;
+    if (typeof window.RPC_RELOAD_TICKETS !== "function") return;
+    ticketsRequested = true;
+    try { await window.RPC_RELOAD_TICKETS(); } catch (_) { /* Repairs shows its own error */ }
+    ticketsRequested = false;
+  }
+
+  // ---- Server --------------------------------------------------------------
+
+  async function api(payload, { keepalive = false } = {}) {
+    // text/plain avoids a CORS preflight, matching how Check-In calls the API.
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ pin: storedPin() }, payload)),
+      keepalive,
     });
-    return out;
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Rejected");
+    return data;
+  }
+
+  const payloadOf = (rec) => ({
+    ticketId: rec.ticketId,
+    deviceType: rec.deviceType,
+    before: rec.before || {},
+    after: rec.after || {},
+    notes: rec.notes || "",
+  });
+
+  function readPending() {
+    try {
+      const map = JSON.parse(localStorage.getItem(LS_PENDING) || "{}");
+      return map && typeof map === "object" && !Array.isArray(map) ? map : {};
+    } catch (_) { return {}; }
+  }
+
+  function writePending(map) {
+    try {
+      if (Object.keys(map).length) localStorage.setItem(LS_PENDING, JSON.stringify(map));
+      else localStorage.removeItem(LS_PENDING);
+    } catch (_) { /* storage full/unavailable — the in-memory draft still saves */ }
+  }
+
+  function loadRecords() {
+    if (!storedPin()) return Promise.resolve();
+    if (recordsPromise) return recordsPromise;
+    recordsPromise = api({ action: "listTicketDiagnostics" })
+      .then((data) => {
+        records = new Map((data.diagnostics || []).map((d) => [d.ticketId, d]));
+        // Unsaved local changes are newer than anything the server has.
+        Object.values(readPending()).forEach((p) => records.set(p.ticketId, Object.assign({}, records.get(p.ticketId), p)));
+      })
+      .catch(() => { /* badges just stay as they were */ })
+      .finally(() => {
+        recordsPromise = null;
+        if (!$("dgPicker")?.hidden) renderPicker();
+      });
+    return recordsPromise;
+  }
+
+  // Sends one record and, if nothing has changed since it was sent, drops it
+  // from the unsaved list.
+  async function pushRecord(rec, opts) {
+    const body = payloadOf(rec);
+    const sent = JSON.stringify(body);
+    let diagnostic = null;
+    try {
+      diagnostic = (await api(Object.assign({ action: "saveTicketDiagnostic" }, body), opts)).diagnostic;
+    } catch (err) {
+      // A repair deleted since the test was run can never be saved to —
+      // let it go rather than retrying forever.
+      if (!/ticket not found/i.test(String(err && err.message))) throw err;
+    }
+    if (diagnostic) records.set(body.ticketId, diagnostic);
+    else records.delete(body.ticketId);
+    const pending = readPending();
+    if (pending[body.ticketId] && JSON.stringify(payloadOf(pending[body.ticketId])) === sent) {
+      delete pending[body.ticketId];
+      writePending(pending);
+    }
+    return diagnostic;
+  }
+
+  function scheduleRetry() {
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(flushPending, RETRY_DELAY);
+  }
+
+  function saveNow(opts) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (!draft) return Promise.resolve();
+    if (saving) { saveAgain = true; return saving; }
+    const target = draft;
+    saveState = "saving";
+    renderSaveState();
+    saving = pushRecord(target, opts)
+      .then((diagnostic) => {
+        if (draft !== target) return;
+        draft.updated = diagnostic ? diagnostic.updated : "";
+        saveError = "";
+        // Edits made while this was in flight are still on their way.
+        saveState = saveTimer || saveAgain ? "dirty" : "saved";
+      }, (err) => {
+        if (draft !== target) return;
+        const message = String((err && err.message) || err);
+        saveError = /invalid pin/i.test(message)
+          ? "Not saved — reconnect this device in Settings"
+          : "Not saved yet — retrying";
+        saveState = "error";
+        if (!/invalid pin/i.test(message)) scheduleRetry();
+      })
+      .then(() => {
+        saving = null;
+        if (saveAgain) {
+          saveAgain = false;
+          if (draft === target) return saveNow(opts);
+        }
+        renderSaveState();
+      });
+    return saving;
+  }
+
+  // Everything this device still owes the server, including tests on other
+  // repairs that were run while offline.
+  async function flushPending() {
+    clearTimeout(retryTimer);
+    const pending = readPending();
+    for (const id of Object.keys(pending)) {
+      if (draft && draft.ticketId === id) { await saveNow(); continue; }
+      try { await pushRecord(pending[id]); }
+      catch (_) { scheduleRetry(); return; }
+    }
+  }
+
+  // Every edit lands in the unsaved list straight away, then goes to the
+  // server once tapping pauses — so a burst of "All pass" taps is one save.
+  function markChanged() {
+    if (!draft) return;
+    const pending = readPending();
+    pending[draft.ticketId] = payloadOf(draft);
+    writePending(pending);
+    records.set(draft.ticketId, Object.assign({}, records.get(draft.ticketId), payloadOf(draft)));
+    saveState = "dirty";
+    clearTimeout(saveTimer);
+    clearTimeout(retryTimer);
+    saveTimer = setTimeout(() => saveNow(), SAVE_DELAY);
+    render();
+  }
+
+  function rememberState() {
+    try {
+      if (!draft) localStorage.removeItem(LS_STATE);
+      else localStorage.setItem(LS_STATE, JSON.stringify({ ticketId: draft.ticketId, stage: draft.stage, section: draft.section }));
+    } catch (_) { /* non-fatal */ }
+  }
+
+  function readState() {
+    try { return JSON.parse(localStorage.getItem(LS_STATE) || "null"); } catch (_) { return null; }
+  }
+
+  // ---- Choosing a repair ---------------------------------------------------
+
+  async function selectTicket(id, opts = {}) {
+    const ticket = findTicket(id);
+    if (!ticket) {
+      toast("Couldn't find that repair — it may have been deleted.");
+      showPicker();
+      return;
+    }
+    // Finish saving the repair being left before switching away from it.
+    if (draft && draft.ticketId !== id && (saveTimer || saving)) await saveNow();
+
+    const seq = ++selectSeq;
+    const pending = readPending()[id] || null;
+    let record = pending;
+    if (!record) {
+      try {
+        record = (await api({ action: "getTicketDiagnostic", ticketId: id })).diagnostic;
+        if (record) records.set(id, record);
+        else records.delete(id);
+      } catch (_) {
+        // Starting blank here would overwrite results saved from another
+        // device the moment anything was tapped, so don't open it at all.
+        if (seq !== selectSeq) return;
+        toast("Couldn't load this repair's saved results — check the connection and try again.");
+        showPicker();
+        return;
+      }
+    }
+    if (seq !== selectSeq) return;
+
+    draft = newDraft(id, record ? record.deviceType : detectType(ticket.device));
+    if (record) {
+      draft.before = Object.assign({}, record.before);
+      draft.after = Object.assign({}, record.after);
+      draft.notes = record.notes || "";
+      draft.updated = record.updated || "";
+    }
+    draft.stage = opts.stage === "before" || opts.stage === "after" ? opts.stage : pickStage(draft, ticket);
+    draft.section = Number.isInteger(opts.section) ? opts.section : firstOpenSection(draft.stage);
+    draft.section = sectionIndex();
+    saveError = "";
+    saveState = pending ? "dirty" : record ? "saved" : "idle";
+    rememberState();
+    showWorkspace();
+    if (pending) saveNow();
+  }
+
+  async function leaveRepair() {
+    if (draft && (saveTimer || saving)) await saveNow();
+    draft = null;
+    selectSeq++;
+    rememberState();
+    showPicker();
+    $("dgRepairSearch")?.focus();
+  }
+
+  function diagBadge(rec) {
+    if (!rec) return { cls: "", text: "Not tested" };
+    const before = tallyOf(rec, "before");
+    const after = tallyOf(rec, "after");
+    if (after.tested) {
+      const c = comparisonOf(rec);
+      if (c.newIssues.length) return { cls: "is-new", text: `${c.newIssues.length} new issue${c.newIssues.length === 1 ? "" : "s"}` };
+      if (after.fail) return { cls: "is-still", text: `After · ${after.fail} fail` };
+      return { cls: "is-fixed", text: after.tested === after.total ? "After · all pass" : `After · ${after.tested}/${after.total}` };
+    }
+    if (before.tested) {
+      return {
+        cls: before.fail ? "is-still" : "is-fixed",
+        text: `Before · ${before.fail} fail${before.tested < before.total ? ` · ${before.tested}/${before.total}` : ""}`,
+      };
+    }
+    return { cls: "", text: "Notes only" };
+  }
+
+  function renderPicker() {
+    const box = $("dgPickerList");
+    if (!box) return;
+    const query = String($("dgRepairSearch")?.value || "").trim().toLowerCase();
+    document.querySelectorAll("[data-dg-filter]").forEach((btn) => {
+      const active = !query && btn.dataset.dgFilter === pickerFilter;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    if (!storedPin()) {
+      box.innerHTML = `<p class="ops-empty">This device isn't connected to the shop yet — open <strong>Repairs</strong> and enter the team PIN, then come back here.</p>`;
+      return;
+    }
+    if (!Array.isArray(window.RPC_INTAKE_TICKETS)) {
+      box.innerHTML = `<p class="ops-empty">Loading repairs…</p>`;
+      return;
+    }
+
+    const tickets = allTickets();
+    let list;
+    if (query) {
+      list = tickets.filter((t) =>
+        [t.customerName, t.phone, t.email, t.device, t.id, t.issues]
+          .some((v) => String(v || "").toLowerCase().includes(query))
+      );
+    } else if (pickerFilter === "tested") {
+      list = tickets
+        .filter((t) => records.has(t.id))
+        .sort((a, b) => String(records.get(b.id).updated || "").localeCompare(String(records.get(a.id).updated || "")));
+    } else if (pickerFilter === "active") {
+      list = tickets.filter((t) => !INACTIVE_STATUSES.has(t.status));
+    } else {
+      list = tickets.slice();
+    }
+
+    if (!list.length) {
+      const empty = query
+        ? `No repair matches “${esc(query)}”.`
+        : pickerFilter === "tested"
+          ? "No repairs have been tested yet — pick one under <strong>In the shop</strong> to start."
+          : pickerFilter === "active"
+            ? "No repairs in the shop right now."
+            : "No repairs logged yet.";
+      box.innerHTML = `<p class="ops-empty">${empty}</p>`;
+      return;
+    }
+
+    const shown = list.slice(0, PICKER_LIMIT);
+    box.innerHTML = (query ? `<p class="dg-picker-note">Searching all repairs</p>` : "") + shown.map((t) => {
+      const badge = diagBadge(records.get(t.id));
+      return `
+        <button type="button" class="dg-pick-row" data-dg-pick="${esc(t.id)}">
+          <span class="dg-pick-icon"><svg class="icon"><use href="#${deviceIcon(detectType(t.device))}"></use></svg></span>
+          <span class="dg-pick-main">
+            <span class="dg-pick-name">${esc(t.customerName || "Unnamed client")}</span>
+            <span class="dg-pick-sub">${esc(t.device || "No device")} · <span class="mono">#${esc(t.id || "")}</span></span>
+          </span>
+          <span class="dg-pick-tags">
+            <span class="status-badge ${statusClass(t.status)}">${esc(t.status || "—")}</span>
+            <span class="dg-saved-stat ${badge.cls}">${esc(badge.text)}</span>
+          </span>
+          <svg class="icon dg-pick-go" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>`;
+    }).join("") + (list.length > shown.length
+      ? `<p class="dg-picker-note">Showing ${shown.length} of ${list.length} — search to find the rest.</p>`
+      : "");
+  }
+
+  function showPicker() {
+    if ($("dgPicker")) $("dgPicker").hidden = false;
+    if ($("dgWorkspace")) $("dgWorkspace").hidden = true;
+    renderPicker();
+    renderStatusLine();
+  }
+
+  function showWorkspace() {
+    if ($("dgPicker")) $("dgPicker").hidden = true;
+    if ($("dgWorkspace")) $("dgWorkspace").hidden = false;
+    renderFields();
+    render();
   }
 
   // ---- Rendering -----------------------------------------------------------
+
+  function renderRepairCard() {
+    const box = $("dgRepairCard");
+    if (!box) return;
+    const t = findTicket(draft.ticketId) || { id: draft.ticketId };
+    box.innerHTML = `
+      <span class="dg-repair-icon"><svg class="icon"><use href="#${deviceIcon(draft.deviceType)}"></use></svg></span>
+      <div class="dg-repair-main">
+        <p class="dg-repair-eyebrow">Testing repair <span class="mono">#${esc(t.id)}</span></p>
+        <h3 class="dg-repair-title">${esc(t.device || "Device")}</h3>
+        <p class="dg-repair-sub">${esc(t.customerName || "Unnamed client")}${t.issues ? ` · ${esc(t.issues)}` : ""}</p>
+      </div>
+      <div class="dg-repair-side">
+        ${t.status ? `<span class="status-badge ${statusClass(t.status)}">${esc(t.status)}</span>` : ""}
+        <span id="dgSaveState" class="dg-save-state" aria-live="polite"></span>
+      </div>`;
+    renderSaveState();
+  }
+
+  function renderSaveState() {
+    const el = $("dgSaveState");
+    if (!el || !draft) return;
+    let cls = "";
+    let html = "";
+    if (saveState === "dirty" || saveState === "saving") {
+      cls = "is-pending";
+      html = `<span class="dg-save-dot"></span>Saving…`;
+    } else if (saveState === "saved") {
+      cls = "is-saved";
+      html = `<svg class="icon"><use href="#i-check"></use></svg>Saved to repair${draft.updated ? ` · ${esc(whenLabel(draft.updated))}` : ""}`;
+    } else if (saveState === "error") {
+      cls = "is-error";
+      html = `<svg class="icon"><use href="#i-alert"></use></svg>${esc(saveError)}<button type="button" class="dg-save-retry" id="dgSaveRetry">Retry</button>`;
+    } else {
+      html = `Results save to this repair as you test`;
+    }
+    el.className = `dg-save-state ${cls}`;
+    el.innerHTML = html;
+  }
 
   // Only the current section's parts are drawn. Showing all seventeen at
   // once — even dimmed — buries the handful actually being tested under a
@@ -318,11 +711,17 @@
     if (prev) prev.disabled = i === 0;
     if (next) {
       const done = groupTally(currentGroup(), draft.stage).complete;
-      next.disabled = i === last;
-      next.classList.toggle("attention", done && i < last);
-      next.innerHTML = i === last
-        ? `All sections done<svg class="icon"><use href="#i-check"></use></svg>`
-        : `Next: ${esc(groups()[i + 1].label)}<svg class="icon"><use href="#i-chevron-right"></use></svg>`;
+      const stageDone = tally(draft.stage).untested === 0;
+      // The last section of a finished before-pass leads straight on to
+      // the after-pass, so nobody has to hunt for the stage switch.
+      const toAfter = i === last && draft.stage === "before" && stageDone;
+      next.disabled = i === last && !toAfter;
+      next.classList.toggle("attention", (done && i < last) || toAfter);
+      next.innerHTML = toAfter
+        ? `Start after-repair test<svg class="icon"><use href="#i-chevron-right"></use></svg>`
+        : i === last
+          ? `All sections done<svg class="icon"><use href="#i-check"></use></svg>`
+          : `Next: ${esc(groups()[i + 1].label)}<svg class="icon"><use href="#i-chevron-right"></use></svg>`;
     }
   }
 
@@ -430,80 +829,18 @@
       ${c.newIssues.length ? `<p class="dg-compare-warning"><svg class="icon"><use href="#i-alert"></use></svg>Something that worked before the repair is failing now — check these before handing the device back.</p>` : ""}`;
   }
 
-  function renderTagged() {
-    const box = $("dgTagged");
-    if (!box) return;
-    if (!draft.ticketId) {
-      box.hidden = true;
-      box.innerHTML = "";
-      return;
-    }
-    box.hidden = false;
-    box.innerHTML = `
-      <span class="dg-tag-chip">
-        <svg class="icon"><use href="#i-clipboard"></use></svg>
-        Linked to ticket <strong>#${esc(draft.ticketId)}</strong>${draft.ticketLabel ? ` · ${esc(draft.ticketLabel)}` : ""}
-        <button type="button" id="dgUntag" class="dg-tag-clear" aria-label="Unlink ticket"><svg class="icon"><use href="#i-xmark"></use></svg></button>
-      </span>`;
-    $("dgUntag").onclick = () => {
-      draft.ticketId = "";
-      draft.ticketLabel = "";
-      saveDraft();
-      renderTagged();
-    };
-  }
-
-  function renderSaved() {
-    const box = $("dgSavedList");
-    const count = $("dgSavedCount");
-    if (!box) return;
-    if (count) count.textContent = reports.length ? `${reports.length} saved` : "";
-    if (!reports.length) {
-      box.innerHTML = `<p class="ops-empty">No saved reports yet — run a diagnostic and tap Save report.</p>`;
-      return;
-    }
-    box.innerHTML = reports.map((r) => {
-      const b = r.before || {};
-      const a = r.after || {};
-      const parts = (LAYOUTS[r.deviceType] || LAYOUTS.phone).parts;
-      let fixed = 0, still = 0, newIssues = 0;
-      parts.forEach((p) => {
-        const bs = b[p.key] || "untested";
-        const as = a[p.key] || "untested";
-        if (bs === "fail" && as === "pass") fixed += 1;
-        else if (bs === "fail" && as === "fail") still += 1;
-        else if (bs === "pass" && as === "fail") newIssues += 1;
-      });
-      const when = r.created ? new Date(r.created).toLocaleDateString([], { month: "short", day: "numeric" }) : "";
-      return `
-        <div class="dg-saved-row">
-          <div class="dg-saved-main">
-            <div class="dg-saved-name">${esc(r.clientName || "Unnamed client")}${r.ticketId ? `<span class="dg-saved-ticket">#${esc(r.ticketId)}</span>` : ""}</div>
-            <div class="dg-saved-sub">${esc(r.device || "No device")}${when ? ` · ${esc(when)}` : ""}</div>
-          </div>
-          <div class="dg-saved-stats">
-            <span class="dg-saved-stat is-fixed">${fixed} fixed</span>
-            ${still ? `<span class="dg-saved-stat is-still">${still} faulty</span>` : ""}
-            ${newIssues ? `<span class="dg-saved-stat is-new">${newIssues} new</span>` : ""}
-          </div>
-          <div class="dg-saved-actions">
-            <button type="button" class="ghost-btn" data-dg-open="${esc(r.id)}">Open</button>
-            <button type="button" class="ghost-btn danger-btn" data-dg-delete="${esc(r.id)}" aria-label="Delete report"><svg class="icon"><use href="#i-trash"></use></svg></button>
-          </div>
-        </div>`;
-    }).join("");
-  }
-
   function renderFields() {
-    if ($("dgClientName") && $("dgClientName").value !== draft.clientName) $("dgClientName").value = draft.clientName;
-    if ($("dgClientContact") && $("dgClientContact").value !== draft.clientContact) $("dgClientContact").value = draft.clientContact;
-    if ($("dgDevice") && $("dgDevice").value !== draft.device) $("dgDevice").value = draft.device;
+    if (!draft) return;
     if ($("dgNotes") && $("dgNotes").value !== draft.notes) $("dgNotes").value = draft.notes;
   }
 
   function renderStatusLine() {
     const el = $("dgStatusLine");
     if (!el) return;
+    if (!draft) {
+      el.textContent = records.size ? `${records.size} repair${records.size === 1 ? "" : "s"} tested` : "";
+      return;
+    }
     const b = tally("before");
     const a = tally("after");
     el.textContent = b.tested || a.tested
@@ -511,9 +848,11 @@
       : "";
   }
 
-  // Everything except the free-text inputs, which are left alone so typing
-  // never loses focus or caret position.
+  // Everything except the notes box, which is left alone so typing never
+  // loses focus or caret position.
   function render() {
+    if (!draft) return;
+    renderRepairCard();
     renderTypeSwitch();
     renderStage();
     renderStepper();
@@ -523,247 +862,134 @@
     renderOverview();
     renderProgress();
     renderCompare();
-    renderTagged();
     renderStatusLine();
   }
 
   // ---- Interactions --------------------------------------------------------
 
   function setPartState(key, value) {
-    if (!draft[draft.stage]) draft[draft.stage] = {};
     // Tapping the state a part is already in clears it back to untested,
     // so a mis-tap is undone with a second tap on the same button.
     if (stateOf(draft.stage, key) === value) delete draft[draft.stage][key];
     else draft[draft.stage][key] = value;
-    saveDraft();
-    render();
+    markChanged();
   }
 
   function cyclePart(key) {
     const current = stateOf(draft.stage, key);
     const next = STATES[(STATES.indexOf(current) + 1) % STATES.length];
-    if (!draft[draft.stage]) draft[draft.stage] = {};
     if (next === "untested") delete draft[draft.stage][key];
     else draft[draft.stage][key] = next;
-    saveDraft();
-    render();
+    markChanged();
   }
 
   function setCurrentSectionState(value) {
-    if (!draft[draft.stage]) draft[draft.stage] = {};
     currentGroup().parts.forEach((key) => {
       if (value === "clear") delete draft[draft.stage][key];
       else draft[draft.stage][key] = value;
     });
-    saveDraft();
-    render();
+    markChanged();
   }
 
   function setSection(index) {
     const max = groups().length - 1;
     draft.section = Math.min(Math.max(index, 0), max);
-    saveDraft();
+    rememberState();
     render();
     $("dgStepper")?.querySelector(".dg-step.active")?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
   }
 
   function setStage(stage) {
     draft.stage = stage === "after" ? "after" : "before";
-    saveDraft();
+    draft.section = firstOpenSection(draft.stage);
+    rememberState();
     render();
+  }
+
+  function nextSection() {
+    const i = sectionIndex();
+    if (i === groups().length - 1 && draft.stage === "before") {
+      setStage("after");
+      $("dgWorkspace")?.querySelector(".dg-stage-bar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    setSection(i + 1);
   }
 
   function setDeviceType(type) {
     if (!LAYOUTS[type] || draft.deviceType === type) return;
     draft.deviceType = type;
     draft.section = 0; // the two layouts have different sections
-    saveDraft();
-    render();
+    rememberState();
+    markChanged();
   }
 
-  // ---- Ticket tagging ------------------------------------------------------
-
-  function knownTickets() {
-    const list = window.RPC_INTAKE_TICKETS;
-    return Array.isArray(list) ? list : [];
-  }
-
-  function renderCombo(query) {
-    const box = $("dgComboList");
-    if (!box) return;
-    const q = String(query || "").trim().toLowerCase();
-    if (!q) {
-      box.hidden = true;
-      box.innerHTML = "";
-      comboOpen = false;
-      return;
-    }
-    const tickets = knownTickets();
-    if (!tickets.length) {
-      box.hidden = false;
-      comboOpen = true;
-      box.innerHTML = `<p class="dg-combo-empty">No logged devices loaded on this device yet — open the Repairs tab (and save the team PIN) to pull them in. You can still type the client's details below.</p>`;
-      return;
-    }
-    const matches = tickets.filter((t) =>
-      [t.customerName, t.phone, t.email, t.device, t.id, t.issues]
-        .map((v) => String(v || "").toLowerCase())
-        .some((v) => v.includes(q))
-    ).slice(0, 8);
-
-    box.hidden = false;
-    comboOpen = true;
-    box.innerHTML = matches.length
-      ? matches.map((t) => `
-          <button type="button" class="dg-combo-item" data-dg-pick="${esc(t.id)}" role="option">
-            <span class="dg-combo-name">${esc(t.customerName || "Unnamed")}</span>
-            <span class="dg-combo-meta">${esc(t.device || "—")}${t.phone ? ` · ${esc(t.phone)}` : ""}</span>
-            <span class="dg-combo-id">#${esc(t.id || "")}</span>
-          </button>`).join("")
-      : `<p class="dg-combo-empty">No logged device matches “${esc(query)}”.</p>`;
-  }
-
-  function pickTicket(id) {
-    const ticket = knownTickets().find((t) => t.id === id);
-    if (!ticket) return;
-    draft.ticketId = ticket.id || "";
-    draft.ticketLabel = ticket.device || "";
-    draft.clientName = ticket.customerName || "";
-    draft.clientContact = ticket.phone || ticket.email || "";
-    draft.device = ticket.device || "";
-    const type = detectType(ticket.device);
-    if (type !== draft.deviceType) draft.section = 0;
-    draft.deviceType = type;
-    saveDraft();
-    if ($("dgClientSearch")) $("dgClientSearch").value = "";
-    renderCombo("");
-    renderFields();
-    render();
-  }
-
-  // ---- Save / load / reset / copy -----------------------------------------
-
-  function saveReport() {
-    const b = tally("before");
-    const a = tally("after");
-    if (!b.tested && !a.tested) {
-      toast("Test at least one part before saving.");
-      return;
-    }
-    const now = new Date().toISOString();
-    const record = Object.assign({}, draft, {
-      id: draft.id || "DG" + Date.now().toString(36).toUpperCase(),
-      created: draft.created || now,
-      updated: now,
-    });
-    delete record.stage;
-    delete record.section;
-    const existing = reports.findIndex((r) => r.id === record.id);
-    if (existing >= 0) reports[existing] = record;
-    else reports.unshift(record);
-    reports = reports.slice(0, MAX_REPORTS);
-    saveReports();
-    draft.id = record.id;
-    draft.created = record.created;
-    saveDraft();
-    renderSaved();
-    toast(existing >= 0 ? "Report updated." : "Report saved.");
-  }
-
-  function openReport(id) {
-    const record = reports.find((r) => r.id === id);
-    if (!record) return;
-    draft = Object.assign(newDraft(), record, { stage: "before", section: 0 });
-    if (!LAYOUTS[draft.deviceType]) draft.deviceType = "phone";
-    saveDraft();
-    renderFields();
-    render();
-    document.getElementById("view-diagnostics")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function deleteReport(id) {
-    const record = reports.find((r) => r.id === id);
-    if (!record) return;
-    if (!window.confirm(`Delete the diagnostic report for ${record.clientName || record.device || "this device"}?`)) return;
-    reports = reports.filter((r) => r.id !== id);
-    saveReports();
-    renderSaved();
-  }
-
-  // Clears just the current stage's results, keeping the client details and
-  // the other stage — for when a test run needs starting over rather than
-  // the whole report.
+  // Clears just the current stage's results, keeping the notes and the
+  // other stage — for when a test run needs starting over.
   function resetStage() {
     const stageLabel = draft.stage === "before" ? "before repair" : "after repair";
     if (!tally(draft.stage).tested) {
       toast(`Nothing recorded in the ${stageLabel} test yet.`);
       return;
     }
-    if (!window.confirm(`Clear every result in the ${stageLabel} test? The client details and the other test are kept.`)) return;
+    if (!window.confirm(`Clear every result in the ${stageLabel} test for this repair? The notes and the other test are kept.`)) return;
     draft[draft.stage] = {};
     draft.section = 0;
-    saveDraft();
-    render();
+    rememberState();
+    markChanged();
     toast(`Cleared the ${stageLabel} test.`);
   }
 
-  function resetDraft() {
-    const b = tally("before");
-    const a = tally("after");
-    if ((b.tested || a.tested) && !window.confirm("Start a new report? Save the current one first if you still need it.")) return;
-    draft = newDraft();
-    saveDraft();
-    if ($("dgClientSearch")) $("dgClientSearch").value = "";
-    renderCombo("");
-    renderFields();
-    render();
+  async function openRepair() {
+    if (!draft) return;
+    const id = draft.ticketId;
+    if (saveTimer || saving) await saveNow();
+    if (typeof window.RPC_OPEN_TICKET_BY_ID === "function") window.RPC_OPEN_TICKET_BY_ID(id);
   }
 
-  function buildSummary() {
-    const l = layout();
-    const c = comparison();
+  // ---- Summary text (Copy summary) -----------------------------------------
+
+  function summaryText(rec, ticket) {
+    const l = layoutFor(rec.deviceType);
+    const c = comparisonOf(rec);
+    const t = ticket || {};
     const lines = [];
-    lines.push(`Device Diagnostic${draft.device ? ` — ${draft.device}` : ""}`);
-    if (draft.clientName || draft.clientContact) {
-      lines.push(`Client: ${draft.clientName || "—"}${draft.clientContact ? ` (${draft.clientContact})` : ""}`);
-    }
-    if (draft.ticketId) lines.push(`Ticket: #${draft.ticketId}`);
-    lines.push(new Date().toLocaleDateString());
+    lines.push(`Device Diagnostic${t.device ? ` — ${t.device}` : ""}`);
+    if (t.customerName || t.phone) lines.push(`Client: ${t.customerName || "—"}${t.phone ? ` (${t.phone})` : ""}`);
+    lines.push(`Repair: #${rec.ticketId}`);
+    lines.push(new Date(rec.updated || Date.now()).toLocaleDateString());
     lines.push("");
 
     ["before", "after"].forEach((stage) => {
-      const t = tally(stage);
-      if (!t.tested) return;
+      if (!tallyOf(rec, stage).tested) return;
       lines.push(stage === "before" ? "BEFORE REPAIR" : "AFTER REPAIR");
       l.groups.forEach((g) => {
-        const tested = g.parts.filter((k) => stateOf(stage, k) !== "untested");
+        const tested = g.parts.filter((k) => resultOf(rec, stage, k) !== "untested");
         if (!tested.length) return;
         lines.push(`  ${g.label}`);
         tested.forEach((k) => {
-          const s = stateOf(stage, k);
-          const p = partByKey(k);
+          const s = resultOf(rec, stage, k);
+          const p = l.parts.find((part) => part.key === k);
           lines.push(`  ${s === "pass" ? "[OK]" : s === "fail" ? "[X]" : "[-]"} ${p ? p.label : k}`);
         });
       });
       lines.push("");
     });
 
-    if (tally("before").tested && tally("after").tested) {
+    if (tallyOf(rec, "before").tested && tallyOf(rec, "after").tested) {
       lines.push(`Fixed (${c.fixed.length}): ${c.fixed.map((p) => p.label).join(", ") || "—"}`);
       lines.push(`Still faulty (${c.stillFaulty.length}): ${c.stillFaulty.map((p) => p.label).join(", ") || "—"}`);
       lines.push(`New issues (${c.newIssues.length}): ${c.newIssues.map((p) => p.label).join(", ") || "—"}`);
       lines.push("");
     }
-    if (draft.notes.trim()) {
+    if (String(rec.notes || "").trim()) {
       lines.push("Notes");
-      lines.push(draft.notes.trim());
+      lines.push(rec.notes.trim());
     }
     return lines.join("\n").trim();
   }
 
-  async function copySummary() {
-    const text = buildSummary();
-    const btn = $("dgCopy");
+  async function copyText(text, btn) {
     const original = btn ? btn.innerHTML : "";
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -794,6 +1020,106 @@
     if (typeof window.RPC_TOAST === "function") window.RPC_TOAST(message, { tone: "info", duration: 3000 });
   }
 
+  // ---- Summary inside the repair's detail view -----------------------------
+  // assets/intake.js calls this when a repair is opened, passing the
+  // container in its modal.
+
+  function ticketSummaryHtml(rec, loadFailed) {
+    const before = rec ? tallyOf(rec, "before") : null;
+    const after = rec ? tallyOf(rec, "after") : null;
+    if (!rec || (!before.tested && !after.tested && !String(rec.notes || "").trim())) {
+      return `
+        <div class="dg-ticket-empty">
+          <p>${loadFailed ? "Couldn't load diagnostics — check the connection." : "Not tested yet."}</p>
+          <button type="button" class="ghost-btn" data-dg-run><svg class="icon"><use href="#i-diagnose"></use></svg>Run diagnostics</button>
+        </div>`;
+    }
+
+    const l = layoutFor(rec.deviceType);
+    const stat = (label, t) => `
+      <div class="dg-ticket-stat${t.fail ? " has-fail" : ""}">
+        <span class="dg-overview-label">${label}</span>
+        <strong>${t.tested ? `${t.tested}/${t.total}` : "—"}</strong>
+        <span>${t.tested ? `${t.pass} pass · ${t.fail} fail` : "Not run"}</span>
+      </div>`;
+    const chips = (list) => list.map((p) => `<span class="dg-chip">${esc(p.label)}</span>`).join("");
+    const group = (cls, label, list) => list.length ? `
+      <div class="dg-ticket-group ${cls}">
+        <span class="dg-ticket-group-label">${label} (${list.length})</span>
+        <div class="dg-chips">${chips(list)}</div>
+      </div>` : "";
+
+    let detail;
+    if (before.tested && after.tested) {
+      const c = comparisonOf(rec);
+      detail = group("is-new", "New issues", c.newIssues)
+        + group("is-still", "Still faulty", c.stillFaulty)
+        + group("is-fixed", "Fixed", c.fixed);
+      if (!detail) detail = `<p class="dg-ticket-line">No faults found before or after the repair.</p>`;
+    } else {
+      const stage = after.tested ? "after" : "before";
+      const fails = l.parts.filter((p) => resultOf(rec, stage, p.key) === "fail");
+      detail = fails.length
+        ? group("is-still", `Faults found ${stage} repair`, fails)
+        : `<p class="dg-ticket-line">No faults found ${stage} the repair.</p>`;
+    }
+
+    const action = after.tested
+      ? "Open diagnostics"
+      : before.tested === before.total ? "Run after-repair test" : "Continue testing";
+    return `
+      <div class="dg-ticket-summary">
+        <div class="dg-ticket-stats">${stat("Before repair", before)}${stat("After repair", after)}</div>
+        ${detail}
+        ${String(rec.notes || "").trim() ? `<p class="dg-ticket-notes">${esc(rec.notes.trim())}</p>` : ""}
+        <div class="dg-ticket-foot">
+          <span class="dg-ticket-when">${rec.updated ? `Updated ${esc(whenLabel(rec.updated))}` : "Not saved yet"}</span>
+          <span class="dg-ticket-actions">
+            <button type="button" class="ghost-btn" data-dg-copy><svg class="icon"><use href="#i-clipboard"></use></svg>Copy</button>
+            <button type="button" class="ghost-btn" data-dg-run><svg class="icon"><use href="#i-diagnose"></use></svg>${action}</button>
+          </span>
+        </div>
+      </div>`;
+  }
+
+  async function renderTicketDiagnostics(box, ticket, opts = {}) {
+    if (!box || !ticket || !ticket.id) return;
+    const id = ticket.id;
+    let rec = null;
+    let loadFailed = false;
+    const unsaved = draft && draft.ticketId === id && saveState !== "saved" && saveState !== "idle";
+    if (unsaved) rec = draft;
+    else if (readPending()[id]) rec = readPending()[id];
+    else {
+      try {
+        rec = (await api({ action: "getTicketDiagnostic", ticketId: id })).diagnostic;
+        if (rec) records.set(id, rec);
+        else records.delete(id);
+      } catch (_) {
+        loadFailed = true;
+        rec = records.get(id) || null;
+      }
+    }
+    // The modal may have moved on to another repair while this loaded.
+    if (!box.isConnected || box.dataset.ticketId !== id) return;
+    box.innerHTML = ticketSummaryHtml(rec, loadFailed);
+    box.querySelectorAll("[data-dg-run]").forEach((btn) => btn.addEventListener("click", () => {
+      if (typeof opts.onOpen === "function") opts.onOpen();
+      openDiagnostics(id);
+    }));
+    box.querySelector("[data-dg-copy]")?.addEventListener("click", (e) => copyText(summaryText(rec, ticket), e.currentTarget));
+  }
+
+  function openDiagnostics(ticketId, opts = {}) {
+    openRequest = { id: ticketId, opts };
+    if (typeof window.RPC_SHOW_VIEW === "function") window.RPC_SHOW_VIEW("diagnostics");
+    else enterDiagnostics();
+    window.scrollTo({ top: 0 });
+  }
+
+  window.RPC_RENDER_TICKET_DIAGNOSTICS = renderTicketDiagnostics;
+  window.RPC_OPEN_DIAGNOSTICS = openDiagnostics;
+
   // ---- Wiring --------------------------------------------------------------
 
   function bindOnce() {
@@ -803,6 +1129,17 @@
     bound = true;
 
     shell.addEventListener("click", (event) => {
+      const pick = event.target.closest("[data-dg-pick]");
+      if (pick) { selectTicket(pick.dataset.dgPick); return; }
+      const filter = event.target.closest("[data-dg-filter]");
+      if (filter) {
+        pickerFilter = filter.dataset.dgFilter;
+        if ($("dgRepairSearch")) $("dgRepairSearch").value = "";
+        renderPicker();
+        return;
+      }
+      if (event.target.closest("#dgSaveRetry")) { flushPending(); saveNow(); return; }
+      if (!draft) return;
       const setBtn = event.target.closest("[data-dg-set]");
       if (setBtn) { setPartState(setBtn.dataset.dgSet, setBtn.dataset.dgValue); return; }
       const bulkBtn = event.target.closest("[data-dg-section-bulk]");
@@ -815,60 +1152,66 @@
       if (stageBtn) { setStage(stageBtn.dataset.dgStage); return; }
       const typeBtn = event.target.closest("[data-dg-type]");
       if (typeBtn) { setDeviceType(typeBtn.dataset.dgType); return; }
-      const pick = event.target.closest("[data-dg-pick]");
-      if (pick) { pickTicket(pick.dataset.dgPick); return; }
-      const open = event.target.closest("[data-dg-open]");
-      if (open) { openReport(open.dataset.dgOpen); return; }
-      const del = event.target.closest("[data-dg-delete]");
-      if (del) { deleteReport(del.dataset.dgDelete); return; }
-      // A click anywhere else closes the ticket picker.
-      if (comboOpen && !event.target.closest(".dg-field-search")) renderCombo("");
     });
 
     // Hotspots are SVG <g> elements, so they need explicit keyboard handling.
     shell.addEventListener("keydown", (event) => {
       const hotspot = event.target.closest("[data-dg-part]");
-      if (hotspot && (event.key === "Enter" || event.key === " ")) {
+      if (draft && hotspot && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
         cyclePart(hotspot.dataset.dgPart);
       }
     });
 
+    $("dgRepairSearch")?.addEventListener("input", renderPicker);
     $("dgPrevSection")?.addEventListener("click", () => setSection(sectionIndex() - 1));
-    $("dgNextSection")?.addEventListener("click", () => setSection(sectionIndex() + 1));
-
-    $("dgClientSearch")?.addEventListener("input", (e) => renderCombo(e.target.value));
-    $("dgClientSearch")?.addEventListener("focus", (e) => renderCombo(e.target.value));
-
-    $("dgClientName")?.addEventListener("input", (e) => { draft.clientName = e.target.value; saveDraft(); });
-    $("dgClientContact")?.addEventListener("input", (e) => { draft.clientContact = e.target.value; saveDraft(); });
-    $("dgNotes")?.addEventListener("input", (e) => { draft.notes = e.target.value; saveDraft(); });
-    $("dgDevice")?.addEventListener("input", (e) => { draft.device = e.target.value; saveDraft(); });
-    // Switching the map on every keystroke would fight someone mid-word, so
-    // the auto-detect only runs once they've finished typing the model.
-    $("dgDevice")?.addEventListener("change", () => {
-      const detected = detectType(draft.device);
-      if (detected !== draft.deviceType) setDeviceType(detected);
+    $("dgNextSection")?.addEventListener("click", nextSection);
+    $("dgNotes")?.addEventListener("input", (e) => {
+      if (!draft) return;
+      draft.notes = e.target.value;
+      markChanged();
     });
+    $("dgCopy")?.addEventListener("click", (e) => draft && copyText(summaryText(draft, findTicket(draft.ticketId)), e.currentTarget));
+    $("dgResetStage")?.addEventListener("click", () => draft && resetStage());
+    $("dgOpenRepair")?.addEventListener("click", openRepair);
+    $("dgChangeRepair")?.addEventListener("click", leaveRepair);
 
-    $("dgSave")?.addEventListener("click", saveReport);
-    $("dgCopy")?.addEventListener("click", copySummary);
-    $("dgResetStage")?.addEventListener("click", resetStage);
-    $("dgReset")?.addEventListener("click", resetDraft);
-
-    // Keep the picker's source list fresh when Repairs finishes loading.
+    // Status changes and newly logged devices show up in the picker and the
+    // repair header as soon as Repairs reloads.
     window.addEventListener("rpc-tickets", () => {
-      const search = $("dgClientSearch");
-      if (search && search.value.trim() && comboOpen) renderCombo(search.value);
+      if (!$("dgPicker")?.hidden) renderPicker();
+      if (draft) renderRepairCard();
     });
+
+    // Closing the tab or switching apps mid-test: send what's waiting now
+    // rather than after the debounce, and let it outlive the page.
+    const flushOnLeave = () => { if (draft && (saveTimer || saveState === "dirty")) saveNow({ keepalive: true }); };
+    window.addEventListener("pagehide", flushOnLeave);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushOnLeave(); });
   }
 
-  function enterDiagnostics() {
-    loadStored();
+  async function enterDiagnostics() {
     bindOnce();
-    renderFields();
-    render();
-    renderSaved();
+    const request = openRequest;
+    openRequest = null;
+    if (!draft && !request) showPicker();
+    loadRecords();
+    flushPending();
+    await ensureTickets();
+
+    if (request) return selectTicket(request.id, request.opts);
+    if (draft) {
+      // Pick up anything saved from another device since — unless this one
+      // still has changes of its own on the way.
+      if (saveState === "dirty" || saveState === "saving" || saveState === "error") showWorkspace();
+      else selectTicket(draft.ticketId, { stage: draft.stage, section: draft.section });
+      return;
+    }
+    const last = readState();
+    if (last && last.ticketId && findTicket(last.ticketId)) {
+      return selectTicket(last.ticketId, { stage: last.stage, section: last.section });
+    }
+    showPicker();
   }
 
   window.addEventListener("rpc-enter-diagnostics", enterDiagnostics);

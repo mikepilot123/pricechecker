@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=date-chevron-1" />
+  <link rel="stylesheet" href="assets/style.css?v=repair-diagnostics-2" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -140,6 +140,7 @@
         <button type="button" class="appt-subnav-btn" data-repairs-panel="completed" aria-selected="false">Completed Repairs</button>
       </div>
       <button class="nav-btn" data-target="reminders" role="tab" aria-selected="false"><svg class="icon icon-reminders"><use href="#i-clock"></use></svg>Reminders</button>
+      <button class="nav-btn" data-target="diagnostics" role="tab" aria-selected="false"><svg class="icon"><use href="#i-diagnose"></use></svg>Diagnostics</button>
       <button class="nav-btn" data-target="partsOrders" role="tab" aria-selected="false"><svg class="icon"><use href="#i-receipt"></use></svg>Parts orders</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Parts orders sections">
         <button type="button" class="appt-subnav-btn active" data-parts-panel="orders" aria-selected="true">Orders</button>
@@ -1273,9 +1274,9 @@
   </main>
 
   <!-- ============ PARTS CHECKER VIEW ============ -->
-  <!-- ============ DIAGNOSTICS VIEW ============ -->
+  <!-- ============ DIAGNOSTICS VIEW (assets/diagnostics.js) ============ -->
   <main class="container view" id="view-diagnostics" hidden>
-    <p class="info-banner">Tap each part on the device to record how it tests — before the repair, then again after.</p>
+    <p class="info-banner">Pick a repair, then tap each part to record how it tests — before the repair and again after. Results save to the repair automatically.</p>
 
     <section class="dg-shell" aria-labelledby="dgTitle">
       <div class="leads-heading-row">
@@ -1286,106 +1287,84 @@
         <p id="dgStatusLine" class="result-count"></p>
       </div>
 
-      <!-- Client / device -->
-      <div class="dg-client-card">
-        <div class="dg-field dg-field-search">
-          <label class="field-label" for="dgClientSearch">Link a logged device <span class="field-optional">(optional)</span></label>
-          <div class="dg-combo">
-            <svg class="icon"><use href="#i-search"></use></svg>
-            <input id="dgClientSearch" class="dg-combo-input" type="search" autocomplete="off" placeholder="Search Repairs by client, phone, device or ticket #…" aria-label="Search logged devices" />
+      <!-- Step 1: choose the repair being tested -->
+      <div id="dgPicker" class="dg-picker">
+        <div class="dg-combo">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input id="dgRepairSearch" class="dg-combo-input" type="search" autocomplete="off" placeholder="Search by client, phone, device or ticket #…" aria-label="Search repairs" />
+        </div>
+        <div class="dg-picker-filters" role="tablist" aria-label="Which repairs to show">
+          <button type="button" class="dg-filter-chip active" data-dg-filter="active" role="tab" aria-selected="true">In the shop</button>
+          <button type="button" class="dg-filter-chip" data-dg-filter="tested" role="tab" aria-selected="false">Tested</button>
+          <button type="button" class="dg-filter-chip" data-dg-filter="all" role="tab" aria-selected="false">All repairs</button>
+        </div>
+        <div id="dgPickerList" class="dg-picker-list" aria-live="polite"></div>
+      </div>
+
+      <!-- Step 2: test it -->
+      <div id="dgWorkspace" hidden>
+        <div id="dgRepairCard" class="dg-repair-card"></div>
+
+        <!-- Before / after stage -->
+        <div class="dg-stage-bar" role="tablist" aria-label="Repair stage">
+          <button type="button" class="dg-stage-btn active" data-dg-stage="before" role="tab" aria-selected="true">
+            <span class="dg-stage-name">Before repair</span>
+            <span class="dg-stage-meta" data-dg-stage-meta="before">0 tested</span>
+          </button>
+          <button type="button" class="dg-stage-btn" data-dg-stage="after" role="tab" aria-selected="false">
+            <span class="dg-stage-name">After repair</span>
+            <span class="dg-stage-meta" data-dg-stage-meta="after">0 tested</span>
+          </button>
+        </div>
+
+        <div id="dgOverview" class="dg-overview" aria-live="polite"></div>
+
+        <!-- Section stepper: one group of related tests at a time -->
+        <div class="dg-type-row">
+          <div class="dg-type-switch" role="group" aria-label="Device layout">
+            <button type="button" class="dg-type-btn" data-dg-type="phone"><svg class="icon"><use href="#i-smartphone"></use></svg>Phone / tablet</button>
+            <button type="button" class="dg-type-btn" data-dg-type="laptop"><svg class="icon"><use href="#i-laptop"></use></svg>Laptop</button>
           </div>
-          <div id="dgComboList" class="dg-combo-list" hidden role="listbox"></div>
-          <p id="dgComboHint" class="parts-helper-text">Pick a logged device to tag this report to it, or just type the client's details below.</p>
-        </div>
-
-        <div id="dgTagged" class="dg-tagged" hidden></div>
-
-        <div class="dg-client-grid">
-          <div class="dg-field">
-            <label class="field-label" for="dgClientName">Client name</label>
-            <input id="dgClientName" class="text-input" autocomplete="off" placeholder="Walk-in customer" />
-          </div>
-          <div class="dg-field">
-            <label class="field-label" for="dgClientContact">Contact</label>
-            <input id="dgClientContact" class="text-input" autocomplete="off" placeholder="Phone or email" />
-          </div>
-          <div class="dg-field">
-            <label class="field-label" for="dgDevice">Device</label>
-            <input id="dgDevice" class="text-input" autocomplete="off" placeholder="iPhone 11, MacBook A1466" />
+          <div class="dg-legend" aria-hidden="true">
+            <span class="dg-legend-item"><i class="dg-swatch state-untested"></i>Untested</span>
+            <span class="dg-legend-item"><i class="dg-swatch state-pass"></i>Pass</span>
+            <span class="dg-legend-item"><i class="dg-swatch state-fail"></i>Fail</span>
+            <span class="dg-legend-item"><i class="dg-swatch state-na"></i>N/A</span>
           </div>
         </div>
-      </div>
 
-      <!-- Before / after stage -->
-      <div class="dg-stage-bar" role="tablist" aria-label="Repair stage">
-        <button type="button" class="dg-stage-btn active" data-dg-stage="before" role="tab" aria-selected="true">
-          <span class="dg-stage-name">Before repair</span>
-          <span class="dg-stage-meta" data-dg-stage-meta="before">0 tested</span>
-        </button>
-        <button type="button" class="dg-stage-btn" data-dg-stage="after" role="tab" aria-selected="false">
-          <span class="dg-stage-name">After repair</span>
-          <span class="dg-stage-meta" data-dg-stage-meta="after">0 tested</span>
-        </button>
-      </div>
+        <div id="dgStepper" class="dg-stepper" role="tablist" aria-label="Test sections"></div>
 
-      <div id="dgOverview" class="dg-overview" aria-live="polite"></div>
-
-      <!-- Section stepper: one group of related tests at a time -->
-      <div class="dg-type-row">
-        <div class="dg-type-switch" role="group" aria-label="Device layout">
-          <button type="button" class="dg-type-btn" data-dg-type="phone"><svg class="icon"><use href="#i-smartphone"></use></svg>Phone / tablet</button>
-          <button type="button" class="dg-type-btn" data-dg-type="laptop"><svg class="icon"><use href="#i-laptop"></use></svg>Laptop</button>
-        </div>
-        <div class="dg-legend" aria-hidden="true">
-          <span class="dg-legend-item"><i class="dg-swatch state-untested"></i>Untested</span>
-          <span class="dg-legend-item"><i class="dg-swatch state-pass"></i>Pass</span>
-          <span class="dg-legend-item"><i class="dg-swatch state-fail"></i>Fail</span>
-          <span class="dg-legend-item"><i class="dg-swatch state-na"></i>N/A</span>
-        </div>
-      </div>
-
-      <div id="dgStepper" class="dg-stepper" role="tablist" aria-label="Test sections"></div>
-
-      <div class="dg-main">
-        <div class="dg-map-card">
-          <div id="dgMap" class="dg-map"></div>
-          <p class="dg-hint">Tap a part on the device, or use the buttons alongside it.</p>
-        </div>
-
-        <div class="dg-side">
-          <div id="dgSectionPanel" class="dg-section-panel" aria-live="polite"></div>
-        </div>
-      </div>
-
-      <div class="dg-section-nav">
-        <button type="button" id="dgPrevSection" class="ghost-btn"><svg class="icon"><use href="#i-chevron-left"></use></svg>Back</button>
-        <div id="dgProgress" class="dg-progress-inline" aria-live="polite"></div>
-        <button type="button" id="dgNextSection" class="primary-btn">Next<svg class="icon"><use href="#i-chevron-right"></use></svg></button>
-      </div>
-
-      <div id="dgCompare" class="dg-compare-card" aria-live="polite"></div>
-
-      <div class="dg-field dg-notes">
-        <label class="field-label" for="dgNotes">Notes</label>
-        <textarea id="dgNotes" class="text-input" rows="2" placeholder="Parts used, faults found, anything to tell the client…"></textarea>
-      </div>
-
-      <div class="dg-actions">
-        <button type="button" id="dgSave" class="primary-btn"><svg class="icon"><use href="#i-check"></use></svg>Save report</button>
-        <button type="button" id="dgCopy" class="ghost-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy summary</button>
-        <button type="button" id="dgResetStage" class="ghost-btn"><svg class="icon"><use href="#i-restore"></use></svg>Reset this test</button>
-        <button type="button" id="dgReset" class="ghost-btn danger-btn"><svg class="icon"><use href="#i-refresh"></use></svg>New report</button>
-      </div>
-
-      <div class="dg-saved">
-        <div class="leads-heading-row">
-          <div>
-            <p class="dashboard-eyebrow">History</p>
-            <h3 class="dg-saved-title">Saved reports</h3>
+        <div class="dg-main">
+          <div class="dg-map-card">
+            <div id="dgMap" class="dg-map"></div>
+            <p class="dg-hint">Tap a part on the device, or use the buttons alongside it.</p>
           </div>
-          <p id="dgSavedCount" class="result-count"></p>
+
+          <div class="dg-side">
+            <div id="dgSectionPanel" class="dg-section-panel" aria-live="polite"></div>
+          </div>
         </div>
-        <div id="dgSavedList" class="dg-saved-list"></div>
+
+        <div class="dg-section-nav">
+          <button type="button" id="dgPrevSection" class="ghost-btn"><svg class="icon"><use href="#i-chevron-left"></use></svg>Back</button>
+          <div id="dgProgress" class="dg-progress-inline" aria-live="polite"></div>
+          <button type="button" id="dgNextSection" class="primary-btn">Next<svg class="icon"><use href="#i-chevron-right"></use></svg></button>
+        </div>
+
+        <div id="dgCompare" class="dg-compare-card" aria-live="polite"></div>
+
+        <div class="dg-field dg-notes">
+          <label class="field-label" for="dgNotes">Diagnostic notes</label>
+          <textarea id="dgNotes" class="text-input" rows="2" placeholder="Faults found, parts used, anything to tell the client…"></textarea>
+        </div>
+
+        <div class="dg-actions">
+          <button type="button" id="dgOpenRepair" class="primary-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>View in repair</button>
+          <button type="button" id="dgCopy" class="ghost-btn"><svg class="icon"><use href="#i-clipboard"></use></svg>Copy summary</button>
+          <button type="button" id="dgResetStage" class="ghost-btn"><svg class="icon"><use href="#i-restore"></use></svg>Reset this test</button>
+          <button type="button" id="dgChangeRepair" class="ghost-btn"><svg class="icon"><use href="#i-search"></use></svg>Test another repair</button>
+        </div>
       </div>
     </section>
   </main>
@@ -2816,7 +2795,7 @@
   <script defer src="assets/inventory.js?v=add-item-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=repairs-date-1"></script>
+  <script defer src="assets/intake.js?v=repair-diagnostics-2"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>
@@ -2824,7 +2803,7 @@
   <script defer src="assets/appointments.js?v=collection-day-1"></script>
   <script defer src="assets/leads.js?v=no-backdrop-close-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
-  <script defer src="assets/diagnostics.js?v=diagnostics-design-1"></script>
+  <script defer src="assets/diagnostics.js?v=repair-diagnostics-1"></script>
   <script defer src="assets/prices-admin.js?v=all-columns-1"></script>
   <script defer src="assets/account.js?v=no-403-toast-1"></script>
   <script defer src="assets/parts-order-xlsx.js?v=pdf-text-extract-1"></script>

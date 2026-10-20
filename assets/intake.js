@@ -59,6 +59,9 @@
     "Picked Up": "st-pickedup",
     "Cancelled": "st-cancelled",
   };
+  // Shared with assets/diagnostics.js so its repair picker shows the same
+  // status colours as the Repairs list.
+  window.RPC_STATUS_CLASS = STATUS_CLASS;
   const ACTIVE_REPAIR_STATUSES = new Set([
     "Received",
     "Diagnosing",
@@ -190,6 +193,7 @@
     inventory: $("view-inventory"),
     account: $("view-account"),
     reminders: $("view-reminders"),
+    diagnostics: $("view-diagnostics"),
   };
   function setActiveNav(target) {
     navBtns.forEach((b) => {
@@ -240,6 +244,7 @@
     if (target === "inventory") window.dispatchEvent(new Event("rpc-enter-inventory"));
     if (target === "account") window.dispatchEvent(new Event("rpc-enter-account"));
     if (target === "reminders") window.dispatchEvent(new Event("rpc-enter-reminders"));
+    if (target === "diagnostics") window.dispatchEvent(new Event("rpc-enter-diagnostics"));
   }
   window.RPC_SHOW_VIEW = navigateTo;
   navBtns.forEach((btn) => {
@@ -1569,6 +1574,9 @@
         ${detailRow("i-cash", "Paid by", fieldDisplayHtml("paymentMethod", ticket), "", "paymentMethod")}
       </div><div id="ticketRecordPayment">${recordPaymentButtonHtml(ticket)}</div></section>
       <section class="ticket-detail-section" id="ticketIssuesSection">${issuesSectionStaticHtml(ticket)}</section>
+      <section class="ticket-detail-section"><p class="field-label">Diagnostics</p>
+        <div id="ticketDiagnostics" data-ticket-id="${esc(ticket.id || "")}"><p class="ops-empty">Loading…</p></div>
+      </section>
       <section class="ticket-detail-section"><p class="field-label">Photos & videos</p>
         <div class="ticket-media-gallery" id="ticketMediaGallery"><p class="ops-empty ticket-media-loading">Loading…</p></div>
         <label class="ghost-btn ticket-media-add-btn" id="ticketMediaAddBtn">
@@ -1596,6 +1604,10 @@
     if ($("ticketModalReadyEmail")) $("ticketModalReadyEmail").onclick = () => { closeTicketModal(); offerReadyNotice(ticket); };
     bindTicketMediaControls(ticket);
     loadTicketMedia(ticket);
+    // Rendered by assets/diagnostics.js, which owns the test layouts.
+    if (typeof window.RPC_RENDER_TICKET_DIAGNOSTICS === "function") {
+      window.RPC_RENDER_TICKET_DIAGNOSTICS($("ticketDiagnostics"), ticket, { onOpen: closeTicketModal });
+    }
     $("ticketModal").hidden = false;
     $("closeTicketModal").focus();
   }

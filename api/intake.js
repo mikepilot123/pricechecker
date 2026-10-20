@@ -18,6 +18,7 @@ import {
   deleteTicketNote,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
+import { getTicketDiagnostic, listTicketDiagnostics, saveTicketDiagnostic, deleteTicketDiagnostic } from "../lib/diagnostics.js";
 import { listCustomers } from "../lib/customers.js";
 import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../lib/appointments.js";
 import { listExpenses, addExpense, updateExpense, deleteExpense, addExpenseCollection, undoExpenseCollection } from "../lib/expenses.js";
@@ -287,6 +288,18 @@ export default async function handler(req, res) {
     }
     if (action === "deleteTicketNote") {
       return res.status(200).json({ ok: true, notes: await deleteTicketNote(body) });
+    }
+    if (action === "listTicketDiagnostics") {
+      return res.status(200).json({ ok: true, diagnostics: await listTicketDiagnostics() });
+    }
+    if (action === "getTicketDiagnostic") {
+      return res.status(200).json({ ok: true, diagnostic: await getTicketDiagnostic(body.ticketId) });
+    }
+    if (action === "saveTicketDiagnostic") {
+      return res.status(200).json({ ok: true, diagnostic: await saveTicketDiagnostic(body) });
+    }
+    if (action === "deleteTicketDiagnostic") {
+      return res.status(200).json({ ok: true, deletedId: await deleteTicketDiagnostic(body) });
     }
     if (action === "listReminders") {
       return res.status(200).json({ ok: true, reminders: await listReminders() });
