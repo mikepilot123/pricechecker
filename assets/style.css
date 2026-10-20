@@ -8589,7 +8589,10 @@ html.hide-targets #view-targets,
 html.hide-accounting .nav-btn[data-target="account"],
 html.hide-accounting .nav-btn[data-target="account"] + .appt-sidebar-subnav,
 html.hide-accounting .bottom-nav-btn[data-bottom-target="account"],
-html.hide-accounting #view-account {
+html.hide-accounting #view-account,
+html.hide-partsOrders .nav-btn[data-target="partsOrders"],
+html.hide-partsOrders .nav-btn[data-target="partsOrders"] + .appt-sidebar-subnav,
+html.hide-partsOrders #view-partsOrders {
   display: none !important;
 }
 html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }

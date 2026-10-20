@@ -19,11 +19,12 @@
     { key: "dashboard", label: "Dashboard", help: "Business overview and KPIs." },
     { key: "targets", label: "Targets", help: "Sales targets and progress." },
     { key: "accounting", label: "Accounting", help: "Bank account and expenses." },
+    { key: "partsOrders", label: "Parts orders", help: "Parts ordered from suppliers and Smart restock." },
   ];
   const ALL_KEYS = SECTIONS.map((s) => s.key);
   // Views a hidden section takes with it. "expenses" is the old name for the
   // Accounting → Expenses panel, still stored as some devices' last view.
-  const VIEW_SECTION = { dashboard: "dashboard", targets: "targets", account: "accounting", expenses: "accounting" };
+  const VIEW_SECTION = { dashboard: "dashboard", targets: "targets", account: "accounting", expenses: "accounting", partsOrders: "partsOrders" };
   const REFRESH_MIN_MS = 60 * 1000;
 
   const $ = (id) => document.getElementById(id);
@@ -184,10 +185,10 @@
             Last opened ${escapeHtml(relativeTime(device.lastSeenAt))} · signed in ${escapeHtml(relativeTime(device.createdAt))}
             · <strong>${restricted ? (restricted === SECTIONS.length ? "Restricted" : "Partly restricted") : "Full access"}</strong>
           </p>
-          <label class="device-master" title="Show or hide all four sections on this device">
+          <label class="device-master" title="Show or hide every section on this device">
             <input type="checkbox" class="device-master-input" data-device-all="${escapeHtml(device.id)}" ${allOn ? "checked" : ""} ${partly ? 'data-partly="1"' : ""} />
             <span class="device-master-track" aria-hidden="true"></span>
-            <span class="device-master-text"><strong>Show everything on this device</strong><small>${allOn ? "All four sections are on." : partly ? "Some sections are on. Switch on to show all four." : "All four sections are hidden."}</small></span>
+            <span class="device-master-text"><strong>Show everything on this device</strong><small>${allOn ? "Every section is on." : partly ? "Some sections are on. Switch on to show them all." : "Every section is hidden."}</small></span>
           </label>
           <p class="field-label device-can-see">Can see</p>
           <div class="alert-prefs device-toggles">${toggles}</div>
@@ -276,7 +277,7 @@
 
     $("devicesRestrictOthersBtn").addEventListener("click", async () => {
       showError("");
-      if (!window.confirm("Hide invoice figures, Dashboard, Targets and Accounting on every device except this one? You can allow them again one by one.")) return;
+      if (!window.confirm("Hide invoice figures, Dashboard, Targets, Accounting and Parts orders on every device except this one? You can allow them again one by one.")) return;
       const btn = $("devicesRestrictOthersBtn");
       btn.disabled = true;
       try {
@@ -332,7 +333,7 @@
     $("devicesList").addEventListener("change", (e) => {
       const master = e.target.closest("input[data-device-all]");
       if (master) {
-        // Switching on shows all four sections; switching off hides them all.
+        // Switching on shows every section; switching off hides them all.
         saveDevice(master.dataset.deviceAll, { hidden: master.checked ? [] : ALL_KEYS });
         return;
       }
