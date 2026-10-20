@@ -60,6 +60,13 @@ const SECTION_GUARDED_ACTIONS = {
   deleteExpense: ["accounting"],
   addExpenseCollection: ["accounting"],
   undoExpenseCollection: ["accounting"],
+  listPartsOrders: ["partsOrders"],
+  addPartsOrder: ["partsOrders"],
+  updatePartsOrder: ["partsOrders"],
+  deletePartsOrder: ["partsOrders"],
+  renamePartsShipment: ["partsOrders"],
+  setPartsShipmentPaymentStatus: ["partsOrders"],
+  extractPartsOrderPdf: ["partsOrders"],
 };
 
 // Default is 10s, which isn't enough for extractPartsOrderPdf: Gemini answers

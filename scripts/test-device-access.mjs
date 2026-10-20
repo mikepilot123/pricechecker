@@ -45,7 +45,7 @@ async function register(ua) {
   return data.credential;
 }
 
-const ALL = ["invoiceFigures", "dashboard", "targets", "accounting"];
+const ALL = ["invoiceFigures", "dashboard", "targets", "accounting", "partsOrders"];
 
 // --- Without an owner PIN nothing is restricted ---
 const early = await register();
@@ -95,7 +95,7 @@ assert.deepEqual((await call({ action: "deviceAccess", pin: "1234" })).hidden, A
 assert.equal((await call({ action: "listExpenses", pin: "1234" })).status, 403);
 
 // The data behind hidden sections is refused; the rest of the app still works.
-for (const action of ["listMonthlySales", "accountSummary", "listBankTransactions", "bankAccountSummary", "listExpenses"]) {
+for (const action of ["listMonthlySales", "accountSummary", "listBankTransactions", "bankAccountSummary", "listExpenses", "listPartsOrders", "addPartsOrder"]) {
   const denied = await call({ action, pin: staff });
   assert.equal(denied.status, 403, action);
   assert.equal(denied.ok, false);
@@ -125,6 +125,14 @@ assert.deepEqual((await call({ action: "deviceAccess", pin: staff })).hidden, ["
 assert.equal((await call({ action: "listMonthlySales", pin: staff })).ok, true);
 assert.equal((await call({ action: "accountSummary", pin: staff })).ok, true);
 assert.equal((await call({ action: "listBankTransactions", pin: staff })).status, 403);
+// Parts orders wasn't in that list, so it's allowed now.
+assert.equal((await call({ action: "listPartsOrders", pin: staff })).ok, true);
+
+// A device saved before Parts orders could be hidden keeps seeing it.
+await db.query("UPDATE devices SET hidden_sections = $1 WHERE id = $2", [["invoiceFigures", "dashboard", "targets", "accounting"], updated.device.id]);
+assert.deepEqual((await call({ action: "deviceAccess", pin: staff })).hidden, ["invoiceFigures", "dashboard", "targets", "accounting"]);
+assert.equal((await call({ action: "listPartsOrders", pin: staff })).ok, true);
+assert.equal((await call({ action: "listMonthlySales", pin: staff })).status, 403);
 
 // Allowing everything shows it; hiding a section again applies at once, and
 // the one-time reset never undoes what the owner allowed.
