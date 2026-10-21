@@ -2517,22 +2517,90 @@
     }
   }
 
-  // One invoice per check-in, covering every device logged together.
-  async function createCheckinInvoice({ tickets, devices, customerName, phone, email, send }) {
-    const items = devices.flatMap(invoiceItemsForDevice);
-    const paymentMade = devices.reduce((sum, d) => sum + (Number(String(d.amountPaid || "").replace(/[^0-9.]/g, "")) || 0), 0);
+  // One invoice per client: the devices logged together go on one invoice,
+  // and the server adds them to the client's existing one instead of starting
+  // another — an invoice made before they were logged, or the one covering
+  // their other active repairs (lib/invoices.js checkinInvoice). invoiceId:
+  // "" = that automatic choice, "new" = always a new invoice, or an id.
+  async function createCheckinInvoice({ tickets, devices, customerName, phone, email, send, invoiceId = "" }) {
     const today = new Date();
     const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    return window.RPC_INVOICE_REQUEST({
-      action: "create",
+    const data = await window.RPC_INVOICE_REQUEST({
+      action: "checkin",
+      invoiceId,
       ticketIds: tickets.map((t) => t.id),
+      devices: devices.map((d, i) => ({
+        ticketId: tickets[i]?.id || "",
+        device: d.device,
+        items: invoiceItemsForDevice(d),
+        amountPaid: d.amountPaid,
+      })),
       billTo: { name: customerName, phone, email },
-      items,
-      paymentMade,
       invoiceDate: ymd,
       useDefaultNotes: true,
       send: send || "",
     });
+    // Joining an invoice that already had a payment (a deposit taken when it
+    // was made) passes that payment on to the repairs, so the next Amount
+    // paid edit — which rebuilds the invoice from its repairs — keeps it.
+    if (data.merged && data.invoice) {
+      try {
+        await window.RPC_SYNC_REPAIRS_FROM_INVOICE(data.invoice);
+      } catch (err) {
+        toast(`Repairs added to invoice ${data.invoice.number}, but their amounts couldn't be matched to it: ${err.message || err}`, { duration: 8000 });
+      }
+    }
+    return data;
+  }
+
+  // "Added to invoice INV-000123 (already open for the Pixel 6)."
+  function mergedInvoiceMessage(data) {
+    const merged = data?.merged;
+    if (!merged || !data.invoice) return "";
+    const why = merged.reason === "active"
+      ? "the client's invoice for their other active repair"
+      : "the invoice made for the client before this check-in";
+    const billed = merged.alreadyBilled?.length
+      ? ` ${merged.alreadyBilled.join(", ")} was already on it, so its lines were kept.`
+      : "";
+    return `Added to ${why}, ${data.invoice.number} — no second invoice was created.${billed}`;
+  }
+
+  // Payment step of a new check-in: which invoice the devices will go on.
+  // Shows the client's existing invoice (pre-selected) when there is one,
+  // with "Create a new invoice" as the alternative.
+  let checkinInvoiceLookup = 0;
+  async function refreshCheckinInvoiceField() {
+    const field = $("checkinInvoiceField");
+    const select = $("fCheckinInvoice");
+    if (!field || !select) return;
+    const lookup = ++checkinInvoiceLookup;
+    const billTo = { name: $("fName").value.trim(), phone: $("fPhone").value.trim() };
+    if (editingId || typeof window.RPC_INVOICE_REQUEST !== "function" || (!billTo.name && !billTo.phone)) {
+      field.hidden = true;
+      select.innerHTML = "";
+      return;
+    }
+    const devices = [...formDevices.map((d) => d.device), $("fDevice").value.trim()].filter(Boolean).map((device) => ({ device }));
+    let found = null;
+    try {
+      found = await window.RPC_INVOICE_REQUEST({ action: "checkinCandidate", billTo, devices });
+    } catch (_) {
+      found = null;
+    }
+    if (lookup !== checkinInvoiceLookup) return;
+    const invoice = found?.invoice;
+    if (!invoice) {
+      field.hidden = true;
+      select.innerHTML = "";
+      return;
+    }
+    const balance = formatMoney(Number(invoice.balanceDue) || 0);
+    const why = found.reason === "active" ? "covers their other active repair" : "made before this check-in, not linked to a repair yet";
+    select.innerHTML = `<option value="${esc(invoice.id)}">Add to ${esc(invoice.number)} (balance ${esc(balance)})</option>`
+      + `<option value="new">Create a new invoice</option>`;
+    $("checkinInvoiceHint").textContent = `${invoice.number} ${why}. Adding this check-in to it keeps the client on one invoice.`;
+    field.hidden = false;
   }
 
   // ---- Repairs from a new invoice -------------------------------------------
@@ -3397,6 +3465,7 @@
     setFormPaymentMethod("");
     refreshPaymentMethodField();
     $("fSendInvoice").checked = !ticket;
+    $("checkinInvoiceField").hidden = true;
     $("fInvoiceDelivery").value = "email";
     $("fInvoiceDelivery").closest(".invoice-delivery-field").hidden = Boolean(ticket);
     setIssueTags(ticket ? ticket.issues || "" : "");
@@ -3476,6 +3545,7 @@
     if (step === 3) {
       renderPaymentCards();
       refreshPaymentMethodField();
+      refreshCheckinInvoiceField();
       // Safety net: if the cost is still blank (or auto-filled) on arrival,
       // fill it from the price list now rather than relying on the earlier
       // device/issue events having fired with the list already loaded.
@@ -3916,6 +3986,8 @@
     const phone = $("fPhone").value.trim();
     const email = $("fEmail").value.trim();
     const shouldSendInvoice = $("fSendInvoice").checked && !editingId;
+    // "" lets the server find the client's existing invoice itself.
+    const invoiceChoice = $("checkinInvoiceField").hidden ? "" : $("fCheckinInvoice").value;
     const invoiceDelivery = $("fInvoiceDelivery").value === "whatsapp" ? "whatsapp" : "email";
     const saveBtn = $("saveForm");
     const original = saveBtn.textContent;
@@ -4084,6 +4156,7 @@
           phone,
           email,
           send: shouldSendInvoice && invoiceDelivery === "whatsapp" ? "whatsapp" : "",
+          invoiceId: invoiceChoice,
         });
       } catch (ex) {
         invoiceError = ex.message || String(ex);
@@ -4124,13 +4197,15 @@
         : "The device check-in has been saved.",
     ];
     if (invoiceData) {
+      const joined = mergedInvoiceMessage(invoiceData);
+      if (joined) summaryLines.push(joined);
       const delivered = invoiceDeliveryMessage(invoiceData, shouldSendInvoice ? invoiceDelivery : "");
       if (delivered) summaryLines.push(delivered);
     }
     if (wasPartial) summaryLines.push(`${failureMessage} The remaining device(s) were not logged — add them separately.`);
     $("formSuccessMessage").textContent = summaryLines.join(" ");
     renderSuccessInvoice(invoiceData, invoiceError, {
-      retry: () => createCheckinInvoice({ tickets: savedTickets, devices: devices.slice(0, savedTickets.length), customerName, phone, email, send: "" }),
+      retry: () => createCheckinInvoice({ tickets: savedTickets, devices: devices.slice(0, savedTickets.length), customerName, phone, email, send: "", invoiceId: invoiceChoice }),
     });
     setFormStep(4);
     $("doneForm").focus();
