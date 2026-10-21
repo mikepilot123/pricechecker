@@ -7477,6 +7477,7 @@ video.media-viewer-media {
 .pickup-pay-method.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .pickup-pay-panel .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .payment-method-field { margin-top: 16px; }
+.checkin-invoice-field { margin-top: 16px; }
 
 /* ---------- Dashboard: "Sales this month" breakdown ----------
    Follows the platform table guidance: numbers right-aligned in tabular

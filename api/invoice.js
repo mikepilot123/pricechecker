@@ -1,6 +1,6 @@
 import { ensureSchema } from "../lib/db.js";
 import { readyEmailDraft, sendReadyEmail, deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
-import { createInvoice, DEFAULT_INVOICE_NOTES, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
+import { checkinInvoice, createInvoice, DEFAULT_INVOICE_NOTES, findCheckinInvoice, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
 import { isRepairSyncPaymentUpdate } from "../lib/invoice-payment-sync.js";
 import { applyCors, checkPin } from "../lib/security.js";
 import { getTicketById, listTicketNotes, addTicketNote, updateTicket } from "../lib/tickets.js";
@@ -107,6 +107,13 @@ function escapeHtml(value) {
 //                `send: "email" | "whatsapp"` also delivers it.
 //   update     – { id, invoice: { …editable fields } }
 //   forTicket  – { ticketId } → the latest invoice containing that repair
+//   checkin    – invoice for newly logged repairs { billTo, devices: [{ ticketId,
+//                device, items, amountPaid }], invoiceId?, send? }: joins the
+//                client's existing invoice (made before they were logged, or
+//                covering their other active repairs) unless invoiceId is
+//                "new"; an invoice id picks one explicitly
+//   checkinCandidate – { billTo, devices: [{ device }] } → the invoice
+//                `checkin` would join, so check-in can show it first
 //   list       – every invoice (with its customer link), plus the defaults a
 //                brand-new invoice starts from
 //   send       – { id, delivery } re-delivers an existing invoice
@@ -247,11 +254,19 @@ async function createAndDeliverInvoice(req, res) {
     const invoice = await getInvoiceForTicket(body.ticketId);
     return res.status(200).json({ ok: true, invoice, invoiceUrl: invoice ? publicInvoiceUrl(req, invoice.token) : "" });
   }
+  if (action === "checkinCandidate") {
+    const found = await findCheckinInvoice({ billTo: body.billTo, devices: body.devices });
+    return res.status(200).json({ ok: true, invoice: found?.invoice || null, reason: found?.reason || "" });
+  }
   let invoice;
   let delivery = "";
+  let merged = null;
   if (action === "send") {
     invoice = await getInvoiceById(body.id);
     delivery = body.delivery === "whatsapp" ? "whatsapp" : "email";
+  } else if (action === "checkin") {
+    ({ invoice, merged } = await checkinInvoice(body));
+    delivery = body.send === "whatsapp" || body.send === "email" ? body.send : "";
   } else if (action === "create") {
     invoice = await createInvoice(body);
     delivery = body.send === "whatsapp" || body.send === "email" ? body.send : "";
@@ -276,6 +291,7 @@ async function createAndDeliverInvoice(req, res) {
     invoiceId: invoice.id,
     invoiceNumber: invoice.number,
     invoiceUrl,
+    merged,
     emailSent,
     emailError,
     whatsappUrl: invoiceWhatsAppUrl(invoice, invoiceUrl),
