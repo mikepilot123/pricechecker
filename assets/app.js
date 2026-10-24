@@ -87,6 +87,7 @@ let socketReconnectDelay = 2000;
 let syncTimer = null;
 let loadInFlight = null;
 let INVENTORY_ITEMS = [];
+let INVENTORY_LINKS = [];   // inventory row → model + repair it supplies (lib/inventory-links.js)
 let inventoryLoadInFlight = null;
 let PRICE_OVERRIDES = [];   // catalog rows layered over the sheet (lib/prices.js)
 let COMMON_SEARCHES = [];
@@ -377,8 +378,10 @@ async function loadData({ reason = "auto" } = {}) {
 }
 
 async function loadInventoryForPrices({ force = false } = {}) {
-  if (!force && Array.isArray(window.RPC_INVENTORY_ITEMS) && window.RPC_INVENTORY_ITEMS.length) {
+  if (!force && Array.isArray(window.RPC_INVENTORY_ITEMS) && window.RPC_INVENTORY_ITEMS.length
+      && Array.isArray(window.RPC_INVENTORY_LINKS)) {
     INVENTORY_ITEMS = window.RPC_INVENTORY_ITEMS.map(normalizeInventoryItemForPrices);
+    INVENTORY_LINKS = window.RPC_INVENTORY_LINKS.slice();
     if (MODELS.length) render();
     return INVENTORY_ITEMS;
   }
@@ -390,7 +393,9 @@ async function loadInventoryForPrices({ force = false } = {}) {
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Inventory rejected");
       INVENTORY_ITEMS = (data.items || []).map(normalizeInventoryItemForPrices);
+      INVENTORY_LINKS = Array.isArray(data.links) ? data.links : [];
       window.RPC_INVENTORY_ITEMS = INVENTORY_ITEMS.slice();
+      window.RPC_INVENTORY_LINKS = INVENTORY_LINKS.slice();
       if (MODELS.length) render();
       return INVENTORY_ITEMS;
     } catch (err) {
@@ -752,16 +757,73 @@ function inventoryPartMatchesRepair(repairType, item) {
   return false;
 }
 
+function repairTypeKey(repairType) {
+  return String(repairType || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// Built once per inventory/links update rather than per price row: the item
+// lookup by key, and which model + repair each linked item supplies.
+let stockIndexCache = null;
+function inventoryStockIndex() {
+  if (stockIndexCache && stockIndexCache.items === INVENTORY_ITEMS && stockIndexCache.links === INVENTORY_LINKS) {
+    return stockIndexCache;
+  }
+  const byKey = new Map(INVENTORY_ITEMS.map((item) => [item.key, item]));
+  const linkedKeys = new Set();
+  const linkedInStock = new Set();
+  INVENTORY_LINKS.forEach((link) => {
+    if (!link || !link.itemKey) return;
+    linkedKeys.add(link.itemKey);
+    const item = byKey.get(link.itemKey);
+    if (item && item.available > 0) linkedInStock.add(link.modelKey + "|" + repairTypeKey(link.repairType));
+  });
+  stockIndexCache = { items: INVENTORY_ITEMS, links: INVENTORY_LINKS, linkedKeys, linkedInStock };
+  return stockIndexCache;
+}
+
+// A part linked to a model + repair (Add item modal) ticks exactly that row.
+// Unlinked parts fall back to matching the sheet's item name and quality
+// against the model and repair names; a linked part never also ticks a row
+// by name, so the link is always the final word.
 function isPricePartInStock(modelName, repairType) {
+  if (!INVENTORY_ITEMS.length) return false;
+  const index = inventoryStockIndex();
+  if (index.linkedInStock.has(priceModelKey(modelName) + "|" + repairTypeKey(repairType))) return true;
   const section = inventorySectionForRepair(repairType);
-  if (!section || !INVENTORY_ITEMS.length) return false;
+  if (!section) return false;
   return INVENTORY_ITEMS.some((item) =>
     item.section === section
     && item.available > 0
+    && !index.linkedKeys.has(item.key)
     && inventoryDeviceMatches(modelName, item.device || item.item || item.label)
     && inventoryPartMatchesRepair(repairType, item)
   );
 }
+
+// Best guess at the model + repair a new inventory item supplies, used to
+// pre-fill the Add item modal's link dropdowns (assets/inventory.js).
+// Pass `model` to keep a device staff already chose and only guess the repair.
+function suggestPriceLink({ section, item, quality, model: chosenModel } = {}) {
+  let model = null;
+  if (chosenModel) {
+    model = MODELS.find((m) => m.name === chosenModel);
+  } else {
+    const name = normalizeDeviceName(item);
+    if (!name) return null;
+    model = MODELS.find((m) => normalizeDeviceName(m.name) === name);
+    if (!model) {
+      // "13 Pro" in the sheet for "iPhone 13 Pro" — only when exactly one
+      // model ends that way, so "13" never guesses between several.
+      const endings = MODELS.filter((m) => normalizeDeviceName(m.name).endsWith(" " + name));
+      if (endings.length === 1) model = endings[0];
+    }
+  }
+  if (!model) return null;
+  const part = normalizeInventoryItemForPrices({ section, item, quality, label: [item, quality].filter(Boolean).join(" · ") });
+  const repair = model.prices.find((p) => inventorySectionForRepair(p.type) === part.section && inventoryPartMatchesRepair(p.type, part));
+  return { model: model.name, repairType: repair ? repair.type : "" };
+}
+window.RPC_SUGGEST_PRICE_LINK = suggestPriceLink;
 
 function scrollCardIntoView(cardEl) {
   if (!cardEl) return;
@@ -894,7 +956,7 @@ function priceRowHtml(m, p, idx) {
   const inStock = isPricePartInStock(m.name, p.type);
   return `<div class="price-row" role="button" tabindex="0" data-idx="${idx}"
       aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
-    <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${inStock ? `<span class="price-stock-tick" title="In stock" aria-label="In stock">✓</span>` : ""}</span>
+    <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${inStock ? `<span class="price-stock-tick" title="Part in stock" aria-label="Part in stock"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></span>` : ""}</span>
     ${priceValueHtml(p.value)}
     <button type="button" class="icon-btn ghost-btn price-edit-btn" data-edit-price aria-label="Edit price"><svg class="icon"><use href="#i-pencil"></use></svg></button>
   </div>`;
@@ -1267,6 +1329,8 @@ els.commonSearchSettingsList?.addEventListener("click", (event) => {
 window.addEventListener("rpc-inventory", (event) => {
   INVENTORY_ITEMS = ((event.detail && event.detail.items) || window.RPC_INVENTORY_ITEMS || [])
     .map(normalizeInventoryItemForPrices);
+  const links = (event.detail && event.detail.links) || window.RPC_INVENTORY_LINKS;
+  if (Array.isArray(links)) INVENTORY_LINKS = links.slice();
   if (MODELS.length) render();
 });
 // Refresh when the tab regains focus (counter staff reopening the app).

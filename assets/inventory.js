@@ -10,6 +10,7 @@
   const $ = (id) => document.getElementById(id);
 
   let ITEMS = [];
+  let LINKS = [];   // inventory row → price list model + repair (lib/inventory-links.js)
   let sections = [];
   let sectionFields = [];
   let activeSection = "all";
@@ -18,11 +19,16 @@
   let loadedOnce = false;
   let loadInFlight = null;
   let addItemBusy = false;
+  // Once staff pick the device or repair themselves, typing the item name no
+  // longer re-guesses it for them.
+  let linkModelTouched = false;
+  let linkRepairTouched = false;
   const pendingAdjustments = new Map();
 
   function publishInventory() {
     window.RPC_INVENTORY_ITEMS = ITEMS.slice();
-    window.dispatchEvent(new CustomEvent("rpc-inventory", { detail: { items: ITEMS.slice() } }));
+    window.RPC_INVENTORY_LINKS = LINKS.slice();
+    window.dispatchEvent(new CustomEvent("rpc-inventory", { detail: { items: ITEMS.slice(), links: LINKS.slice() } }));
   }
 
   async function loadInventory({ force = false } = {}) {
@@ -68,6 +74,7 @@
     sections = data.sections || [...new Set(ITEMS.map((item) => item.section))];
     sections = sections.filter((section) => section !== "TOOLS" && ITEMS.some((item) => item.section === section));
     sectionFields = (data.sectionFields || []).filter((entry) => sections.includes(entry.section));
+    if (Array.isArray(data.links)) LINKS = data.links;
   }
 
   function normalizeItem(item) {
@@ -327,6 +334,11 @@
       `<option value="${esc(section)}">${esc(titleCase(section))}</option>`
     ).join("");
     syncQualityField();
+    linkModelTouched = false;
+    linkRepairTouched = false;
+    renderLinkModelOptions();
+    $("inventoryAddModel").value = "";
+    syncLinkRepairField("");
     modal.hidden = false;
     (sections.length ? $("inventoryAddItem") : select).focus();
   }
@@ -349,6 +361,78 @@
     $("inventoryAddQualityOptions").innerHTML = options.map((q) => `<option value="${esc(q)}"></option>`).join("");
   }
 
+  /* ---- Link to the price list ------------------------------------------ */
+  function priceModels() {
+    return Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : [];
+  }
+
+  // Grouped by brand, each group in price list order, so the dropdown reads
+  // like the Prices view.
+  function renderLinkModelOptions() {
+    const select = $("inventoryAddModel");
+    if (!select) return;
+    const current = select.value;
+    const groups = new Map();
+    priceModels().forEach((model) => {
+      const brand = model.brand || "Other";
+      if (!groups.has(brand)) groups.set(brand, []);
+      groups.get(brand).push(model);
+    });
+    select.innerHTML = `<option value="">Don't link</option>` + [...groups].map(([brand, models]) =>
+      `<optgroup label="${esc(brand)}">${models.map((model) =>
+        `<option value="${esc(model.name)}">${esc(model.name)}</option>`).join("")}</optgroup>`
+    ).join("");
+    select.value = priceModels().some((model) => model.name === current) ? current : "";
+  }
+
+  function syncLinkRepairField(suggestedRepair) {
+    const field = $("inventoryAddRepairField");
+    const select = $("inventoryAddRepair");
+    if (!field || !select) return;
+    const model = priceModels().find((candidate) => candidate.name === $("inventoryAddModel").value);
+    field.hidden = !model;
+    select.required = !!model;
+    if (!model) {
+      select.innerHTML = "";
+      return;
+    }
+    const keep = linkRepairTouched ? select.value : suggestedRepair;
+    select.innerHTML = `<option value="">Choose the repair…</option>` + model.prices.map((price) =>
+      `<option value="${esc(price.type)}">${esc(price.type)}</option>`).join("");
+    select.value = model.prices.some((price) => price.type === keep) ? keep : "";
+  }
+
+  function linkSuggestion(model) {
+    if (typeof window.RPC_SUGGEST_PRICE_LINK !== "function") return null;
+    return window.RPC_SUGGEST_PRICE_LINK({
+      section: $("inventoryAddSection").value,
+      item: $("inventoryAddItem").value.trim(),
+      quality: $("inventoryAddQualityField").hidden ? "" : $("inventoryAddQuality").value.trim(),
+      model,
+    });
+  }
+
+  // Item name, section or quality changed: pre-select the device it most
+  // likely is (unless staff already chose one) and the matching repair.
+  function suggestLink() {
+    const select = $("inventoryAddModel");
+    if (!select) return;
+    if (!linkModelTouched) {
+      const suggestion = linkSuggestion();
+      select.value = suggestion ? suggestion.model : "";
+      syncLinkRepairField(suggestion ? suggestion.repairType : "");
+      return;
+    }
+    const suggestion = select.value ? linkSuggestion(select.value) : null;
+    syncLinkRepairField(suggestion ? suggestion.repairType : "");
+  }
+
+  function onLinkModelChange() {
+    linkModelTouched = true;
+    linkRepairTouched = false;
+    suggestLink();
+  }
+
   async function submitInventoryAdd(event) {
     event?.preventDefault();
     if (addItemBusy) return;
@@ -369,6 +453,8 @@
       quality: $("inventoryAddQualityField").hidden ? "" : $("inventoryAddQuality").value.trim(),
       quantity: $("inventoryAddQuantity").value,
     };
+    const linkModel = $("inventoryAddModel").value;
+    if (linkModel) payload.link = { model: linkModel, repairType: $("inventoryAddRepair").value };
     addItemBusy = true;
     message.hidden = true;
     const submitBtn = $("inventoryAddSubmit");
@@ -392,7 +478,12 @@
       $("inventoryError").hidden = true;
       $("inventoryAddModal").hidden = true;
       if (typeof window.RPC_TOAST === "function") {
-        window.RPC_TOAST(`Added ${payload.item} to ${titleCase(payload.section)}`, { tone: "info", duration: 3000 });
+        if (data.linkError) {
+          window.RPC_TOAST(`Added ${payload.item}, but couldn't link it to ${payload.link.model}: ${data.linkError}`, { tone: "error", duration: 6000 });
+        } else {
+          const linked = payload.link ? ` · linked to ${payload.link.model} ${payload.link.repairType}` : "";
+          window.RPC_TOAST(`Added ${payload.item} to ${titleCase(payload.section)}${linked}`, { tone: "info", duration: 3000 });
+        }
       }
     } catch (err) {
       message.textContent = err.message;
@@ -429,7 +520,19 @@
   $("inventoryAddBtn")?.addEventListener("click", openInventoryAddModal);
   $("closeInventoryAddModal")?.addEventListener("click", closeInventoryAddModal);
   $("inventoryAddCancelBtn")?.addEventListener("click", closeInventoryAddModal);
-  $("inventoryAddSection")?.addEventListener("change", syncQualityField);
+  $("inventoryAddSection")?.addEventListener("change", () => {
+    syncQualityField();
+    suggestLink();
+  });
+  $("inventoryAddItem")?.addEventListener("input", suggestLink);
+  $("inventoryAddQuality")?.addEventListener("input", suggestLink);
+  $("inventoryAddModel")?.addEventListener("change", onLinkModelChange);
+  $("inventoryAddRepair")?.addEventListener("change", () => { linkRepairTouched = true; });
+  window.addEventListener("rpc-price-models", () => {
+    if ($("inventoryAddModal")?.hidden !== false) return;
+    renderLinkModelOptions();
+    suggestLink();
+  });
   $("inventoryAddForm")?.addEventListener("submit", submitInventoryAdd);
   $("inventoryAddSubmit")?.addEventListener("click", submitInventoryAdd);
 

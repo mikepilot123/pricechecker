@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=checkin-invoice-merge-1" />
+  <link rel="stylesheet" href="assets/style.css?v=inventory-price-link-1" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -1598,6 +1598,15 @@
               <label class="field-label" for="inventoryAddQuantity">Starting quantity</label>
               <input id="inventoryAddQuantity" class="text-input" type="number" min="0" step="1" placeholder="0" required />
             </div>
+            <div class="form-field form-field-full">
+              <label class="field-label" for="inventoryAddModel">Link to device (optional)</label>
+              <select id="inventoryAddModel" class="text-input select-input"></select>
+              <p class="field-hint">Pick the device on the price list this part is for. Prices then shows a green tick by that repair while it's in stock.</p>
+            </div>
+            <div class="form-field form-field-full" id="inventoryAddRepairField" hidden>
+              <label class="field-label" for="inventoryAddRepair">Part / repair</label>
+              <select id="inventoryAddRepair" class="text-input select-input"></select>
+            </div>
           </div>
           <p id="inventoryAddMessage" class="field-error" hidden></p>
         </form>
@@ -2798,8 +2807,8 @@
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
   <script defer src="assets/device-access.js?v=parts-orders-hide-1"></script>
-  <script defer src="assets/app.js?v=space-key-edit-fix-1"></script>
-  <script defer src="assets/inventory.js?v=add-item-1"></script>
+  <script defer src="assets/app.js?v=inventory-price-link-1"></script>
+  <script defer src="assets/inventory.js?v=inventory-price-link-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
   <script defer src="assets/intake.js?v=checkin-invoice-merge-1"></script>

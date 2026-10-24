@@ -494,15 +494,19 @@ body.nav-open .nav-backdrop { opacity: 1; }
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 18px;
-  height: 18px;
-  margin-left: 7px;
-  border-radius: var(--radius-sm);
-  background: #dff5ec;
-  color: var(--price);
-  font-size: 0.74rem;
-  font-weight: 500;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
   line-height: 1;
+}
+.price-stock-tick .icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3.4;
+  vertical-align: 0;
 }
 .price-add-btn {
   display: inline-flex;
