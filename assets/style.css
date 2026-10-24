@@ -497,11 +497,15 @@ body.nav-open .nav-backdrop { opacity: 1; }
   width: 20px;
   height: 20px;
   margin-left: 8px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: #16a34a;
   color: #fff;
   line-height: 1;
+  cursor: pointer;
 }
+.price-stock-tick:hover { background: #15803d; }
 .price-stock-tick .icon {
   width: 14px;
   height: 14px;
@@ -1288,6 +1292,32 @@ body.nav-open .nav-backdrop { opacity: 1; }
   color: var(--accent);
   font-weight: 500;
 }
+/* Links the part to a device + repair on the price list (assets/inventory.js). */
+.inventory-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.inventory-link-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inventory-link-chip:hover { border-color: var(--accent); color: var(--accent); }
+.inventory-link-chip.is-linked {
+  border: 1px solid #bbe5cb;
+  background: #e9f8ef;
+  color: #15803d;
+}
+.inventory-link-chip.is-linked:hover { border-color: #16a34a; }
 .inventory-category,
 .inventory-stock-status {
   display: inline-flex;

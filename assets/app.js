@@ -770,34 +770,56 @@ function inventoryStockIndex() {
   }
   const byKey = new Map(INVENTORY_ITEMS.map((item) => [item.key, item]));
   const linkedKeys = new Set();
-  const linkedInStock = new Set();
+  const linkedInStock = new Map();
   INVENTORY_LINKS.forEach((link) => {
     if (!link || !link.itemKey) return;
     linkedKeys.add(link.itemKey);
     const item = byKey.get(link.itemKey);
-    if (item && item.available > 0) linkedInStock.add(link.modelKey + "|" + repairTypeKey(link.repairType));
+    if (!item || item.available <= 0) return;
+    const key = link.modelKey + "|" + repairTypeKey(link.repairType);
+    if (!linkedInStock.has(key)) linkedInStock.set(key, []);
+    linkedInStock.get(key).push(item);
   });
   stockIndexCache = { items: INVENTORY_ITEMS, links: INVENTORY_LINKS, linkedKeys, linkedInStock };
   return stockIndexCache;
 }
 
-// A part linked to a model + repair (Add item modal) ticks exactly that row.
-// Unlinked parts fall back to matching the sheet's item name and quality
-// against the model and repair names; a linked part never also ticks a row
-// by name, so the link is always the final word.
-function isPricePartInStock(modelName, repairType) {
-  if (!INVENTORY_ITEMS.length) return false;
+// The in-stock parts for one price row. A part linked to a model + repair
+// (Inventory tab) counts for exactly that row. Unlinked parts fall back to
+// matching the sheet's item name and quality against the model and repair
+// names; a linked part never also counts for a row by name, so the link is
+// always the final word.
+function pricePartStock(modelName, repairType) {
+  if (!INVENTORY_ITEMS.length) return [];
   const index = inventoryStockIndex();
-  if (index.linkedInStock.has(priceModelKey(modelName) + "|" + repairTypeKey(repairType))) return true;
+  const linked = index.linkedInStock.get(priceModelKey(modelName) + "|" + repairTypeKey(repairType)) || [];
   const section = inventorySectionForRepair(repairType);
-  if (!section) return false;
-  return INVENTORY_ITEMS.some((item) =>
+  const matched = !section ? [] : INVENTORY_ITEMS.filter((item) =>
     item.section === section
     && item.available > 0
     && !index.linkedKeys.has(item.key)
     && inventoryDeviceMatches(modelName, item.device || item.item || item.label)
     && inventoryPartMatchesRepair(repairType, item)
   );
+  return linked.concat(matched);
+}
+
+function stockTickHtml(parts) {
+  if (!parts.length) return "";
+  const total = parts.reduce((sum, item) => sum + item.available, 0);
+  const title = "In stock: " + parts.map((item) => `${item.label || item.item} (${item.available})`).join(", ");
+  return `<button type="button" class="price-stock-tick" data-stock-key="${escapeHtml(parts[0].key)}"
+    title="${escapeHtml(title)} — tap to open in Inventory" aria-label="${escapeHtml(total + " in stock — open in Inventory")}">
+    <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></button>`;
+}
+
+// Tapping a tick opens that part on the Inventory tab.
+function openStockInInventory(itemKey) {
+  const item = INVENTORY_ITEMS.find((candidate) => candidate.key === itemKey);
+  if (!item) return;
+  window.dispatchEvent(new CustomEvent("rpc-filter-inventory", {
+    detail: { section: item.section, query: item.label || item.item, stock: "all" },
+  }));
 }
 
 // Best guess at the model + repair a new inventory item supplies, used to
@@ -867,6 +889,12 @@ function card(m, expand = false) {
     grid.innerHTML = m.prices.map((p, i) => priceRowHtml(m, p, i)).join("");
     grid.querySelectorAll(".price-row").forEach((rowEl) => {
       const p = m.prices[Number(rowEl.dataset.idx)];
+      const tick = rowEl.querySelector("[data-stock-key]");
+      tick?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openStockInInventory(tick.dataset.stockKey);
+      });
+      tick?.addEventListener("keydown", (e) => e.stopPropagation());
       const go = (e) => {
         e.stopPropagation();
         logDeviceFromPrice(m, p);
@@ -953,10 +981,10 @@ async function saveAddedPriceRepair() {
 // saveInlineEdit / renderDetailRowStatic): clicking the pencil turns just
 // that row's value into an input + save/cancel, no page-wide edit mode.
 function priceRowHtml(m, p, idx) {
-  const inStock = isPricePartInStock(m.name, p.type);
+  const stock = pricePartStock(m.name, p.type);
   return `<div class="price-row" role="button" tabindex="0" data-idx="${idx}"
       aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
-    <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${inStock ? `<span class="price-stock-tick" title="Part in stock" aria-label="Part in stock"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></span>` : ""}</span>
+    <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${stockTickHtml(stock)}</span>
     ${priceValueHtml(p.value)}
     <button type="button" class="icon-btn ghost-btn price-edit-btn" data-edit-price aria-label="Edit price"><svg class="icon"><use href="#i-pencil"></use></svg></button>
   </div>`;

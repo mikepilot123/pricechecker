@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=inventory-price-link-1" />
+  <link rel="stylesheet" href="assets/style.css?v=inventory-price-link-2" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -1571,6 +1571,38 @@
     </div>
   </main>
 
+  <!-- Link an inventory part to a price list repair -->
+  <div id="inventoryLinkModal" class="modal-backdrop" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="inventoryLinkTitle">
+      <div class="modal-header">
+        <h3 id="inventoryLinkTitle">Link to a repair</h3>
+        <button type="button" id="closeInventoryLinkModal" class="modal-close" aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p id="inventoryLinkItem" class="settings-help"></p>
+        <div class="form-grid">
+          <div class="form-field form-field-full">
+            <label class="field-label" for="inventoryLinkModel">Device</label>
+            <select id="inventoryLinkModel" class="text-input select-input"></select>
+          </div>
+          <div class="form-field form-field-full" id="inventoryLinkRepairField" hidden>
+            <label class="field-label" for="inventoryLinkRepair">Part / repair</label>
+            <select id="inventoryLinkRepair" class="text-input select-input"></select>
+          </div>
+        </div>
+        <p class="field-hint">Prices shows a green tick by this repair while the part is in stock, and Check In suggests it for this repair.</p>
+        <p id="inventoryLinkMessage" class="field-error" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <div class="form-actions">
+          <button type="button" id="inventoryLinkRemove" class="ghost-btn" hidden>Remove link</button>
+          <button type="button" id="inventoryLinkCancel" class="ghost-btn">Cancel</button>
+          <button type="button" id="inventoryLinkSave" class="primary-btn">Save link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Add inventory item modal -->
   <div id="inventoryAddModal" class="modal-backdrop" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="inventoryAddTitle">
@@ -1601,7 +1633,7 @@
             <div class="form-field form-field-full">
               <label class="field-label" for="inventoryAddModel">Link to device (optional)</label>
               <select id="inventoryAddModel" class="text-input select-input"></select>
-              <p class="field-hint">Pick the device on the price list this part is for. Prices then shows a green tick by that repair while it's in stock.</p>
+              <p class="field-hint">Pick the device on the price list this part is for. Prices then shows a green tick by that repair while it's in stock, and Check In suggests the part for it.</p>
             </div>
             <div class="form-field form-field-full" id="inventoryAddRepairField" hidden>
               <label class="field-label" for="inventoryAddRepair">Part / repair</label>
@@ -2807,11 +2839,11 @@
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
   <script defer src="assets/device-access.js?v=parts-orders-hide-1"></script>
-  <script defer src="assets/app.js?v=inventory-price-link-1"></script>
-  <script defer src="assets/inventory.js?v=inventory-price-link-1"></script>
+  <script defer src="assets/app.js?v=inventory-price-link-2"></script>
+  <script defer src="assets/inventory.js?v=inventory-price-link-2"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=checkin-invoice-merge-1"></script>
+  <script defer src="assets/intake.js?v=inventory-price-link-2"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>

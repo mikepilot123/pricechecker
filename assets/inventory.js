@@ -19,10 +19,8 @@
   let loadedOnce = false;
   let loadInFlight = null;
   let addItemBusy = false;
-  // Once staff pick the device or repair themselves, typing the item name no
-  // longer re-guesses it for them.
-  let linkModelTouched = false;
-  let linkRepairTouched = false;
+  let linkBusy = false;
+  let linkingItemKey = "";
   const pendingAdjustments = new Map();
 
   function publishInventory() {
@@ -162,7 +160,8 @@
       if (activeSection !== "all" && item.section !== activeSection) return false;
       if (activeStock !== "all" && stockStatus(item) !== activeStock) return false;
       if (!q) return true;
-      return [item.section, item.item, item.device, item.quality, item.note, item.label]
+      const link = linkFor(item.key);
+      return [item.section, item.item, item.device, item.quality, item.note, item.label, link?.model, link?.repairType]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -228,6 +227,7 @@
               ${item.quality ? `<span class="inventory-pill">${esc(item.quality)}</span>` : `<span>${esc(titleCase(item.section))}</span>`}
               ${item.note ? `<span class="inventory-note">${esc(item.note)}</span>` : ""}
             </span>
+            ${linkChipHtml(item)}
           </span>
         </div>
       </td>
@@ -334,11 +334,7 @@
       `<option value="${esc(section)}">${esc(titleCase(section))}</option>`
     ).join("");
     syncQualityField();
-    linkModelTouched = false;
-    linkRepairTouched = false;
-    renderLinkModelOptions();
-    $("inventoryAddModel").value = "";
-    syncLinkRepairField("");
+    addLinkPicker.reset();
     modal.hidden = false;
     (sections.length ? $("inventoryAddItem") : select).focus();
   }
@@ -366,71 +362,199 @@
     return Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : [];
   }
 
-  // Grouped by brand, each group in price list order, so the dropdown reads
-  // like the Prices view.
-  function renderLinkModelOptions() {
-    const select = $("inventoryAddModel");
-    if (!select) return;
-    const current = select.value;
-    const groups = new Map();
-    priceModels().forEach((model) => {
-      const brand = model.brand || "Other";
-      if (!groups.has(brand)) groups.set(brand, []);
-      groups.get(brand).push(model);
-    });
-    select.innerHTML = `<option value="">Don't link</option>` + [...groups].map(([brand, models]) =>
-      `<optgroup label="${esc(brand)}">${models.map((model) =>
-        `<option value="${esc(model.name)}">${esc(model.name)}</option>`).join("")}</optgroup>`
-    ).join("");
-    select.value = priceModels().some((model) => model.name === current) ? current : "";
+  function linkFor(itemKey) {
+    return LINKS.find((link) => link.itemKey === itemKey) || null;
   }
 
-  function syncLinkRepairField(suggestedRepair) {
-    const field = $("inventoryAddRepairField");
-    const select = $("inventoryAddRepair");
-    if (!field || !select) return;
-    const model = priceModels().find((candidate) => candidate.name === $("inventoryAddModel").value);
-    field.hidden = !model;
-    select.required = !!model;
-    if (!model) {
-      select.innerHTML = "";
-      return;
+  // A device dropdown plus a repair dropdown for that device, used by both
+  // the Add item modal and the per-row Link modal. `context` describes the
+  // part, so the pickers can pre-select the device and repair it most likely
+  // is — until staff choose one themselves.
+  function createLinkPicker({ modelId, repairFieldId, repairId, emptyLabel, context }) {
+    let modelTouched = false;
+    let repairTouched = false;
+
+    // Grouped by brand, each group in price list order, so the dropdown
+    // reads like the Prices view.
+    function renderModels() {
+      const select = $(modelId);
+      const current = select.value;
+      const groups = new Map();
+      priceModels().forEach((model) => {
+        const brand = model.brand || "Other";
+        if (!groups.has(brand)) groups.set(brand, []);
+        groups.get(brand).push(model);
+      });
+      select.innerHTML = `<option value="">${esc(emptyLabel)}</option>` + [...groups].map(([brand, models]) =>
+        `<optgroup label="${esc(brand)}">${models.map((model) =>
+          `<option value="${esc(model.name)}">${esc(model.name)}</option>`).join("")}</optgroup>`
+      ).join("");
+      select.value = priceModels().some((model) => model.name === current) ? current : "";
     }
-    const keep = linkRepairTouched ? select.value : suggestedRepair;
-    select.innerHTML = `<option value="">Choose the repair…</option>` + model.prices.map((price) =>
-      `<option value="${esc(price.type)}">${esc(price.type)}</option>`).join("");
-    select.value = model.prices.some((price) => price.type === keep) ? keep : "";
+
+    function syncRepair(preferred) {
+      const select = $(repairId);
+      const model = priceModels().find((candidate) => candidate.name === $(modelId).value);
+      $(repairFieldId).hidden = !model;
+      select.required = !!model;
+      if (!model) {
+        select.innerHTML = "";
+        return;
+      }
+      const keep = repairTouched && select.value ? select.value : preferred;
+      select.innerHTML = `<option value="">Choose the repair…</option>` + model.prices.map((price) =>
+        `<option value="${esc(price.type)}">${esc(price.type)}</option>`).join("");
+      select.value = model.prices.some((price) => price.type === keep) ? keep : "";
+    }
+
+    function suggestion(model) {
+      if (typeof window.RPC_SUGGEST_PRICE_LINK !== "function") return null;
+      return window.RPC_SUGGEST_PRICE_LINK(Object.assign({}, context(), { model }));
+    }
+
+    function suggest() {
+      const select = $(modelId);
+      if (!modelTouched) {
+        const guess = suggestion();
+        select.value = guess ? guess.model : "";
+        syncRepair(guess ? guess.repairType : "");
+        return;
+      }
+      const guess = select.value ? suggestion(select.value) : null;
+      syncRepair(guess ? guess.repairType : "");
+    }
+
+    $(modelId)?.addEventListener("change", () => {
+      modelTouched = true;
+      repairTouched = false;
+      suggest();
+    });
+    $(repairId)?.addEventListener("change", () => { repairTouched = true; });
+
+    return {
+      suggest,
+      // Start over, on an existing link if there is one.
+      reset(link) {
+        modelTouched = !!link;
+        repairTouched = !!link;
+        renderModels();
+        $(modelId).value = link ? link.model : "";
+        $(repairId).innerHTML = "";
+        if (link) syncRepair(link.repairType);
+        else suggest();
+      },
+      refreshModels() {
+        renderModels();
+        suggest();
+      },
+      value() {
+        return { model: $(modelId).value, repairType: $(repairId).value };
+      },
+    };
   }
 
-  function linkSuggestion(model) {
-    if (typeof window.RPC_SUGGEST_PRICE_LINK !== "function") return null;
-    return window.RPC_SUGGEST_PRICE_LINK({
+  const addLinkPicker = createLinkPicker({
+    modelId: "inventoryAddModel",
+    repairFieldId: "inventoryAddRepairField",
+    repairId: "inventoryAddRepair",
+    emptyLabel: "Don't link",
+    context: () => ({
       section: $("inventoryAddSection").value,
       item: $("inventoryAddItem").value.trim(),
       quality: $("inventoryAddQualityField").hidden ? "" : $("inventoryAddQuality").value.trim(),
-      model,
-    });
+    }),
+  });
+
+  const rowLinkPicker = createLinkPicker({
+    modelId: "inventoryLinkModel",
+    repairFieldId: "inventoryLinkRepairField",
+    repairId: "inventoryLinkRepair",
+    emptyLabel: "Choose a device…",
+    context: () => {
+      const item = ITEMS.find((candidate) => candidate.key === linkingItemKey) || {};
+      return { section: item.section, item: item.item, quality: item.quality };
+    },
+  });
+
+  function openInventoryLinkModal(itemKey) {
+    const item = ITEMS.find((candidate) => candidate.key === itemKey);
+    if (!item) return;
+    linkingItemKey = itemKey;
+    const link = linkFor(itemKey);
+    $("inventoryLinkItem").textContent = `${item.label || item.item} · ${titleCase(item.section)} — ${item.quantity} in stock`;
+    $("inventoryLinkMessage").hidden = true;
+    $("inventoryLinkRemove").hidden = !link;
+    rowLinkPicker.reset(link);
+    $("inventoryLinkModal").hidden = false;
+    $("inventoryLinkModel").focus();
   }
 
-  // Item name, section or quality changed: pre-select the device it most
-  // likely is (unless staff already chose one) and the matching repair.
-  function suggestLink() {
-    const select = $("inventoryAddModel");
-    if (!select) return;
-    if (!linkModelTouched) {
-      const suggestion = linkSuggestion();
-      select.value = suggestion ? suggestion.model : "";
-      syncLinkRepairField(suggestion ? suggestion.repairType : "");
+  function closeInventoryLinkModal() {
+    if (linkBusy) return;
+    $("inventoryLinkModal").hidden = true;
+    linkingItemKey = "";
+  }
+
+  async function saveInventoryLink({ remove = false } = {}) {
+    if (linkBusy || !linkingItemKey) return;
+    const message = $("inventoryLinkMessage");
+    const pin = safeLocalStorageGet(LS_PIN);
+    if (!pin) {
+      message.textContent = "Enter Check In PIN first.";
+      message.hidden = false;
       return;
     }
-    const suggestion = select.value ? linkSuggestion(select.value) : null;
-    syncLinkRepairField(suggestion ? suggestion.repairType : "");
+    const choice = rowLinkPicker.value();
+    if (!remove && (!choice.model || !choice.repairType)) {
+      message.textContent = "Choose the device and the repair this part is used for.";
+      message.hidden = false;
+      return;
+    }
+    const payload = remove
+      ? { action: "unlinkItem", pin, itemKey: linkingItemKey }
+      : { action: "linkItem", pin, itemKey: linkingItemKey, model: choice.model, repairType: choice.repairType };
+    linkBusy = true;
+    message.hidden = true;
+    const button = remove ? $("inventoryLinkRemove") : $("inventoryLinkSave");
+    const idle = button.textContent;
+    button.disabled = true;
+    button.textContent = remove ? "Removing…" : "Saving…";
+    try {
+      const res = await fetch(INVENTORY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Couldn't save the link");
+      setInventoryData(data);
+      lastUpdated = Date.now();
+      loadedOnce = true;
+      publishInventory();
+      render();
+      setStatus("live");
+      linkBusy = false;
+      closeInventoryLinkModal();
+      if (typeof window.RPC_TOAST === "function") {
+        window.RPC_TOAST(remove ? "Link removed" : `Linked to ${choice.model} · ${choice.repairType}`, { tone: "info", duration: 3000 });
+      }
+    } catch (err) {
+      message.textContent = err.message;
+      message.hidden = false;
+    } finally {
+      linkBusy = false;
+      button.disabled = false;
+      button.textContent = idle;
+    }
   }
 
-  function onLinkModelChange() {
-    linkModelTouched = true;
-    linkRepairTouched = false;
-    suggestLink();
+  function linkChipHtml(item) {
+    const link = linkFor(item.key);
+    const text = link ? `${link.model} · ${link.repairType}` : "Link to repair";
+    return `<button type="button" class="inventory-link-chip ${link ? "is-linked" : ""}" data-link-item="${esc(item.key)}"
+      title="${link ? "Linked to " + esc(text) + " — tap to change" : "Link this part to a device and repair on the price list"}">
+      <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg><span>${esc(text)}</span></button>`;
   }
 
   async function submitInventoryAdd(event) {
@@ -453,8 +577,8 @@
       quality: $("inventoryAddQualityField").hidden ? "" : $("inventoryAddQuality").value.trim(),
       quantity: $("inventoryAddQuantity").value,
     };
-    const linkModel = $("inventoryAddModel").value;
-    if (linkModel) payload.link = { model: linkModel, repairType: $("inventoryAddRepair").value };
+    const link = addLinkPicker.value();
+    if (link.model) payload.link = link;
     addItemBusy = true;
     message.hidden = true;
     const submitBtn = $("inventoryAddSubmit");
@@ -522,16 +646,21 @@
   $("inventoryAddCancelBtn")?.addEventListener("click", closeInventoryAddModal);
   $("inventoryAddSection")?.addEventListener("change", () => {
     syncQualityField();
-    suggestLink();
+    addLinkPicker.suggest();
   });
-  $("inventoryAddItem")?.addEventListener("input", suggestLink);
-  $("inventoryAddQuality")?.addEventListener("input", suggestLink);
-  $("inventoryAddModel")?.addEventListener("change", onLinkModelChange);
-  $("inventoryAddRepair")?.addEventListener("change", () => { linkRepairTouched = true; });
+  $("inventoryAddItem")?.addEventListener("input", addLinkPicker.suggest);
+  $("inventoryAddQuality")?.addEventListener("input", addLinkPicker.suggest);
+  $("closeInventoryLinkModal")?.addEventListener("click", closeInventoryLinkModal);
+  $("inventoryLinkCancel")?.addEventListener("click", closeInventoryLinkModal);
+  $("inventoryLinkSave")?.addEventListener("click", () => saveInventoryLink());
+  $("inventoryLinkRemove")?.addEventListener("click", () => saveInventoryLink({ remove: true }));
+  $("inventoryList")?.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-link-item]");
+    if (chip) openInventoryLinkModal(chip.dataset.linkItem);
+  });
   window.addEventListener("rpc-price-models", () => {
-    if ($("inventoryAddModal")?.hidden !== false) return;
-    renderLinkModelOptions();
-    suggestLink();
+    if ($("inventoryAddModal")?.hidden === false) addLinkPicker.refreshModels();
+    if ($("inventoryLinkModal")?.hidden === false) rowLinkPicker.refreshModels();
   });
   $("inventoryAddForm")?.addEventListener("submit", submitInventoryAdd);
   $("inventoryAddSubmit")?.addEventListener("click", submitInventoryAdd);

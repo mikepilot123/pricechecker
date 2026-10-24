@@ -668,16 +668,62 @@
     return device === inventoryDevice || device.includes(inventoryDevice) || inventoryDevice.includes(device);
   }
 
+  const linkKey = (text) => String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+  // Stock items linked (Inventory tab) to this device + any repair the
+  // selected issues cover on the price list. `chosen` marks the ones linked
+  // to the exact price row picked for an issue (e.g. Soft OLED, not Incell).
+  function linkedInventoryItems() {
+    const links = Array.isArray(window.RPC_INVENTORY_LINKS) ? window.RPC_INVENTORY_LINKS : [];
+    const model = findPriceModel($("fDevice").value);
+    if (!links.length || !model) return [];
+    const suggestion = currentPriceSuggestion();
+    const chosenTypes = new Set(suggestion ? suggestion.lines.map((line) => linkKey(line.type)) : []);
+    const issueTypes = new Set();
+    selectedIssues.forEach((issue) => {
+      const pattern = ISSUE_PRICE_TYPES[issue];
+      if (!pattern) return;
+      (model.prices || []).forEach((price) => { if (pattern.test(price.type || "")) issueTypes.add(linkKey(price.type)); });
+    });
+    const modelKey = linkKey(model.name);
+    const byItem = new Map();
+    links.forEach((link) => {
+      const repair = linkKey(link.repairType);
+      if (link.modelKey !== modelKey || !issueTypes.has(repair)) return;
+      byItem.set(link.itemKey, byItem.get(link.itemKey) || chosenTypes.has(repair));
+    });
+    return INVENTORY_ITEMS
+      .filter((item) => byItem.has(item.key))
+      .map((item) => ({ item, chosen: byItem.get(item.key) }))
+      .sort((a, b) => Number(b.chosen) - Number(a.chosen));
+  }
+
   function updateInventoryOptions(selectedKey = "") {
     const select = $("fInventoryItem");
     if (!select) return;
     const device = $("fDevice").value.trim();
     const issues = buildIssuesString();
-    const suggested = matchingInventoryItems(device, issues);
+    // A part pre-selected earlier is re-picked from scratch, so changing the
+    // device or repair never leaves the wrong part selected.
+    if (selectedKey && selectedKey === autoInventoryKey) selectedKey = "";
+    const linked = linkedInventoryItems();
+    const linkedKeys = new Set(linked.map(({ item }) => item.key));
+    const autoPick = !selectedKey && !editingId && !inventoryChosenByStaff
+      ? linked.find(({ item, chosen }) => chosen && item.quantity > 0)
+      : null;
+    autoInventoryKey = autoPick ? autoPick.item.key : "";
+    if (autoPick) selectedKey = autoPick.item.key;
+    const linkedShown = linked.filter(({ item }) => item.quantity > 0 || item.key === selectedKey).map(({ item }) => item);
+    const suggested = matchingInventoryItems(device, issues).filter((item) => !linkedKeys.has(item.key));
     const suggestedKeys = new Set(suggested.map((item) => item.key));
     const available = INVENTORY_ITEMS.filter((item) => item.quantity > 0 || item.key === selectedKey);
-    const other = available.filter((item) => !suggestedKeys.has(item.key));
+    const other = available.filter((item) => !suggestedKeys.has(item.key) && !linkedKeys.has(item.key));
     const parts = [`<option value="">No stock item used</option>`];
+    if (linkedShown.length) {
+      parts.push(`<optgroup label="Linked to this device">`);
+      linkedShown.forEach((item) => parts.push(inventoryOptionHtml(item, selectedKey)));
+      parts.push(`</optgroup>`);
+    }
     if (suggested.length) {
       parts.push(`<optgroup label="Suggested">`);
       suggested.forEach((item) => parts.push(inventoryOptionHtml(item, selectedKey)));
@@ -693,7 +739,12 @@
     select.value = hasSelectedKey ? selectedKey : "";
     const hint = $("inventoryHint");
     const need = repairNeedsInventory(issues);
-    if (!need) {
+    if (autoPick) {
+      const item = autoPick.item;
+      hint.textContent = `Linked part selected: ${item.label || item.item} (${item.quantity} in stock). Choose “No stock item used” if this repair won't use it.`;
+    } else if (linkedShown.length) {
+      hint.textContent = `${linkedShown.length} part${linkedShown.length === 1 ? "" : "s"} linked to this device's ${need ? need.toLowerCase().replace(/s$/, "") : "repair"} repairs.`;
+    } else if (!need) {
       hint.textContent = "Choose a stock item only if this repair uses one.";
     } else if (suggested.length) {
       hint.textContent = `${suggested.length} matching ${need.toLowerCase()} item${suggested.length === 1 ? "" : "s"} found.`;
@@ -1037,6 +1088,11 @@
   // cost staff typed themselves is never overwritten.
   let priceChoices = {};
   let autoRepairCost = "";
+  // The stock item pre-selected because it's linked to this device + repair
+  // (Inventory tab), and whether staff have chosen one themselves — after
+  // which nothing is pre-selected for them again.
+  let autoInventoryKey = "";
+  let inventoryChosenByStaff = false;
 
   function populateStatusSelect() {
     $("fStatus").innerHTML = STATUSES.map(
@@ -1183,6 +1239,7 @@
     if (!select) return;
     priceChoices[select.dataset.priceIssue] = select.value;
     refreshPriceSuggestion({ apply: true });
+    updateInventoryOptions($("fInventoryItem")?.value || "");
   });
   $("priceSuggestion")?.addEventListener("click", (e) => {
     if (!e.target.closest("[data-apply-price]")) return;
@@ -1250,6 +1307,11 @@
   // is already open, fill the cost then (an empty or auto-filled one only).
   window.addEventListener("rpc-price-models", () => {
     refreshPriceSuggestion({ apply: !$("intakeFormModal").hidden && !editingId });
+    if (!$("intakeFormModal").hidden) updateInventoryOptions($("fInventoryItem")?.value || "");
+  });
+  $("fInventoryItem")?.addEventListener("change", () => {
+    inventoryChosenByStaff = true;
+    autoInventoryKey = "";
   });
 
   // ---- Issue picker modal ---------------------------------------------------
@@ -3268,6 +3330,8 @@
     setIssueTags("");
     pendingFormMedia = [];
     renderPendingFormMedia();
+    autoInventoryKey = "";
+    inventoryChosenByStaff = false;
     updateInventoryOptions("");
     toast("Device added — enter the next one.", { tone: "info", duration: 2500 });
     focusUnlessTouch($("fDevice"));
@@ -3444,6 +3508,8 @@
     addToCheckinGroup = "";
     priceChoices = {};
     autoRepairCost = "";
+    autoInventoryKey = "";
+    inventoryChosenByStaff = false;
     const invoiceCard = $("invoiceSuccessCard");
     if (invoiceCard) { invoiceCard.hidden = true; invoiceCard.innerHTML = ""; }
     setQuickLogMode(false);
@@ -3674,7 +3740,11 @@
     const { device, repairType, price, priceValue } = detail || {};
     openForm(null);
     $("fDevice").value = device || "";
-    setIssueTags(guessIssueFromRepairType(repairType) || (repairType ? "Other: " + repairType : ""));
+    const issue = guessIssueFromRepairType(repairType);
+    // The exact price row tapped (Soft OLED, not Incell), so the part linked
+    // to it is the one Check In picks.
+    if (issue && repairType) priceChoices[issue] = repairType;
+    setIssueTags(issue || (repairType ? "Other: " + repairType : ""));
     if (priceValue != null) $("fRepairCost").value = priceValue;
     loadInventoryForForm().then(() => updateInventoryOptions("")).catch(() => {});
     setQuickLogMode(true);

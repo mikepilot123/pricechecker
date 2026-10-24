@@ -290,17 +290,27 @@ INVENTORY_SHEET_GID=85811363
 If write credentials are not configured, the Inventory tab can still load, but
 ticket saves with a selected stock item will fail with a setup message.
 
-### Linking parts to the price list
+### Linking parts to repairs
 
-When a part is in stock, **Prices** shows a green tick next to the repair it's
-for (e.g. *iPhone 13 Pro → Soft OLED Screen*). The **Add item** window on the
-Inventory tab has a **Link to device** dropdown listing every device on the
-price list, then a **Part / repair** dropdown with that device's repairs. Both
-are pre-filled from the item name and quality when the match is clear, and
-can be changed or left as *Don't link*. The link is saved in the database
-(`inventory_price_links`), so the sheet's item name doesn't have to match the
-price list exactly. Parts with no link still tick a repair when the sheet's
-device name matches the model exactly.
+Every row on the **Inventory** tab has a link chip. Tap **Link to repair** (or
+the green chip of an existing link) to pick the device on the price list and
+the repair the part is for, e.g. *13 Pro · Soft → iPhone 13 Pro · Soft OLED
+Screen*. **Add item** has the same two dropdowns, so new parts can be linked as
+they're added. Both are pre-filled when the item name and quality make the
+match clear. Searching the Inventory tab also finds parts by their linked
+device and repair.
+
+Once a part is linked:
+
+- **Prices** shows a green tick next to that repair while the part is in
+  stock. Hover it for the count; tap it to open the part on the Inventory tab.
+- **Check In** lists the part first under *Linked to this device* and, for a
+  new check-in, selects it for the repair being quoted (so one comes off stock
+  when the repair is saved). Pick *No stock item used* if it won't be used.
+
+Links are saved in the database (`inventory_price_links`), so the sheet's item
+names don't have to match the price list. Parts with no link still tick a
+repair when the sheet's device name matches the model exactly.
 
 ---
 
