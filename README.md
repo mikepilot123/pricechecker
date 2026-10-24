@@ -290,27 +290,33 @@ INVENTORY_SHEET_GID=85811363
 If write credentials are not configured, the Inventory tab can still load, but
 ticket saves with a selected stock item will fail with a setup message.
 
-### Linking parts to repairs
+### Inventory ↔ prices
 
-Every row on the **Inventory** tab has a link chip. Tap **Link to repair** (or
-the green chip of an existing link) to pick the device on the price list and
-the repair the part is for, e.g. *13 Pro · Soft → iPhone 13 Pro · Soft OLED
-Screen*. **Add item** has the same two dropdowns, so new parts can be linked as
-they're added. Both are pre-filled when the item name and quality make the
-match clear. Searching the Inventory tab also finds parts by their linked
-device and repair.
+Whenever a part is in stock, its device card on **Prices** shows it: a green
+**✓ In stock** badge on the card, and a green tick next to each repair that
+part is for (e.g. *iPhone 13 Pro → Soft OLED Screen*). Add an item with a
+quantity, or bump a quantity up on the Inventory tab, and the tick appears;
+sell the last one and it goes. Hover a tick for the count; tap it to open the
+part on the Inventory tab. Stock is re-checked every minute, so changes made
+on another device show up too.
 
-Once a part is linked:
+This works from the inventory names as they are:
 
-- **Prices** shows a green tick next to that repair while the part is in
-  stock. Hover it for the count; tap it to open the part on the Inventory tab.
-- **Check In** lists the part first under *Linked to this device* and, for a
-  new check-in, selects it for the repair being quoted (so one comes off stock
-  when the repair is saved). Pick *No stock item used* if it won't be used.
+- The device can be written in full or without its brand — `13 Pro`,
+  `iPhone 13 Pro`, `A15`, `Galaxy A15` — and one row can cover several models
+  (`iPhone 12/12 Pro`).
+- The section says which repair it is: Screens, Batteries, Charging Ports,
+  Back Glass, Cameras, Speakers.
+- A screen's quality picks the grade (`Soft` → Soft OLED, `Incell` →
+  Incell). A screen with no quality ticks every screen repair on that card.
+- A row whose note says "sold" counts one fewer in stock.
 
-Links are saved in the database (`inventory_price_links`), so the sheet's item
-names don't have to match the price list. Parts with no link still tick a
-repair when the sheet's device name matches the model exactly.
+When a name can't be matched, link it by hand: every Inventory row has a
+**Link to repair** chip (and Add item has the same dropdowns) to pick the
+device and repair. A linked part ticks exactly that repair, and **Check In**
+lists it first, pre-selecting it for a new check-in of that repair (choose
+*No stock item used* if it won't be used). Links are saved in the database
+(`inventory_price_links`).
 
 ---
 

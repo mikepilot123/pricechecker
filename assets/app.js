@@ -688,31 +688,97 @@ function normalizeInventoryItemForPrices(item) {
   });
 }
 
-function inventorySectionForRepair(repairType) {
-  const text = String(repairType || "").toLowerCase();
-  if (/(screen|lcd|display|front\s*glass)/i.test(text)) return "SCREENS";
-  if (/battery/i.test(text)) return "BATTERIES";
-  return "";
+// Kinds of part, shared by the inventory sheet's sections and the price
+// list's repair names (mirrors assets/restock.js's PARTS). Order matters:
+// back glass comes before screen, so "Back Glass" never reads as a screen.
+const PART_KINDS = [
+  { key: "backglass", repair: /back\s*glass|back\s*cover|housing|rear\s*glass/i, section: /BACK|HOUSING/ },
+  { key: "screen", repair: /screen|display|lcd|oled|incell|digiti[sz]er|front\s*glass/i, section: /SCREEN|LCD|DISPLAY/ },
+  { key: "battery", repair: /batter/i, section: /BATTER/ },
+  { key: "charging", repair: /charg|dock|usb|lightning\s*port/i, section: /CHARG/ },
+  { key: "camera", repair: /camera|lens/i, section: /CAMERA/ },
+  { key: "speaker", repair: /speaker|\bmic\b|microphone|earpiece/i, section: /SPEAKER|MIC/ },
+];
+
+function repairPartKind(repairType) {
+  const kind = PART_KINDS.find((k) => k.repair.test(String(repairType || "")));
+  return kind ? kind.key : "";
 }
 
+// The section says what an item is ("SCREENS"); an item in a catch-all
+// section falls back to its own name ("iPhone 13 Battery").
+function itemPartKind(item) {
+  const section = String(item.section || "").toUpperCase();
+  const kind = PART_KINDS.find((k) => k.section.test(section));
+  return kind ? kind.key : repairPartKind([item.item || item.device, item.quality].join(" "));
+}
+
+// Lowercase words with brand filler, punctuation and letter/number joins
+// evened out, so "Galaxy A15", "Samsung A15" and "A15" line up.
 function normalizeDeviceName(text) {
   return String(text || "")
     .toLowerCase()
-    .replace(/\b(apple|cell|phone|tablet)\b/g, " ")
+    .replace(/\+/g, " plus ")
+    .replace(/\b(apple|galaxy|cell|phone|tablet)\b/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
+    .replace(/([a-z])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-z])/g, "$1 $2")
     .replace(/\bgen(?:eration)?\b/g, "gen")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function inventoryDeviceMatches(modelName, itemName) {
-  const model = normalizeDeviceName(modelName);
-  const item = normalizeDeviceName(itemName);
-  if (!model || !item) return false;
-  // Strict equality only — substring matching let a bare "iPhone 13" inventory
-  // entry falsely match "iPhone 13 Mini"/"Pro"/"Pro Max" price rows, since the
-  // shorter normalized name is a substring of the longer ones.
-  return model === item;
+// Words that make a different model, so "iPhone 13 Pro" stock is never read
+// as plain "iPhone 13" when the price list has no 13 Pro.
+const MODEL_VARIANT_WORDS = new Set(["pro", "max", "plus", "mini", "ultra", "fe", "lite", "e", "s", "se", "edge", "xl", "a", "c", "r", "core", "neo", "prime"]);
+
+// "iPhone 12/12 Pro" → ["iPhone 12", "iPhone 12 Pro"]; "iPhone 13 Pro/Pro Max"
+// → ["iPhone 13 Pro", "iPhone 13 Pro Max"] — one part that fits several
+// models (same rule as assets/restock.js).
+function expandInventoryNames(name) {
+  const parts = String(name || "").split("/").map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return parts;
+  const first = parts[0];
+  const brand = (first.match(/^(\D*?)(?=\d)/) || [, ""])[1];
+  const upToNumber = (first.match(/^(.*?\d+\w*)/) || [, first])[1];
+  return [first, ...parts.slice(1).map((part) => (/^\d/.test(part) ? `${brand}${part}` : `${upToNumber} ${part}`))];
+}
+
+// One inventory name → the price list model it is, or null when it's unclear.
+// The name may be the full model name or drop its brand ("13 Pro" for
+// "iPhone 13 Pro"), and may run on with part words ("iPhone 13 Pro Max
+// OLED"). The longest model that fits wins; a tie between two models is too
+// vague to guess.
+function priceModelForName(name, models = MODELS) {
+  const words = normalizeDeviceName(name).split(" ").filter(Boolean);
+  if (!words.length) return null;
+  let best = null;
+  let bestScore = 0;
+  let tied = false;
+  const consider = (model, modelWords, bonus) => {
+    if (!modelWords.length || modelWords.length > words.length) return;
+    if (modelWords.some((word, i) => words[i] !== word)) return;
+    const next = words[modelWords.length];
+    if (next && MODEL_VARIANT_WORDS.has(next)) return;
+    const score = modelWords.length + bonus + (next ? 0 : 0.5);
+    if (score > bestScore) { best = model; bestScore = score; tied = false; }
+    else if (score === bestScore && best !== model) tied = true;
+  };
+  models.forEach((model) => {
+    const modelWords = normalizeDeviceName(model.name).split(" ").filter(Boolean);
+    consider(model, modelWords, 100);
+    if (modelWords.length > 1 && /^[a-z]+$/.test(modelWords[0])) consider(model, modelWords.slice(1), 0);
+  });
+  return tied ? null : best;
+}
+
+function priceModelsForItem(item, models = MODELS) {
+  const found = new Set();
+  expandInventoryNames(item.device || item.item || "").forEach((name) => {
+    const model = priceModelForName(name, models);
+    if (model) found.add(model);
+  });
+  return [...found];
 }
 
 function normalizePartQuality(text) {
@@ -750,22 +816,31 @@ function screenQualityMatches(repairType, inventoryItem) {
   return true;
 }
 
-function inventoryPartMatchesRepair(repairType, item) {
-  const section = inventorySectionForRepair(repairType);
-  if (section === "SCREENS") return screenQualityMatches(repairType, item);
-  if (section === "BATTERIES") return true;
-  return false;
+// Whether an in-stock item counts for one repair on a model's card. Screens
+// come in grades (Incell / Soft OLED / Hard OLED…): a part whose quality
+// names a grade only counts for that grade's rows; one with no grade the
+// card recognises counts for every screen row.
+function inventoryItemFitsRepair(item, repairType, model) {
+  const kind = repairPartKind(repairType);
+  if (!kind || itemPartKind(item) !== kind) return false;
+  if (kind !== "screen") return true;
+  const screenRows = (model.prices || []).filter((p) => repairPartKind(p.type) === "screen");
+  if (screenRows.length <= 1) return true;
+  const fits = screenRows.filter((p) => screenQualityMatches(p.type, item));
+  return fits.length ? fits.some((p) => p.type === repairType) : true;
 }
 
 function repairTypeKey(repairType) {
   return String(repairType || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-// Built once per inventory/links update rather than per price row: the item
-// lookup by key, and which model + repair each linked item supplies.
+// Built once per inventory/links/price list update rather than per price
+// row: which model + repair each linked item supplies, and which model each
+// unlinked in-stock item was matched to by name.
 let stockIndexCache = null;
 function inventoryStockIndex() {
-  if (stockIndexCache && stockIndexCache.items === INVENTORY_ITEMS && stockIndexCache.links === INVENTORY_LINKS) {
+  if (stockIndexCache && stockIndexCache.items === INVENTORY_ITEMS
+      && stockIndexCache.links === INVENTORY_LINKS && stockIndexCache.models === MODELS) {
     return stockIndexCache;
   }
   const byKey = new Map(INVENTORY_ITEMS.map((item) => [item.key, item]));
@@ -780,27 +855,30 @@ function inventoryStockIndex() {
     if (!linkedInStock.has(key)) linkedInStock.set(key, []);
     linkedInStock.get(key).push(item);
   });
-  stockIndexCache = { items: INVENTORY_ITEMS, links: INVENTORY_LINKS, linkedKeys, linkedInStock };
+  const matchedByModel = new Map();
+  INVENTORY_ITEMS.forEach((item) => {
+    if (item.available <= 0 || linkedKeys.has(item.key) || !itemPartKind(item)) return;
+    priceModelsForItem(item).forEach((model) => {
+      const key = priceModelKey(model.name);
+      if (!matchedByModel.has(key)) matchedByModel.set(key, []);
+      matchedByModel.get(key).push(item);
+    });
+  });
+  stockIndexCache = { items: INVENTORY_ITEMS, links: INVENTORY_LINKS, models: MODELS, linkedKeys, linkedInStock, matchedByModel };
   return stockIndexCache;
 }
 
-// The in-stock parts for one price row. A part linked to a model + repair
-// (Inventory tab) counts for exactly that row. Unlinked parts fall back to
-// matching the sheet's item name and quality against the model and repair
-// names; a linked part never also counts for a row by name, so the link is
-// always the final word.
-function pricePartStock(modelName, repairType) {
+// The in-stock parts for one repair on a model's card. A part linked to a
+// model + repair (Inventory tab) counts for exactly that row. Every other
+// in-stock part counts when its name matches the model and its section
+// (and screen grade) matches the repair; a linked part never also counts for
+// a row by name, so the link is always the final word.
+function pricePartStock(model, repairType) {
   if (!INVENTORY_ITEMS.length) return [];
   const index = inventoryStockIndex();
-  const linked = index.linkedInStock.get(priceModelKey(modelName) + "|" + repairTypeKey(repairType)) || [];
-  const section = inventorySectionForRepair(repairType);
-  const matched = !section ? [] : INVENTORY_ITEMS.filter((item) =>
-    item.section === section
-    && item.available > 0
-    && !index.linkedKeys.has(item.key)
-    && inventoryDeviceMatches(modelName, item.device || item.item || item.label)
-    && inventoryPartMatchesRepair(repairType, item)
-  );
+  const key = priceModelKey(model.name);
+  const linked = index.linkedInStock.get(key + "|" + repairTypeKey(repairType)) || [];
+  const matched = (index.matchedByModel.get(key) || []).filter((item) => inventoryItemFitsRepair(item, repairType, model));
   return linked.concat(matched);
 }
 
@@ -813,7 +891,18 @@ function stockTickHtml(parts) {
     <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></button>`;
 }
 
-// Tapping a tick opens that part on the Inventory tab.
+// Tapping a tick opens that part on the Inventory tab — not "Log device",
+// which the rest of the row does.
+function bindStockTick(rowEl) {
+  const tick = rowEl.querySelector("[data-stock-key]");
+  if (!tick) return;
+  tick.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openStockInInventory(tick.dataset.stockKey);
+  });
+  tick.addEventListener("keydown", (e) => e.stopPropagation());
+}
+
 function openStockInInventory(itemKey) {
   const item = INVENTORY_ITEMS.find((candidate) => candidate.key === itemKey);
   if (!item) return;
@@ -823,26 +912,17 @@ function openStockInInventory(itemKey) {
 }
 
 // Best guess at the model + repair a new inventory item supplies, used to
-// pre-fill the Add item modal's link dropdowns (assets/inventory.js).
+// pre-fill the link dropdowns on the Inventory tab (assets/inventory.js).
 // Pass `model` to keep a device staff already chose and only guess the repair.
 function suggestPriceLink({ section, item, quality, model: chosenModel } = {}) {
-  let model = null;
-  if (chosenModel) {
-    model = MODELS.find((m) => m.name === chosenModel);
-  } else {
-    const name = normalizeDeviceName(item);
-    if (!name) return null;
-    model = MODELS.find((m) => normalizeDeviceName(m.name) === name);
-    if (!model) {
-      // "13 Pro" in the sheet for "iPhone 13 Pro" — only when exactly one
-      // model ends that way, so "13" never guesses between several.
-      const endings = MODELS.filter((m) => normalizeDeviceName(m.name).endsWith(" " + name));
-      if (endings.length === 1) model = endings[0];
-    }
-  }
-  if (!model) return null;
   const part = normalizeInventoryItemForPrices({ section, item, quality, label: [item, quality].filter(Boolean).join(" · ") });
-  const repair = model.prices.find((p) => inventorySectionForRepair(p.type) === part.section && inventoryPartMatchesRepair(p.type, part));
+  const model = chosenModel
+    ? MODELS.find((m) => m.name === chosenModel)
+    : priceModelsForItem(part)[0];
+  if (!model) return null;
+  const fitting = (model.prices || []).filter((p) => inventoryItemFitsRepair(part, p.type, model));
+  // A screen with a grade picks that grade's row over a generic one.
+  const repair = fitting.find((p) => repairPartKind(p.type) !== "screen" || screenQualityMatches(p.type, part)) || fitting[0];
   return { model: model.name, repairType: repair ? repair.type : "" };
 }
 window.RPC_SUGGEST_PRICE_LINK = suggestPriceLink;
@@ -863,12 +943,17 @@ function card(m, expand = false) {
   const el = document.createElement("div");
   el.className = "card" + (expand ? " open" : "");
 
+  // Repairs with their part in stock, flagged on the card itself so it
+  // shows before the card is opened.
+  const stocked = m.prices.filter((p) => pricePartStock(m, p.type).length).map((p) => p.type);
   const head = document.createElement("div");
   head.className = "card-head";
   head.innerHTML = `
     <div class="card-model">
       <span>${escapeHtml(m.name)}</span>
       <span class="brand-tag">${m.brand}</span>
+      ${stocked.length ? `<span class="card-stock-badge" title="${escapeHtml("Parts in stock: " + stocked.join(", "))}">
+        <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span class="card-stock-text">In stock</span></span>` : ""}
     </div>
     <div class="card-right">
       <div class="from-price">
@@ -889,12 +974,7 @@ function card(m, expand = false) {
     grid.innerHTML = m.prices.map((p, i) => priceRowHtml(m, p, i)).join("");
     grid.querySelectorAll(".price-row").forEach((rowEl) => {
       const p = m.prices[Number(rowEl.dataset.idx)];
-      const tick = rowEl.querySelector("[data-stock-key]");
-      tick?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openStockInInventory(tick.dataset.stockKey);
-      });
-      tick?.addEventListener("keydown", (e) => e.stopPropagation());
+      bindStockTick(rowEl);
       const go = (e) => {
         e.stopPropagation();
         logDeviceFromPrice(m, p);
@@ -980,11 +1060,14 @@ async function saveAddedPriceRepair() {
 // Matches assets/intake.js's per-field pencil pattern (startInlineEdit /
 // saveInlineEdit / renderDetailRowStatic): clicking the pencil turns just
 // that row's value into an input + save/cancel, no page-wide edit mode.
+function priceNameInnerHtml(m, p) {
+  return `<button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${stockTickHtml(pricePartStock(m, p.type))}`;
+}
+
 function priceRowHtml(m, p, idx) {
-  const stock = pricePartStock(m.name, p.type);
   return `<div class="price-row" role="button" tabindex="0" data-idx="${idx}"
       aria-label="Log a device for ${escapeHtml(m.name)} — ${escapeHtml(p.type)}">
-    <span class="price-name"><button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(p.type)}${stockTickHtml(stock)}</span>
+    <span class="price-name">${priceNameInnerHtml(m, p)}</span>
     ${priceValueHtml(p.value)}
     <button type="button" class="icon-btn ghost-btn price-edit-btn" data-edit-price aria-label="Edit price"><svg class="icon"><use href="#i-pencil"></use></svg></button>
   </div>`;
@@ -1048,8 +1131,9 @@ function startPriceInlineEdit(rowEl, model, priceEntry) {
 function renderPriceRowStatic(rowEl, model, priceEntry) {
   rowEl.querySelector(".price-name-editing")?.replaceWith(Object.assign(document.createElement("span"), {
     className: "price-name",
-    innerHTML: `<button type="button" class="price-add-btn" tabindex="-1" aria-hidden="true">+</button>${escapeHtml(priceEntry.type)}${isPricePartInStock(model.name, priceEntry.type) ? `<span class="price-stock-tick" title="In stock" aria-label="In stock">✓</span>` : ""}`,
+    innerHTML: priceNameInnerHtml(model, priceEntry),
   }));
+  bindStockTick(rowEl);
   rowEl.querySelector(".price-val-editing")?.remove();
   rowEl.insertAdjacentHTML(
     "beforeend",
@@ -1365,6 +1449,7 @@ window.addEventListener("rpc-inventory", (event) => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && lastFetchTime && Date.now() - lastFetchTime > 60000) {
     loadData({ reason: "focus" });
+    loadInventoryForPrices({ force: true });
   }
 });
 
@@ -1379,6 +1464,9 @@ function startAutoSync() {
     // visibilitychange handler above catches the app up on return.
     if (document.hidden) return;
     loadData({ reason: "interval" });
+    // Stock changes made on another device (or straight in the sheet) reach
+    // the ticks without a reload.
+    loadInventoryForPrices({ force: true });
   }, AUTO_REFRESH_MS);
 }
 

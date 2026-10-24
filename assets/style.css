@@ -456,6 +456,8 @@ body.nav-open .nav-backdrop { opacity: 1; }
   #results .card-head { gap: 8px; }
   #results .card-model { font-size: 0.96rem; }
   .from-prefix { display: none; }
+  .card-stock-badge { padding: 3px; }
+  .card-stock-text { display: none; }
 }
 
 .card-body {
@@ -489,6 +491,20 @@ body.nav-open .nav-backdrop { opacity: 1; }
 }
 .price-name { color: var(--text-dim); display: inline-flex; align-items: center; }
 .price-val { text-align: right; font-weight: 500; color: var(--price); font-family: var(--font-mono); }
+.card-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 2px 8px 2px 4px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.card-stock-badge .icon { width: 13px; height: 13px; stroke-width: 3.4; vertical-align: 0; }
 .price-stock-tick {
   display: inline-flex;
   align-items: center;
