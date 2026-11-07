@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=inventory-price-link-3" />
+  <link rel="stylesheet" href="assets/style.css?v=inventory-price-link-4" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -1619,7 +1619,9 @@
             </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="inventoryAddItem">Item name</label>
-              <input id="inventoryAddItem" class="text-input" placeholder="e.g. iPhone 16 Pro Max" required />
+              <input id="inventoryAddItem" class="text-input" list="inventoryAddItemOptions" autocomplete="off" placeholder="e.g. iPhone 16 Pro Max" required />
+              <datalist id="inventoryAddItemOptions"></datalist>
+              <p class="field-hint">Start typing to pick the device as it's named on Prices.</p>
             </div>
             <div class="form-field form-field-full" id="inventoryAddQualityField">
               <label class="field-label" for="inventoryAddQuality">Quality / type</label>
@@ -1631,9 +1633,9 @@
               <input id="inventoryAddQuantity" class="text-input" type="number" min="0" step="1" placeholder="0" required />
             </div>
             <div class="form-field form-field-full">
-              <label class="field-label" for="inventoryAddModel">Link to device (optional)</label>
+              <label class="field-label" for="inventoryAddModel">Link to device on Prices</label>
               <select id="inventoryAddModel" class="text-input select-input"></select>
-              <p class="field-hint">Pick the device on the price list this part is for. Prices then shows a green tick by that repair while it's in stock, and Check In suggests the part for it.</p>
+              <p class="field-hint">Filled in from the item name. Prices then shows a green tick by that repair while it's in stock, and Check In suggests the part for it. Change it if the guess is wrong.</p>
             </div>
             <div class="form-field form-field-full" id="inventoryAddRepairField" hidden>
               <label class="field-label" for="inventoryAddRepair">Part / repair</label>
@@ -2839,11 +2841,11 @@
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
   <script defer src="assets/device-access.js?v=parts-orders-hide-1"></script>
-  <script defer src="assets/app.js?v=inventory-price-link-3"></script>
-  <script defer src="assets/inventory.js?v=inventory-price-link-3"></script>
+  <script defer src="assets/app.js?v=inventory-price-link-4"></script>
+  <script defer src="assets/inventory.js?v=inventory-price-link-4"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=inventory-price-link-3"></script>
+  <script defer src="assets/intake.js?v=inventory-price-link-4"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>

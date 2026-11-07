@@ -302,21 +302,32 @@ on another device show up too.
 
 This works from the inventory names as they are:
 
-- The device can be written in full or without its brand — `13 Pro`,
-  `iPhone 13 Pro`, `A15`, `Galaxy A15` — and one row can cover several models
-  (`iPhone 12/12 Pro`).
+- The device can be written in full, without its brand, or with a different
+  one — `13 Pro`, `iPhone 13 Pro`, `Iphone13pro`, `13 ProMax`, `A15`, `A2`
+  for `A02`, `Galaxy A15`, `Samsung Galaxy A15` — and one row can cover several
+  models (`iPhone 12/12 Pro`, `13 Pro/Pro Max`, `X/XS`, `A10/A10s`,
+  `A22 4G/5G`). Price list names written that way (`iPhone X/XS`) work too.
 - The section says which repair it is: Screens, Batteries, Charging Ports,
   Back Glass, Cameras, Speakers.
 - A screen's quality picks the grade (`Soft` → Soft OLED, `Incell` →
   Incell). A screen with no quality ticks every screen repair on that card.
 - A row whose note says "sold" counts one fewer in stock.
 
-When a name can't be matched, link it by hand: every Inventory row has a
-**Link to repair** chip (and Add item has the same dropdowns) to pick the
-device and repair. A linked part ticks exactly that repair, and **Check In**
-lists it first, pre-selecting it for a new check-in of that repair (choose
-*No stock item used* if it won't be used). Links are saved in the database
-(`inventory_price_links`).
+Every Inventory row says how it shows on Prices:
+
+- **Solid green chip**: linked by hand to that device and repair.
+- **Green outline**: matched by its name, e.g. *iPhone 13 Pro · Soft OLED
+  Screen*. Tap it to link the part somewhere else.
+- **Amber "Not on Prices"**: the name doesn't match any device on the price
+  list, so Prices can't show it. Tap it to pick the device and repair.
+
+**Add item** suggests the price list's device names as you type the item name,
+and fills in *Link to device on Prices* from it, so a new part is linked as
+it's added. A linked part ticks exactly that repair. **Check In** lists the
+parts for the device being checked in, linked or matched by name, under *For
+this device*, and for a new check-in pre-selects the one linked to the repair
+being quoted (choose *No stock item used* if it won't be used). Links are
+saved in the database (`inventory_price_links`).
 
 ---
 

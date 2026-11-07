@@ -161,7 +161,9 @@
       if (activeStock !== "all" && stockStatus(item) !== activeStock) return false;
       if (!q) return true;
       const link = linkFor(item.key);
-      return [item.section, item.item, item.device, item.quality, item.note, item.label, link?.model, link?.repairType]
+      const found = link ? null : nameMatch(item);
+      const matched = found ? found.matches.flatMap((match) => [match.model, match.repairType]) : [];
+      return [item.section, item.item, item.device, item.quality, item.note, item.label, link?.model, link?.repairType, ...matched]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -334,6 +336,7 @@
       `<option value="${esc(section)}">${esc(titleCase(section))}</option>`
     ).join("");
     syncQualityField();
+    renderItemNameOptions();
     addLinkPicker.reset();
     modal.hidden = false;
     (sections.length ? $("inventoryAddItem") : select).focus();
@@ -360,6 +363,15 @@
   /* ---- Link to the price list ------------------------------------------ */
   function priceModels() {
     return Array.isArray(window.RPC_PRICE_MODELS) ? window.RPC_PRICE_MODELS : [];
+  }
+
+  // Add item's name field suggests the price list's own device names, so a
+  // new part is named the way Prices spells it and shows there straight away.
+  function renderItemNameOptions() {
+    const list = $("inventoryAddItemOptions");
+    if (!list) return;
+    list.innerHTML = [...new Set(priceModels().map((model) => model.name.trim()))]
+      .map((name) => `<option value="${esc(name)}"></option>`).join("");
   }
 
   function linkFor(itemKey) {
@@ -549,11 +561,48 @@
     }
   }
 
+  // What Prices matched this part to by its name (assets/app.js), when it
+  // has no link of its own.
+  function nameMatch(item) {
+    if (typeof window.RPC_PRICE_MATCHES_FOR_ITEM !== "function" || !priceModels().length) return null;
+    return window.RPC_PRICE_MATCHES_FOR_ITEM(item);
+  }
+
+  // "iPhone 13 Pro · Soft OLED Screen", "iPhone 12 · 2 repairs",
+  // "iPhone 12 +1 · Battery" — the same repairs Prices ticks for this part.
+  function matchText(matches) {
+    const models = [...new Set(matches.map((match) => match.model))];
+    const repairs = [...new Set(matches.map((match) => match.repairType))];
+    const model = models[0] + (models.length > 1 ? ` +${models.length - 1}` : "");
+    return `${model} · ${repairs.length === 1 ? repairs[0] : repairs.length + " repairs"}`;
+  }
+
+  // Every row says how it reaches Prices: linked by hand (solid green),
+  // matched by its name (green outline — tap to link it elsewhere), or not
+  // on Prices at all (amber — tap to link it).
   function linkChipHtml(item) {
     const link = linkFor(item.key);
-    const text = link ? `${link.model} · ${link.repairType}` : "Link to repair";
-    return `<button type="button" class="inventory-link-chip ${link ? "is-linked" : ""}" data-link-item="${esc(item.key)}"
-      title="${link ? "Linked to " + esc(text) + " — tap to change" : "Link this part to a device and repair on the price list"}">
+    let text = "Link to repair";
+    let tone = "";
+    let title = "Link this part to a device and repair on the price list";
+    if (link) {
+      text = `${link.model} · ${link.repairType}`;
+      tone = "is-linked";
+      title = `Linked to ${text} — tap to change`;
+    } else {
+      const found = nameMatch(item);
+      if (found && found.matches.length) {
+        text = matchText(found.matches);
+        tone = "is-matched";
+        title = "Shows on Prices as: " + found.matches.map((match) => `${match.model} · ${match.repairType}`).join(", ")
+          + " (matched by name) — tap to link it to a different repair";
+      } else if (found && found.kind) {
+        text = "Not on Prices — link to repair";
+        tone = "is-unmatched";
+        title = "This name doesn't match a device on the price list, so Prices can't show it. Tap to pick the device and repair.";
+      }
+    }
+    return `<button type="button" class="inventory-link-chip ${tone}" data-link-item="${esc(item.key)}" title="${esc(title)}">
       <svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg><span>${esc(text)}</span></button>`;
   }
 
@@ -659,8 +708,11 @@
     if (chip) openInventoryLinkModal(chip.dataset.linkItem);
   });
   window.addEventListener("rpc-price-models", () => {
+    renderItemNameOptions();
     if ($("inventoryAddModal")?.hidden === false) addLinkPicker.refreshModels();
     if ($("inventoryLinkModal")?.hidden === false) rowLinkPicker.refreshModels();
+    // Each row's "shows on Prices as" chip depends on the price list.
+    if (loadedOnce) render();
   });
   $("inventoryAddForm")?.addEventListener("submit", submitInventoryAdd);
   $("inventoryAddSubmit")?.addEventListener("click", submitInventoryAdd);

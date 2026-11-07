@@ -1334,6 +1334,18 @@ body.nav-open .nav-backdrop { opacity: 1; }
   color: #15803d;
 }
 .inventory-link-chip.is-linked:hover { border-color: #16a34a; }
+/* Matched to Prices by its name: same green, outlined rather than filled. */
+.inventory-link-chip.is-matched {
+  border: 1px solid #bbe5cb;
+  color: #15803d;
+}
+.inventory-link-chip.is-matched:hover { border-color: #16a34a; color: #15803d; }
+/* A part Prices can't place — worth a tap to link it. */
+.inventory-link-chip.is-unmatched {
+  border-color: #f2c98a;
+  color: #b45309;
+}
+.inventory-link-chip.is-unmatched:hover { border-color: #d97706; color: #b45309; }
 .inventory-category,
 .inventory-stock-status {
   display: inline-flex;

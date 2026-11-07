@@ -670,13 +670,15 @@
 
   const linkKey = (text) => String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
 
-  // Stock items linked (Inventory tab) to this device + any repair the
-  // selected issues cover on the price list. `chosen` marks the ones linked
-  // to the exact price row picked for an issue (e.g. Soft OLED, not Incell).
+  // Stock items for this device + any repair the selected issues cover on
+  // the price list: parts linked to it on the Inventory tab, and unlinked
+  // parts whose name matches it (the same match that ticks Prices). `chosen`
+  // marks the ones for the exact price row picked for an issue (e.g. Soft
+  // OLED, not Incell).
   function linkedInventoryItems() {
     const links = Array.isArray(window.RPC_INVENTORY_LINKS) ? window.RPC_INVENTORY_LINKS : [];
     const model = findPriceModel($("fDevice").value);
-    if (!links.length || !model) return [];
+    if (!model) return [];
     const suggestion = currentPriceSuggestion();
     const chosenTypes = new Set(suggestion ? suggestion.lines.map((line) => linkKey(line.type)) : []);
     const issueTypes = new Set();
@@ -687,11 +689,24 @@
     });
     const modelKey = linkKey(model.name);
     const byItem = new Map();
+    const linkedKeys = new Set();
     links.forEach((link) => {
+      linkedKeys.add(link.itemKey);
       const repair = linkKey(link.repairType);
       if (link.modelKey !== modelKey || !issueTypes.has(repair)) return;
       byItem.set(link.itemKey, byItem.get(link.itemKey) || chosenTypes.has(repair));
     });
+    // A link is the final word, so a linked part is never also matched by name.
+    if (typeof window.RPC_PRICE_MATCHES_FOR_ITEM === "function") {
+      INVENTORY_ITEMS.forEach((item) => {
+        if (linkedKeys.has(item.key)) return;
+        window.RPC_PRICE_MATCHES_FOR_ITEM(item).matches.forEach((match) => {
+          const repair = linkKey(match.repairType);
+          if (linkKey(match.model) !== modelKey || !issueTypes.has(repair)) return;
+          byItem.set(item.key, byItem.get(item.key) || chosenTypes.has(repair));
+        });
+      });
+    }
     return INVENTORY_ITEMS
       .filter((item) => byItem.has(item.key))
       .map((item) => ({ item, chosen: byItem.get(item.key) }))
@@ -720,7 +735,7 @@
     const other = available.filter((item) => !suggestedKeys.has(item.key) && !linkedKeys.has(item.key));
     const parts = [`<option value="">No stock item used</option>`];
     if (linkedShown.length) {
-      parts.push(`<optgroup label="Linked to this device">`);
+      parts.push(`<optgroup label="For this device">`);
       linkedShown.forEach((item) => parts.push(inventoryOptionHtml(item, selectedKey)));
       parts.push(`</optgroup>`);
     }

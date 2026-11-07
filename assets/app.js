@@ -723,25 +723,54 @@ function normalizeDeviceName(text) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/([a-z])(\d)/g, "$1 $2")
     .replace(/(\d)([a-z])/g, "$1 $2")
+    .replace(/\bpromax\b/g, "pro max")
+    .replace(/\b0+(\d)/g, "$1")          // "A02" and "A2" are the same model
     .replace(/\bgen(?:eration)?\b/g, "gen")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+// Brand words an inventory name may start with even when the price list
+// leaves them off ("Samsung Galaxy A15" stock, a "Galaxy A15" card).
+const DEVICE_BRAND_WORDS = new Set([
+  "iphone", "ipad", "samsung", "tecno", "techno", "pixel", "google", "infinix", "itel",
+  "motorola", "moto", "huawei", "xiaomi", "redmi", "oppo", "vivo", "nokia", "lg", "oneplus",
+]);
+
 // Words that make a different model, so "iPhone 13 Pro" stock is never read
 // as plain "iPhone 13" when the price list has no 13 Pro.
 const MODEL_VARIANT_WORDS = new Set(["pro", "max", "plus", "mini", "ultra", "fe", "lite", "e", "s", "se", "edge", "xl", "a", "c", "r", "core", "neo", "prime"]);
 
-// "iPhone 12/12 Pro" → ["iPhone 12", "iPhone 12 Pro"]; "iPhone 13 Pro/Pro Max"
-// → ["iPhone 13 Pro", "iPhone 13 Pro Max"] — one part that fits several
-// models (same rule as assets/restock.js).
+// One name that covers several models → each model's full name:
+//   "iPhone 12/12 Pro"       → iPhone 12, iPhone 12 Pro
+//   "iPhone 13 Pro/Pro Max"  → iPhone 13 Pro, iPhone 13 Pro Max
+//   "iPhone X/XS"            → iPhone X, iPhone XS
+//   "Samsung A10/A10s"       → Samsung A10, Samsung A10s
+//   "Samsung A22 4G/5G"      → Samsung A22 4G, Samsung A22 5G
+// Used for inventory names and for price list names written the same way.
 function expandInventoryNames(name) {
   const parts = String(name || "").split("/").map((part) => part.trim()).filter(Boolean);
   if (parts.length < 2) return parts;
   const first = parts[0];
-  const brand = (first.match(/^(\D*?)(?=\d)/) || [, ""])[1];
+  const words = first.split(/\s+/);
+  const last = words[words.length - 1];
+  const withoutLast = words.slice(0, -1).join(" ");
+  const join = (prefix, part) => (prefix ? prefix + " " + part : part);
+  // Words before the first one with a digit: "iPhone", "Samsung".
+  const firstNumbered = words.findIndex((word) => /\d/.test(word));
+  const brand = words.slice(0, firstNumbered < 0 ? words.length - 1 : firstNumbered).join(" ");
   const upToNumber = (first.match(/^(.*?\d+\w*)/) || [, first])[1];
-  return [first, ...parts.slice(1).map((part) => (/^\d/.test(part) ? `${brand}${part}` : `${upToNumber} ${part}`))];
+  return [first, ...parts.slice(1).map((part) => {
+    if (/^\d/.test(part)) {
+      // "A22 4G/5G" swaps the last word; "iPhone 12/12 Pro" the model number.
+      if (/^\d/.test(last) && words.slice(0, -1).some((word) => /\d/.test(word))) return join(withoutLast, part);
+      const brandPrefix = (first.match(/^(\D*?)(?=\d)/) || [, ""])[1];
+      return brandPrefix + part;
+    }
+    if (/\d/.test(part.split(/\s+/)[0])) return join(brand, part);   // "A10/A10s"
+    if (firstNumbered >= 0) return `${upToNumber} ${part}`;          // "13 Pro/Pro Max"
+    return join(withoutLast, part);                                  // "X/XS"
+  })];
 }
 
 // One inventory name → the price list model it is, or null when it's unclear.
@@ -750,24 +779,33 @@ function expandInventoryNames(name) {
 // OLED"). The longest model that fits wins; a tie between two models is too
 // vague to guess.
 function priceModelForName(name, models = MODELS) {
-  const words = normalizeDeviceName(name).split(" ").filter(Boolean);
-  if (!words.length) return null;
+  const fullWords = normalizeDeviceName(name).split(" ").filter(Boolean);
+  if (!fullWords.length) return null;
+  // The name as written, and without a leading brand word the card may not
+  // have ("Samsung Galaxy A15" → "A15").
+  const nameForms = [{ words: fullWords, bonus: 0 }];
+  if (fullWords.length > 1 && DEVICE_BRAND_WORDS.has(fullWords[0])) nameForms.push({ words: fullWords.slice(1), bonus: -0.25 });
   let best = null;
   let bestScore = 0;
   let tied = false;
   const consider = (model, modelWords, bonus) => {
-    if (!modelWords.length || modelWords.length > words.length) return;
-    if (modelWords.some((word, i) => words[i] !== word)) return;
-    const next = words[modelWords.length];
-    if (next && MODEL_VARIANT_WORDS.has(next)) return;
-    const score = modelWords.length + bonus + (next ? 0 : 0.5);
-    if (score > bestScore) { best = model; bestScore = score; tied = false; }
-    else if (score === bestScore && best !== model) tied = true;
+    nameForms.forEach(({ words, bonus: formBonus }) => {
+      if (!modelWords.length || modelWords.length > words.length) return;
+      if (modelWords.some((word, i) => words[i] !== word)) return;
+      const next = words[modelWords.length];
+      if (next && MODEL_VARIANT_WORDS.has(next)) return;
+      const score = modelWords.length + bonus + formBonus + (next ? 0 : 0.5);
+      if (score > bestScore) { best = model; bestScore = score; tied = false; }
+      else if (score === bestScore && best !== model) tied = true;
+    });
   };
   models.forEach((model) => {
-    const modelWords = normalizeDeviceName(model.name).split(" ").filter(Boolean);
-    consider(model, modelWords, 100);
-    if (modelWords.length > 1 && /^[a-z]+$/.test(modelWords[0])) consider(model, modelWords.slice(1), 0);
+    // A card named "iPhone X/XS" is found by "XS" stock too.
+    expandInventoryNames(model.name).forEach((alias) => {
+      const modelWords = normalizeDeviceName(alias).split(" ").filter(Boolean);
+      consider(model, modelWords, 100);
+      if (modelWords.length > 1 && /^[a-z]+$/.test(modelWords[0])) consider(model, modelWords.slice(1), 0);
+    });
   });
   return tied ? null : best;
 }
@@ -911,6 +949,33 @@ function openStockInInventory(itemKey) {
   }));
 }
 
+// Which price list repairs an inventory item counts for by its name alone
+// (links aside) — the same match that puts the tick on Prices. The Inventory
+// tab shows it on each row, and Check In lists those parts for the device.
+// Returns { kind, matches: [{ model, repairType }] }; kind is "" for things
+// that aren't a repair part (tools, accessories).
+let nameMatchCache = { models: null, byKey: new Map() };
+function priceMatchesForItem(rawItem) {
+  if (!rawItem) return { kind: "", matches: [] };
+  if (nameMatchCache.models !== MODELS) nameMatchCache = { models: MODELS, byKey: new Map() };
+  const item = normalizeInventoryItemForPrices(rawItem);
+  const cacheKey = [item.key, item.section, item.item, item.quality].join("\u0000");
+  if (nameMatchCache.byKey.has(cacheKey)) return nameMatchCache.byKey.get(cacheKey);
+  const kind = itemPartKind(item);
+  const matches = [];
+  if (kind) {
+    priceModelsForItem(item).forEach((model) => {
+      (model.prices || []).forEach((p) => {
+        if (inventoryItemFitsRepair(item, p.type, model)) matches.push({ model: model.name, repairType: p.type });
+      });
+    });
+  }
+  const result = { kind, matches };
+  nameMatchCache.byKey.set(cacheKey, result);
+  return result;
+}
+window.RPC_PRICE_MATCHES_FOR_ITEM = priceMatchesForItem;
+
 // Best guess at the model + repair a new inventory item supplies, used to
 // pre-fill the link dropdowns on the Inventory tab (assets/inventory.js).
 // Pass `model` to keep a device staff already chose and only guess the repair.
@@ -923,6 +988,9 @@ function suggestPriceLink({ section, item, quality, model: chosenModel } = {}) {
   const fitting = (model.prices || []).filter((p) => inventoryItemFitsRepair(part, p.type, model));
   // A screen with a grade picks that grade's row over a generic one.
   const repair = fitting.find((p) => repairPartKind(p.type) !== "screen" || screenQualityMatches(p.type, part)) || fitting[0];
+  // A guessed device with no repair to go with it would leave Add item
+  // stuck on a required "Part / repair" choice — only guess a full link.
+  if (!repair && !chosenModel) return null;
   return { model: model.name, repairType: repair ? repair.type : "" };
 }
 window.RPC_SUGGEST_PRICE_LINK = suggestPriceLink;
