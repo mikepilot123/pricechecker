@@ -1617,6 +1617,11 @@
               <label class="field-label" for="inventoryAddSection">Section</label>
               <select id="inventoryAddSection" class="text-input select-input" required></select>
             </div>
+            <div class="form-field form-field-full" id="inventoryAddNewSectionField" hidden>
+              <label class="field-label" for="inventoryAddNewSection">New category name</label>
+              <input id="inventoryAddNewSection" class="text-input" autocomplete="off" maxlength="40" placeholder="e.g. Charging Ports" />
+              <p class="field-hint">Letters, spaces, &amp;, / and - only. It's added at the bottom of the inventory sheet with this item in it.</p>
+            </div>
             <div class="form-field form-field-full">
               <label class="field-label" for="inventoryAddItem">Item name</label>
               <input id="inventoryAddItem" class="text-input" list="inventoryAddItemOptions" autocomplete="off" placeholder="e.g. iPhone 16 Pro Max" required />
@@ -2842,7 +2847,7 @@
        DOMContentLoaded fires. -->
   <script defer src="assets/device-access.js?v=parts-orders-hide-1"></script>
   <script defer src="assets/app.js?v=inventory-price-link-4"></script>
-  <script defer src="assets/inventory.js?v=inventory-price-link-4"></script>
+  <script defer src="assets/inventory.js?v=inventory-new-category-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
   <script defer src="assets/intake.js?v=inventory-price-link-4"></script>

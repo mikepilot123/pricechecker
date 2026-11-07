@@ -50,8 +50,12 @@ globalThis.fetch = async (url, init = {}) => {
     return json({});
   }
   if (href.endsWith(":batchUpdate")) {
-    const start = JSON.parse(init.body).requests[0].insertDimension.range.startIndex;
-    sheet.splice(start, 0, ["", "", ""]);
+    const request = JSON.parse(init.body).requests[0];
+    if (request.appendDimension) {
+      for (let i = 0; i < request.appendDimension.length; i += 1) sheet.push(["", "", ""]);
+      return json({});
+    }
+    sheet.splice(request.insertDimension.range.startIndex, 0, ["", "", ""]);
     return json({});
   }
   throw new Error("Unexpected fetch: " + href);
@@ -133,6 +137,48 @@ await test("existing items can be relinked and unlinked", async () => {
   data = await call("POST", { action: "unlinkItem", pin: "1234", itemKey: battery.key });
   assert.equal(data.ok, true, data.error);
   assert.equal(data.links.some((link) => link.itemKey === battery.key), false);
+});
+
+await test("adding an item under a new category starts that section at the bottom of the sheet", async () => {
+  const data = await call("POST", {
+    action: "addItem", pin: "1234", section: "charging  ports", newSection: true, item: "iPhone 13", quantity: "4",
+    link: { model: "iPhone 13", repairType: "Charging Port" },
+  });
+  assert.equal(data.ok, true, data.error);
+  assert.equal(data.linkError, "");
+  assert.ok(data.sections.includes("CHARGING PORTS"));
+  const item = data.items.find((candidate) => candidate.section === "CHARGING PORTS");
+  assert.equal(item.item, "iPhone 13");
+  assert.equal(item.quantity, 4);
+  assert.equal(item.key, "charging ports|iphone 13|");
+  assert.ok(data.links.some((link) => link.itemKey === item.key && link.repairType === "Charging Port"));
+  // Laid out like the others: blank row, title, header, item.
+  const title = sheet.findIndex((row) => row[0] === "CHARGING PORTS");
+  assert.deepEqual(sheet[title - 1].filter(Boolean), []);
+  assert.deepEqual(sheet[title + 1], ["Device", "Quality", "Quantity"]);
+  // Nothing in the existing sections moved.
+  assert.equal(data.items.find((candidate) => candidate.item === "13 Pro").quantity, 2);
+
+  // The next item for that category goes into it like any other section.
+  const next = await call("POST", { action: "addItem", pin: "1234", section: "CHARGING PORTS", item: "iPhone 12", quality: "Original", quantity: "1" });
+  assert.equal(next.ok, true, next.error);
+  assert.equal(next.items.filter((candidate) => candidate.section === "CHARGING PORTS").length, 2);
+});
+
+await test("a new category naming an existing one adds to it instead", async () => {
+  const before = sheet.filter((row) => row[0] === "SCREENS").length;
+  const data = await call("POST", { action: "addItem", pin: "1234", section: "Screens", newSection: true, item: "iPhone 15", quality: "Soft", quantity: "1" });
+  assert.equal(data.ok, true, data.error);
+  assert.equal(sheet.filter((row) => row[0] === "SCREENS").length, before);
+  assert.ok(data.items.some((candidate) => candidate.section === "SCREENS" && candidate.item === "iPhone 15"));
+});
+
+await test("a new category name can't contain digits or symbols the sheet would misread", async () => {
+  const rows = sheet.length;
+  const data = await call("POST", { action: "addItem", pin: "1234", section: "iPhone 15 parts", newSection: true, item: "Flex", quantity: "1" });
+  assert.equal(data.ok, false);
+  assert.match(data.error, /letters, spaces/);
+  assert.equal(sheet.length, rows);
 });
 
 await test("linking needs the team PIN", async () => {

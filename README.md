@@ -290,6 +290,17 @@ INVENTORY_SHEET_GID=85811363
 If write credentials are not configured, the Inventory tab can still load, but
 ticket saves with a selected stock item will fail with a setup message.
 
+### Adding items and categories
+
+**Add item** on the Inventory tab adds a row to the sheet, right under the
+last item of the chosen section. To start a new category, pick **+ New
+category…** in the Section dropdown and name it (letters, spaces, `&`, `/` and
+`-` only, e.g. *Charging Ports*). It's added at the bottom of the sheet the same
+way the others are laid out: a blank row, the category title in capitals, a
+*Device · Quality · Quantity* header, then the item. After that it's in the
+Section dropdown like any other. Naming a category that already exists just
+adds the item to it.
+
 ### Inventory ↔ prices
 
 Whenever a part is in stock, its device card on **Prices** shows it: a green

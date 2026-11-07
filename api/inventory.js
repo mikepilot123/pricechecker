@@ -24,6 +24,7 @@ export default async function handler(req, res) {
         }
         const inventory = await addInventoryItem({
           section: body.section, item: body.item, quality: body.quality, quantity: body.quantity,
+          newSection: body.newSection === true,
         });
         // The row is already in the sheet by now, so a failed link is
         // reported alongside the success rather than as a failed add.
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
           try {
             await ensureSchema();
             await saveInventoryLink({
-              itemKey: inventoryKey(String(body.section || "").toUpperCase(), body.item, body.quality),
+              itemKey: inventoryKey(String(body.section || "").trim().toUpperCase().replace(/\s+/g, " "), body.item, body.quality),
               model: link.model,
               repairType: link.repairType,
             });

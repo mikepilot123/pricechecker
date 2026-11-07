@@ -331,10 +331,12 @@
     $("inventoryAddItem").value = "";
     $("inventoryAddQuality").value = "";
     $("inventoryAddQuantity").value = "";
+    $("inventoryAddNewSection").value = "";
     const select = $("inventoryAddSection");
     select.innerHTML = sections.map((section) =>
       `<option value="${esc(section)}">${esc(titleCase(section))}</option>`
-    ).join("");
+    ).join("") + `<option value="${NEW_SECTION}">+ New category…</option>`;
+    syncNewSectionField();
     syncQualityField();
     renderItemNameOptions();
     addLinkPicker.reset();
@@ -347,12 +349,33 @@
     $("inventoryAddModal").hidden = true;
   }
 
+  // "+ New category…" in the Section dropdown: staff name the category, and
+  // it's created in the sheet along with the item (lib/inventory.js).
+  const NEW_SECTION = "__new__";
+  function addingNewSection() {
+    return $("inventoryAddSection").value === NEW_SECTION;
+  }
+
+  // The section the new item goes in, as the sheet will spell it.
+  function addSectionName() {
+    return addingNewSection()
+      ? $("inventoryAddNewSection").value.trim().toUpperCase().replace(/\s+/g, " ")
+      : $("inventoryAddSection").value;
+  }
+
+  function syncNewSectionField() {
+    const on = addingNewSection();
+    $("inventoryAddNewSectionField").hidden = !on;
+    $("inventoryAddNewSection").required = on;
+  }
+
   // Sections without a quality/type column in the sheet (e.g. bare parts
-  // lists) shouldn't offer a field that has nowhere to be saved.
+  // lists) shouldn't offer a field that has nowhere to be saved. A new
+  // category always gets one.
   function syncQualityField() {
     const section = $("inventoryAddSection").value;
     const fields = sectionFields.find((entry) => entry.section === section);
-    const hasQuality = !!(fields && fields.qualityCol);
+    const hasQuality = addingNewSection() || !!(fields && fields.qualityCol);
     $("inventoryAddQualityField").hidden = !hasQuality;
     const options = hasQuality
       ? [...new Set(ITEMS.filter((item) => item.section === section && item.quality).map((item) => item.quality))]
@@ -471,7 +494,7 @@
     repairId: "inventoryAddRepair",
     emptyLabel: "Don't link",
     context: () => ({
-      section: $("inventoryAddSection").value,
+      section: addSectionName(),
       item: $("inventoryAddItem").value.trim(),
       quality: $("inventoryAddQualityField").hidden ? "" : $("inventoryAddQuality").value.trim(),
     }),
@@ -618,10 +641,18 @@
       message.hidden = false;
       return;
     }
+    const newSection = addingNewSection();
+    const section = addSectionName();
+    if (newSection && !/^[A-Z][A-Z\s/&-]+$/.test(section)) {
+      message.textContent = "Category names can only use letters, spaces, & / and - (e.g. Charging Ports).";
+      message.hidden = false;
+      return;
+    }
     const payload = {
       action: "addItem",
       pin,
-      section: $("inventoryAddSection").value,
+      section,
+      newSection,
       item: $("inventoryAddItem").value.trim(),
       quality: $("inventoryAddQualityField").hidden ? "" : $("inventoryAddQuality").value.trim(),
       quantity: $("inventoryAddQuantity").value,
@@ -694,9 +725,12 @@
   $("closeInventoryAddModal")?.addEventListener("click", closeInventoryAddModal);
   $("inventoryAddCancelBtn")?.addEventListener("click", closeInventoryAddModal);
   $("inventoryAddSection")?.addEventListener("change", () => {
+    syncNewSectionField();
     syncQualityField();
     addLinkPicker.suggest();
+    if (addingNewSection()) $("inventoryAddNewSection").focus();
   });
+  $("inventoryAddNewSection")?.addEventListener("input", addLinkPicker.suggest);
   $("inventoryAddItem")?.addEventListener("input", addLinkPicker.suggest);
   $("inventoryAddQuality")?.addEventListener("input", addLinkPicker.suggest);
   $("closeInventoryLinkModal")?.addEventListener("click", closeInventoryLinkModal);
