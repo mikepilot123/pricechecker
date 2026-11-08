@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=accessory-icons-1" />
+  <link rel="stylesheet" href="assets/style.css?v=form-toast-1" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -2450,10 +2450,12 @@
             </div>
             <div id="invoiceSuccessCard" class="invoice-success" hidden></div>
           </section>
-          <p id="formError" class="field-error" hidden></p>
         </form>
       </div>
       <div class="modal-footer">
+        <!-- Why Continue/Save didn't go through, shown as a toast right above
+             the buttons rather than at the bottom of a long form. -->
+        <p id="formError" class="field-error form-toast" role="alert" hidden></p>
         <div class="form-actions">
           <button type="button" id="cancelForm" class="ghost-btn">Cancel</button>
           <button type="button" id="previousFormStep" class="ghost-btn" hidden>Back</button>

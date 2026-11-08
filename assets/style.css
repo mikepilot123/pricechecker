@@ -4946,6 +4946,42 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   border-top: 1px solid var(--border);
   flex: none;
 }
+/* Log device: the reason Continue/Save didn't go through, as a toast just
+   above the footer buttons (always in view, unlike the bottom of the form). */
+.modal-footer .form-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  background: #fef2f2;
+  color: #b91c1c;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgba(185, 28, 28, 0.12);
+  animation: form-toast-in 0.18s ease-out;
+}
+.modal-footer .form-toast::before {
+  content: "!";
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.modal-footer .form-toast[hidden] { display: none; }
+@keyframes form-toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 .modal-footer .primary-btn { width: 100%; }
 .modal-footer .form-actions { margin-top: 0; }
 .modal-footer .form-actions .ghost-btn,
