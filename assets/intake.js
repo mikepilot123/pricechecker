@@ -3382,6 +3382,39 @@
     return !(container.querySelector("[data-accessory-other]")?.value || "").trim();
   }
 
+  // One icon per kind of accessory, for the row above a repair card's photo.
+  const ACCESSORY_ICONS = {
+    Charger: "i-acc-charger",
+    Cable: "i-acc-cable",
+    Case: "i-acc-case",
+    Bag: "i-acc-bag",
+    "SIM card": "i-acc-sim",
+    "Memory card": "i-acc-memory",
+    Stylus: "i-acc-stylus",
+    Box: "i-acc-box",
+    Other: "i-acc-other",
+  };
+  // Three icons fit above the photo; past that, two and a "+N".
+  const ACCESSORY_ICON_LIMIT = 3;
+
+  /** The icons above a repair card's photo: what the client left, with the
+   *  full list on hover. Nothing when it wasn't recorded or nothing was left. */
+  function accessoryIconsHtml(ticket) {
+    const value = ticket.accessories || "";
+    if (!value || value === NO_ACCESSORIES) return "";
+    const { selected, otherText } = parseAccessories(value);
+    const items = ACCESSORIES.filter((a) => selected.has(a))
+      .map((a) => ({ icon: ACCESSORY_ICONS[a], label: a === "Other" ? otherText || "Other" : a }));
+    if (!items.length) return "";
+    const tip = "Left with device: " + items.map((item) => item.label).join(", ");
+    const shown = items.length > ACCESSORY_ICON_LIMIT ? items.slice(0, ACCESSORY_ICON_LIMIT - 1) : items;
+    const more = items.length - shown.length;
+    return `<div class="ticket-accessories" data-tip="${esc(tip)}" role="img" aria-label="${esc(tip)}">
+      ${shown.map((item) => `<span class="ticket-accessory"><svg class="icon" aria-hidden="true"><use href="#${item.icon}"></use></svg></span>`).join("")}
+      ${more ? `<span class="ticket-accessory ticket-accessory-more">+${more}</span>` : ""}
+    </div>`;
+  }
+
   // At pickup, remind staff what goes back to the client with the device.
   function remindAccessoriesAtPickup(ticket) {
     const value = ticket && ticket.accessories;
@@ -5681,9 +5714,12 @@
       </div>
       <div class="ticket-phone-row">${phoneLine}</div>`;
     head.innerHTML = `
-      <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
-        <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
-        <img alt="" />
+      <div class="ticket-thumb-col">
+        ${accessoryIconsHtml(t)}
+        <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
+          <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
+          <img alt="" />
+        </div>
       </div>
       ${identityHtml}
       <div class="ticket-repair">
