@@ -102,6 +102,12 @@
   const ACCESSORIES = ["Charger", "Cable", "Case", "Bag", "SIM card", "Memory card", "Stylus", "Box", "Other"];
   const NO_ACCESSORIES = "None";
 
+  // The "Inventory item used" picker on Check In's device step is hidden for
+  // now. While it's off, a check-in never picks or deducts a stock part, and
+  // editing a repair leaves the part it already has alone. Set to true (and
+  // un-hide #fInventoryItemField in index.html) to bring it back.
+  const INVENTORY_PICKER_ENABLED = false;
+
   const LS_PIN = "rpc_intake_pin";
   const BROWSER_CREDENTIAL_PREFIX = "rpcb1.";
   const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
@@ -730,7 +736,7 @@
     if (selectedKey && selectedKey === autoInventoryKey) selectedKey = "";
     const linked = linkedInventoryItems();
     const linkedKeys = new Set(linked.map(({ item }) => item.key));
-    const autoPick = !selectedKey && !editingId && !inventoryChosenByStaff
+    const autoPick = INVENTORY_PICKER_ENABLED && !selectedKey && !editingId && !inventoryChosenByStaff
       ? linked.find(({ item, chosen }) => chosen && item.quantity > 0)
       : null;
     autoInventoryKey = autoPick ? autoPick.item.key : "";
@@ -3546,8 +3552,8 @@
       device: $("fDevice").value.trim(),
       issues: issuesStr,
       status: $("fStatus").value,
-      inventoryItemKey: $("fInventoryItem").value,
-      inventoryItemLabel: $("fInventoryItem").value && inventoryOption ? inventoryOption.textContent : "",
+      inventoryItemKey: formInventoryItemKey(),
+      inventoryItemLabel: formInventoryItemKey() && inventoryOption ? inventoryOption.textContent : "",
       repairDueDate: $("fRepairDueDate").value,
       accessories: readAccessoryPicker($("fAccessories")),
       notes: $("fNotes").value.trim(),
@@ -3891,6 +3897,11 @@
     if (!name || !phone || !email) return "Enter the client's name, phone, and email.";
     if (!$("fEmail").checkValidity()) return "Enter a valid email address for the invoice.";
     return null;
+  }
+
+  /** The stock part chosen on the form — none while the picker is hidden. */
+  function formInventoryItemKey() {
+    return INVENTORY_PICKER_ENABLED ? $("fInventoryItem").value : "";
   }
 
   // A new check-in has to say what the client left with the device (even if
@@ -4370,7 +4381,8 @@
         notes: $("fNotes").value.trim(),
         repairCost: $("fRepairCost").value.trim(),
         amountPaid: $("fAmountPaid").value.trim(),
-        inventoryItemKey: $("fInventoryItem").value,
+        // With the picker hidden, leave the repair's stock part as it is.
+        ...(INVENTORY_PICKER_ENABLED ? { inventoryItemKey: $("fInventoryItem").value } : {}),
         ...(paidMethod ? { paymentMethod: paidMethod, depositToAccount: true } : {}),
       };
       saveBtn.disabled = true;
@@ -4427,7 +4439,7 @@
         status: $("fStatus").value,
         repairDueDate: $("fRepairDueDate").value,
         accessories: readAccessoryPicker($("fAccessories")),
-        inventoryItemKey: $("fInventoryItem").value,
+        inventoryItemKey: formInventoryItemKey(),
         notes: $("fNotes").value.trim(),
         media: pendingFormMedia.slice(),
         priceChoices: { ...priceChoices },

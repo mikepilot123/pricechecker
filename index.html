@@ -2359,7 +2359,8 @@
                 <label class="field-label" for="fRepairDueDate">Due date</label>
                 <input id="fRepairDueDate" class="text-input" type="date" />
               </div>
-              <div class="form-field form-field-full">
+              <!-- Hidden for now (assets/intake.js INVENTORY_PICKER_ENABLED). -->
+              <div class="form-field form-field-full" id="fInventoryItemField" hidden>
                 <label class="field-label" for="fInventoryItem">Inventory item used</label>
                 <div class="select-wrap">
                   <select id="fInventoryItem" class="text-input select-input">
@@ -2865,7 +2866,7 @@
   <script defer src="assets/inventory.js?v=inventory-new-category-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=accessory-icons-1"></script>
+  <script defer src="assets/intake.js?v=hide-inventory-picker-1"></script>
   <script defer src="assets/invoice.js?v=invoice-sale-or-repair-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>

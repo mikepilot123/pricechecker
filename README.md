@@ -220,7 +220,10 @@ Prices tab skip the question, and older repairs show *Not recorded*.
 
 When a repair uses stock, staff can choose the exact inventory item during
 check-in. The backend deducts one from that item in the inventory sheet when
-the ticket is saved, and restores one if that ticket is deleted.
+the ticket is saved, and restores one if that ticket is deleted. *This
+picker is hidden for now* (`INVENTORY_PICKER_ENABLED` in `assets/intake.js`):
+check-ins don't take a part from stock, and editing a repair leaves any part
+it already has alone.
 
 Open any ticket card to edit its client details, or use **Delete record** to
 remove it after a confirmation prompt. Older tickets created before client
