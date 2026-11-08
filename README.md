@@ -372,6 +372,21 @@ INVOICE_BUSINESS_NAME=JQ Electronics
 INVOICE_CURRENCY=TTD
 ```
 
+### New invoices from the Invoices tab: sale or repair?
+
+A new invoice made on the **Invoices** tab asks **Is this a sale or a
+repair?** at the top, with nothing picked to start with:
+
+- **Sale only** — devices, accessories, parts: just the invoice is saved.
+- **Repair** — the invoice is saved and its devices are logged on the
+  Repairs tab (or added to the client's open repair for that device). The box
+  says what will be logged before you save.
+
+When a line looks like a repair ("iPhone 13 Screen Replacement") the question
+has to be answered before the invoice can be saved, so a sale is never turned
+into a repair by accident. Lines that don't look like a repair (a case, a
+screen protector) save as a sale unless you pick Repair.
+
 ### Ready for collection → client picks a day
 
 The "ready for collection" email (offered when a repair is marked

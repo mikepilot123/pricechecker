@@ -164,13 +164,16 @@
           <button type="button" class="modal-close" data-inv-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
         </div>
         <div class="modal-body invoice-editor-body">
-          <label class="inv-log-bar" id="invLogBar" hidden>
-            <input type="checkbox" id="invLogRepairs" checked />
-            <span>
-              <strong>Log these devices as repairs</strong>
-              <small id="invLogPreview">Add a line like “Pixel 7 Pro Screen Replacement” and the repair is logged on save.</small>
-            </span>
-          </label>
+          <fieldset class="inv-log-bar" id="invLogBar" hidden>
+            <legend><strong>Is this a sale or a repair?</strong></legend>
+            <div class="inv-log-choices" role="radiogroup">
+              <label class="inv-log-choice"><input type="radio" name="invLogChoice" value="sale" />
+                <span><strong>Sale only</strong><small>Devices, accessories, parts — just the invoice</small></span></label>
+              <label class="inv-log-choice"><input type="radio" name="invLogChoice" value="repair" />
+                <span><strong>Repair</strong><small>Also log it on the Repairs tab</small></span></label>
+            </div>
+            <small id="invLogPreview" class="inv-log-preview"></small>
+          </fieldset>
           <div class="inv-sheet">
             <section class="inv-top">
               <div class="inv-from" id="invFrom"></div>
@@ -249,7 +252,10 @@
       updateEditorTotals();
       updateLogPreview();
     });
-    modal.querySelector("#invLogRepairs").addEventListener("change", updateLogPreview);
+    modal.querySelectorAll("[name=invLogChoice]").forEach((radio) => radio.addEventListener("change", () => {
+      $("invLogBar").classList.remove("needs-answer");
+      updateLogPreview();
+    }));
     modal.querySelector("#invBillPhone").addEventListener("input", updateLogPreview);
     modal.querySelector("#invBillName").addEventListener("input", updateLogPreview);
     modal.querySelector("#invItems").addEventListener("click", (e) => {
@@ -466,20 +472,37 @@
     if (s.rate == null) rate.focus();
   }
 
-  // New invoices only: what "Log these devices as repairs" will create.
+  // "Sale only" / "Repair" on a new invoice. Nothing is picked to start
+  // with: a repair is only logged when staff say this is one.
+  function logChoice() {
+    return document.querySelector("#invoiceEditorModal [name=invLogChoice]:checked")?.value || "";
+  }
+
+  // What saving would log as repairs, if this is a repair.
+  function repairPreviewLines() {
+    const billTo = { name: $("invBillName").value, phone: $("invBillPhone").value };
+    return typeof window.RPC_INVOICE_REPAIR_PREVIEW === "function" ? window.RPC_INVOICE_REPAIR_PREVIEW(readItems(), billTo) : [];
+  }
+
   function updateLogPreview() {
     const bar = $("invLogBar");
     if (!bar || bar.hidden) return;
     const preview = $("invLogPreview");
-    if (!$("invLogRepairs").checked) {
-      preview.textContent = "Only the invoice will be saved — no repair is logged.";
+    const choice = logChoice();
+    if (choice === "sale") {
+      preview.textContent = "Only the invoice is saved — nothing is logged on the Repairs tab.";
       return;
     }
-    const billTo = { name: $("invBillName").value, phone: $("invBillPhone").value };
-    const lines = typeof window.RPC_INVOICE_REPAIR_PREVIEW === "function" ? window.RPC_INVOICE_REPAIR_PREVIEW(readItems(), billTo) : [];
+    const lines = repairPreviewLines();
+    if (choice === "repair") {
+      preview.textContent = lines.length
+        ? `On save: ${lines.join(" · ")}. Fees and accessories are added to the repair, not logged separately.`
+        : "Add a line like “Pixel 7 Pro Screen Replacement” and the repair is logged on save.";
+      return;
+    }
     preview.textContent = lines.length
-      ? `On save: ${lines.join(" · ")}. Fees and accessories are added to the repair, not logged separately.`
-      : "Add a line like “Pixel 7 Pro Screen Replacement” and the repair is logged on save.";
+      ? "Choose one before saving. As a repair, this would log: " + lines.join(" · ") + "."
+      : "Nothing here looks like a repair yet, so only the invoice will be saved unless you choose Repair.";
   }
 
   function autoGrow(el) {
@@ -572,7 +595,8 @@
     modal.querySelector("[data-inv-delete]").hidden = !invoice.id;
     const canLog = !invoice.id && typeof window.RPC_LOG_REPAIRS_FOR_INVOICE === "function";
     $("invLogBar").hidden = !canLog;
-    $("invLogRepairs").checked = canLog;
+    $("invLogBar").classList.remove("needs-answer");
+    modal.querySelectorAll("[name=invLogChoice]").forEach((radio) => { radio.checked = false; });
     const b = invoice.business || {};
     $("invFrom").innerHTML = `<p class="inv-from-name">${esc(b.name || "JQ Electronics Ltd.")}</p>`
       + [...(b.addressLines || []), b.email].filter(Boolean).map((l) => `<p>${esc(l)}</p>`).join("");
@@ -625,6 +649,15 @@
     };
     if (!$("invBillName").value.trim()) return fail("Enter who the invoice is billed to.", $("invBillName"));
     if (!items.length) return fail("Add at least one line item.", document.querySelector("#invItems [data-item=description]"));
+    // A new invoice with lines that would log a repair has to say whether it
+    // is one — sales of devices and accessories mustn't turn into repairs.
+    const askLog = !editing.invoice.id && !$("invLogBar").hidden;
+    if (askLog && !logChoice() && repairPreviewLines().length) {
+      $("invLogBar").classList.add("needs-answer");
+      $("invLogBar").scrollIntoView({ block: "nearest" });
+      return fail("Is this a sale or a repair? Choose one at the top — a repair is only logged if you pick Repair.",
+        document.querySelector("#invoiceEditorModal [name=invLogChoice]"));
+    }
     const changes = {
       number: $("invNumber").value.trim(),
       terms: $("invTerms").value.trim(),
@@ -647,7 +680,7 @@
       // No id yet = a new invoice from the Invoices tab; it's only created on
       // save, so cancelling never leaves a blank invoice (or a used number).
       const isNew = !editing.invoice.id;
-      const logRepairs = isNew && !$("invLogBar").hidden && $("invLogRepairs").checked;
+      const logRepairs = isNew && !$("invLogBar").hidden && logChoice() === "repair";
       let res = isNew
         ? await request({ action: "create", ...changes })
         : await request({ action: "update", id: editing.invoice.id, invoice: changes });

@@ -7248,22 +7248,36 @@ video.media-viewer-media {
 .invoice-editor-panel { max-width: 900px; max-height: 94vh; }
 @media (min-width: 560px) { .invoice-editor-panel { width: calc(100% - 32px); } }
 .invoice-editor-hint { margin: 2px 0 0; color: var(--text-dim); font-size: 0.78rem; }
+/* New invoice: "Is this a sale or a repair?" — nothing picked to start with,
+   and it must be answered when a line would log a repair. */
 .inv-log-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   max-width: 794px;
+  min-width: 0;
   margin: 0 auto 14px;
   padding: 12px 14px;
   border: 1px solid #bcd0ee;
   border-radius: var(--radius-md);
   background: var(--accent-soft);
-  cursor: pointer;
 }
 .inv-log-bar[hidden] { display: none; }
-.inv-log-bar input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+.inv-log-bar.needs-answer { border-color: #dc2626; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15); }
+.inv-log-bar legend { float: left; width: 100%; padding: 0; margin-bottom: 8px; }
 .inv-log-bar strong { display: block; font-size: 0.9rem; }
 .inv-log-bar small { display: block; margin-top: 2px; color: var(--text-dim); font-size: 0.8rem; line-height: 1.4; }
+.inv-log-choices { clear: both; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.inv-log-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  cursor: pointer;
+}
+.inv-log-choice:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.inv-log-choice input { width: 18px; height: 18px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+.inv-log-preview { margin-top: 8px !important; }
 .invoice-editor-body { background: #e9ecf1; padding: 20px; }
 .inv-sheet {
   --inv-ink: #333;
