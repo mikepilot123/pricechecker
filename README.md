@@ -213,7 +213,10 @@ Charger, Cable, Case, Bag, SIM card, Memory card, Stylus, Box, or Other (typed
 in) — or **Nothing**. A new check-in can't continue until it's answered. It's
 shown in its own *Left with device* section of the repair (with a pencil to
 change it, recorded in the repair's history), and marking the repair
-**Picked Up** pops up a reminder of what to hand back. On the Repairs list,
+**Picked Up** first asks whether the client was given those things back:
+**Not yet** leaves the status as it was, **Yes, given back** carries on (to
+the balance check, if one is owed) and adds a *Handed back at pickup* note to
+the repair. On the Repairs list,
 small icons above the device photo show what was left (charger, cable, case,
 bag, SIM, memory card, stylus, box, other); hover them for the full list. Quick logs from the
 Prices tab skip the question, and older repairs show *Not recorded*.

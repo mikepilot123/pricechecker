@@ -3421,11 +3421,68 @@
     </div>`;
   }
 
-  // At pickup, remind staff what goes back to the client with the device.
-  function remindAccessoriesAtPickup(ticket) {
+  /** True when the repair has things to hand back at pickup. */
+  function hasAccessoriesToReturn(ticket) {
     const value = ticket && ticket.accessories;
-    if (!value || value === NO_ACCESSORIES) return;
-    toast(`Hand back to ${ticket.customerName || "the client"}: ${accessoriesText(value)}.`, { tone: "info", duration: 7000 });
+    return !!value && value !== NO_ACCESSORIES;
+  }
+
+  // Before a repair is marked Picked Up: "Was the client given back their
+  // charger, case…?" Resolves true to go ahead, false to leave the status as
+  // it was. Repairs with nothing recorded (or "Nothing") skip the question.
+  function confirmAccessoriesReturned(ticket) {
+    if (!hasAccessoriesToReturn(ticket)) return Promise.resolve(true);
+    let modal = $("pickupAccessoriesModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "pickupAccessoriesModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel pickup-pay-panel" role="dialog" aria-modal="true" aria-labelledby="pickupAccessoriesTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Before pickup</p><h3 id="pickupAccessoriesTitle">Hand back what they left</h3></div>
+            <button type="button" class="modal-close" data-accessories-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p class="empty-sub" id="pickupAccessoriesSub"></p>
+            <p class="field-label">Left with the device</p>
+            <div class="issue-tags issue-tags-readonly" id="pickupAccessoriesList"></div>
+            <p class="pickup-pay-question" id="pickupAccessoriesQuestion"></p>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-accessories-cancel>Not yet</button>
+            <button type="button" class="primary-btn" id="pickupAccessoriesConfirm"><svg class="icon"><use href="#i-check"></use></svg><span>Yes, given back</span></button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const { selected, otherText } = parseAccessories(ticket.accessories);
+    const items = ACCESSORIES.filter((a) => selected.has(a)).map((a) => (a === "Other" ? otherText || "Other" : a));
+    $("pickupAccessoriesSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
+    $("pickupAccessoriesList").innerHTML = items.map((item) =>
+      `<span class="issue-chip accessory-chip"><svg class="icon" aria-hidden="true"><use href="#${ACCESSORY_ICONS[ACCESSORIES.includes(item) ? item : "Other"]}"></use></svg> ${esc(item)}</span>`).join("");
+    $("pickupAccessoriesQuestion").textContent = `Was ${ticket.customerName || "the client"} given back ${items.length === 1 ? "their " + items[0].toLowerCase() : "everything above"}?`;
+    modal.hidden = false;
+    $("pickupAccessoriesConfirm").focus();
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        modal.hidden = true;
+        document.removeEventListener("keydown", onKey);
+        resolve(value);
+      };
+      const onKey = (e) => { if (e.key === "Escape") finish(false); };
+      document.addEventListener("keydown", onKey);
+      $("pickupAccessoriesConfirm").onclick = () => finish(true);
+      modal.querySelectorAll("[data-accessories-cancel]").forEach((btn) => { btn.onclick = () => finish(false); });
+    });
+  }
+
+  // Once picked up, the repair's notes say what was handed back.
+  function noteAccessoriesReturned(ticket) {
+    if (!hasAccessoriesToReturn(ticket)) return;
+    api({ action: "addTicketNote", ticketId: ticket.id, note: `Handed back at pickup: ${accessoriesText(ticket.accessories)}.` })
+      .catch((err) => console.warn("Couldn't note the accessories handed back:", err));
   }
 
   /** Splits a saved issues string into preset tags plus any "Other" free text. */
@@ -4350,6 +4407,13 @@
       let pickupMethod = "";
       let pickupBalance = 0;
       if ($("fStatus").value === "Picked Up" && original && original.status !== "Picked Up") {
+        // The accessories as they'll be saved, in case they were just changed.
+        const returned = await confirmAccessoriesReturned({ ...original, accessories: readAccessoryPicker($("fAccessories")) || original.accessories });
+        if (!returned) {
+          err.textContent = "Not saved: hand back what the client left before marking it Picked Up (or choose another status).";
+          err.hidden = false;
+          return;
+        }
         const draft = { ...original, customerName, device: currentDeviceValue, repairCost: $("fRepairCost").value.trim(), amountPaid: $("fAmountPaid").value.trim() };
         pickupBalance = ticketBalance(draft);
         if (pickupBalance > 0) {
@@ -4405,7 +4469,7 @@
         pendingFormMedia = [];
         await syncLinkedInvoiceFromRepair(res.ticket, original);
         if (res.ticket.status === "Repaired" && original?.status !== "Repaired") offerReadyNotice(normalizeTicket(res.ticket));
-        if (res.ticket.status === "Picked Up" && original?.status !== "Picked Up") remindAccessoriesAtPickup(normalizeTicket(res.ticket));
+        if (res.ticket.status === "Picked Up" && original?.status !== "Picked Up") noteAccessoriesReturned(normalizeTicket(res.ticket));
       } catch (ex) {
         err.textContent = "Couldn't save: " + ex.message;
         err.hidden = false;
@@ -4598,7 +4662,7 @@
       renderStatusChips();
       render();
       if (onSaved) onSaved(res);
-      if (status === "Picked Up" && ticket.status !== "Picked Up") remindAccessoriesAtPickup(normalizeTicket(res.ticket));
+      if (status === "Picked Up" && ticket.status !== "Picked Up") noteAccessoriesReturned(normalizeTicket(res.ticket));
       return normalizeTicket(res.ticket);
     } catch (e) {
       toast("Couldn't update status: " + e.message);
@@ -5096,6 +5160,13 @@
     if (!ticket || status === ticket.status) {
       closeStatusModal();
       return;
+    }
+    if (status === "Picked Up" && hasAccessoriesToReturn(ticket)) {
+      closeStatusModal();
+      if (!(await confirmAccessoriesReturned(ticket))) {
+        toast("Left as " + (ticket.status || "it was") + " — hand back what the client left first.", { tone: "info", duration: 3500 });
+        return;
+      }
     }
     if (status === "Picked Up" && ticketBalance(ticket) > 0) {
       // Picked up = paid in full: confirm the balance was collected first.
