@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=inventory-price-link-4" />
+  <link rel="stylesheet" href="assets/style.css?v=accessories-1" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -2358,9 +2358,14 @@
                 </div>
                 <p id="inventoryHint" class="field-hint">Choose the part to deduct from stock, if this repair uses one.</p>
               </div>
+              <div class="form-field form-field-full" id="fAccessoriesField">
+                <label class="field-label" id="fAccessoriesLabel">Left with the device *</label>
+                <div id="fAccessories" class="accessory-picker" role="group" aria-labelledby="fAccessoriesLabel"></div>
+                <p class="field-hint">Ask the client: did they leave a charger, case, bag…? Tap <strong>Nothing</strong> if they kept everything. It's shown again at pickup.</p>
+              </div>
               <div class="form-field form-field-full">
                 <label class="field-label" for="fNotes">Notes</label>
-                <textarea id="fNotes" class="text-input" rows="3" placeholder="Extra details (accessories left, prior repairs, etc.)"></textarea>
+                <textarea id="fNotes" class="text-input" rows="3" placeholder="Extra details (prior repairs, passcode given, etc.)"></textarea>
               </div>
               <div class="form-field form-field-full">
                 <label class="field-label">Photos &amp; videos <span class="field-optional">(optional)</span></label>
@@ -2850,7 +2855,7 @@
   <script defer src="assets/inventory.js?v=inventory-new-category-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=inventory-price-link-4"></script>
+  <script defer src="assets/intake.js?v=accessories-1"></script>
   <script defer src="assets/invoice.js?v=invoice-pdf-link-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>

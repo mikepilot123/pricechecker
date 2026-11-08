@@ -95,6 +95,13 @@
     "Other",
   ];
 
+  // What a client may leave with the device. Asked on Check In's device step
+  // and editable in the repair modal, so it goes back to them at pickup.
+  // "Other" reveals a free-text field; NO_ACCESSORIES records that the
+  // client kept everything (as opposed to "" — never asked).
+  const ACCESSORIES = ["Charger", "Cable", "Case", "Bag", "SIM card", "Memory card", "Stylus", "Box", "Other"];
+  const NO_ACCESSORIES = "None";
+
   const LS_PIN = "rpc_intake_pin";
   const BROWSER_CREDENTIAL_PREFIX = "rpcb1.";
   const DEFAULT_TECHNICIANS = ["Liana", "Michael", "Marcus"];
@@ -1644,6 +1651,7 @@
         ${detailRow("i-calendar", "Due date", fieldDisplayHtml("repairDueDate", ticket), repairCheckAlertReason(ticket) ? "repair-due-alert-text" : "", "repairDueDate")}
         ${detailRow("i-tools", "Stock used", esc(ticket.inventoryItemLabel || "No stock item used"))}
       </div></section>
+      <section class="ticket-detail-section" id="ticketAccessoriesSection">${accessoriesSectionStaticHtml(ticket)}</section>
       <section class="ticket-detail-section"><p class="field-label">Payment</p><div class="ticket-detail-grid">
         ${detailRow("i-cash", "Repair cost", fieldDisplayHtml("repairCost", ticket), "money-positive", "repairCost")}
         ${detailRow("i-cash", "Amount paid", fieldDisplayHtml("amountPaid", ticket), "money-positive", "amountPaid")}
@@ -1729,6 +1737,10 @@
     if (issueChoice) { toggleIssueChoice(issueChoice); return; }
     if (e.target.closest("[data-save-issues]")) { saveIssuesEdit(); return; }
     if (e.target.closest("[data-cancel-issues]")) { renderIssuesSectionStatic(); return; }
+    if (e.target.closest("[data-edit-accessories]")) { startAccessoriesEdit(); return; }
+    if (e.target.closest("[data-save-accessories]")) { saveAccessoriesEdit(); return; }
+    if (e.target.closest("[data-cancel-accessories]")) { renderAccessoriesSectionStatic(); return; }
+    if (handleAccessoryClick($("ticketAccessoriesPicker"), e.target)) return;
   });
   $("ticketModalBody").addEventListener("change", (e) => {
     const select = e.target.closest("[data-issues-price-issue]");
@@ -1736,6 +1748,75 @@
     issuesEditPriceChoices[select.dataset.issuesPriceIssue] = select.value;
     refreshIssuesEditPrice();
   });
+
+  // ---- Accessories left with the device --------------------------------------
+  // Its own section with a pencil, like Issues, so what the client left can
+  // be filled in or corrected after check-in — and is in plain view at pickup.
+  function accessoriesSectionStaticHtml(ticket) {
+    const value = ticket.accessories || "";
+    let body;
+    if (!value) {
+      body = `<p class="ops-empty accessory-empty">Not recorded — tap the pencil to note what the client left.</p>`;
+    } else if (value === NO_ACCESSORIES) {
+      body = `<p class="accessory-none">Nothing — the client kept everything.</p>`;
+    } else {
+      body = `<div class="issue-tags issue-tags-readonly">${value.split(",").map((part) =>
+        `<span class="issue-chip accessory-chip">${esc(part.trim().replace(/^Other:\s*/, ""))}</span>`).join("")}</div>`;
+    }
+    return `<div class="ticket-issues-head"><p class="field-label">Left with device</p>
+      <button type="button" class="icon-btn ghost-btn ticket-detail-edit-btn" data-edit-accessories aria-label="Edit what was left with the device"><svg class="icon"><use href="#i-pencil"></use></svg></button></div>
+      ${body}`;
+  }
+
+  function renderAccessoriesSectionStatic() {
+    const section = $("ticketAccessoriesSection");
+    if (section && currentModalTicket) section.innerHTML = accessoriesSectionStaticHtml(currentModalTicket);
+  }
+
+  function startAccessoriesEdit() {
+    const section = $("ticketAccessoriesSection");
+    if (!section || !currentModalTicket) return;
+    section.innerHTML = `<p class="field-label">Left with device</p>
+      <div id="ticketAccessoriesPicker" class="accessory-picker">${accessoryPickerHtml(currentModalTicket.accessories || "")}</div>
+      <div class="ticket-issues-actions">
+        <button type="button" class="ghost-btn" data-cancel-accessories>Cancel</button>
+        <button type="button" class="primary-btn" data-save-accessories><svg class="icon"><use href="#i-check"></use></svg>Save</button>
+      </div>`;
+    section.querySelector(".accessory-toggle")?.focus();
+  }
+
+  async function saveAccessoriesEdit() {
+    const section = $("ticketAccessoriesSection");
+    const picker = $("ticketAccessoriesPicker");
+    if (!section || !picker || !currentModalTicket) return;
+    const otherInput = picker.querySelector("[data-accessory-other]");
+    otherInput?.classList.remove("field-error-input");
+    if (accessoryOtherMissing(picker)) {
+      otherInput?.classList.add("field-error-input");
+      otherInput?.focus();
+      toast("Describe what else the client left, or untick Other.");
+      return;
+    }
+    const accessories = readAccessoryPicker(picker);
+    if (accessories === (currentModalTicket.accessories || "")) {
+      renderAccessoriesSectionStatic();
+      return;
+    }
+    const saveBtn = section.querySelector("[data-save-accessories]");
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      const res = await api({ action: "update", id: currentModalTicket.id, accessories });
+      if (!res.ok) throw new Error(res.error || "Save failed");
+      mergeTicket(res.ticket);
+      currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
+      renderAccessoriesSectionStatic();
+      render();
+      toast("Saved what was left with the device.", { tone: "info", duration: 2500 });
+    } catch (err) {
+      if (saveBtn) saveBtn.disabled = false;
+      toast(`Couldn't save: ${err.message}. Check your connection and try again.`);
+    }
+  }
 
   // ---- Inline issues editor -------------------------------------------------
   // The Issues section gets its own pencil, like the rows above it, so a
@@ -3208,6 +3289,106 @@
     return balance > 0 ? "money-due" : "money-positive";
   }
 
+  // ---- Accessories left with the device -----------------------------------
+  /** "Charger, Case, Other: blue pouch" → chips + free text; "None" → none. */
+  function parseAccessories(value) {
+    const selected = new Set();
+    const other = [];
+    let none = false;
+    String(value || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((part) => {
+      if (part.toLowerCase() === NO_ACCESSORIES.toLowerCase()) { none = true; return; }
+      const preset = ACCESSORIES.find((a) => a !== "Other" && a.toLowerCase() === part.toLowerCase());
+      if (preset) selected.add(preset);
+      else other.push(/^other:/i.test(part) ? part.slice(6).trim() : part);
+    });
+    const otherText = other.filter(Boolean).join("; ");
+    if (otherText) selected.add("Other");
+    return { selected, otherText, none: none && !selected.size };
+  }
+
+  /** The inverse of parseAccessories: the string saved on the ticket. */
+  function joinAccessories({ selected, otherText, none }) {
+    if (none) return NO_ACCESSORIES;
+    const parts = ACCESSORIES.filter((a) => a !== "Other" && selected.has(a));
+    // Commas separate items in the saved string, so keep them out of "Other".
+    const text = String(otherText || "").trim().replace(/\s*,\s*/g, "; ");
+    if (selected.has("Other") && text) parts.push("Other: " + text);
+    return parts.join(", ");
+  }
+
+  /** How a ticket's accessories read to staff. */
+  function accessoriesText(value) {
+    if (!value) return "";
+    if (value === NO_ACCESSORIES) return "Nothing — the client kept everything";
+    return value.replace(/(^|, )Other: /, "$1");
+  }
+
+  // The chip picker, shared by the Check In form and the repair modal: one
+  // chip per accessory, "Nothing" (exclusive), and a text field for Other.
+  function accessoryPickerHtml(value) {
+    const { selected, otherText, none } = parseAccessories(value);
+    const chip = (label, attrs, on) =>
+      `<button type="button" class="issue-toggle accessory-toggle${on ? " active" : ""}" ${attrs} aria-pressed="${on}">${esc(label)}</button>`;
+    return `<div class="issue-tags accessory-tags">
+        ${ACCESSORIES.map((a) => chip(a, `data-accessory="${esc(a)}"`, selected.has(a))).join("")}
+        ${chip("Nothing", "data-accessory-none", none)}
+      </div>
+      <input type="text" class="text-input issue-other-input accessory-other-input" data-accessory-other maxlength="120"
+        placeholder="What else? e.g. stylus pen, blue pouch" value="${esc(otherText)}"${selected.has("Other") ? "" : " hidden"} />`;
+  }
+
+  function renderAccessoryPicker(container, value) {
+    if (container) container.innerHTML = accessoryPickerHtml(value);
+  }
+
+  /** Handles a tap inside a picker; returns true when it was one of ours. */
+  function handleAccessoryClick(container, target) {
+    const btn = target.closest("[data-accessory], [data-accessory-none]");
+    if (!btn || !container || !container.contains(btn)) return false;
+    const on = !btn.classList.contains("active");
+    const setChip = (el, value) => { el.classList.toggle("active", value); el.setAttribute("aria-pressed", String(value)); };
+    setChip(btn, on);
+    if (on) {
+      // "Nothing" and the items rule each other out.
+      if (btn.hasAttribute("data-accessory-none")) {
+        container.querySelectorAll("[data-accessory]").forEach((el) => setChip(el, false));
+      } else {
+        container.querySelectorAll("[data-accessory-none]").forEach((el) => setChip(el, false));
+      }
+    }
+    const other = container.querySelector("[data-accessory-other]");
+    const otherOn = !!container.querySelector('[data-accessory="Other"].active');
+    if (other) {
+      other.hidden = !otherOn;
+      if (otherOn && btn.dataset.accessory === "Other") other.focus();
+    }
+    return true;
+  }
+
+  /** The picker's answer: "Charger, Case", "None", or "" when unanswered. */
+  function readAccessoryPicker(container) {
+    if (!container) return "";
+    const selected = new Set([...container.querySelectorAll("[data-accessory].active")].map((el) => el.dataset.accessory));
+    const none = !!container.querySelector("[data-accessory-none].active");
+    const otherText = container.querySelector("[data-accessory-other]")?.value || "";
+    // "Other" with nothing typed doesn't count as an answer on its own.
+    if (selected.has("Other") && !otherText.trim()) selected.delete("Other");
+    return joinAccessories({ selected, otherText, none });
+  }
+
+  /** True when Other is ticked but nothing describes it. */
+  function accessoryOtherMissing(container) {
+    if (!container || !container.querySelector('[data-accessory="Other"].active')) return false;
+    return !(container.querySelector("[data-accessory-other]")?.value || "").trim();
+  }
+
+  // At pickup, remind staff what goes back to the client with the device.
+  function remindAccessoriesAtPickup(ticket) {
+    const value = ticket && ticket.accessories;
+    if (!value || value === NO_ACCESSORIES) return;
+    toast(`Hand back to ${ticket.customerName || "the client"}: ${accessoriesText(value)}.`, { tone: "info", duration: 7000 });
+  }
+
   /** Splits a saved issues string into preset tags plus any "Other" free text. */
   function parseIssuesString(issuesStr) {
     const selected = new Set();
@@ -3294,6 +3475,10 @@
     `).join("");
   }
 
+  $("fAccessories")?.addEventListener("click", (e) => {
+    if (handleAccessoryClick($("fAccessories"), e.target)) $("formError").hidden = true;
+  });
+
   $("addedDevicesList")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-remove-device]");
     if (!btn) return;
@@ -3317,6 +3502,12 @@
       err.hidden = false;
       return;
     }
+    const accessoriesError = formAccessoriesError();
+    if (accessoriesError) {
+      err.textContent = accessoriesError;
+      err.hidden = false;
+      return;
+    }
     const inventoryOption = $("fInventoryItem").selectedOptions[0];
     formDevices.push({
       device: $("fDevice").value.trim(),
@@ -3325,6 +3516,7 @@
       inventoryItemKey: $("fInventoryItem").value,
       inventoryItemLabel: $("fInventoryItem").value && inventoryOption ? inventoryOption.textContent : "",
       repairDueDate: $("fRepairDueDate").value,
+      accessories: readAccessoryPicker($("fAccessories")),
       notes: $("fNotes").value.trim(),
       media: pendingFormMedia.slice(),
       repairCost: currentPriceSuggestion() ? String(currentPriceSuggestion().total) : "",
@@ -3343,6 +3535,7 @@
     $("fRepairDueDate").value = "";
     $("fNotes").value = "";
     setIssueTags("");
+    renderAccessoryPicker($("fAccessories"), "");
     pendingFormMedia = [];
     renderPendingFormMedia();
     autoInventoryKey = "";
@@ -3367,6 +3560,7 @@
     return Boolean(
       $("fDevice").value.trim() ||
       buildIssuesString() ||
+      readAccessoryPicker($("fAccessories")) ||
       $("fNotes").value.trim() ||
       $("fInventoryItem").value ||
       $("fRepairCost").value.trim() ||
@@ -3410,6 +3604,7 @@
     autoRepairCost = previous.repairCost || "";
     priceChoices = {};
     setIssueTags(previous.issues || "");
+    renderAccessoryPicker($("fAccessories"), previous.accessories || "");
     // Ownership of the restored entry's media moves back to the live form.
     pendingFormMedia = previous.media || [];
     renderPendingFormMedia();
@@ -3550,6 +3745,7 @@
     $("fInvoiceDelivery").value = "email";
     $("fInvoiceDelivery").closest(".invoice-delivery-field").hidden = Boolean(ticket);
     setIssueTags(ticket ? ticket.issues || "" : "");
+    renderAccessoryPicker($("fAccessories"), ticket ? ticket.accessories || "" : "");
     $("fInventoryItem").innerHTML = `<option value="">Loading inventory…</option>`;
     loadInventoryForForm()
       .then(() => updateInventoryOptions(ticket ? ticket.inventoryItemKey || "" : ""))
@@ -3664,6 +3860,17 @@
     return null;
   }
 
+  // A new check-in has to say what the client left with the device (even if
+  // it's "Nothing"); an edit only has to be complete if Other is ticked.
+  function formAccessoriesError() {
+    const picker = $("fAccessories");
+    if (accessoryOtherMissing(picker)) return "Describe what else the client left, or untick Other.";
+    if (!editingId && !quickLogMode && !readAccessoryPicker(picker)) {
+      return "Ask what the client left with the device — tap Nothing if they kept everything.";
+    }
+    return "";
+  }
+
   function validateFormStep(step) {
     const err = $("formError");
     if (step === 1) {
@@ -3678,6 +3885,8 @@
       err.textContent = "Enter the device model.";
     } else if (step === 2 && !buildIssuesString()) {
       err.textContent = "Select at least one issue.";
+    } else if (step === 2 && formAccessoriesError()) {
+      err.textContent = formAccessoriesError();
     } else if (step === 3 && (!$("fRepairCost").checkValidity() || !$("fAmountPaid").checkValidity())) {
       err.textContent = "Enter valid non-negative payment amounts.";
     } else {
@@ -4066,6 +4275,13 @@
         err.hidden = false;
         return;
       }
+      const accessoriesError = formAccessoriesError();
+      if (accessoriesError) {
+        err.textContent = accessoriesError;
+        err.hidden = false;
+        if (!quickLogMode) setFormStep(2);
+        return;
+      }
     }
     const customerName = $("fName").value.trim();
     const phone = $("fPhone").value.trim();
@@ -4117,6 +4333,7 @@
         issue: resolvedIssuesStr,
         status: $("fStatus").value,
         repairDueDate: $("fRepairDueDate").value,
+        accessories: readAccessoryPicker($("fAccessories")),
         notes: $("fNotes").value.trim(),
         repairCost: $("fRepairCost").value.trim(),
         amountPaid: $("fAmountPaid").value.trim(),
@@ -4143,6 +4360,7 @@
         pendingFormMedia = [];
         await syncLinkedInvoiceFromRepair(res.ticket, original);
         if (res.ticket.status === "Repaired" && original?.status !== "Repaired") offerReadyNotice(normalizeTicket(res.ticket));
+        if (res.ticket.status === "Picked Up" && original?.status !== "Picked Up") remindAccessoriesAtPickup(normalizeTicket(res.ticket));
       } catch (ex) {
         err.textContent = "Couldn't save: " + ex.message;
         err.hidden = false;
@@ -4162,6 +4380,7 @@
       status: d.status,
       inventoryItemKey: d.inventoryItemKey,
       repairDueDate: d.repairDueDate || "",
+      accessories: d.accessories || "",
       notes: d.notes,
       media: d.media || [],
       priceChoices: d.priceChoices || {},
@@ -4174,6 +4393,7 @@
         issues: currentIssuesStr,
         status: $("fStatus").value,
         repairDueDate: $("fRepairDueDate").value,
+        accessories: readAccessoryPicker($("fAccessories")),
         inventoryItemKey: $("fInventoryItem").value,
         notes: $("fNotes").value.trim(),
         media: pendingFormMedia.slice(),
@@ -4210,6 +4430,7 @@
           issue: dev.issues,
           status: dev.status,
           repairDueDate: dev.repairDueDate,
+          accessories: dev.accessories,
           notes: [invoiceNote, dev.notes].filter(Boolean).join("\n"),
           repairCost: dev.repairCost,
           amountPaid: dev.amountPaid,
@@ -4332,6 +4553,7 @@
       renderStatusChips();
       render();
       if (onSaved) onSaved(res);
+      if (status === "Picked Up" && ticket.status !== "Picked Up") remindAccessoriesAtPickup(normalizeTicket(res.ticket));
       return normalizeTicket(res.ticket);
     } catch (e) {
       toast("Couldn't update status: " + e.message);
@@ -5852,6 +6074,7 @@
       amountPaid: ticket.amountPaid ?? ticket.paid ?? "",
       technician: ticket.technician || "",
       repairDueDate: ticket.repairDueDate || "",
+      accessories: ticket.accessories || "",
       inventoryItemKey: ticket.inventoryItemKey || "",
       inventoryItemLabel: ticket.inventoryItemLabel || "",
       inventorySection: ticket.inventorySection || "",

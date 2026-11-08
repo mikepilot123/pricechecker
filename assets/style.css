@@ -8804,3 +8804,11 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
   .intake-date-custom { flex: 1 1 100%; }
   .intake-date-custom .intake-date-input { flex: 1; min-width: 0; min-height: 44px; font-size: 16px; }
 }
+
+/* Accessories left with the device (Check In step 2 and the repair modal).
+   Reuses the issue chips; "Nothing" sits with the items. */
+.accessory-picker .accessory-other-input { margin-top: 10px; }
+.accessory-picker .issue-tags { margin-bottom: 0; }
+.accessory-none { margin: 0; color: var(--text-dim); font-size: 0.85rem; }
+.accessory-empty { margin: 0; }
+.accessory-chip { font-size: 0.8rem; }

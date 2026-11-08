@@ -208,6 +208,14 @@ It captures Customer Name, Phone, Device, Issues, Status, and Notes. The
 call button on each card dials the customer directly (`tel:` link) using
 the phone number captured at check-in.
 
+The device step also asks what the client **left with the device** —
+Charger, Cable, Case, Bag, SIM card, Memory card, Stylus, Box, or Other (typed
+in) — or **Nothing**. A new check-in can't continue until it's answered. It's
+shown in its own *Left with device* section of the repair (with a pencil to
+change it, recorded in the repair's history), and marking the repair
+**Picked Up** pops up a reminder of what to hand back. Quick logs from the
+Prices tab skip the question, and older repairs show *Not recorded*.
+
 When a repair uses stock, staff can choose the exact inventory item during
 check-in. The backend deducts one from that item in the inventory sheet when
 the ticket is saved, and restores one if that ticket is deleted.
