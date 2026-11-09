@@ -153,6 +153,11 @@
   // groups (collapsedShipments there).
   const collapsedRepairStatuses = new Set();
   const REPAIR_STATUS_ORDER_KEY = "repair-status-order";
+  // "Parts to order at top" switch on the Repairs list (on unless this
+  // device turned it off): repairs waiting on a part jump to the top.
+  const PIN_PARTS_KEY = "rpc_repairs_pin_parts";
+  let pinPartsToTop = true;
+  try { pinPartsToTop = localStorage.getItem(PIN_PARTS_KEY) !== "off"; } catch (_) {}
   let repairStatusOrder = (() => {
     try { return JSON.parse(localStorage.getItem(REPAIR_STATUS_ORDER_KEY) || "[]"); } catch { return []; }
   })();
@@ -5332,6 +5337,12 @@
     if ($("repairsCustomDates")) $("repairsCustomDates").hidden = repairsDateView.range !== "custom";
   }
   syncRepairsDateControls();
+  if ($("repairsPinParts")) $("repairsPinParts").checked = pinPartsToTop;
+  $("repairsPinParts")?.addEventListener("change", (e) => {
+    pinPartsToTop = e.target.checked;
+    try { localStorage.setItem(PIN_PARTS_KEY, pinPartsToTop ? "on" : "off"); } catch (_) {}
+    render();
+  });
   $("repairsSort")?.addEventListener("change", (e) => {
     repairsDateView.sort = e.target.value === "oldest" ? "oldest" : "newest";
     saveRepairsDateView();
@@ -5566,12 +5577,15 @@
       .filter((section) => section.count > 0);
     // A group with a "waiting on parts" warning jumps to the top so it can't
     // be missed; otherwise the dragged order stands (sort is stable).
+    if (!pinPartsToTop) return sections;
     const hasAlert = (section) => section.groups.some((group) => group.some(showsPartsAlert));
     return sections.sort((a, b) => hasAlert(b) - hasAlert(a));
   }
 
-  // Check-ins with a "waiting on parts" warning first, longest wait first.
+  // Check-ins with a "waiting on parts" warning first, longest wait first —
+  // unless the "Parts to order at top" switch is off.
   function partsAlertsFirst(groups) {
+    if (!pinPartsToTop) return groups;
     const wait = (group) => Math.max(-1, ...group.filter(showsPartsAlert).map((t) => daysSince(t.waitingForPartsSince)));
     return groups
       .map((group, i) => ({ group, i, w: wait(group) }))
