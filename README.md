@@ -210,7 +210,11 @@ the phone number captured at check-in.
 
 The device step also asks what the client **left with the device** —
 Charger, Cable, Case, Bag, SIM card, Memory card, Stylus, Box, or Other (typed
-in) — or **Nothing**. A new check-in can't continue until it's answered. It's
+in) — or **Nothing**. Ticking an item opens a *Describe what they left* line
+for it, with a dropdown of common descriptions (e.g. *White Apple USB-C*,
+*Clear case*, *Digicel SIM*) or your own words; descriptions are optional and
+show wherever the accessories are listed. A new check-in can't continue until
+it's answered. It's
 shown in its own *Left with device* section of the repair (with a pencil to
 change it, recorded in the repair's history), and marking the repair
 **Picked Up** first asks whether the client was given those things back:

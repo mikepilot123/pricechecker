@@ -1766,8 +1766,8 @@
     } else if (value === NO_ACCESSORIES) {
       body = `<p class="accessory-none">Nothing — the client kept everything.</p>`;
     } else {
-      body = `<div class="issue-tags issue-tags-readonly">${value.split(",").map((part) =>
-        `<span class="issue-chip accessory-chip">${esc(part.trim().replace(/^Other:\s*/, ""))}</span>`).join("")}</div>`;
+      body = `<div class="issue-tags issue-tags-readonly">${accessoryItems(value).map((item) =>
+        `<span class="issue-chip accessory-chip"><svg class="icon" aria-hidden="true"><use href="#${item.icon}"></use></svg> ${esc(accessoryItemLabel(item))}</span>`).join("")}</div>`;
     }
     return `<div class="ticket-issues-head"><p class="field-label">Left with device</p>
       <button type="button" class="icon-btn ghost-btn ticket-detail-edit-btn" data-edit-accessories aria-label="Edit what was left with the device"><svg class="icon"><use href="#i-pencil"></use></svg></button></div>
@@ -3296,51 +3296,137 @@
   }
 
   // ---- Accessories left with the device -----------------------------------
-  /** "Charger, Case, Other: blue pouch" → chips + free text; "None" → none. */
+  // Saved as staff read it: "Charger (White Apple USB-C), Case, Other: blue
+  // pouch", "None" for nothing left, "" when not recorded. The description in
+  // brackets is optional.
+
+  // Suggestions in each item's description dropdown — staff can type anything.
+  const ACCESSORY_SUGGESTIONS = {
+    Charger: ["White Apple USB-C", "White Apple Lightning", "Samsung fast charger", "Generic USB-C", "Wall plug only", "Laptop charger"],
+    Cable: ["USB-C to USB-C", "USB-C to Lightning", "USB-A to Lightning", "Micro-USB", "Braided cable"],
+    Case: ["Clear case", "Black silicone case", "Wallet / flip case", "Rugged case", "Case with card holder"],
+    Bag: ["Plastic bag", "Paper bag", "Backpack", "Laptop bag", "Pouch"],
+    "SIM card": ["Digicel SIM", "bmobile SIM", "SIM tray with SIM"],
+    "Memory card": ["microSD 32GB", "microSD 64GB", "microSD 128GB"],
+    Stylus: ["Apple Pencil 1st gen", "Apple Pencil 2nd gen", "Samsung S Pen", "Generic stylus"],
+    Box: ["Original box", "Box with accessories"],
+  };
+
+  /** A description as it can sit inside "Item (…)" in the saved list. */
+  function cleanAccessoryDetail(text) {
+    return String(text || "").replace(/[()]/g, "").replace(/\s*,\s*/g, "; ").replace(/\s+/g, " ").trim().slice(0, 60);
+  }
+
+  /** "Charger (White Apple USB-C), Case, Other: blue pouch" → chips,
+   *  descriptions and free text; "None" → none. */
   function parseAccessories(value) {
     const selected = new Set();
+    const details = new Map();
     const other = [];
     let none = false;
     String(value || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((part) => {
       if (part.toLowerCase() === NO_ACCESSORIES.toLowerCase()) { none = true; return; }
-      const preset = ACCESSORIES.find((a) => a !== "Other" && a.toLowerCase() === part.toLowerCase());
-      if (preset) selected.add(preset);
-      else other.push(/^other:/i.test(part) ? part.slice(6).trim() : part);
+      const [, name, detail] = part.match(/^(.*?)\s*\((.*)\)$/) || [, part, ""];
+      const preset = ACCESSORIES.find((a) => a !== "Other" && a.toLowerCase() === name.toLowerCase());
+      if (preset) {
+        selected.add(preset);
+        if (detail.trim()) details.set(preset, detail.trim());
+      } else {
+        other.push(/^other:/i.test(part) ? part.slice(6).trim() : part);
+      }
     });
     const otherText = other.filter(Boolean).join("; ");
     if (otherText) selected.add("Other");
-    return { selected, otherText, none: none && !selected.size };
+    return { selected, details, otherText, none: none && !selected.size };
   }
 
   /** The inverse of parseAccessories: the string saved on the ticket. */
-  function joinAccessories({ selected, otherText, none }) {
+  function joinAccessories({ selected, details, otherText, none }) {
     if (none) return NO_ACCESSORIES;
-    const parts = ACCESSORIES.filter((a) => a !== "Other" && selected.has(a));
+    const parts = ACCESSORIES.filter((a) => a !== "Other" && selected.has(a)).map((a) => {
+      const detail = cleanAccessoryDetail(details && details.get(a));
+      return detail ? `${a} (${detail})` : a;
+    });
     // Commas separate items in the saved string, so keep them out of "Other".
     const text = String(otherText || "").trim().replace(/\s*,\s*/g, "; ");
     if (selected.has("Other") && text) parts.push("Other: " + text);
     return parts.join(", ");
   }
 
+  /** Each item left, for showing: name, description, icon. */
+  function accessoryItems(value) {
+    if (!value || value === NO_ACCESSORIES) return [];
+    const { selected, details, otherText } = parseAccessories(value);
+    return ACCESSORIES.filter((a) => selected.has(a)).map((a) => (a === "Other"
+      ? { name: otherText || "Other", detail: "", icon: ACCESSORY_ICONS.Other }
+      : { name: a, detail: details.get(a) || "", icon: ACCESSORY_ICONS[a] }));
+  }
+
+  /** "Charger — White Apple USB-C" */
+  function accessoryItemLabel(item, separator = " — ") {
+    return item.detail ? item.name + separator + item.detail : item.name;
+  }
+
   /** How a ticket's accessories read to staff. */
   function accessoriesText(value) {
     if (!value) return "";
     if (value === NO_ACCESSORIES) return "Nothing — the client kept everything";
-    return value.replace(/(^|, )Other: /, "$1");
+    return accessoryItems(value).map((item) => accessoryItemLabel(item, ": ")).join(", ");
   }
 
   // The chip picker, shared by the Check In form and the repair modal: one
-  // chip per accessory, "Nothing" (exclusive), and a text field for Other.
+  // chip per accessory, "Nothing" (exclusive), a text field for Other, and —
+  // once items are ticked — a description for each, with suggestions.
   function accessoryPickerHtml(value) {
-    const { selected, otherText, none } = parseAccessories(value);
+    const { selected, details, otherText, none } = parseAccessories(value);
     const chip = (label, attrs, on) =>
       `<button type="button" class="issue-toggle accessory-toggle${on ? " active" : ""}" ${attrs} aria-pressed="${on}">${esc(label)}</button>`;
     return `<div class="issue-tags accessory-tags">
         ${ACCESSORIES.map((a) => chip(a, `data-accessory="${esc(a)}"`, selected.has(a))).join("")}
         ${chip("Nothing", "data-accessory-none", none)}
       </div>
+      <div class="accessory-details" data-accessory-details>${accessoryDetailsHtml(selected, details)}</div>
       <input type="text" class="text-input issue-other-input accessory-other-input" data-accessory-other maxlength="120"
         placeholder="What else? e.g. stylus pen, blue pouch" value="${esc(otherText)}"${selected.has("Other") ? "" : " hidden"} />`;
+  }
+
+  // One line per ticked item: its icon and name, and a description field
+  // with a dropdown of suggestions (ACCESSORY_SUGGESTIONS).
+  function accessoryDetailsHtml(selected, details) {
+    const items = ACCESSORIES.filter((a) => a !== "Other" && selected.has(a));
+    if (!items.length) return "";
+    ensureAccessorySuggestionLists();
+    return `<p class="accessory-details-title">Describe what they left <span class="field-optional">(optional)</span></p>
+      ${items.map((a) => `<label class="accessory-detail-row">
+        <span class="accessory-detail-name"><svg class="icon" aria-hidden="true"><use href="#${ACCESSORY_ICONS[a]}"></use></svg>${esc(a)}</span>
+        <input type="text" class="text-input accessory-detail-input" data-accessory-detail="${esc(a)}" maxlength="60" autocomplete="off"
+          list="${accessorySuggestionListId(a)}" placeholder="e.g. ${esc((ACCESSORY_SUGGESTIONS[a] || ["colour, brand"])[0])}"
+          value="${esc((details && details.get(a)) || "")}" aria-label="Describe the ${esc(a.toLowerCase())}" />
+      </label>`).join("")}`;
+  }
+
+  function accessorySuggestionListId(name) {
+    return "accessorySuggest-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  }
+
+  // The <datalist>s behind each description's dropdown, added to the page once.
+  function ensureAccessorySuggestionLists() {
+    if (document.getElementById("accessorySuggestionLists")) return;
+    const holder = document.createElement("div");
+    holder.id = "accessorySuggestionLists";
+    holder.hidden = true;
+    holder.innerHTML = Object.entries(ACCESSORY_SUGGESTIONS).map(([name, options]) =>
+      `<datalist id="${accessorySuggestionListId(name)}">${options.map((o) => `<option value="${esc(o)}"></option>`).join("")}</datalist>`).join("");
+    document.body.appendChild(holder);
+  }
+
+  /** The descriptions typed so far, by item. */
+  function readAccessoryDetails(container) {
+    const details = new Map();
+    container?.querySelectorAll("[data-accessory-detail]").forEach((input) => {
+      if (input.value.trim()) details.set(input.dataset.accessoryDetail, input.value.trim());
+    });
+    return details;
   }
 
   function renderAccessoryPicker(container, value) {
@@ -3351,6 +3437,7 @@
   function handleAccessoryClick(container, target) {
     const btn = target.closest("[data-accessory], [data-accessory-none]");
     if (!btn || !container || !container.contains(btn)) return false;
+    const typed = readAccessoryDetails(container);
     const on = !btn.classList.contains("active");
     const setChip = (el, value) => { el.classList.toggle("active", value); el.setAttribute("aria-pressed", String(value)); };
     setChip(btn, on);
@@ -3368,10 +3455,17 @@
       other.hidden = !otherOn;
       if (otherOn && btn.dataset.accessory === "Other") other.focus();
     }
+    // Redraw the description lines for what's ticked now, keeping what was typed.
+    const box = container.querySelector("[data-accessory-details]");
+    if (box) {
+      const selected = new Set([...container.querySelectorAll("[data-accessory].active")].map((el) => el.dataset.accessory));
+      box.innerHTML = accessoryDetailsHtml(selected, typed);
+    }
     return true;
   }
 
-  /** The picker's answer: "Charger, Case", "None", or "" when unanswered. */
+  /** The picker's answer: "Charger (White Apple USB-C), Case", "None", or ""
+   *  when unanswered. */
   function readAccessoryPicker(container) {
     if (!container) return "";
     const selected = new Set([...container.querySelectorAll("[data-accessory].active")].map((el) => el.dataset.accessory));
@@ -3379,7 +3473,7 @@
     const otherText = container.querySelector("[data-accessory-other]")?.value || "";
     // "Other" with nothing typed doesn't count as an answer on its own.
     if (selected.has("Other") && !otherText.trim()) selected.delete("Other");
-    return joinAccessories({ selected, otherText, none });
+    return joinAccessories({ selected, details: readAccessoryDetails(container), otherText, none });
   }
 
   /** True when Other is ticked but nothing describes it. */
@@ -3406,13 +3500,9 @@
   /** The icons above a repair card's photo: what the client left, with the
    *  full list on hover. Nothing when it wasn't recorded or nothing was left. */
   function accessoryIconsHtml(ticket) {
-    const value = ticket.accessories || "";
-    if (!value || value === NO_ACCESSORIES) return "";
-    const { selected, otherText } = parseAccessories(value);
-    const items = ACCESSORIES.filter((a) => selected.has(a))
-      .map((a) => ({ icon: ACCESSORY_ICONS[a], label: a === "Other" ? otherText || "Other" : a }));
+    const items = accessoryItems(ticket.accessories || "");
     if (!items.length) return "";
-    const tip = "Left with device: " + items.map((item) => item.label).join(", ");
+    const tip = "Left with device: " + items.map((item) => accessoryItemLabel(item, ": ")).join(", ");
     const shown = items.length > ACCESSORY_ICON_LIMIT ? items.slice(0, ACCESSORY_ICON_LIMIT - 1) : items;
     const more = items.length - shown.length;
     return `<div class="ticket-accessories" data-tip="${esc(tip)}" role="img" aria-label="${esc(tip)}">
@@ -3457,12 +3547,11 @@
         </div>`;
       document.body.appendChild(modal);
     }
-    const { selected, otherText } = parseAccessories(ticket.accessories);
-    const items = ACCESSORIES.filter((a) => selected.has(a)).map((a) => (a === "Other" ? otherText || "Other" : a));
+    const items = accessoryItems(ticket.accessories);
     $("pickupAccessoriesSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
     $("pickupAccessoriesList").innerHTML = items.map((item) =>
-      `<span class="issue-chip accessory-chip"><svg class="icon" aria-hidden="true"><use href="#${ACCESSORY_ICONS[ACCESSORIES.includes(item) ? item : "Other"]}"></use></svg> ${esc(item)}</span>`).join("");
-    $("pickupAccessoriesQuestion").textContent = `Was ${ticket.customerName || "the client"} given back ${items.length === 1 ? "their " + items[0].toLowerCase() : "everything above"}?`;
+      `<span class="issue-chip accessory-chip"><svg class="icon" aria-hidden="true"><use href="#${item.icon}"></use></svg> ${esc(accessoryItemLabel(item))}</span>`).join("");
+    $("pickupAccessoriesQuestion").textContent = `Was ${ticket.customerName || "the client"} given back ${items.length === 1 ? "their " + items[0].name.toLowerCase() : "everything above"}?`;
     modal.hidden = false;
     $("pickupAccessoriesConfirm").focus();
     return new Promise((resolve) => {

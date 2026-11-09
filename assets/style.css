@@ -8924,3 +8924,33 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .accessory-none { margin: 0; color: var(--text-dim); font-size: 0.85rem; }
 .accessory-empty { margin: 0; }
 .accessory-chip { font-size: 0.8rem; }
+.accessory-chip .icon { width: 13px; height: 13px; vertical-align: -2px; }
+/* A description line per ticked item, with a dropdown of suggestions. */
+.accessory-details:empty { display: none; }
+.accessory-details {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+  animation: accessory-details-in 0.16s ease-out;
+}
+.accessory-details-title { margin: 0; font-size: 0.8rem; font-weight: 600; color: var(--text-dim); }
+.accessory-detail-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.accessory-detail-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.88rem; color: #15803d; }
+.accessory-detail-name .icon { width: 16px; height: 16px; }
+.accessory-detail-input { min-height: 38px; padding-top: 6px; padding-bottom: 6px; background: #fff; }
+@media (max-width: 520px) {
+  .accessory-detail-row { grid-template-columns: 1fr; gap: 4px; }
+}
+@keyframes accessory-details-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}

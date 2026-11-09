@@ -64,10 +64,15 @@ await test("an update that doesn't mention accessories keeps them", async () => 
   assert.doesNotMatch(updated.history, /Left with device/);
 });
 
+await test("descriptions are kept with each item", async () => {
+  const { ticket } = await checkIn({ accessories: "Charger (White Apple USB-C), Case (Clear case), Other: blue pouch" });
+  assert.equal(ticket.accessories, "Charger (White Apple USB-C), Case (Clear case), Other: blue pouch");
+});
+
 await test("the saved text is tidied and capped", async () => {
   assert.equal(accessoriesFrom(" Charger ,, SIM   card "), "Charger, SIM card");
   assert.equal(accessoriesFrom(null), "");
-  assert.equal(accessoriesFrom("x".repeat(500)).length, 300);
+  assert.equal(accessoriesFrom("x".repeat(800)).length, 500);
 });
 
 console.log(`All ${passed} accessories tests passed`);
