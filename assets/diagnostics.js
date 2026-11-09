@@ -41,7 +41,7 @@
   const INACTIVE_STATUSES = new Set(["Picked Up", "Cancelled"]);
   // A repair already at one of these with nothing tested yet opens straight
   // on the after-repair pass — there's no "before" left to record.
-  const REPAIRED_STATUSES = new Set(["Repaired", "Checked Out - Waiting on Client", "Picked Up", "No Fix"]);
+  const REPAIRED_STATUSES = new Set(["Repaired", "Checked Out - Waiting on Client", "Picked Up", "No Fix", "No Fix - Client to Collect", "No Fix - Client Collected"]);
 
   const STATES = ["untested", "pass", "fail", "na"];
   const STATE_LABEL = { untested: "Untested", pass: "Pass", fail: "Fail", na: "N/A" };

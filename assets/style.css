@@ -4747,6 +4747,13 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   --status-ink: #3f3f46;
   --status-dot: #52525b;
 }
+/* No fix, device still waiting for the client — amber, it needs a call. */
+.st-no-fix-collect {
+  --status-bg: #fffbeb;
+  --status-border: #fcd34d;
+  --status-ink: #92400e;
+  --status-dot: #d97706;
+}
 .st-cancelled {
   --status-bg: #fff5f5;
   --status-border: #f4c7c3;

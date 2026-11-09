@@ -33,6 +33,18 @@
   ]);
 
   // Status pipeline — keep in sync with apps-script/Code.gs STATUSES.
+  // No fix: the device either still waits for the client, or they've
+  // collected it (which moves it to Completed Repairs → No Fix, like the
+  // older plain "No Fix" status that existing repairs may still have).
+  const NO_FIX_TO_COLLECT = "No Fix - Client to Collect";
+  const NO_FIX_COLLECTED = "No Fix - Client Collected";
+  // Done and gone from the Repairs list (Completed Repairs tab instead).
+  const COMPLETED_STATUSES = new Set(["Picked Up", "No Fix", NO_FIX_COLLECTED]);
+  const NO_FIX_DONE_STATUSES = new Set(["No Fix", NO_FIX_COLLECTED]);
+  // The device leaves the shop: hand back what the client left, and settle
+  // what's owed (repair, or the diagnostic fee for a no fix).
+  const HANDOVER_STATUSES = new Set(["Picked Up", NO_FIX_COLLECTED]);
+
   const STATUSES = [
     "Received",
     "Diagnosing",
@@ -42,7 +54,8 @@
     "In Progress",
     "Repaired",
     "Checked Out - Waiting on Client",
-    "No Fix",
+    NO_FIX_TO_COLLECT,
+    NO_FIX_COLLECTED,
     "Picked Up",
     "Cancelled",
   ];
@@ -56,6 +69,8 @@
     "Repaired": "st-repaired",
     "Checked Out - Waiting on Client": "st-checked-out",
     "No Fix": "st-no-fix",
+    [NO_FIX_TO_COLLECT]: "st-no-fix-collect",
+    [NO_FIX_COLLECTED]: "st-no-fix",
     "Picked Up": "st-pickedup",
     "Cancelled": "st-cancelled",
   };
@@ -1127,9 +1142,12 @@
   let autoInventoryKey = "";
   let inventoryChosenByStaff = false;
 
-  function populateStatusSelect() {
-    $("fStatus").innerHTML = STATUSES.map(
-      (s) => `<option value="${s}">${s}</option>`
+  // `keep` adds a status that's no longer offered (an older repair's plain
+  // "No Fix"), so editing that repair doesn't quietly change its status.
+  function populateStatusSelect(keep = "") {
+    const list = keep && !STATUSES.includes(keep) ? [...STATUSES, keep] : STATUSES;
+    $("fStatus").innerHTML = list.map(
+      (s) => `<option value="${esc(s)}">${esc(s)}</option>`
     ).join("");
   }
 
@@ -2878,7 +2896,7 @@
     return repairs.map((r) => ({ ...r, cost: Math.round(r.cost * 100) / 100 }));
   }
 
-  const FINAL_TICKET_STATUSES = new Set(["Picked Up", "No Fix", "Cancelled"]);
+  const FINAL_TICKET_STATUSES = new Set(["Picked Up", "No Fix", NO_FIX_COLLECTED, "Cancelled"]);
   const phoneKey = (phone) => String(phone || "").replace(/\D/g, "").slice(-7);
 
   function isSameClient(t, billTo) {
@@ -3933,6 +3951,7 @@
     $("fPhone").value = ticket ? ticket.phone || "" : "";
     $("fEmail").value = ticket ? ticket.email || "" : "";
     $("fDevice").value = ticket ? ticket.device || "" : "";
+    populateStatusSelect(ticket ? ticket.status : "");
     $("fStatus").value = ticket ? ticket.status || "Received" : "Received";
     $("fRepairDueDate").value = ticket ? ticket.repairDueDate || "" : "";
     $("fNotes").value = ticket ? ticket.notes || "" : "";
@@ -4510,20 +4529,22 @@
       const original = TICKETS.find((t) => t.id === editingId);
       let pickupMethod = "";
       let pickupBalance = 0;
-      if ($("fStatus").value === "Picked Up" && original && original.status !== "Picked Up") {
+      const handoverStatus = $("fStatus").value;
+      const handoverLabel = handoverStatus === NO_FIX_COLLECTED ? "No Fix - Client Collected" : "Picked Up";
+      if (HANDOVER_STATUSES.has(handoverStatus) && original && original.status !== handoverStatus) {
         // The accessories as they'll be saved, in case they were just changed.
         const returned = await confirmAccessoriesReturned({ ...original, accessories: readAccessoryPicker($("fAccessories")) || original.accessories });
         if (!returned) {
-          err.textContent = "Not saved: hand back what the client left before marking it Picked Up (or choose another status).";
+          err.textContent = `Not saved: hand back what the client left before marking it ${handoverLabel} (or choose another status).`;
           err.hidden = false;
           return;
         }
         const draft = { ...original, customerName, device: currentDeviceValue, repairCost: $("fRepairCost").value.trim(), amountPaid: $("fAmountPaid").value.trim() };
         pickupBalance = ticketBalance(draft);
         if (pickupBalance > 0) {
-          pickupMethod = await confirmPickupPayment(draft);
+          pickupMethod = await confirmPickupPayment(draft, handoverStatus);
           if (!pickupMethod) {
-            err.textContent = "Not saved: confirm the balance was paid before marking it Picked Up (or choose another status).";
+            err.textContent = `Not saved: confirm the balance was paid before marking it ${handoverLabel} (or choose another status).`;
             err.hidden = false;
             return;
           }
@@ -4573,7 +4594,7 @@
         pendingFormMedia = [];
         await syncLinkedInvoiceFromRepair(res.ticket, original);
         if (res.ticket.status === "Repaired" && original?.status !== "Repaired") offerReadyNotice(normalizeTicket(res.ticket));
-        if (res.ticket.status === "Picked Up" && original?.status !== "Picked Up") noteAccessoriesReturned(normalizeTicket(res.ticket));
+        if (HANDOVER_STATUSES.has(res.ticket.status) && !HANDOVER_STATUSES.has(original?.status)) noteAccessoriesReturned(normalizeTicket(res.ticket));
       } catch (ex) {
         err.textContent = "Couldn't save: " + ex.message;
         err.hidden = false;
@@ -4766,7 +4787,7 @@
       renderStatusChips();
       render();
       if (onSaved) onSaved(res);
-      if (status === "Picked Up" && ticket.status !== "Picked Up") noteAccessoriesReturned(normalizeTicket(res.ticket));
+      if (HANDOVER_STATUSES.has(status) && !HANDOVER_STATUSES.has(ticket.status)) noteAccessoriesReturned(normalizeTicket(res.ticket));
       return normalizeTicket(res.ticket);
     } catch (e) {
       toast("Couldn't update status: " + e.message);
@@ -4809,8 +4830,10 @@
   }
 
   // Resolves to "cash" / "transfer" once staff confirm the balance was paid,
-  // or null if they back out (the status is then left as it was).
-  function confirmPickupPayment(ticket) {
+  // or null if they back out (the status is then left as it was). `status`
+  // is where the repair is going: Picked Up, or No Fix - Client Collected
+  // (where what's owed is the diagnostic fee).
+  function confirmPickupPayment(ticket, status = "Picked Up") {
     let modal = $("pickupPayModal");
     if (!modal) {
       modal = document.createElement("div");
@@ -4820,7 +4843,7 @@
       modal.innerHTML = `
         <div class="modal-panel pickup-pay-panel" role="dialog" aria-modal="true" aria-labelledby="pickupPayTitle">
           <div class="modal-header">
-            <div><p class="modal-eyebrow">Before pickup</p><h3 id="pickupPayTitle">Confirm the balance is paid</h3></div>
+            <div><p class="modal-eyebrow" id="pickupPayEyebrow">Before pickup</p><h3 id="pickupPayTitle">Confirm the balance is paid</h3></div>
             <button type="button" class="modal-close" data-pickup-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
           </div>
           <div class="modal-body">
@@ -4832,7 +4855,7 @@
               <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pickup-method="cash"><svg class="icon"><use href="#i-cash"></use></svg>Cash</button>
               <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-pickup-method="transfer"><svg class="icon"><use href="#i-receipt"></use></svg>Bank transfer</button>
             </div>
-            <p class="field-hint">Picked up means paid in full — the balance will be recorded as paid on the repair and its invoice, and deposited on the Account tab (cash to cash on hand, a bank transfer to the bank account).</p>
+            <p class="field-hint" id="pickupPayHint"></p>
           </div>
           <div class="modal-footer"><div class="form-actions">
             <button type="button" class="ghost-btn" data-pickup-cancel>Not paid yet</button>
@@ -4848,9 +4871,16 @@
       <div><span>Repair cost</span><strong>${esc(formatMoney(ticket.repairCost || 0))}</strong></div>
       <div><span>Paid so far</span><strong>${esc(formatMoney(ticket.amountPaid || 0))}</strong></div>
       <div class="is-due"><span>Balance due</span><strong>${esc(formatMoney(balance))}</strong></div>`;
-    $("pickupPayQuestion").textContent = `Has ${name} paid the remaining ${formatMoney(balance)}?`;
+    const noFix = status === NO_FIX_COLLECTED;
+    $("pickupPayEyebrow").textContent = noFix ? "No fix — before the client collects" : "Before pickup";
+    $("pickupPayTitle").textContent = noFix ? "Confirm the diagnostic fee is paid" : "Confirm the balance is paid";
+    $("pickupPaySums").querySelector("span").textContent = noFix ? "Charge (diagnostic)" : "Repair cost";
+    $("pickupPayQuestion").textContent = noFix
+      ? `Has ${name} paid the diagnostic balance of ${formatMoney(balance)}?`
+      : `Has ${name} paid the remaining ${formatMoney(balance)}?`;
+    $("pickupPayHint").textContent = `${noFix ? "Collected" : "Picked up"} means paid in full — the balance will be recorded as paid on the repair and its invoice, and deposited on the Account tab (cash to cash on hand, a bank transfer to the bank account).`;
     const confirmBtn = $("pickupPayConfirm");
-    confirmBtn.querySelector("span").textContent = `Balance paid — mark picked up`;
+    confirmBtn.querySelector("span").textContent = noFix ? "Paid — mark collected" : "Balance paid — mark picked up";
     confirmBtn.disabled = true;
     let method = "";
     const methods = modal.querySelectorAll("[data-pickup-method]");
@@ -5213,10 +5243,10 @@
     return normalizeTicket(res.ticket);
   };
 
-  async function pickUpWithBalancePaid(ticket, method) {
+  async function pickUpWithBalancePaid(ticket, method, status = "Picked Up") {
     const balance = ticketBalance(ticket);
     let accountDeposit = null;
-    const updated = await setStatus(ticket, "Picked Up", {
+    const updated = await setStatus(ticket, status, {
       amountPaid: ticket.repairCost,
       paymentMethod: method,
       depositToAccount: true,
@@ -5226,7 +5256,7 @@
     if (accountDeposit && !accountDeposit.ok) reportAccountDeposits([accountDeposit]);
     else {
       if (accountDeposit) refreshAccountTab();
-      toast(`${ticket.customerName || "Repair"} picked up — ${formatMoney(balance)} balance recorded as paid${accountDeposit ? ` and deposited to ${accountDepositPlace(accountDeposit.deposit)}` : ""}.`, { tone: "info", duration: 3500 });
+      toast(`${ticket.customerName || "Repair"} ${status === NO_FIX_COLLECTED ? "collected (no fix)" : "picked up"} — ${formatMoney(balance)} balance recorded as paid${accountDeposit ? ` and deposited to ${accountDepositPlace(accountDeposit.deposit)}` : ""}.`, { tone: "info", duration: 3500 });
     }
     return updated;
   }
@@ -5265,18 +5295,19 @@
       closeStatusModal();
       return;
     }
-    if (status === "Picked Up" && hasAccessoriesToReturn(ticket)) {
+    if (HANDOVER_STATUSES.has(status) && hasAccessoriesToReturn(ticket)) {
       closeStatusModal();
       if (!(await confirmAccessoriesReturned(ticket))) {
         toast("Left as " + (ticket.status || "it was") + " — hand back what the client left first.", { tone: "info", duration: 3500 });
         return;
       }
     }
-    if (status === "Picked Up" && ticketBalance(ticket) > 0) {
-      // Picked up = paid in full: confirm the balance was collected first.
+    if (HANDOVER_STATUSES.has(status) && ticketBalance(ticket) > 0) {
+      // Picked up / collected = paid in full (for a no fix, the diagnostic
+      // fee): confirm the balance was collected first.
       closeStatusModal();
-      const method = await confirmPickupPayment(ticket);
-      if (method) await pickUpWithBalancePaid(ticket, method);
+      const method = await confirmPickupPayment(ticket, status);
+      if (method) await pickUpWithBalancePaid(ticket, method, status);
       return;
     }
     const box = $("statusModalOptions");
@@ -5454,15 +5485,15 @@
   });
 
   function renderStatusChips() {
-    const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up" && s !== "No Fix");
-    const counts = { all: TICKETS.filter((t) => t.status !== "Picked Up" && t.status !== "No Fix").length };
+    const filterableStatuses = STATUSES.filter((s) => !COMPLETED_STATUSES.has(s));
+    const counts = { all: TICKETS.filter((t) => !COMPLETED_STATUSES.has(t.status)).length };
     filterableStatuses.forEach((s) => (counts[s] = TICKETS.filter((t) => t.status === s).length));
     const select = $("statusFilterSelect");
     if (!select) return;
     // Cross-status shortcut: every repair still waiting on someone to place
     // the order, whether it's on the explicit "Part to be Ordered" status or
     // an older "Waiting for Parts" ticket whose flag was never set.
-    const partsToOrder = TICKETS.filter((t) => t.status !== "Picked Up" && t.status !== "No Fix" && needsPartsOrdered(t)).length;
+    const partsToOrder = TICKETS.filter((t) => !COMPLETED_STATUSES.has(t.status) && needsPartsOrdered(t)).length;
     const options = [{ key: "all", label: `All (${counts.all})` }]
       .concat([{ key: "__parts_needed", label: `⚠ Parts to order (${partsToOrder})` }])
       .concat(filterableStatuses.map((status) => ({ key: status, label: `${status} (${counts[status]})` })));
@@ -5477,7 +5508,7 @@
     const q = $("intakeSearch").value.trim().toLowerCase();
     const bounds = repairsDateBounds();
     const list = TICKETS.filter((t) => {
-      if (t.status === "Picked Up" || t.status === "No Fix") return false; // moved to the Completed Repairs tab
+      if (COMPLETED_STATUSES.has(t.status)) return false; // moved to the Completed Repairs tab
       if (bounds) {
         const logged = new Date(t.created).getTime();
         if (!(logged >= bounds[0] && logged < bounds[1])) return false;
@@ -5522,8 +5553,8 @@
     const list = $("completedTicketsList");
     if (!list) return;
     const q = ($("completedSearch")?.value || "").trim().toLowerCase();
-    const wantStatus = completedTab === "no-fix" ? "No Fix" : "Picked Up";
-    const completed = TICKETS.filter((t) => t.status === wantStatus).filter((t) => {
+    const inTab = completedTab === "no-fix" ? (t) => NO_FIX_DONE_STATUSES.has(t.status) : (t) => t.status === "Picked Up";
+    const completed = TICKETS.filter(inTab).filter((t) => {
       if (!q) return true;
       return [t.device, t.issues, t.id, t.customerName, t.phone, t.email, t.technician]
         .map((x) => (x || "").toLowerCase())
@@ -5567,7 +5598,7 @@
   // together, etc. Picking an actual status from the filter collapses back
   // to a single flat section, since there's nothing left to separate.
   function buildStatusSections(list) {
-    const filterableStatuses = STATUSES.filter((s) => s !== "Picked Up" && s !== "No Fix");
+    const filterableStatuses = STATUSES.filter((s) => !COMPLETED_STATUSES.has(s));
     const order = [...repairStatusOrder, ...filterableStatuses.filter((status) => !repairStatusOrder.includes(status))];
     const sections = order
       .map((status) => {

@@ -229,6 +229,15 @@ the repair. On the Repairs list, a green
 Case*), with an icon per item; hover it for the descriptions. Quick logs from the
 Prices tab skip the question, and older repairs show *Not recorded*.
 
+When a repair can't be fixed, set **No Fix - Client to Collect** while the
+device waits in the shop (it stays on the Repairs list, in amber), then **No
+Fix - Client Collected** when they take it. Collecting asks the same questions
+as Picked Up: whether what they left was handed back, and — if a balance is
+still owed, e.g. the diagnostic fee — whether it was paid, by cash or bank
+transfer (recorded on the repair and its invoice and deposited on the Account
+tab). Collected no-fix repairs move to Completed Repairs → No Fix, with any
+older repairs marked plain "No Fix".
+
 When a repair uses stock, staff can choose the exact inventory item during
 check-in. The backend deducts one from that item in the inventory sheet when
 the ticket is saved, and restores one if that ticket is deleted. *This

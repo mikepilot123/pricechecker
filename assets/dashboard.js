@@ -29,7 +29,7 @@
     "Part Ordered",
     "In Progress",
   ]);
-  const FINAL_STATUSES = new Set(["Picked Up", "No Fix", "Cancelled"]);
+  const FINAL_STATUSES = new Set(["Picked Up", "No Fix", "No Fix - Client Collected", "Cancelled"]);
   const $ = (id) => document.getElementById(id);
 
   let tickets = [];
@@ -1299,6 +1299,8 @@
     "Repaired": "st-repaired",
     "Checked Out - Waiting on Client": "st-checked-out",
     "No Fix": "st-no-fix",
+    "No Fix - Client to Collect": "st-no-fix-collect",
+    "No Fix - Client Collected": "st-no-fix",
     "Picked Up": "st-pickedup",
     "Cancelled": "st-cancelled",
   };

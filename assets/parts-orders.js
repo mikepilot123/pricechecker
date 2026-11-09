@@ -236,7 +236,7 @@
   // Assembly ... For Google Pixel 6 Pro" -> a ticket with device "Google
   // Pixel 6 Pro". Only offered while a part isn't already linked. ----
   const CLOSED_TICKET_STATUSES = new Set([
-    "Repaired", "Checked Out - Waiting on Client", "No Fix", "Picked Up", "Cancelled",
+    "Repaired", "Checked Out - Waiting on Client", "No Fix", "No Fix - Client to Collect", "No Fix - Client Collected", "Picked Up", "Cancelled",
   ]);
 
   function normalizeMatchText(s) {
