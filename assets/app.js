@@ -459,10 +459,15 @@ function buildChips() {
 }
 
 function currentFilter() {
-  const q = els.search.value.trim().toLowerCase();
+  const q = els.search.value.trim();
+  // Every word typed has to fit the model, in any order, with years in a
+  // range, short forms and small typos understood (assets/device-search.js).
+  const fits = window.RPC_DEVICE_SEARCH
+    ? (name) => window.RPC_DEVICE_SEARCH.matchesAll(name, q)
+    : (name) => name.toLowerCase().includes(q.toLowerCase());
   return MODELS.filter((m) => {
     if (activeBrand !== "all" && m.brand !== activeBrand) return false;
-    if (q && !m.name.toLowerCase().includes(q)) return false;
+    if (q && !fits(m.name)) return false;
     return true;
   });
 }

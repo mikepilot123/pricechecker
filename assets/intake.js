@@ -6144,8 +6144,11 @@
 
     function deviceOptions(showAll) {
       const names = window.RPC_MODEL_NAMES || [];
-      const query = showAll ? "" : input.value.trim().toLowerCase();
-      return query ? names.filter((name) => name.toLowerCase().includes(query)) : names;
+      const query = showAll ? "" : input.value.trim();
+      if (!query) return names;
+      // Matches by intent, not the exact text — see assets/device-search.js.
+      if (window.RPC_DEVICE_SEARCH) return window.RPC_DEVICE_SEARCH.search(names, query);
+      return names.filter((name) => name.toLowerCase().includes(query.toLowerCase()));
     }
 
     function render(showAll) {

@@ -17,7 +17,7 @@
    The prices/intake API and Google Sheet are never touched here — those go
    straight to the network and have their own localStorage fallbacks. */
 
-const VERSION = "v170";
+const VERSION = "v171";
 const CACHE = `rpc-shell-${VERSION}`;
 
 // How long any single network request may take before we stop waiting and
@@ -36,6 +36,7 @@ const SHELL = [
   "./index.html",
   "./assets/style.css",
   "./assets/device-access.js",
+  "./assets/device-search.js",
   "./assets/app.js",
   "./assets/dashboard.js",
   "./assets/appointments.js",
