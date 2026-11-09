@@ -50,6 +50,18 @@ for (const model of SAMSUNG_A_SEED) {
 }
 assert.equal((migration.match(/^  \('PM:/gm) || []).length, SAMSUNG_A_SEED.length + SAMSUNG_A_SEED.reduce((n, m) => n + Object.keys(m.entries).length, 0));
 
+// MacBooks: every model is listed with no prices yet, under its own brand,
+// and the migration mirrors the seed.
+const { MACBOOK_SEED } = await import("../lib/price-seed.js");
+const macbooks = models.filter((m) => m.brand === "MacBook");
+assert.deepEqual(macbooks.map((m) => m.name), MACBOOK_SEED.map((m) => m.name));
+assert.ok(macbooks.every((m) => m.entries.length === 0), "MacBooks start without prices");
+assert.ok(macbooks.some((m) => m.name === "MacBook Air 13-inch M1 2020 (A2337)"));
+const macMigration = readFileSync(new URL("050_seed_macbook_models.sql", migrations), "utf8");
+for (const model of MACBOOK_SEED) {
+  assert.ok(macMigration.includes(`'${model.name}'`), `${model.name} missing from the MacBook migration`);
+}
+
 // An in-app edit and a deletion both survive re-running the seed migrations.
 await savePriceModels({ models: [{ name: "Samsung A15", brand: "Samsung", entries: [{ type: "OLED Screen replacement", value: "525" }] }] });
 await deletePriceModel({ name: "Samsung A02" });

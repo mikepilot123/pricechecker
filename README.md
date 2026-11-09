@@ -122,6 +122,11 @@ Two layers, merged in the browser on every sync:
    Original grades) as seed data in [`lib/price-seed.js`](lib/price-seed.js),
    loaded on the first request after a deploy; they land on the sheet's own
    `Samsung A…` cards where the names match.
+   Every MacBook (Pro, Air and MacBook, 2006 to today) is seeded the same way
+   under a **MacBook** brand, named with its size, chip, year and model number —
+   e.g. `MacBook Air 13-inch M1 2020 (A2337)` — so it can be picked on Check
+   In (search the A-number from the bottom case) and Appointments. They start
+   with no prices ("Call to confirm"); add them in Settings → Repair prices.
 
 Catalog rows win: they override a sheet model's repair price, add repair types
 to it, add models the sheet doesn't list, or hide a model entirely. A price
@@ -453,7 +458,7 @@ assets/dashboard.js        # Dashboard, Targets, Expenses, and Reminders tabs
 api/inventory.js           # Vercel API for inventory reads
 api/prices.js              # Vercel API for the price catalog (public reads)
 lib/prices.js              # price catalog queries
-lib/price-seed.js          # Pixel price list shipped as seed data
+lib/price-seed.js          # Pixel, Samsung A-series and MacBook seed data
 lib/reminders.js           # reminders queries (Reminders tab)
 api/price-updates.js       # Vercel WebSocket watcher for price sheet changes
 apps-script/Code.gs         # Apps Script backend for the check-in sheet
