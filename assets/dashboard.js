@@ -2960,6 +2960,23 @@
     updateReminderNavBadge(due.length);
   }
 
+  // The phone bottom bar's "More" badge adds up what's waiting behind it:
+  // reminders due (here) and new client collection bookings
+  // (assets/appointments.js).
+  const moreCounts = { reminders: 0, bookings: 0 };
+  window.RPC_SET_NAV_COUNT = (kind, count) => {
+    moreCounts[kind] = Math.max(0, Number(count) || 0);
+    const total = moreCounts.reminders + moreCounts.bookings;
+    const moreBadge = document.getElementById("bottomNavMoreBadge");
+    if (!moreBadge) return;
+    moreBadge.hidden = !total;
+    moreBadge.textContent = total > 99 ? "99+" : String(total || "");
+    const parts = [];
+    if (moreCounts.reminders) parts.push(`${moreCounts.reminders} reminder${moreCounts.reminders === 1 ? "" : "s"} due`);
+    if (moreCounts.bookings) parts.push(`${moreCounts.bookings} new collection booking${moreCounts.bookings === 1 ? "" : "s"}`);
+    document.getElementById("bottomNavMore")?.setAttribute("aria-label", parts.length ? `More, ${parts.join(", ")}` : "More");
+  };
+
   function updateReminderNavBadge(count) {
     document.querySelectorAll('.nav-btn[data-target="reminders"]').forEach((btn) => {
       let badge = btn.querySelector(".nav-badge");
@@ -2974,13 +2991,7 @@
     });
     // Reminders sits behind "More" on the phone bottom bar, so surface the
     // count there too.
-    const moreBadge = document.getElementById("bottomNavMoreBadge");
-    if (moreBadge) {
-      moreBadge.hidden = !count;
-      moreBadge.textContent = count > 99 ? "99+" : String(count || "");
-      const more = document.getElementById("bottomNavMore");
-      more?.setAttribute("aria-label", count ? `More, ${count} reminder${count === 1 ? "" : "s"} due` : "More");
-    }
+    window.RPC_SET_NAV_COUNT("reminders", count);
   }
 
   function isDemoAlert(id) {

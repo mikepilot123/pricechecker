@@ -6675,6 +6675,12 @@ video.media-viewer-media {
   line-height: 18px;
   text-align: center;
 }
+/* New client collection bookings on the Appointments nav item — good news,
+   so green rather than the reminders' red. */
+.nav-badge.nav-badge-info { background: #16a34a; }
+/* …and those bookings in the Appointments list, for the visit that clears them. */
+.source-tag.source-tag-new { background: #16a34a; color: #fff; border-color: #16a34a; }
+.booking-row.is-new-booking { border-color: #86efac; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.15); }
 
 /* ---- Cash-reclaim expenses ---------------------------------------------- */
 .reclaim-toggle {

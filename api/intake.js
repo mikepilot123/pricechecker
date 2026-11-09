@@ -20,7 +20,7 @@ import {
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { getTicketDiagnostic, listTicketDiagnostics, saveTicketDiagnostic, deleteTicketDiagnostic } from "../lib/diagnostics.js";
 import { listCustomers } from "../lib/customers.js";
-import { listAppointments, addAppointment, updateAppointment, deleteAppointment } from "../lib/appointments.js";
+import { listAppointments, addAppointment, updateAppointment, deleteAppointment, listNewClientBookings, markAppointmentsSeen } from "../lib/appointments.js";
 import { listExpenses, addExpense, updateExpense, deleteExpense, addExpenseCollection, undoExpenseCollection } from "../lib/expenses.js";
 import { listReminders, addReminder, updateReminder, deleteReminder } from "../lib/reminders.js";
 // Card payments/payouts (lib/card-payments.js, lib/payouts.js) and their
@@ -226,6 +226,12 @@ export default async function handler(req, res) {
     }
     if (action === "listAppointments") {
       return res.status(200).json({ ok: true, appointments: await listAppointments() });
+    }
+    if (action === "listNewClientBookings") {
+      return res.status(200).json({ ok: true, appointments: await listNewClientBookings() });
+    }
+    if (action === "markAppointmentsSeen") {
+      return res.status(200).json({ ok: true, marked: await markAppointmentsSeen(body) });
     }
     if (action === "addAppointment") {
       return res.status(200).json({ ok: true, appointment: await addAppointment(body) });

@@ -405,7 +405,14 @@ the link books nothing — only the page's **Confirm** does, so email scanners
 that follow links can't make bookings.
 
 Confirming adds the collection to **Appointments**, tagged *Client booked
-collection*, with the usual reminder 30 minutes before. It also leaves a note
+collection*, with the usual reminder 30 minutes before. Staff are told
+straight away: a green number on the **Appointments** nav item (and on
+**More** on a phone) counts client bookings nobody has looked at yet, and
+every open copy of the app pops up *New collection booking: Anita Singh
+(iPhone 13) is coming Tue, Nov 10, 2:00 PM*. The app checks every minute and
+whenever it's brought back to the front. Opening Appointments clears the
+number for everyone and shows the list with those bookings tagged **New**.
+A client moving their day counts as new again. It also leaves a note
 on the repair. If the client picks again, the same appointment moves rather
 than a second one being added. The link is signed per repair (with
 `BROWSER_CREDENTIAL_SECRET`, or `DATABASE_URL` if that isn't set). Once the

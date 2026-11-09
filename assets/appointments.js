@@ -74,6 +74,12 @@
   // In-memory list, refreshed from the server. Kept synchronous for the many
   // existing read call sites (calendar counts, day lists, renders).
   let APPOINTMENTS = readCache();
+  // Client-booked collections staff haven't seen yet (see "New collection
+  // bookings from clients" below).
+  let newBookings = [];
+  const announcedBookings = new Set();
+  let highlightedBookingIds = new Set();
+  let bookingsCheckInFlight = false;
 
   function readAppointments() {
     return APPOINTMENTS;
@@ -621,12 +627,13 @@
   // A collection day the client picked from their ready-for-collection email
   // (lib/collection-booking.js) rather than one staff booked.
   function collectionTagHtml(item) {
-    return item.source === "Ready email" ? `<span class="source-tag source-tag-collection">Client booked collection</span>` : "";
+    const fresh = highlightedBookingIds.has(item.id) ? `<span class="source-tag source-tag-new">New</span>` : "";
+    return item.source === "Ready email" ? `${fresh}<span class="source-tag source-tag-collection">Client booked collection</span>` : "";
   }
 
   function appointmentRowHtml(item) {
     return `
-      <article class="booking-row ${item.status === "completed" ? "is-completed" : ""}" data-open-detail="${esc(item.id)}" role="button" tabindex="0">
+      <article class="booking-row ${item.status === "completed" ? "is-completed" : ""} ${highlightedBookingIds.has(item.id) ? "is-new-booking" : ""}" data-open-detail="${esc(item.id)}" role="button" tabindex="0">
         <div class="booking-row-main">
           <strong>${esc(item.client)}${collectionTagHtml(item)}</strong>
           <p>${esc(item.device)}${item.issue ? " · " + esc(item.issue) : ""}${item.technician ? " · Assigned to " + esc(item.technician) : ""}</p>
@@ -1099,8 +1106,91 @@
     });
   }
 
+  // ---- New collection bookings from clients --------------------------------
+  // A client picking their collection day from the ready email books an
+  // appointment on the server (lib/collection-booking.js). Every open copy of
+  // the app checks for ones staff haven't seen yet: a number on the
+  // Appointments nav item, and a notification when a new one comes in.
+  // Opening Appointments marks them seen for everyone; they stay tagged
+  // "New" in the list for that visit.
+  const NEW_BOOKINGS_POLL_MS = 60 * 1000;
+
+  function bookingWhen(item) {
+    const [y, m, d] = String(item.date || "").split("-").map(Number);
+    if (!y) return "";
+    const day = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    return `${day}, ${minutesToLabel(timeToMinutes(item.time))}`;
+  }
+
+  function updateBookingsBadge() {
+    const count = newBookings.length;
+    document.querySelectorAll('.nav-btn[data-target="appointments"]').forEach((btn) => {
+      let badge = btn.querySelector(".nav-badge");
+      if (!count) { badge?.remove(); return; }
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "nav-badge nav-badge-info";
+        btn.appendChild(badge);
+      }
+      badge.textContent = count > 99 ? "99+" : String(count);
+      badge.setAttribute("aria-label", `${count} new collection booking${count === 1 ? "" : "s"}`);
+      btn.title = `${count} new collection booking${count === 1 ? "" : "s"} from clients`;
+    });
+    // Appointments sits behind "More" on the phone bottom bar.
+    if (typeof window.RPC_SET_NAV_COUNT === "function") window.RPC_SET_NAV_COUNT("bookings", count);
+  }
+
+  function announceNewBookings(list) {
+    const fresh = list.filter((item) => !announcedBookings.has(item.id + "|" + item.clientBookedAt));
+    fresh.forEach((item) => announcedBookings.add(item.id + "|" + item.clientBookedAt));
+    if (!fresh.length || typeof window.RPC_TOAST !== "function") return;
+    const message = fresh.length === 1
+      ? `New collection booking: ${fresh[0].client || "A client"}${fresh[0].device ? " (" + fresh[0].device + ")" : ""} is coming ${bookingWhen(fresh[0])}. See Appointments.`
+      : `${fresh.length} new collection bookings from clients. See Appointments.`;
+    window.RPC_TOAST(message, { tone: "info", duration: 9000 });
+  }
+
+  async function checkNewBookings() {
+    let pin = "";
+    try { pin = localStorage.getItem(LS_PIN) || ""; } catch (_) { /* storage unavailable */ }
+    if (bookingsCheckInFlight || !pin) return;
+    // Staff looking at Appointments right now see them in the list instead.
+    if (!$("view-appointments")?.hidden) return;
+    bookingsCheckInFlight = true;
+    try {
+      const data = await api({ action: "listNewClientBookings" });
+      newBookings = Array.isArray(data.appointments) ? data.appointments : [];
+      updateBookingsBadge();
+      announceNewBookings(newBookings);
+    } catch (err) {
+      console.warn("Couldn't check for new collection bookings:", err);
+    } finally {
+      bookingsCheckInFlight = false;
+    }
+  }
+
+  // Opening Appointments: show the new ones in the list, and clear the count.
+  async function markNewBookingsSeen() {
+    if (!newBookings.length) return false;
+    const ids = newBookings.map((item) => item.id);
+    highlightedBookingIds = new Set(ids);
+    newBookings = [];
+    updateBookingsBadge();
+    try {
+      await api({ action: "markAppointmentsSeen", ids });
+    } catch (err) {
+      console.warn("Couldn't mark collection bookings as seen:", err);
+    }
+    return true;
+  }
+
+  setTimeout(checkNewBookings, 2500);
+  setInterval(() => { if (!document.hidden) checkNewBookings(); }, NEW_BOOKINGS_POLL_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkNewBookings(); });
+
   function init() {
     bindOnce();
+    highlightedBookingIds = new Set();
     viewMonth = startOfMonth(new Date());
     // Nothing is selected until staff actually click a day — the slots
     // panel (and that day's scheduled appointments) only appear then.
@@ -1116,16 +1206,22 @@
     renderTechnicianPicker();
     populateIssueTags();
     fetchTechnicians();
-    loadAppointments();
     setStep(1);
     setPanel("create");
     applyPendingPrefill();
+    // New client bookings waiting: open the list so staff see them.
+    markNewBookingsSeen().then((hadNew) => {
+      if (hadNew && !pendingPrefillApplied) setPanel("view");
+      loadAppointments();
+    });
   }
 
   // Fills in what a converted lead already told us (client, phone, device,
   // source) without picking a date/time for them — staff still choose that
   // by clicking a day, same as any other booking.
+  let pendingPrefillApplied = false;
   function applyPendingPrefill() {
+    pendingPrefillApplied = !!pendingPrefill;
     if (!pendingPrefill) return;
     const { client, phone, device, issue, source } = pendingPrefill;
     pendingPrefill = null;
