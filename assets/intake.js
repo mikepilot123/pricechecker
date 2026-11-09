@@ -3391,34 +3391,106 @@
   }
 
   // One line per ticked item: its icon and name, and a description field
-  // with a dropdown of suggestions (ACCESSORY_SUGGESTIONS).
+  // with the app's own dropdown of suggestions (ACCESSORY_SUGGESTIONS). The
+  // browser's <datalist> isn't used: on iPhone/iPad it never shows as a
+  // dropdown, only as words above the keyboard.
   function accessoryDetailsHtml(selected, details) {
     const items = ACCESSORIES.filter((a) => a !== "Other" && selected.has(a));
     if (!items.length) return "";
-    ensureAccessorySuggestionLists();
     return `<p class="accessory-details-title">Describe what they left <span class="field-optional">(optional)</span></p>
-      ${items.map((a) => `<label class="accessory-detail-row">
-        <span class="accessory-detail-name"><svg class="icon" aria-hidden="true"><use href="#${ACCESSORY_ICONS[a]}"></use></svg>${esc(a)}</span>
-        <input type="text" class="text-input accessory-detail-input" data-accessory-detail="${esc(a)}" maxlength="60" autocomplete="off"
-          list="${accessorySuggestionListId(a)}" placeholder="e.g. ${esc((ACCESSORY_SUGGESTIONS[a] || ["colour, brand"])[0])}"
-          value="${esc((details && details.get(a)) || "")}" aria-label="Describe the ${esc(a.toLowerCase())}" />
-      </label>`).join("")}`;
+      ${items.map((a) => {
+        const id = "accDetail-" + Math.random().toString(36).slice(2, 9);
+        return `<div class="accessory-detail-row">
+        <label class="accessory-detail-name" for="${id}"><svg class="icon" aria-hidden="true"><use href="#${ACCESSORY_ICONS[a]}"></use></svg>${esc(a)}</label>
+        <div class="accessory-detail-field" data-accessory-field>
+          <div class="accessory-detail-control">
+            <input type="text" id="${id}" class="text-input accessory-detail-input" data-accessory-detail="${esc(a)}" maxlength="60" autocomplete="off"
+              placeholder="${ACCESSORY_SUGGESTIONS[a] ? "Choose or type…" : "Colour, brand…"}"
+              value="${esc((details && details.get(a)) || "")}" role="combobox" aria-expanded="false" aria-autocomplete="list" />
+            <button type="button" class="accessory-detail-toggle" data-accessory-suggest-toggle tabindex="-1" aria-label="Show ${esc(a.toLowerCase())} suggestions">
+              <svg class="icon" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+            </button>
+          </div>
+          <div class="accessory-suggest-menu" role="listbox" hidden></div>
+        </div>
+      </div>`;
+      }).join("")}`;
   }
 
-  function accessorySuggestionListId(name) {
-    return "accessorySuggest-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  // The suggestions for one description field, narrowed to what's typed
+  // (all of them while it's empty or exactly a suggestion).
+  function renderAccessorySuggestions(field) {
+    const input = field.querySelector("[data-accessory-detail]");
+    const menu = field.querySelector(".accessory-suggest-menu");
+    const options = ACCESSORY_SUGGESTIONS[input.dataset.accessoryDetail] || [];
+    const typed = input.value.trim().toLowerCase();
+    const exact = options.some((o) => o.toLowerCase() === typed);
+    const shown = !typed || exact ? options : options.filter((o) => o.toLowerCase().includes(typed));
+    menu.innerHTML = shown.map((o) => `<button type="button" class="accessory-suggestion${o.toLowerCase() === typed ? " is-current" : ""}" role="option" data-accessory-suggestion="${esc(o)}">${esc(o)}</button>`).join("");
+    return shown.length;
   }
 
-  // The <datalist>s behind each description's dropdown, added to the page once.
-  function ensureAccessorySuggestionLists() {
-    if (document.getElementById("accessorySuggestionLists")) return;
-    const holder = document.createElement("div");
-    holder.id = "accessorySuggestionLists";
-    holder.hidden = true;
-    holder.innerHTML = Object.entries(ACCESSORY_SUGGESTIONS).map(([name, options]) =>
-      `<datalist id="${accessorySuggestionListId(name)}">${options.map((o) => `<option value="${esc(o)}"></option>`).join("")}</datalist>`).join("");
-    document.body.appendChild(holder);
+  function openAccessorySuggestions(field) {
+    closeAccessorySuggestions(field);
+    const menu = field.querySelector(".accessory-suggest-menu");
+    menu.hidden = !renderAccessorySuggestions(field);
+    field.querySelector("[data-accessory-detail]").setAttribute("aria-expanded", String(!menu.hidden));
+    field.classList.toggle("is-open", !menu.hidden);
   }
+
+  // Closes every open suggestion list except `keep`'s.
+  function closeAccessorySuggestions(keep) {
+    document.querySelectorAll("[data-accessory-field].is-open").forEach((field) => {
+      if (field === keep) return;
+      field.classList.remove("is-open");
+      field.querySelector(".accessory-suggest-menu").hidden = true;
+      field.querySelector("[data-accessory-detail]").setAttribute("aria-expanded", "false");
+    });
+  }
+
+  // One set of listeners for every picker (Check In and the repair modal).
+  document.addEventListener("focusin", (e) => {
+    const input = e.target.closest?.("[data-accessory-detail]");
+    if (input) openAccessorySuggestions(input.closest("[data-accessory-field]"));
+    else if (!e.target.closest?.("[data-accessory-field]")) closeAccessorySuggestions();
+  });
+  document.addEventListener("input", (e) => {
+    const input = e.target.closest?.("[data-accessory-detail]");
+    if (input) openAccessorySuggestions(input.closest("[data-accessory-field]"));
+  });
+  // Pressing a suggestion mustn't blur the field first (the list would close).
+  document.addEventListener("pointerdown", (e) => {
+    if (e.target.closest?.("[data-accessory-suggestion], [data-accessory-suggest-toggle]")) e.preventDefault();
+  });
+  document.addEventListener("click", (e) => {
+    const option = e.target.closest?.("[data-accessory-suggestion]");
+    const toggle = e.target.closest?.("[data-accessory-suggest-toggle]");
+    const field = (option || toggle)?.closest("[data-accessory-field]");
+    if (option && field) {
+      const input = field.querySelector("[data-accessory-detail]");
+      input.value = option.dataset.accessorySuggestion;
+      closeAccessorySuggestions();
+      input.focus({ preventScroll: true });
+      // Focusing reopens the list; close it again — a choice was just made.
+      closeAccessorySuggestions();
+      return;
+    }
+    if (toggle && field) {
+      if (field.classList.contains("is-open")) closeAccessorySuggestions();
+      else {
+        field.querySelector("[data-accessory-detail]").focus({ preventScroll: true });
+        openAccessorySuggestions(field);
+      }
+      return;
+    }
+    if (!e.target.closest?.("[data-accessory-field]")) closeAccessorySuggestions();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.querySelector("[data-accessory-field].is-open")) {
+      e.stopPropagation();
+      closeAccessorySuggestions();
+    }
+  }, true);
 
   /** The descriptions typed so far, by item. */
   function readAccessoryDetails(container) {

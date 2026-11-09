@@ -8941,12 +8941,60 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .accessory-detail-row {
   display: grid;
   grid-template-columns: 130px minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 10px;
 }
-.accessory-detail-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.88rem; color: #15803d; }
+.accessory-detail-name { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; font-weight: 600; font-size: 0.88rem; color: #15803d; }
 .accessory-detail-name .icon { width: 16px; height: 16px; }
-.accessory-detail-input { min-height: 38px; padding-top: 6px; padding-bottom: 6px; background: #fff; }
+.accessory-detail-input { min-height: 38px; padding-top: 6px; padding-bottom: 6px; padding-right: 40px; background: #fff; }
+.accessory-detail-field { min-width: 0; }
+.accessory-detail-control { position: relative; }
+.accessory-detail-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.accessory-detail-toggle .icon { transition: transform 0.15s; }
+.accessory-detail-field.is-open .accessory-detail-toggle .icon { transform: rotate(180deg); }
+/* The suggestion list opens in place under the field (not floating), so it
+   is never clipped inside the scrolling form or repair window. */
+.accessory-suggest-menu {
+  display: grid;
+  margin-top: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+.accessory-suggest-menu[hidden] { display: none; }
+.accessory-suggestion {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+.accessory-suggestion:last-child { border-bottom: 0; }
+.accessory-suggestion:hover,
+.accessory-suggestion:focus-visible { background: var(--accent-soft); outline: none; }
+.accessory-suggestion.is-current { font-weight: 600; color: var(--accent); }
 @media (max-width: 520px) {
   .accessory-detail-row { grid-template-columns: 1fr; gap: 4px; }
 }
