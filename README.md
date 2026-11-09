@@ -224,9 +224,9 @@ change it, recorded in the repair's history), and marking the repair
 **Picked Up** first asks whether the client was given those things back:
 **Not yet** leaves the status as it was, **Yes, given back** carries on (to
 the balance check, if one is owed) and adds a *Handed back at pickup* note to
-the repair. On the Repairs list,
-small icons above the device photo show what was left (charger, cable, case,
-bag, SIM, memory card, stylus, box, other); hover them for the full list. Quick logs from the
+the repair. On the Repairs list, a green
+**Left:** tag under the device name shows what was left (e.g. *Left: Charger ·
+Case*), with an icon per item; hover it for the descriptions. Quick logs from the
 Prices tab skip the question, and older repairs show *Not recorded*.
 
 When a repair uses stock, staff can choose the exact inventory item during

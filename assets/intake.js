@@ -3494,7 +3494,7 @@
     return !(container.querySelector("[data-accessory-other]")?.value || "").trim();
   }
 
-  // One icon per kind of accessory, for the row above a repair card's photo.
+  // One icon per kind of accessory (repair cards, the repair window, pickup).
   const ACCESSORY_ICONS = {
     Charger: "i-acc-charger",
     Cable: "i-acc-cable",
@@ -3506,20 +3506,18 @@
     Box: "i-acc-box",
     Other: "i-acc-other",
   };
-  // Three icons fit above the photo; past that, two and a "+N".
-  const ACCESSORY_ICON_LIMIT = 3;
 
-  /** The icons above a repair card's photo: what the client left, with the
-   *  full list on hover. Nothing when it wasn't recorded or nothing was left. */
-  function accessoryIconsHtml(ticket) {
+  /** The green "Left: Charger · Case" tag under the device name on a repair
+   *  card: each item's icon and name, so what to hand back is clear at a
+   *  glance. Hovering shows the descriptions. Nothing when nothing was left
+   *  or it wasn't recorded. */
+  function accessoryTagHtml(ticket) {
     const items = accessoryItems(ticket.accessories || "");
     if (!items.length) return "";
     const tip = "Left with device: " + items.map((item) => accessoryItemLabel(item, ": ")).join(" · ");
-    const shown = items.length > ACCESSORY_ICON_LIMIT ? items.slice(0, ACCESSORY_ICON_LIMIT - 1) : items;
-    const more = items.length - shown.length;
-    return `<div class="ticket-accessories" data-tip="${esc(tip)}" role="img" aria-label="${esc(tip)}">
-      ${shown.map((item) => `<span class="ticket-accessory"><svg class="icon" aria-hidden="true"><use href="#${item.icon}"></use></svg></span>`).join("")}
-      ${more ? `<span class="ticket-accessory ticket-accessory-more">+${more}</span>` : ""}
+    return `<div class="ticket-accessory-tag" title="${esc(tip)}" aria-label="${esc(tip)}">
+      <span class="ticket-accessory-tag-label">Left:</span>
+      ${items.map((item) => `<span class="ticket-accessory-item"><svg class="icon" aria-hidden="true"><use href="#${item.icon}"></use></svg>${esc(item.name)}</span>`).join("")}
     </div>`;
   }
 
@@ -5890,16 +5888,17 @@
       ? `<div class="ticket-identity">
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
         <div class="ticket-customer">${esc(t.device || "—")}</div>
+        ${accessoryTagHtml(t)}
       </div>`
       : `<div class="ticket-identity">
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
+        ${accessoryTagHtml(t)}
       </div>
       <div class="ticket-phone-row">${phoneLine}</div>`;
     head.innerHTML = `
       <div class="ticket-thumb-col">
-        ${accessoryIconsHtml(t)}
         <div class="ticket-device-thumb" title="${esc(t.device || "Device")}">
           <svg class="icon ticket-device-fallback" aria-hidden="true"><use href="#${deviceIcon}"></use></svg>
           <img alt="" />
