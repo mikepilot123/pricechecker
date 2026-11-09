@@ -1788,6 +1788,7 @@
         <button type="button" class="ghost-btn" data-cancel-accessories>Cancel</button>
         <button type="button" class="primary-btn" data-save-accessories><svg class="icon"><use href="#i-check"></use></svg>Save</button>
       </div>`;
+    sizeAccessoryDetails(section);
     section.querySelector(".accessory-toggle")?.focus();
   }
 
@@ -3300,21 +3301,26 @@
   // pouch", "None" for nothing left, "" when not recorded. The description in
   // brackets is optional.
 
-  // Suggestions in each item's description dropdown — staff can type anything.
-  const ACCESSORY_SUGGESTIONS = {
-    Charger: ["White Apple USB-C", "White Apple Lightning", "Samsung fast charger", "Generic USB-C", "Wall plug only", "Laptop charger"],
-    Cable: ["USB-C to USB-C", "USB-C to Lightning", "USB-A to Lightning", "Micro-USB", "Braided cable"],
-    Case: ["Clear case", "Black silicone case", "Wallet / flip case", "Rugged case", "Case with card holder"],
-    Bag: ["Plastic bag", "Paper bag", "Backpack", "Laptop bag", "Pouch"],
-    "SIM card": ["Digicel SIM", "bmobile SIM", "SIM tray with SIM"],
-    "Memory card": ["microSD 32GB", "microSD 64GB", "microSD 128GB"],
-    Stylus: ["Apple Pencil 1st gen", "Apple Pencil 2nd gen", "Samsung S Pen", "Generic stylus"],
-    Box: ["Original box", "Box with accessories"],
-  };
-
-  /** A description as it can sit inside "Item (…)" in the saved list. */
+  /** A description as it can sit inside "Item (…)" in the saved list —
+   *  commas are fine there, brackets aren't. */
   function cleanAccessoryDetail(text) {
-    return String(text || "").replace(/[()]/g, "").replace(/\s*,\s*/g, "; ").replace(/\s+/g, " ").trim().slice(0, 60);
+    return String(text || "").replace(/[()]/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
+  }
+
+  /** Splits the saved list on the commas between items, not the ones inside
+   *  an item's "(description, like this)". */
+  function splitAccessoryList(value) {
+    const parts = [];
+    let depth = 0;
+    let current = "";
+    for (const ch of String(value || "")) {
+      if (ch === "(") depth += 1;
+      if (ch === ")") depth = Math.max(0, depth - 1);
+      if (ch === "," && depth === 0) { parts.push(current); current = ""; continue; }
+      current += ch;
+    }
+    parts.push(current);
+    return parts.map((part) => part.trim()).filter(Boolean);
   }
 
   /** "Charger (White Apple USB-C), Case, Other: blue pouch" → chips,
@@ -3324,7 +3330,7 @@
     const details = new Map();
     const other = [];
     let none = false;
-    String(value || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((part) => {
+    splitAccessoryList(value).forEach((part) => {
       if (part.toLowerCase() === NO_ACCESSORIES.toLowerCase()) { none = true; return; }
       const [, name, detail] = part.match(/^(.*?)\s*\((.*)\)$/) || [, part, ""];
       const preset = ACCESSORIES.find((a) => a !== "Other" && a.toLowerCase() === name.toLowerCase());
@@ -3371,7 +3377,8 @@
   function accessoriesText(value) {
     if (!value) return "";
     if (value === NO_ACCESSORIES) return "Nothing — the client kept everything";
-    return accessoryItems(value).map((item) => accessoryItemLabel(item, ": ")).join(", ");
+    // Items apart with "·" — descriptions can have commas of their own.
+    return accessoryItems(value).map((item) => accessoryItemLabel(item, ": ")).join(" · ");
   }
 
   // The chip picker, shared by the Check In form and the repair modal: one
@@ -3390,10 +3397,8 @@
         placeholder="What else? e.g. stylus pen, blue pouch" value="${esc(otherText)}"${selected.has("Other") ? "" : " hidden"} />`;
   }
 
-  // One line per ticked item: its icon and name, and a description field
-  // with the app's own dropdown of suggestions (ACCESSORY_SUGGESTIONS). The
-  // browser's <datalist> isn't used: on iPhone/iPad it never shows as a
-  // dropdown, only as words above the keyboard.
+  // One line per ticked item: its icon and name, and a box to describe what
+  // the client left — its colour, any scratches, where it's kept, and so on.
   function accessoryDetailsHtml(selected, details) {
     const items = ACCESSORIES.filter((a) => a !== "Other" && selected.has(a));
     if (!items.length) return "";
@@ -3402,95 +3407,27 @@
         const id = "accDetail-" + Math.random().toString(36).slice(2, 9);
         return `<div class="accessory-detail-row">
         <label class="accessory-detail-name" for="${id}"><svg class="icon" aria-hidden="true"><use href="#${ACCESSORY_ICONS[a]}"></use></svg>${esc(a)}</label>
-        <div class="accessory-detail-field" data-accessory-field>
-          <div class="accessory-detail-control">
-            <input type="text" id="${id}" class="text-input accessory-detail-input" data-accessory-detail="${esc(a)}" maxlength="60" autocomplete="off"
-              placeholder="${ACCESSORY_SUGGESTIONS[a] ? "Choose or type…" : "Colour, brand…"}"
-              value="${esc((details && details.get(a)) || "")}" role="combobox" aria-expanded="false" aria-autocomplete="list" />
-            <button type="button" class="accessory-detail-toggle" data-accessory-suggest-toggle tabindex="-1" aria-label="Show ${esc(a.toLowerCase())} suggestions">
-              <svg class="icon" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
-            </button>
-          </div>
-          <div class="accessory-suggest-menu" role="listbox" hidden></div>
-        </div>
+        <textarea id="${id}" class="text-input accessory-detail-input" data-accessory-detail="${esc(a)}" maxlength="120" rows="1" autocomplete="off"
+          placeholder="Describe the ${esc(a === "SIM card" ? a : a.toLowerCase())} — colour, scratches, location…">${esc((details && details.get(a)) || "")}</textarea>
       </div>`;
       }).join("")}`;
   }
 
-  // The suggestions for one description field, narrowed to what's typed
-  // (all of them while it's empty or exactly a suggestion).
-  function renderAccessorySuggestions(field) {
-    const input = field.querySelector("[data-accessory-detail]");
-    const menu = field.querySelector(".accessory-suggest-menu");
-    const options = ACCESSORY_SUGGESTIONS[input.dataset.accessoryDetail] || [];
-    const typed = input.value.trim().toLowerCase();
-    const exact = options.some((o) => o.toLowerCase() === typed);
-    const shown = !typed || exact ? options : options.filter((o) => o.toLowerCase().includes(typed));
-    menu.innerHTML = shown.map((o) => `<button type="button" class="accessory-suggestion${o.toLowerCase() === typed ? " is-current" : ""}" role="option" data-accessory-suggestion="${esc(o)}">${esc(o)}</button>`).join("");
-    return shown.length;
-  }
-
-  function openAccessorySuggestions(field) {
-    closeAccessorySuggestions(field);
-    const menu = field.querySelector(".accessory-suggest-menu");
-    menu.hidden = !renderAccessorySuggestions(field);
-    field.querySelector("[data-accessory-detail]").setAttribute("aria-expanded", String(!menu.hidden));
-    field.classList.toggle("is-open", !menu.hidden);
-  }
-
-  // Closes every open suggestion list except `keep`'s.
-  function closeAccessorySuggestions(keep) {
-    document.querySelectorAll("[data-accessory-field].is-open").forEach((field) => {
-      if (field === keep) return;
-      field.classList.remove("is-open");
-      field.querySelector(".accessory-suggest-menu").hidden = true;
-      field.querySelector("[data-accessory-detail]").setAttribute("aria-expanded", "false");
+  // The description boxes wrap and grow with what's typed (one line to start,
+  // two on a phone so the whole hint shows); Enter doesn't add line breaks.
+  function sizeAccessoryDetails(root) {
+    root?.querySelectorAll("[data-accessory-detail]").forEach((box) => {
+      box.style.height = "auto";
+      box.style.height = box.scrollHeight + 2 + "px";
     });
   }
-
-  // One set of listeners for every picker (Check In and the repair modal).
-  document.addEventListener("focusin", (e) => {
-    const input = e.target.closest?.("[data-accessory-detail]");
-    if (input) openAccessorySuggestions(input.closest("[data-accessory-field]"));
-    else if (!e.target.closest?.("[data-accessory-field]")) closeAccessorySuggestions();
-  });
   document.addEventListener("input", (e) => {
-    const input = e.target.closest?.("[data-accessory-detail]");
-    if (input) openAccessorySuggestions(input.closest("[data-accessory-field]"));
-  });
-  // Pressing a suggestion mustn't blur the field first (the list would close).
-  document.addEventListener("pointerdown", (e) => {
-    if (e.target.closest?.("[data-accessory-suggestion], [data-accessory-suggest-toggle]")) e.preventDefault();
-  });
-  document.addEventListener("click", (e) => {
-    const option = e.target.closest?.("[data-accessory-suggestion]");
-    const toggle = e.target.closest?.("[data-accessory-suggest-toggle]");
-    const field = (option || toggle)?.closest("[data-accessory-field]");
-    if (option && field) {
-      const input = field.querySelector("[data-accessory-detail]");
-      input.value = option.dataset.accessorySuggestion;
-      closeAccessorySuggestions();
-      input.focus({ preventScroll: true });
-      // Focusing reopens the list; close it again — a choice was just made.
-      closeAccessorySuggestions();
-      return;
-    }
-    if (toggle && field) {
-      if (field.classList.contains("is-open")) closeAccessorySuggestions();
-      else {
-        field.querySelector("[data-accessory-detail]").focus({ preventScroll: true });
-        openAccessorySuggestions(field);
-      }
-      return;
-    }
-    if (!e.target.closest?.("[data-accessory-field]")) closeAccessorySuggestions();
+    const box = e.target.closest?.("[data-accessory-detail]");
+    if (box) sizeAccessoryDetails(box.parentElement);
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && document.querySelector("[data-accessory-field].is-open")) {
-      e.stopPropagation();
-      closeAccessorySuggestions();
-    }
-  }, true);
+    if (e.key === "Enter" && e.target.closest?.("[data-accessory-detail]")) e.preventDefault();
+  });
 
   /** The descriptions typed so far, by item. */
   function readAccessoryDetails(container) {
@@ -3502,7 +3439,9 @@
   }
 
   function renderAccessoryPicker(container, value) {
-    if (container) container.innerHTML = accessoryPickerHtml(value);
+    if (!container) return;
+    container.innerHTML = accessoryPickerHtml(value);
+    sizeAccessoryDetails(container);
   }
 
   /** Handles a tap inside a picker; returns true when it was one of ours. */
@@ -3532,6 +3471,7 @@
     if (box) {
       const selected = new Set([...container.querySelectorAll("[data-accessory].active")].map((el) => el.dataset.accessory));
       box.innerHTML = accessoryDetailsHtml(selected, typed);
+      sizeAccessoryDetails(box);
     }
     return true;
   }
@@ -3574,7 +3514,7 @@
   function accessoryIconsHtml(ticket) {
     const items = accessoryItems(ticket.accessories || "");
     if (!items.length) return "";
-    const tip = "Left with device: " + items.map((item) => accessoryItemLabel(item, ": ")).join(", ");
+    const tip = "Left with device: " + items.map((item) => accessoryItemLabel(item, ": ")).join(" · ");
     const shown = items.length > ACCESSORY_ICON_LIMIT ? items.slice(0, ACCESSORY_ICON_LIMIT - 1) : items;
     const more = items.length - shown.length;
     return `<div class="ticket-accessories" data-tip="${esc(tip)}" role="img" aria-label="${esc(tip)}">

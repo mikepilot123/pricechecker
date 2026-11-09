@@ -69,6 +69,11 @@ await test("descriptions are kept with each item", async () => {
   assert.equal(ticket.accessories, "Charger (White Apple USB-C), Case (Clear case), Other: blue pouch");
 });
 
+await test("a description can have commas in it", async () => {
+  const { ticket } = await checkIn({ accessories: "Charger (White, small scratch on plug, drawer 2), Case" });
+  assert.equal(ticket.accessories, "Charger (White, small scratch on plug, drawer 2), Case");
+});
+
 await test("the saved text is tidied and capped", async () => {
   assert.equal(accessoriesFrom(" Charger ,, SIM   card "), "Charger, SIM card");
   assert.equal(accessoriesFrom(null), "");
