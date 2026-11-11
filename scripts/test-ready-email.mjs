@@ -95,6 +95,28 @@ await test("a fully paid repair says there's nothing to pay", async () => {
   assert.match(draft.message, /fully paid, so there's nothing to pay upon collection/);
 });
 
+await test("no cost on the repair and nothing paid never says fully paid", async () => {
+  const noCost = await addTicket({ customerName: "Makeda", phone: "8680000003", email: "makeda@example.com", device: "MacBook Air 13-inch M1 2020 (A2337)", issues: "Won't Power On", repairCost: "", amountPaid: "0", status: "Repaired" });
+  const draft = await api({ action: "readyEmailDraft", ticketId: noCost.id });
+  assert.doesNotMatch(draft.message, /fully paid/);
+  assert.match(draft.message, /Any balance owing can be paid by cash or bank transfer upon collection\./);
+  const res = await api({ action: "sendReadyEmail", ticketId: noCost.id, to: "makeda@example.com" });
+  assert.equal(res.ok, true, res.error);
+  const mail = dryRunOutbox.at(-1);
+  assert.doesNotMatch(mail.html, /Paid in full/);
+  assert.doesNotMatch(mail.text, /Paid in full/);
+  assert.match(mail.html, /To be confirmed/);
+});
+
+await test("with no cost on the repair, its invoice's balance is used", async () => {
+  const { readyBalance } = await import("../lib/email.js");
+  assert.equal(readyBalance({ repairCost: "", amountPaid: "0", invoice: { total: 900, balanceDue: 900 } }), 900);
+  assert.equal(readyBalance({ repairCost: "", amountPaid: "0", invoice: { total: 900, balanceDue: 0 } }), 0);
+  assert.equal(readyBalance({ repairCost: "", amountPaid: "0", invoice: null }), null);
+  assert.equal(readyBalance({ repairCost: "0", amountPaid: "0", invoice: { total: 0, balanceDue: 0 } }), null);
+  assert.equal(readyBalance({ repairCost: "500", amountPaid: "200" }), 300);
+});
+
 await test("an address typed for a client without one is saved to the repair", async () => {
   const noEmail = await addTicket({ customerName: "Nisha", phone: "8680000002", device: "Galaxy A51", issues: "Screen Cracked / Broken", repairCost: "450", amountPaid: "0", status: "Repaired" });
   assert.equal((await api({ action: "readyEmailDraft", ticketId: noEmail.id })).to, "");

@@ -189,7 +189,13 @@ async function createAndDeliverInvoice(req, res) {
   if (action === "readyEmailDraft" || action === "sendReadyEmail") {
     const ticket = await getTicketById(body.ticketId);
     if (!ticket) throw new Error("This repair couldn't be found — it may have been deleted.");
-    const forEmail = { ...ticket, repair: repairLabels(ticket.issues).join(", ") };
+    // Its invoice tells what's owed when no cost was entered on the repair.
+    const invoice = await getInvoiceForTicket(ticket.id).catch(() => null);
+    const forEmail = {
+      ...ticket,
+      repair: repairLabels(ticket.issues).join(", "),
+      invoice: invoice ? { total: invoice.total, balanceDue: invoice.balanceDue } : null,
+    };
     if (action === "readyEmailDraft") {
       const draft = await readyEmailDraft(forEmail, INVOICE_BUSINESS);
       const sent = (await listTicketNotes(ticket.id)).find((n) => n.note.startsWith(READY_NOTE));
