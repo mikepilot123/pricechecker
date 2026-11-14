@@ -28,6 +28,7 @@
     "Part to be Ordered",
     "Part Ordered",
     "In Progress",
+    "Drop by Ainsley",
   ]);
   const FINAL_STATUSES = new Set(["Picked Up", "No Fix", "No Fix - Client Collected", "Cancelled"]);
   const $ = (id) => document.getElementById(id);
@@ -1296,6 +1297,7 @@
     "Part to be Ordered": "st-parts-needed",
     "Part Ordered": "st-parts-ordered",
     "In Progress": "st-progress",
+    "Drop by Ainsley": "st-drop-ainsley",
     "Repaired": "st-repaired",
     "Checked Out - Waiting on Client": "st-checked-out",
     "No Fix": "st-no-fix",

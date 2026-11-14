@@ -52,6 +52,8 @@
     "Part to be Ordered",
     "Part Ordered",
     "In Progress",
+    // Device needs dropping off at Ainsley's.
+    "Drop by Ainsley",
     "Repaired",
     "Checked Out - Waiting on Client",
     NO_FIX_TO_COLLECT,
@@ -66,6 +68,7 @@
     "Part to be Ordered": "st-parts-needed",
     "Part Ordered": "st-parts-ordered",
     "In Progress": "st-progress",
+    "Drop by Ainsley": "st-drop-ainsley",
     "Repaired": "st-repaired",
     "Checked Out - Waiting on Client": "st-checked-out",
     "No Fix": "st-no-fix",
@@ -84,6 +87,7 @@
     "Part to be Ordered",
     "Part Ordered",
     "In Progress",
+    "Drop by Ainsley",
   ]);
   // Every status where the repair is blocked on a part — keep in sync with
   // lib/tickets.js PARTS_STATUSES.

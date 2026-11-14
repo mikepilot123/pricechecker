@@ -4723,6 +4723,13 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   --status-ink: #047857;
   --status-dot: #0d946b;
 }
+/* Drop by Ainsley — violet, the device has to go out to Ainsley's. */
+.st-drop-ainsley {
+  --status-bg: #f5f3ff;
+  --status-border: #ddd6fe;
+  --status-ink: #6d28d9;
+  --status-dot: #7c3aed;
+}
 .st-repaired {
   --status-bg: #ecfdf5;
   --status-border: #bfe8d8;

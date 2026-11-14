@@ -33,6 +33,7 @@ var STATUSES = [
   "Part to be Ordered",
   "Part Ordered",
   "In Progress",
+  "Drop by Ainsley",
   "Repaired",
   "Checked Out - Waiting on Client",
   "No Fix",
