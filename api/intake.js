@@ -16,6 +16,7 @@ import {
   listAllTicketNotes,
   addTicketNote,
   deleteTicketNote,
+  refundTicket,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { getTicketDiagnostic, listTicketDiagnostics, saveTicketDiagnostic, deleteTicketDiagnostic } from "../lib/diagnostics.js";
@@ -29,7 +30,7 @@ import { listReminders, addReminder, updateReminder, deleteReminder } from "../l
 // accountSummary survives, for the Dashboard's residual "card takings owed"
 // tile; the historical data and library code are otherwise untouched.
 import { accountSummary } from "../lib/card-payments.js";
-import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction, addCashDepositToBank, depositRepairPayment } from "../lib/bank-transactions.js";
+import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction, addCashDepositToBank, depositRepairPayment, refundRepairPayment } from "../lib/bank-transactions.js";
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema } from "../lib/db.js";
@@ -161,6 +162,8 @@ export default async function handler(req, res) {
     }
     if (action === "update") {
       const before = body.depositToAccount ? await getTicketById(body.id) : null;
+      // Refunds only go through the "refund" action, which validates them.
+      delete body._refund;
       const ticket = await updateTicket(body);
       // Only what was newly collected goes to the account, never the total
       // paid so far — earlier payments were deposited when they were taken.
@@ -182,6 +185,32 @@ export default async function handler(req, res) {
         }
       }
       return res.status(200).json({ ok: true, ticket, invoiceSync, accountDeposit });
+    }
+    if (action === "refund") {
+      const { ticket, refund } = await refundTicket(body);
+      // The money comes back out of the Account tab; never lose the logged
+      // refund if that part fails — report it so staff can add it by hand.
+      let accountWithdrawal = null;
+      try {
+        const withdrawal = await refundRepairPayment({
+          method: refund.method,
+          amount: refund.amount,
+          ticketId: ticket.id,
+          customerName: ticket.customerName,
+          device: ticket.device,
+          reason: refund.reason,
+        });
+        accountWithdrawal = withdrawal ? { ok: true, withdrawal } : null;
+      } catch (err) {
+        accountWithdrawal = { ok: false, error: String(err?.message || err) };
+      }
+      let invoiceSync = null;
+      try {
+        invoiceSync = await syncInvoicePaymentForTicket(ticket.id);
+      } catch (syncError) {
+        invoiceSync = { changed: false, error: String(syncError?.message || syncError) };
+      }
+      return res.status(200).json({ ok: true, ticket, refund, accountWithdrawal, invoiceSync });
     }
     if (action === "delete") {
       return res.status(200).json({ ok: true, deletedId: await deleteTicket(body) });

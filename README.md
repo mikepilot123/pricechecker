@@ -238,6 +238,17 @@ transfer (recorded on the repair and its invoice and deposited on the Account
 tab). Collected no-fix repairs move to Completed Repairs → No Fix, with any
 older repairs marked plain "No Fix".
 
+**Refunds** are logged from the last section of a repair's Device details
+(*Log a refund*). Use it when a client paid up front — say for a screen — and
+the diagnosis found a different issue so they don't go ahead. Enter the amount
+(up to what they've paid), cash or bank transfer, and a reason; tick *Cancel
+the repair* to close it, its charge becoming whatever the client keeps paying
+(e.g. a diagnostic fee). The amount paid on the repair and its invoice goes
+down, the refund is listed on the repair and in its activity log, and the
+money is withdrawn on the Account tab (cash from cash on hand, a transfer from
+the bank) — not counted as an expense. Refunding a repair that was already
+picked up lowers its charge, and that month's sales, by the refund.
+
 When a repair uses stock, staff can choose the exact inventory item during
 check-in. The backend deducts one from that item in the inventory sheet when
 the ticket is saved, and restores one if that ticket is deleted. *This

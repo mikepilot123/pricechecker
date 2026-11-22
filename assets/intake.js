@@ -1690,6 +1690,7 @@
         ${detailRow("i-cash", "Amount paid", fieldDisplayHtml("amountPaid", ticket), "money-positive", "amountPaid")}
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
         ${detailRow("i-cash", "Paid by", fieldDisplayHtml("paymentMethod", ticket), "", "paymentMethod")}
+        ${Number(ticket.refunded) > 0 ? detailRow("i-restore", "Refunded", esc(formatMoney(ticket.refunded)), "money-due") : ""}
       </div><div id="ticketRecordPayment">${recordPaymentButtonHtml(ticket)}</div></section>
       <section class="ticket-detail-section" id="ticketIssuesSection">${issuesSectionStaticHtml(ticket)}</section>
       <section class="ticket-detail-section"><p class="field-label">Diagnostics</p>
@@ -1702,7 +1703,8 @@
           <input type="file" accept="image/*,video/*" capture="environment" hidden id="ticketMediaInput" />
         </label>
         <p class="field-error" id="ticketMediaError" hidden></p>
-      </section>`;
+      </section>
+      <section class="ticket-detail-section ticket-refund-section" id="ticketRefundSection">${refundSectionHtml(ticket)}</section>`;
 
     const notifyUrl = whatsAppNotifyUrl(ticket);
     $("ticketModalFooter").innerHTML = `
@@ -1765,6 +1767,7 @@
     const cancelBtn = e.target.closest("[data-cancel-field]");
     if (cancelBtn) { renderDetailRowStatic(cancelBtn.closest(".ticket-detail-row"), cancelBtn.dataset.cancelField); return; }
     if (e.target.closest("[data-record-payment]")) { recordTicketPayment(); return; }
+    if (e.target.closest("[data-log-refund]")) { logTicketRefund(); return; }
     if (e.target.closest("[data-edit-issues]")) { startIssuesEdit(); return; }
     const issueChoice = e.target.closest("[data-issue-choice]");
     if (issueChoice) { toggleIssueChoice(issueChoice); return; }
@@ -5084,6 +5087,198 @@
     if (slot && currentModalTicket) slot.innerHTML = recordPaymentButtonHtml(currentModalTicket);
   }
 
+  // ---- Refunds ------------------------------------------------------------------
+  // At the end of Device details. A client may pay up front for one issue,
+  // then the diagnosis finds another and they don't want to go ahead — some
+  // or all of what they paid goes back. The server (action "refund") lowers
+  // the amount paid, logs the refund on the repair's activity, keeps the
+  // invoice's payment in step, and takes the money back out on the Account
+  // tab (cash from cash on hand, a transfer from the bank) — as a withdrawal
+  // that isn't counted as an expense.
+  const REFUND_METHOD_LABELS = { cash: "Cash", transfer: "Bank transfer" };
+  const REFUND_LOG_RE = /^Refunded TT\$([\d.]+) by (cash|bank transfer) — (.*?)(?:;|$)/;
+
+  /** Past refunds, newest first, read back from the activity log. */
+  function ticketRefunds(ticket) {
+    return parseHistoryEntries(ticket.history)
+      .map((entry) => {
+        const m = REFUND_LOG_RE.exec(entry.msg);
+        return m ? { when: entry.when, amount: Number(m[1]), method: m[2], reason: m[3] } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function refundSectionHtml(ticket) {
+    const paid = Number(ticket.amountPaid) || 0;
+    const refunds = ticketRefunds(ticket);
+    const refunded = Number(ticket.refunded) || 0;
+    const list = refunds.length
+      ? `<ul class="ticket-refund-list">${refunds.map((r) => `
+          <li><strong>${esc(formatMoney(r.amount))}</strong> <span>by ${esc(r.method)} · ${esc(fmtDate(r.when))}</span><p>${esc(r.reason)}</p></li>`).join("")}</ul>`
+      : "";
+    const summary = refunded > 0
+      ? `<p class="ticket-refund-total">${esc(formatMoney(refunded))} refunded to the client so far.</p>`
+      : `<p class="ops-empty">No refunds. If the client paid and decides not to go ahead — e.g. the diagnosis found a different issue — log what you gave back here.</p>`;
+    const button = paid > 0
+      ? `<button type="button" class="ghost-btn ticket-refund-btn" data-log-refund><svg class="icon"><use href="#i-restore"></use></svg><span>Log a refund</span></button>`
+      : refunded > 0 ? "" : `<p class="field-hint">Nothing has been paid on this repair, so there's nothing to refund.</p>`;
+    return `<p class="field-label">Refunds</p>${summary}${list}${button}`;
+  }
+
+  // Resolves to { amount, method, reason, closeAs } once staff confirm, or
+  // null if they back out.
+  function askRefund(ticket) {
+    let modal = $("refundModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "refundModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel pickup-pay-panel" role="dialog" aria-modal="true" aria-labelledby="refundTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Refund</p><h3 id="refundTitle">Log a refund</h3></div>
+            <button type="button" class="modal-close" data-refund-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p class="empty-sub" id="refundSub"></p>
+            <div class="pickup-pay-sums" id="refundSums"></div>
+            <label class="field-label" for="refundAmount">Amount refunded</label>
+            <input id="refundAmount" class="text-input record-pay-amount" type="number" inputmode="decimal" min="0" step="0.01" />
+            <p class="field-hint" id="refundAmountHint"></p>
+            <p class="field-label">How was it given back?</p>
+            <div class="pickup-pay-methods" role="radiogroup" aria-label="Refund method">
+              <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-refund-method="cash"><svg class="icon"><use href="#i-cash"></use></svg>Cash</button>
+              <button type="button" class="pickup-pay-method" role="radio" aria-checked="false" data-refund-method="transfer"><svg class="icon"><use href="#i-receipt"></use></svg>Bank transfer</button>
+            </div>
+            <label class="field-label" for="refundReason">Reason</label>
+            <textarea id="refundReason" class="text-input" rows="2" maxlength="300" placeholder="e.g. Logged for a screen — diagnosis found a board fault, client chose not to go ahead"></textarea>
+            <label class="refund-close-option"><input type="checkbox" id="refundClose" /> <span id="refundCloseLabel"></span></label>
+            <p class="field-hint" id="refundHint">Taken off the amount paid on the repair and its invoice, and withdrawn on the Account tab — cash from cash on hand, a bank transfer from the bank account. It isn't counted as an expense.</p>
+            <p class="field-error" id="refundError" hidden></p>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-refund-cancel>Cancel</button>
+            <button type="button" class="primary-btn danger-btn" id="refundConfirm" disabled><svg class="icon"><use href="#i-check"></use></svg><span></span></button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const paid = roundMoney(Number(ticket.amountPaid) || 0);
+    $("refundSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · #${ticket.id || ""}`;
+    $("refundSums").innerHTML = `
+      <div><span>Repair cost</span><strong>${esc(formatMoney(ticket.repairCost || 0))}</strong></div>
+      <div class="is-due"><span>Paid so far</span><strong>${esc(formatMoney(paid))}</strong></div>
+      <div><span>Refunded before</span><strong>${esc(formatMoney(ticket.refunded || 0))}</strong></div>`;
+    const amountInput = $("refundAmount");
+    const reasonInput = $("refundReason");
+    const closeBox = $("refundClose");
+    const confirmBtn = $("refundConfirm");
+    const error = $("refundError");
+    amountInput.value = paid.toFixed(2);
+    reasonInput.value = "";
+    error.hidden = true;
+    // Closing is offered unless the repair is already closed out.
+    const alreadyClosed = ticket.status === "Cancelled";
+    closeBox.checked = !alreadyClosed && !FINAL_TICKET_STATUSES.has(ticket.status);
+    closeBox.closest("label").hidden = alreadyClosed;
+    let method = "";
+
+    const enteredAmount = () => {
+      const raw = String(amountInput.value || "").trim();
+      if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) return null;
+      const amount = roundMoney(Number(raw));
+      return amount > 0 && amount <= paid ? amount : null;
+    };
+    const refresh = () => {
+      const amount = enteredAmount();
+      const kept = amount == null ? paid : roundMoney(paid - amount);
+      $("refundAmountHint").textContent = amount == null
+        ? `Enter an amount up to the ${formatMoney(paid)} the client has paid.`
+        : kept > 0 ? `The client keeps paying ${formatMoney(kept)} (e.g. a diagnostic fee).` : "Everything the client paid goes back.";
+      $("refundCloseLabel").textContent = `Cancel the repair — the client isn't going ahead (its charge becomes ${formatMoney(kept)})`;
+      confirmBtn.querySelector("span").textContent = amount == null ? "Log refund" : `Refund ${formatMoney(amount)}`;
+      confirmBtn.disabled = !method || amount == null || !reasonInput.value.trim();
+    };
+    amountInput.oninput = refresh;
+    reasonInput.oninput = refresh;
+
+    const methods = modal.querySelectorAll("[data-refund-method]");
+    // Default to how they paid, when that's recorded.
+    const paidBy = REFUND_METHOD_LABELS[ticket.paymentMethod] ? ticket.paymentMethod : "";
+    methods.forEach((btn) => {
+      const select = () => {
+        method = btn.dataset.refundMethod;
+        methods.forEach((b) => {
+          b.classList.toggle("active", b === btn);
+          b.setAttribute("aria-checked", b === btn ? "true" : "false");
+        });
+        refresh();
+      };
+      btn.classList.remove("active");
+      btn.setAttribute("aria-checked", "false");
+      btn.onclick = select;
+      if (btn.dataset.refundMethod === paidBy) select();
+    });
+    refresh();
+    modal.hidden = false;
+    amountInput.focus();
+    amountInput.select();
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        modal.hidden = true;
+        document.removeEventListener("keydown", onKey, true);
+        resolve(value);
+      };
+      const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); finish(null); } };
+      document.addEventListener("keydown", onKey, true);
+      modal.querySelectorAll("[data-refund-cancel]").forEach((b) => { b.onclick = () => finish(null); });
+      confirmBtn.onclick = () => {
+        const amount = enteredAmount();
+        const reason = reasonInput.value.trim();
+        if (method && amount != null && reason) {
+          finish({ amount, method, reason, closeAs: !closeBox.closest("label").hidden && closeBox.checked ? "Cancelled" : "" });
+        }
+      };
+    });
+  }
+
+  async function logTicketRefund() {
+    const ticket = currentModalTicket;
+    if (!ticket) return;
+    const refund = await askRefund(ticket);
+    if (!refund) return;
+    const btn = document.querySelector("#ticketRefundSection [data-log-refund]");
+    if (btn) btn.disabled = true;
+    try {
+      const res = await api({ action: "refund", id: ticket.id, ...refund });
+      if (!res.ok) throw new Error(res.error || "Save failed");
+      mergeTicket(res.ticket);
+      const updated = TICKETS.find((t) => t.id === ticket.id) || normalizeTicket(res.ticket);
+      renderStatusChips();
+      render();
+      // A cancelled (or already handed-back) repair's charge changed too —
+      // bring the invoice's lines in step, like an edit does.
+      if (String(updated.repairCost) !== String(ticket.repairCost)) await syncLinkedInvoiceFromRepair(updated, ticket);
+      if (currentModalTicket && currentModalTicket.id === ticket.id) openTicketModal(updated);
+      const out = res.accountWithdrawal;
+      if (out && !out.ok) {
+        refreshAccountTab();
+        toast(`Refund logged on the repair, but it couldn't be taken off the Account tab: ${out.error}. Add the withdrawal there by hand.`);
+      } else {
+        if (out) refreshAccountTab();
+        toast(
+          `${formatMoney(refund.amount)} refund logged${out ? ` and withdrawn from ${out.withdrawal.accountType === "cash" ? "cash on hand" : "the bank account"}` : ""}` +
+            (refund.closeAs ? " — repair cancelled." : "."),
+          { tone: "info", duration: 4000 }
+        );
+      }
+    } catch (err) {
+      if (btn) btn.disabled = false;
+      toast(`Couldn't log the refund: ${err.message}. Nothing was changed — check your connection and try again.`);
+    }
+  }
+
   // ---- "Ready for collection" notice ------------------------------------------
   // Opens when a repair is marked Repaired (or from Ready email on the repair):
   // a prefilled email from the shop's linked mailbox, editable before it goes.
@@ -6350,6 +6545,7 @@
       inventoryItemLabel: ticket.inventoryItemLabel || "",
       inventorySection: ticket.inventorySection || "",
       inventoryQuantityDelta: ticket.inventoryQuantityDelta || 0,
+      refunded: Number(ticket.refunded) || 0,
     });
   }
 
