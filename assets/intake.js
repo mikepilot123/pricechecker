@@ -1691,7 +1691,7 @@
         ${detailRow("i-cash", "Balance due", formatMoney(balanceDue(ticket.repairCost, ticket.amountPaid)), balanceTone(ticket.repairCost, ticket.amountPaid))}
         ${detailRow("i-cash", "Paid by", fieldDisplayHtml("paymentMethod", ticket), "", "paymentMethod")}
         ${Number(ticket.refunded) > 0 ? detailRow("i-restore", "Refunded", esc(formatMoney(ticket.refunded)), "money-due") : ""}
-      </div><div id="ticketRecordPayment">${recordPaymentButtonHtml(ticket)}</div></section>
+      </div><div id="ticketRecordPayment">${paymentActionsHtml(ticket)}</div></section>
       <section class="ticket-detail-section" id="ticketIssuesSection">${issuesSectionStaticHtml(ticket)}</section>
       <section class="ticket-detail-section"><p class="field-label">Diagnostics</p>
         <div id="ticketDiagnostics" data-ticket-id="${esc(ticket.id || "")}"><p class="ops-empty">Loading…</p></div>
@@ -1703,8 +1703,7 @@
           <input type="file" accept="image/*,video/*" capture="environment" hidden id="ticketMediaInput" />
         </label>
         <p class="field-error" id="ticketMediaError" hidden></p>
-      </section>
-      <section class="ticket-detail-section ticket-refund-section" id="ticketRefundSection">${refundSectionHtml(ticket)}</section>`;
+      </section>`;
 
     const notifyUrl = whatsAppNotifyUrl(ticket);
     $("ticketModalFooter").innerHTML = `
@@ -2050,7 +2049,7 @@
     if (field === "repairCost" || field === "amountPaid") {
       refreshBalanceDueRow();
       const slot = $("ticketRecordPayment");
-      if (slot) slot.innerHTML = recordPaymentButtonHtml(currentModalTicket);
+      if (slot) slot.innerHTML = paymentActionsHtml(currentModalTicket);
     }
   }
 
@@ -4932,6 +4931,12 @@
     </button>`;
   }
 
+  // Record payment and Refund sit side by side under Payment, with any past
+  // refunds listed below them.
+  function paymentActionsHtml(ticket) {
+    return `<div class="ticket-payment-actions">${recordPaymentButtonHtml(ticket)}${refundButtonHtml(ticket)}</div>${refundListHtml(ticket)}`;
+  }
+
   // Resolves to { amount, method } once staff confirm, or null if they back out.
   function askPaymentReceived(ticket) {
     let modal = $("recordPayModal");
@@ -5084,7 +5089,7 @@
     });
     refreshBalanceDueRow();
     const slot = $("ticketRecordPayment");
-    if (slot && currentModalTicket) slot.innerHTML = recordPaymentButtonHtml(currentModalTicket);
+    if (slot && currentModalTicket) slot.innerHTML = paymentActionsHtml(currentModalTicket);
   }
 
   // ---- Refunds ------------------------------------------------------------------
@@ -5108,21 +5113,20 @@
       .filter(Boolean);
   }
 
-  function refundSectionHtml(ticket) {
+  // Always shown, so staff know where refunds live; it can only be used once
+  // the client has paid something.
+  function refundButtonHtml(ticket) {
     const paid = Number(ticket.amountPaid) || 0;
+    return `<button type="button" class="ghost-btn ticket-refund-btn" data-log-refund${paid > 0 ? "" : ` disabled title="Nothing has been paid on this repair, so there's nothing to refund"`}>
+      <svg class="icon"><use href="#i-restore"></use></svg><span>Refund</span>${paid > 0 ? "" : "<small>nothing paid</small>"}
+    </button>`;
+  }
+
+  function refundListHtml(ticket) {
     const refunds = ticketRefunds(ticket);
-    const refunded = Number(ticket.refunded) || 0;
-    const list = refunds.length
-      ? `<ul class="ticket-refund-list">${refunds.map((r) => `
-          <li><strong>${esc(formatMoney(r.amount))}</strong> <span>by ${esc(r.method)} · ${esc(fmtDate(r.when))}</span><p>${esc(r.reason)}</p></li>`).join("")}</ul>`
-      : "";
-    const summary = refunded > 0
-      ? `<p class="ticket-refund-total">${esc(formatMoney(refunded))} refunded to the client so far.</p>`
-      : `<p class="ops-empty">No refunds. If the client paid and decides not to go ahead — e.g. the diagnosis found a different issue — log what you gave back here.</p>`;
-    const button = paid > 0
-      ? `<button type="button" class="ghost-btn ticket-refund-btn" data-log-refund><svg class="icon"><use href="#i-restore"></use></svg><span>Log a refund</span></button>`
-      : refunded > 0 ? "" : `<p class="field-hint">Nothing has been paid on this repair, so there's nothing to refund.</p>`;
-    return `<p class="field-label">Refunds</p>${summary}${list}${button}`;
+    if (!refunds.length) return "";
+    return `<ul class="ticket-refund-list" aria-label="Refunds">${refunds.map((r) => `
+      <li><strong>${esc(formatMoney(r.amount))} refunded</strong> <span>by ${esc(r.method)} · ${esc(fmtDate(r.when))}</span><p>${esc(r.reason)}</p></li>`).join("")}</ul>`;
   }
 
   // Resolves to { amount, method, reason, closeAs } once staff confirm, or
@@ -5248,7 +5252,7 @@
     if (!ticket) return;
     const refund = await askRefund(ticket);
     if (!refund) return;
-    const btn = document.querySelector("#ticketRefundSection [data-log-refund]");
+    const btn = document.querySelector("#ticketRecordPayment [data-log-refund]");
     if (btn) btn.disabled = true;
     try {
       const res = await api({ action: "refund", id: ticket.id, ...refund });

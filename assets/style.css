@@ -8983,14 +8983,16 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
   to { opacity: 1; transform: none; }
 }
 
-/* Refunds — the last section of Device details. */
-.ticket-refund-section { border-top: 1px dashed var(--border); padding-top: 14px; }
-.ticket-refund-total { margin: 0 0 8px; font-weight: 600; color: var(--warn); }
-.ticket-refund-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+/* Record payment and Refund, side by side under Payment. */
+.ticket-payment-actions { display: flex; gap: 10px; margin-top: 12px; }
+.ticket-payment-actions .ticket-record-payment-btn { flex: 2 1 0; margin-top: 0; }
+.ticket-payment-actions .ticket-refund-btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.ticket-refund-btn small { font-size: 0.78rem; font-weight: 500; opacity: 0.85; white-space: nowrap; }
+.ticket-refund-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ticket-refund-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
 .ticket-refund-list li { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); }
 .ticket-refund-list strong { font-variant-numeric: tabular-nums; }
 .ticket-refund-list span { color: var(--text-dim); font-size: 0.8rem; }
 .ticket-refund-list p { margin: 4px 0 0; font-size: 0.85rem; }
-.ticket-refund-btn { margin-top: 4px; }
 .refund-close-option { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 4px; font-size: 0.9rem; cursor: pointer; }
 .refund-close-option input { margin-top: 3px; }
