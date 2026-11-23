@@ -82,8 +82,12 @@
       const data = await post({ action: "deviceAccess" });
       const list = Array.isArray(data.hidden) ? data.hidden : [];
       thisDeviceId = data.deviceId || "";
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ k: credentialTag(cred), hidden: list })); } catch (_) {}
+      // The cached list also carries display choices ("partsAlert"), so the
+      // inline script in index.html's <head> applies them before first paint.
+      const cachedList = data.hidePartsAlert ? list.concat("partsAlert") : list;
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ k: credentialTag(cred), hidden: cachedList })); } catch (_) {}
       apply(list);
+      applyDisplay({ hidePartsAlert: !!data.hidePartsAlert });
       ownerPinSource = data.ownerPin || "";
       renderPanel();
     } catch (_) {
@@ -92,10 +96,21 @@
     }
   }
 
+  // Display choices for this device (Settings → Devices → Repair cards). Not
+  // permissions: they only change what's drawn. Repair cards redraw when one
+  // changes (assets/intake.js listens for rpc-display-change).
+  function applyDisplay({ hidePartsAlert }) {
+    const root = document.documentElement;
+    if (root.classList.contains("hide-partsAlert") === hidePartsAlert) return;
+    root.classList.toggle("hide-partsAlert", hidePartsAlert);
+    window.dispatchEvent(new Event("rpc-display-change"));
+  }
+
   // Called after this browser signs in with the team PIN: it's a new device
   // to the server, so drop the old answer and ask again.
   function signedIn() {
     try { localStorage.removeItem(CACHE_KEY); } catch (_) {}
+    applyDisplay({ hidePartsAlert: false });
     apply(ALL_KEYS);
     return refresh({ force: true });
   }
@@ -192,6 +207,13 @@
           </label>
           <p class="field-label device-can-see">Can see</p>
           <div class="alert-prefs device-toggles">${toggles}</div>
+          <p class="field-label device-can-see">Repair cards</p>
+          <div class="alert-prefs device-toggles">
+            <label class="reclaim-toggle device-toggle">
+              <input type="checkbox" data-device-id="${escapeHtml(device.id)}" data-display="partsAlert" ${device.hidePartsAlert ? "" : "checked"} />
+              <span><strong>“Waiting on parts” notice</strong><small>The red “order parts?” bar at the bottom of repair cards. Switch off to hide it on this device.</small></span>
+            </label>
+          </div>
         </article>`;
     }).join("");
     // A switch with some sections on and some off reads as "partly".
@@ -335,6 +357,12 @@
       if (master) {
         // Switching on shows every section; switching off hides them all.
         saveDevice(master.dataset.deviceAll, { hidden: master.checked ? [] : ALL_KEYS });
+        return;
+      }
+      const display = e.target.closest("input[type=checkbox][data-display]");
+      if (display) {
+        // On = the notice shows; off = hidden on that device.
+        saveDevice(display.dataset.deviceId, { hidePartsAlert: !display.checked });
         return;
       }
       const box = e.target.closest("input[type=checkbox][data-section]");

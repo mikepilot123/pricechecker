@@ -683,8 +683,17 @@
       const logRepairs = isNew && !$("invLogBar").hidden && logChoice() === "repair";
       let res = isNew
         ? await request({ action: "create", ...changes })
-        : await request({ action: "update", id: editing.invoice.id, invoice: changes });
+        : await request({ action: "update", id: editing.invoice.id, invoice: changes, fromEditor: true });
       if (!isNew) await syncRepairs(res.invoice);
+      // The client confirmed: the server moved this invoice's repairs that
+      // were still at Received on to Part to be Ordered.
+      const moved = res.repairsMoved || [];
+      if (moved.length) {
+        window.RPC_RELOAD_TICKETS?.();
+        notify(moved.length === 1
+          ? `${moved[0].device || "Repair"} #${moved[0].id} moved from Received to Part to be Ordered.`
+          : `${moved.length} repairs moved from Received to Part to be Ordered.`);
+      }
       if (logRepairs) {
         // The invoice is saved either way; if logging a repair fails, say so
         // rather than losing the invoice.

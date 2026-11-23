@@ -8983,12 +8983,23 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
   to { opacity: 1; transform: none; }
 }
 
-/* Record payment and Refund, side by side under Payment. */
-.ticket-payment-actions { display: flex; gap: 10px; margin-top: 12px; }
-.ticket-payment-actions .ticket-record-payment-btn { flex: 2 1 0; margin-top: 0; }
-.ticket-payment-actions .ticket-refund-btn { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.ticket-refund-btn small { font-size: 0.78rem; font-weight: 500; opacity: 0.85; white-space: nowrap; }
-.ticket-refund-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+/* Refund — in Device details' footer, where WhatsApp used to be. */
+.ticket-modal-footer .ticket-refund-btn { color: var(--danger, #b42318); border-color: #f1c7c2; }
+.ticket-modal-footer .ticket-refund-btn:hover:not(:disabled) { background: rgba(180, 35, 24, 0.06); }
+.ticket-refund-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ticket-whatsapp-link { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; font-size: 0.85rem; color: #15803d; text-decoration: none; white-space: nowrap; }
+.ticket-whatsapp-link .icon { width: 15px; height: 15px; }
+.ticket-whatsapp-link:hover { text-decoration: underline; }
+/* Full / Partial chooser */
+.refund-kind-panel { max-width: 440px; }
+.refund-kind-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.refund-kind-option { display: grid; gap: 4px; padding: 16px 12px; text-align: center; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); cursor: pointer; font: inherit; color: inherit; }
+.refund-kind-option:hover:not(:disabled), .refund-kind-option:focus-visible { border-color: #e9a59d; background: #fff5f4; }
+.refund-kind-option:disabled { opacity: 0.5; cursor: not-allowed; }
+.refund-kind-option strong { font-size: 1rem; }
+.refund-kind-option span { font-size: 1.1rem; font-weight: 700; color: #b42318; font-variant-numeric: tabular-nums; }
+.refund-kind-option small { color: var(--text-dim); font-size: 0.78rem; }
+@media (max-width: 420px) { .refund-kind-options { grid-template-columns: 1fr; } }
 .ticket-refund-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
 .ticket-refund-list li { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); }
 .ticket-refund-list strong { font-variant-numeric: tabular-nums; }
@@ -8996,3 +9007,23 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .ticket-refund-list p { margin: 4px 0 0; font-size: 0.85rem; }
 .refund-close-option { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 4px; font-size: 0.9rem; cursor: pointer; }
 .refund-close-option input { margin-top: 3px; }
+
+/* ---------- Devices Under Warranty ---------- */
+.warranty-list { display: grid; gap: 10px; }
+.warranty-card { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 16px; border: 1px solid var(--border); border-left: 4px solid #0d946b; border-radius: var(--radius-md); background: var(--surface, #fff); }
+.warranty-card-main { flex: 1 1 280px; min-width: 0; }
+.warranty-card-main p { margin: 0; }
+.warranty-card-who { font-size: 0.95rem; }
+.warranty-card-device { margin-top: 2px !important; color: var(--text-dim); }
+.warranty-card-dates { margin-top: 6px !important; font-size: 0.85rem; color: var(--text-dim); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.warranty-days { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #ecfdf5; border: 1px solid #bfe8d8; color: #047857; font-weight: 600; font-size: 0.78rem; }
+.warranty-days.is-ending { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.warranty-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.warranty-card-actions .ghost-btn, .warranty-card-actions .primary-btn { display: inline-flex; align-items: center; gap: 6px; }
+.warranty-claims { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.warranty-claims li { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.warranty-claim-link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.warranty-claim-terms { margin: 4px 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); font-size: 0.85rem; line-height: 1.45; }
+.warranty-claim-tag { display: inline-flex; align-items: center; gap: 4px; width: fit-content; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: #ecfdf5; border: 1px solid #bfe8d8; color: #047857; font-size: 0.74rem; font-weight: 600; }
+.warranty-claim-tag .icon { width: 12px; height: 12px; }
+@media (max-width: 559px) { .warranty-card-actions { width: 100%; } .warranty-card-actions > * { flex: 1; justify-content: center; } }

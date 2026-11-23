@@ -17,6 +17,7 @@ import {
   addTicketNote,
   deleteTicketNote,
   refundTicket,
+  claimWarranty,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { getTicketDiagnostic, listTicketDiagnostics, saveTicketDiagnostic, deleteTicketDiagnostic } from "../lib/diagnostics.js";
@@ -37,7 +38,7 @@ import { ensureSchema } from "../lib/db.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
-import { registerDevice, isBackupDevice, effectiveHidden, listDevices, updateDevice, restrictOtherDevices } from "../lib/devices.js";
+import { registerDevice, isBackupDevice, effectiveHidden, getDevice, listDevices, updateDevice, restrictOtherDevices } from "../lib/devices.js";
 
 // Data behind a section the owner can hide per device (lib/devices.js). An
 // action is refused only when EVERY section listed for it is hidden, since
@@ -124,7 +125,10 @@ export default async function handler(req, res) {
       // one in Settings → Devices, which is what turns permissions on.
       const ownerPin = await ownerPinSource();
       const hidden = await effectiveHidden(deviceId, { managed: !!ownerPin, userAgent: req.headers["user-agent"] });
-      return res.status(200).json({ ok: true, deviceId, managed: !!ownerPin, ownerPin, hidden });
+      // Display choices for this device (not permissions — they apply with or
+      // without an owner PIN).
+      const device = deviceId ? await getDevice(deviceId, { userAgent: req.headers["user-agent"] }) : null;
+      return res.status(200).json({ ok: true, deviceId, managed: !!ownerPin, ownerPin, hidden, hidePartsAlert: !!device?.hidePartsAlert });
     }
     if (action === "setOwnerPin") {
       // Creating the first owner PIN needs only the team PIN (checked above);
@@ -145,7 +149,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, restricted, deviceId, devices: await listDevices() });
       }
       if (action === "updateDevice") {
-        const device = await updateDevice({ id: body.id, name: body.name, hidden: body.hidden });
+        const device = await updateDevice({ id: body.id, name: body.name, hidden: body.hidden, hidePartsAlert: body.hidePartsAlert });
         return res.status(200).json({ ok: true, device });
       }
       return res.status(200).json({ ok: true, deviceId, devices: await listDevices() });
@@ -185,6 +189,10 @@ export default async function handler(req, res) {
         }
       }
       return res.status(200).json({ ok: true, ticket, invoiceSync, accountDeposit });
+    }
+    if (action === "claimWarranty") {
+      const { ticket, original } = await claimWarranty(body);
+      return res.status(200).json({ ok: true, ticket, original });
     }
     if (action === "refund") {
       const { ticket, refund } = await refundTicket(body);

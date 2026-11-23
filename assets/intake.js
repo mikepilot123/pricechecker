@@ -447,6 +447,7 @@
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
     if (panel === "completed") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
+    if (panel === "warranty") window.dispatchEvent(new Event("rpc-enter-warranty"));
   }
   document.querySelectorAll(".appt-subnav-btn[data-repairs-panel]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1645,7 +1646,13 @@
   function fieldDisplayHtml(field, ticket) {
     switch (field) {
       case "customerName": return esc(ticket.customerName || "Unknown customer");
-      case "phone": return ticket.phone ? `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` : "—";
+      case "phone": {
+        if (!ticket.phone) return "—";
+        // WhatsApp moved here from the footer (Refund took its place).
+        const notifyUrl = whatsAppNotifyUrl(ticket);
+        return `<a class="ticket-tel" href="tel:${esc(ticket.phone)}">${esc(ticket.phone)}</a>` +
+          (notifyUrl ? ` <a class="ticket-whatsapp-link" href="${esc(notifyUrl)}" target="_blank" rel="noopener" title="Message on WhatsApp"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : "");
+      }
       case "email": return ticket.email ? `<a class="ticket-tel" href="mailto:${esc(ticket.email)}">${esc(ticket.email)}</a>` : "—";
       case "device": return esc(ticket.device || "—");
       case "repairDueDate": return esc(repairDueDateLabel(ticket.repairDueDate));
@@ -1705,10 +1712,9 @@
         <p class="field-error" id="ticketMediaError" hidden></p>
       </section>`;
 
-    const notifyUrl = whatsAppNotifyUrl(ticket);
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
-      ${notifyUrl ? `<a class="ghost-btn whatsapp-btn" href="${esc(notifyUrl)}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-chat"></use></svg>WhatsApp</a>` : ""}
+      ${refundButtonHtml(ticket)}
       ${ticket.status === "Repaired" ? `<button type="button" class="ghost-btn" id="ticketModalReadyEmail"><svg class="icon"><use href="#i-mail"></use></svg>Ready email</button>` : ""}
       <button type="button" class="ghost-btn" id="ticketModalAssign"><svg class="icon"><use href="#i-user"></use></svg>${ticket.technician ? "Reassign" : "Assign"}</button>
       <button type="button" class="ghost-btn" id="ticketModalInvoice"><svg class="icon"><use href="#i-receipt"></use></svg>Invoice</button>
@@ -1717,6 +1723,7 @@
     bindActivityLogBtn($("ticketModalActivity"), ticket);
     $("ticketModalStatus").onclick = () => { closeTicketModal(); openStatusModalForTicket(ticket); };
     $("ticketModalAssign").onclick = () => { closeTicketModal(); openTechnicianModalForTicket(ticket); };
+    $("ticketModalRefund").onclick = () => logTicketRefund();
     $("ticketModalEdit").onclick = () => { closeTicketModal(); openForm(ticket); };
     $("ticketModalInvoice").onclick = (e) => openInvoiceForTicket(ticket, e.currentTarget);
     $("ticketModalDelete").onclick = async () => { if (await deleteTicket(ticket)) closeTicketModal(); };
@@ -1766,7 +1773,6 @@
     const cancelBtn = e.target.closest("[data-cancel-field]");
     if (cancelBtn) { renderDetailRowStatic(cancelBtn.closest(".ticket-detail-row"), cancelBtn.dataset.cancelField); return; }
     if (e.target.closest("[data-record-payment]")) { recordTicketPayment(); return; }
-    if (e.target.closest("[data-log-refund]")) { logTicketRefund(); return; }
     if (e.target.closest("[data-edit-issues]")) { startIssuesEdit(); return; }
     const issueChoice = e.target.closest("[data-issue-choice]");
     if (issueChoice) { toggleIssueChoice(issueChoice); return; }
@@ -3207,10 +3213,11 @@
     for (const p of plans) {
       const t = p.ticket;
       if (p.cost === (Number(t.repairCost) || 0) && p.paid === (Number(t.amountPaid) || 0)) continue;
+      // No status: the server keeps the repair's current one (saving the
+      // invoice may just have moved it on — see api/invoice.js).
       const res = await api({
         action: "update",
         id: t.id,
-        status: t.status,
         customerName: t.customerName,
         client: t.customerName,
         phone: t.phone,
@@ -4931,10 +4938,10 @@
     </button>`;
   }
 
-  // Record payment and Refund sit side by side under Payment, with any past
-  // refunds listed below them.
+  // Record payment under Payment, with any past refunds listed below it.
+  // (Refund itself is a footer button — see refundButtonHtml.)
   function paymentActionsHtml(ticket) {
-    return `<div class="ticket-payment-actions">${recordPaymentButtonHtml(ticket)}${refundButtonHtml(ticket)}</div>${refundListHtml(ticket)}`;
+    return `${recordPaymentButtonHtml(ticket)}${refundListHtml(ticket)}`;
   }
 
   // Resolves to { amount, method } once staff confirm, or null if they back out.
@@ -5093,7 +5100,8 @@
   }
 
   // ---- Refunds ------------------------------------------------------------------
-  // At the end of Device details. A client may pay up front for one issue,
+  // The Refund button in Device details' footer asks Full or Partial first,
+  // then the details. A client may pay up front for one issue,
   // then the diagnosis finds another and they don't want to go ahead — some
   // or all of what they paid goes back. The server (action "refund") lowers
   // the amount paid, logs the refund on the repair's activity, keeps the
@@ -5113,13 +5121,66 @@
       .filter(Boolean);
   }
 
-  // Always shown, so staff know where refunds live; it can only be used once
-  // the client has paid something.
+  // In the footer, always shown so staff know where refunds live; it can only
+  // be used once the client has paid something.
   function refundButtonHtml(ticket) {
     const paid = Number(ticket.amountPaid) || 0;
-    return `<button type="button" class="ghost-btn ticket-refund-btn" data-log-refund${paid > 0 ? "" : ` disabled title="Nothing has been paid on this repair, so there's nothing to refund"`}>
-      <svg class="icon"><use href="#i-restore"></use></svg><span>Refund</span>${paid > 0 ? "" : "<small>nothing paid</small>"}
+    return `<button type="button" class="ghost-btn ticket-refund-btn" id="ticketModalRefund" data-log-refund${paid > 0 ? "" : ` disabled title="Nothing has been paid on this repair, so there's nothing to refund"`}>
+      <svg class="icon"><use href="#i-restore"></use></svg><span>Refund</span>
     </button>`;
+  }
+
+  // The mini chooser: everything they paid, or an exact part of it. Resolves
+  // to "full" / "partial", or null if staff back out.
+  function askRefundKind(ticket) {
+    let modal = $("refundKindModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "refundKindModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel refund-kind-panel" role="dialog" aria-modal="true" aria-labelledby="refundKindTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Refund</p><h3 id="refundKindTitle">How much is going back?</h3></div>
+            <button type="button" class="modal-close" data-refund-kind-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p class="empty-sub" id="refundKindSub"></p>
+            <div class="refund-kind-options">
+              <button type="button" class="refund-kind-option" data-refund-kind="full">
+                <strong>Full refund</strong><span id="refundKindFullAmount"></span><small>Everything the client paid</small>
+              </button>
+              <button type="button" class="refund-kind-option" data-refund-kind="partial">
+                <strong>Partial refund</strong><span>Enter amount</span><small>Part of it, e.g. keep a diagnostic fee</small>
+              </button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const paid = roundMoney(Number(ticket.amountPaid) || 0);
+    $("refundKindSub").textContent = `${ticket.customerName || "Customer"} · ${ticket.device || "Device"} · ${formatMoney(paid)} paid`;
+    $("refundKindFullAmount").textContent = formatMoney(paid);
+    // Can't refund part of a single cent.
+    const partialBtn = modal.querySelector('[data-refund-kind="partial"]');
+    partialBtn.disabled = !(paid > 0.01);
+    modal.hidden = false;
+    modal.querySelector('[data-refund-kind="full"]').focus();
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        modal.hidden = true;
+        document.removeEventListener("keydown", onKey, true);
+        resolve(value);
+      };
+      const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); finish(null); } };
+      document.addEventListener("keydown", onKey, true);
+      modal.onclick = (e) => {
+        if (e.target === modal || e.target.closest("[data-refund-kind-cancel]")) { finish(null); return; }
+        const option = e.target.closest("[data-refund-kind]");
+        if (option && !option.disabled) finish(option.dataset.refundKind);
+      };
+    });
   }
 
   function refundListHtml(ticket) {
@@ -5130,8 +5191,9 @@
   }
 
   // Resolves to { amount, method, reason, closeAs } once staff confirm, or
-  // null if they back out.
-  function askRefund(ticket) {
+  // null if they back out. `kind` "full" fixes the amount at everything paid;
+  // "partial" asks for the exact amount (less than what was paid).
+  function askRefund(ticket, kind = "partial") {
     let modal = $("refundModal");
     if (!modal) {
       modal = document.createElement("div");
@@ -5179,7 +5241,10 @@
     const closeBox = $("refundClose");
     const confirmBtn = $("refundConfirm");
     const error = $("refundError");
-    amountInput.value = paid.toFixed(2);
+    const full = kind === "full";
+    $("refundTitle").textContent = full ? "Full refund" : "Partial refund";
+    amountInput.value = full ? paid.toFixed(2) : "";
+    amountInput.readOnly = full;
     reasonInput.value = "";
     error.hidden = true;
     // Closing is offered unless the repair is already closed out.
@@ -5192,13 +5257,14 @@
       const raw = String(amountInput.value || "").trim();
       if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) return null;
       const amount = roundMoney(Number(raw));
-      return amount > 0 && amount <= paid ? amount : null;
+      if (full) return amount === paid ? amount : null;
+      return amount > 0 && amount < paid ? amount : null;
     };
     const refresh = () => {
       const amount = enteredAmount();
       const kept = amount == null ? paid : roundMoney(paid - amount);
       $("refundAmountHint").textContent = amount == null
-        ? `Enter an amount up to the ${formatMoney(paid)} the client has paid.`
+        ? `Enter the exact amount given back — less than the ${formatMoney(paid)} the client has paid (for all of it, choose Full refund).`
         : kept > 0 ? `The client keeps paying ${formatMoney(kept)} (e.g. a diagnostic fee).` : "Everything the client paid goes back.";
       $("refundCloseLabel").textContent = `Cancel the repair — the client isn't going ahead (its charge becomes ${formatMoney(kept)})`;
       confirmBtn.querySelector("span").textContent = amount == null ? "Log refund" : `Refund ${formatMoney(amount)}`;
@@ -5226,8 +5292,8 @@
     });
     refresh();
     modal.hidden = false;
-    amountInput.focus();
-    amountInput.select();
+    if (full) reasonInput.focus();
+    else amountInput.focus();
     return new Promise((resolve) => {
       const finish = (value) => {
         modal.hidden = true;
@@ -5249,10 +5315,12 @@
 
   async function logTicketRefund() {
     const ticket = currentModalTicket;
-    if (!ticket) return;
-    const refund = await askRefund(ticket);
+    if (!ticket || !(Number(ticket.amountPaid) > 0)) return;
+    const kind = await askRefundKind(ticket);
+    if (!kind) return;
+    const refund = await askRefund(ticket, kind);
     if (!refund) return;
-    const btn = document.querySelector("#ticketRecordPayment [data-log-refund]");
+    const btn = $("ticketModalRefund");
     if (btn) btn.disabled = true;
     try {
       const res = await api({ action: "refund", id: ticket.id, ...refund });
@@ -5280,6 +5348,170 @@
     } catch (err) {
       if (btn) btn.disabled = false;
       toast(`Couldn't log the refund: ${err.message}. Nothing was changed — check your connection and try again.`);
+    }
+  }
+
+  // ---- Devices Under Warranty ---------------------------------------------------
+  // Repairs → Devices Under Warranty. A repair fixed and picked up carries the
+  // shop's 60-day warranty (as printed on its invoices), counted from pickup
+  // (pickedUpAt, set by the server). "Claim warranty" opens a new, free repair
+  // for the same client and device, linked back to this one (warrantyOf).
+  const WARRANTY_DAYS = 60;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  function warrantyEnds(t) {
+    if (t.status !== "Picked Up" || t.warrantyOf || !t.pickedUpAt) return null;
+    const ends = new Date(new Date(t.pickedUpAt).getTime() + WARRANTY_DAYS * DAY_MS);
+    return isNaN(ends) ? null : ends;
+  }
+  function warrantyDaysLeft(t) {
+    const ends = warrantyEnds(t);
+    return ends ? Math.ceil((ends.getTime() - Date.now()) / DAY_MS) : -1;
+  }
+  function underWarranty(t) {
+    return warrantyDaysLeft(t) > 0;
+  }
+  const shortDate = (v) => {
+    const d = new Date(v);
+    return isNaN(d) ? "—" : d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  function warrantyClaimTagHtml(t) {
+    if (!t.warrantyOf) return "";
+    return `<span class="warranty-claim-tag" title="Free repair under the warranty on repair #${esc(t.warrantyOf)}"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Warranty claim · #${esc(t.warrantyOf)}</span>`;
+  }
+
+  window.addEventListener("rpc-enter-warranty", async () => {
+    if (!loadedOnce) await loadTickets();
+    renderWarrantyList();
+  });
+  $("warrantySearch")?.addEventListener("input", () => renderWarrantyList());
+
+  function renderWarrantyList() {
+    const list = $("warrantyList");
+    if (!list) return;
+    const q = ($("warrantySearch")?.value || "").trim().toLowerCase();
+    const covered = TICKETS.filter(underWarranty).filter((t) => {
+      if (!q) return true;
+      return [t.device, t.issues, t.id, t.customerName, t.phone, t.email]
+        .map((x) => (x || "").toLowerCase())
+        .some((x) => x.includes(q));
+    });
+    // Soonest to expire first — those are the ones to act on.
+    covered.sort((a, b) => warrantyDaysLeft(a) - warrantyDaysLeft(b));
+    $("warrantyCount").textContent = covered.length
+      ? `${covered.length} device${covered.length === 1 ? "" : "s"} under warranty`
+      : "";
+    const empty = $("warrantyEmpty");
+    empty.textContent = q ? "No devices under warranty match your search." : "No devices under warranty right now.";
+    empty.hidden = covered.length > 0;
+    list.innerHTML = covered.map((t) => {
+      const left = warrantyDaysLeft(t);
+      const claims = TICKETS.filter((c) => c.warrantyOf === t.id);
+      const claimsHtml = claims.length
+        ? `<ul class="warranty-claims">${claims.map((c) => `
+            <li><button type="button" class="warranty-claim-link" data-warranty-open="${esc(c.id)}">Warranty repair #${esc(c.id)}</button>
+              <span class="status-badge ${STATUS_CLASS[c.status] || "st-received"}">${esc(c.status)}</span></li>`).join("")}</ul>`
+        : "";
+      return `
+        <article class="warranty-card" data-warranty-ticket="${esc(t.id)}">
+          <div class="warranty-card-main">
+            <p class="warranty-card-who"><span class="ticket-num mono">#${esc(t.id)}</span> <strong>${esc(t.customerName || "Unknown customer")}</strong>${t.phone ? ` · <a class="ticket-tel" href="tel:${esc(t.phone)}">${esc(t.phone)}</a>` : ""}</p>
+            <p class="warranty-card-device">${esc(t.device || "Device")}${t.issues ? ` — ${esc(issueSummaryText(t.issues))}` : ""}</p>
+            <p class="warranty-card-dates">Picked up ${esc(shortDate(t.pickedUpAt))} · covered until ${esc(shortDate(warrantyEnds(t)))}
+              <span class="warranty-days${left <= 7 ? " is-ending" : ""}">${left} day${left === 1 ? "" : "s"} left</span></p>
+            ${claimsHtml}
+          </div>
+          <div class="warranty-card-actions">
+            <button type="button" class="ghost-btn" data-warranty-open="${esc(t.id)}"><svg class="icon"><use href="#i-clipboard"></use></svg>View repair</button>
+            <button type="button" class="primary-btn" data-warranty-claim="${esc(t.id)}"><svg class="icon"><use href="#i-tools"></use></svg>Claim warranty</button>
+          </div>
+        </article>`;
+    }).join("");
+  }
+
+  $("warrantyList")?.addEventListener("click", (e) => {
+    const open = e.target.closest("[data-warranty-open]");
+    if (open) {
+      const t = TICKETS.find((x) => x.id === open.dataset.warrantyOpen);
+      if (t) openTicketModal(t);
+      return;
+    }
+    const claim = e.target.closest("[data-warranty-claim]");
+    if (claim) {
+      const t = TICKETS.find((x) => x.id === claim.dataset.warrantyClaim);
+      if (t) claimWarrantyFor(t, claim);
+    }
+  });
+
+  // Resolves to { problem } once staff confirm, or null if they back out.
+  function askWarrantyClaim(t) {
+    let modal = $("warrantyClaimModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "warrantyClaimModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel pickup-pay-panel" role="dialog" aria-modal="true" aria-labelledby="warrantyClaimTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Warranty</p><h3 id="warrantyClaimTitle">Claim warranty</h3></div>
+            <button type="button" class="modal-close" data-warranty-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p class="empty-sub" id="warrantyClaimSub"></p>
+            <div class="warranty-claim-terms">
+              <strong>Covered:</strong> defects related to the repair done.
+              <strong>Not covered:</strong> water or liquid damage, drops or other physical damage, or the device opened or repaired by someone else since.
+            </div>
+            <label class="field-label" for="warrantyClaimProblem">What's wrong with it now?</label>
+            <textarea id="warrantyClaimProblem" class="text-input" rows="3" maxlength="300" placeholder="e.g. Touch not responding on the left side of the new screen"></textarea>
+            <p class="field-hint">Opens a new repair for this client and device at no charge, marked as a warranty claim on this one. It starts at Received on the Repairs list.</p>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-warranty-cancel>Cancel</button>
+            <button type="button" class="primary-btn" id="warrantyClaimConfirm" disabled><svg class="icon"><use href="#i-check"></use></svg><span>Open warranty repair</span></button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const left = warrantyDaysLeft(t);
+    $("warrantyClaimSub").textContent = `${t.customerName || "Customer"} · ${t.device || "Device"} · #${t.id} · picked up ${shortDate(t.pickedUpAt)} · ${left} day${left === 1 ? "" : "s"} of warranty left`;
+    const problem = $("warrantyClaimProblem");
+    const confirmBtn = $("warrantyClaimConfirm");
+    problem.value = "";
+    confirmBtn.disabled = true;
+    problem.oninput = () => { confirmBtn.disabled = !problem.value.trim(); };
+    modal.hidden = false;
+    problem.focus();
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        modal.hidden = true;
+        document.removeEventListener("keydown", onKey, true);
+        resolve(value);
+      };
+      const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); finish(null); } };
+      document.addEventListener("keydown", onKey, true);
+      modal.querySelectorAll("[data-warranty-cancel]").forEach((b) => { b.onclick = () => finish(null); });
+      confirmBtn.onclick = () => { if (problem.value.trim()) finish({ problem: problem.value.trim() }); };
+    });
+  }
+
+  async function claimWarrantyFor(t, btn) {
+    const answer = await askWarrantyClaim(t);
+    if (!answer) return;
+    if (btn) btn.disabled = true;
+    try {
+      const res = await api({ action: "claimWarranty", id: t.id, problem: answer.problem });
+      if (!res.ok) throw new Error(res.error || "Save failed");
+      mergeTicket(res.original);
+      mergeTicket(res.ticket);
+      renderStatusChips();
+      render();
+      toast(`Warranty repair #${res.ticket.id} opened for ${t.customerName || "the client"}'s ${t.device || "device"} — no charge. It's on the Repairs list at Received.`, { tone: "info", duration: 5000 });
+    } catch (err) {
+      if (btn) btn.disabled = false;
+      toast(`Couldn't claim the warranty: ${err.message}`);
     }
   }
 
@@ -5952,6 +6184,7 @@
     toggleAll.setAttribute("aria-expanded", allCollapsed ? "false" : "true");
     $("intakeList").appendChild(frag);
     renderCompletedTickets();
+    renderWarrantyList();
   }
 
   function issueTagsHtml(issuesStr) {
@@ -6060,6 +6293,17 @@
     return needsPartsOrdered(t) && daysSince(t.waitingForPartsSince) >= PARTS_ALERT_DAYS;
   }
 
+  // The "waiting on parts" bar at the bottom of a card (and its red edge) —
+  // unless this device hides it (Settings → Devices, assets/device-access.js
+  // sets the hide-partsAlert class). Sorting still uses showsPartsAlert.
+  function partsNoticeHidden() {
+    return document.documentElement.classList.contains("hide-partsAlert");
+  }
+  function showsPartsNotice(t) {
+    return showsPartsAlert(t) && !partsNoticeHidden();
+  }
+  window.addEventListener("rpc-display-change", () => { if (loadedOnce) render(); });
+
   // One tap from "this needs a part" to "the part is on its way". On the
   // explicit statuses that means moving the status; on the older flag-based
   // "Waiting for Parts" it means setting the flag.
@@ -6077,7 +6321,7 @@
   // The red "waiting on parts" strip under a ticket's head, or null when the
   // ticket isn't overdue on parts.
   function partsAlertEl(t) {
-    if (!showsPartsAlert(t)) return null;
+    if (!showsPartsNotice(t)) return null;
     const waitingDays = daysSince(t.waitingForPartsSince);
     const alert = document.createElement("div");
     alert.className = "ticket-parts-alert";
@@ -6136,12 +6380,14 @@
       ? `<div class="ticket-identity">
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
         <div class="ticket-customer">${esc(t.device || "—")}</div>
+        ${warrantyClaimTagHtml(t)}
         ${accessoryTagHtml(t)}
       </div>`
       : `<div class="ticket-identity">
         <span class="ticket-num mono">#${esc(t.id || "")}</span>
         <div class="ticket-customer">${esc(t.customerName || "Unknown customer")}</div>
         <div class="ticket-sub">${esc(t.device || "—")}</div>
+        ${warrantyClaimTagHtml(t)}
         ${accessoryTagHtml(t)}
       </div>
       <div class="ticket-phone-row">${phoneLine}</div>`;
@@ -6228,7 +6474,7 @@
   function ticketCard(t) {
     const el = document.createElement("div");
     el.className = `ticket ${STATUS_CLASS[t.status] || "st-received"}`;
-    if (showsPartsAlert(t)) el.classList.add("has-parts-alert");
+    if (showsPartsNotice(t)) el.classList.add("has-parts-alert");
     if (repairCheckAlertReason(t)) el.classList.add("has-repair-alert");
     el.appendChild(ticketHead(t));
     const repairAlert = repairCheckAlertEl(t);
@@ -6270,7 +6516,7 @@
     for (const t of tickets) {
       const row = document.createElement("div");
       row.className = `ticket-group-item ${STATUS_CLASS[t.status] || "st-received"}`;
-      if (showsPartsAlert(t)) row.classList.add("has-parts-alert");
+      if (showsPartsNotice(t)) row.classList.add("has-parts-alert");
       if (repairCheckAlertReason(t)) row.classList.add("has-repair-alert");
       row.appendChild(ticketHead(t, { compact: true }));
       const repairAlert = repairCheckAlertEl(t);

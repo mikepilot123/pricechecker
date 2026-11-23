@@ -150,8 +150,15 @@ async function createAndDeliverInvoice(req, res) {
         }
       }
     }
+    // Saved from the invoice editor (not a repair → invoice sync): the client
+    // has confirmed, so its repairs still at Received move on to Part to be
+    // Ordered. Only when the invoice actually changed.
+    const before = body.fromEditor ? await getInvoiceById(body.id) : null;
     const invoice = await updateInvoice(body.id, changes);
-    return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token) });
+    const repairsMoved = before && invoiceContentChanged(before, invoice)
+      ? await moveConfirmedRepairs(invoice)
+      : [];
+    return res.status(200).json({ ok: true, invoice, invoiceUrl: publicInvoiceUrl(req, invoice.token), repairsMoved });
   }
   if (action === "emailTemplate") {
     return res.status(200).json({ ok: true, template: await getEmailTemplate(), defaults: EMAIL_TEMPLATE_DEFAULTS, placeholders: EMAIL_PLACEHOLDERS });
@@ -302,6 +309,37 @@ async function createAndDeliverInvoice(req, res) {
     emailError,
     whatsappUrl: invoiceWhatsAppUrl(invoice, invoiceUrl),
   });
+}
+
+// What staff can change on an invoice, compared before and after a save.
+function invoiceContent(invoice) {
+  return JSON.stringify({
+    number: invoice.number, invoiceDate: invoice.invoiceDate, dueDate: invoice.dueDate, terms: invoice.terms,
+    billTo: invoice.billTo, items: invoice.items, paymentMade: invoice.paymentMade, notes: invoice.notes,
+  });
+}
+function invoiceContentChanged(before, after) {
+  return invoiceContent(before) !== invoiceContent(after);
+}
+
+// Repairs at Received when their invoice is updated go to Part to be
+// Ordered (the client confirmed). Returns [{ id, device, from, to }]. A repair
+// that can't be moved is skipped rather than failing the invoice save.
+const CONFIRMED_FROM = "Received";
+const CONFIRMED_TO = "Part to be Ordered";
+async function moveConfirmedRepairs(invoice) {
+  const moved = [];
+  for (const id of invoice.ticketIds || []) {
+    try {
+      const ticket = await getTicketById(id);
+      if (!ticket || ticket.status !== CONFIRMED_FROM) continue;
+      await updateTicket({ id, status: CONFIRMED_TO });
+      moved.push({ id, device: ticket.device, from: CONFIRMED_FROM, to: CONFIRMED_TO });
+    } catch (err) {
+      console.error("Couldn't move repair " + id + " after its invoice was updated:", err);
+    }
+  }
+  return moved;
 }
 
 const READY_NOTE = "Ready-for-collection email sent to";
