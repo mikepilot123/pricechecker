@@ -257,7 +257,9 @@ invoices, counted from pickup — soonest to expire first. *Claim warranty* asks
 what's wrong now and opens a new repair for the same client and device at no
 charge, starting at Received and tagged *Warranty claim · #original* on the
 Repairs list; the claim is noted on the original repair's activity log and
-listed under it on the warranty page.
+listed under it on the warranty page. After claiming, the app jumps to the new
+repair on Existing repairs (clearing any search or filter hiding it),
+highlights it and opens its details.
 
 **Invoices move confirmed repairs on.** Saving a change to a repair's invoice
 in the invoice editor (the client confirmed) moves its repairs that are still

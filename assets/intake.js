@@ -5444,6 +5444,41 @@
     }
   });
 
+  // Repairs → Existing repairs, scrolled to one repair's card, highlighted, with
+  // its details open. Clears a search, status filter or date range that would
+  // hide it, and expands its status group.
+  function showRepairInList(id) {
+    const t = TICKETS.find((x) => x.id === id);
+    if (!t) return;
+    navigateTo("intake");
+    setRepairsPanel("existing");
+    if ($("intakeSearch").value) $("intakeSearch").value = "";
+    if (statusFilter !== "all" && statusFilter !== t.status) {
+      statusFilter = "all";
+      if ($("statusFilterSelect")) $("statusFilterSelect").value = "all";
+    }
+    const bounds = repairsDateBounds();
+    const logged = new Date(t.created).getTime();
+    if (bounds && !(logged >= bounds[0] && logged < bounds[1])) {
+      repairsDateView.range = "all";
+      saveRepairsDateView();
+      syncRepairsDateControls();
+    }
+    collapsedRepairStatuses.delete(t.status);
+    render();
+    const head = [...document.querySelectorAll("#intakeList [data-ticket-id]")].find((el) => el.dataset.ticketId === id);
+    const card = head && (head.closest(".ticket-group-item") || head.closest(".ticket"));
+    if (card) {
+      card.scrollIntoView({ block: "center", behavior: "smooth" });
+      card.classList.remove("is-just-created");
+      void card.offsetWidth; // restart the highlight if it's already there
+      card.classList.add("is-just-created");
+      setTimeout(() => card.classList.remove("is-just-created"), 6000);
+    }
+    // Then its details, once the scroll has landed.
+    setTimeout(() => openTicketModal(TICKETS.find((x) => x.id === id) || t), 700);
+  }
+
   // Resolves to { problem } once staff confirm, or null if they back out.
   function askWarrantyClaim(t) {
     let modal = $("warrantyClaimModal");
@@ -5508,7 +5543,9 @@
       mergeTicket(res.ticket);
       renderStatusChips();
       render();
-      toast(`Warranty repair #${res.ticket.id} opened for ${t.customerName || "the client"}'s ${t.device || "device"} — no charge. It's on the Repairs list at Received.`, { tone: "info", duration: 5000 });
+      // Take staff straight to the new repair as confirmation it exists.
+      showRepairInList(res.ticket.id);
+      toast(`Warranty repair #${res.ticket.id} created for ${t.customerName || "the client"}'s ${t.device || "device"} — no charge, at Received.`, { tone: "info", duration: 5000 });
     } catch (err) {
       if (btn) btn.disabled = false;
       toast(`Couldn't claim the warranty: ${err.message}`);
@@ -6362,6 +6399,7 @@
     head.tabIndex = 0;
     head.setAttribute("role", "button");
     head.setAttribute("aria-label", `View details for ${t.device || "device"}`);
+    head.dataset.ticketId = t.id || "";
     const phoneLine = ticketPhoneLineHtml(t);
     const deviceIcon = deviceTypeIcon(t.device);
     const partsPending = needsPartsOrdered(t);

@@ -9027,3 +9027,15 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .warranty-claim-tag { display: inline-flex; align-items: center; gap: 4px; width: fit-content; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: #ecfdf5; border: 1px solid #bfe8d8; color: #047857; font-size: 0.74rem; font-weight: 600; }
 .warranty-claim-tag .icon { width: 12px; height: 12px; }
 @media (max-width: 559px) { .warranty-card-actions { width: 100%; } .warranty-card-actions > * { flex: 1; justify-content: center; } }
+
+/* A repair just created (e.g. by Claim warranty) — briefly highlighted so
+   it's obvious where it landed on the Repairs list. */
+.ticket.is-just-created,
+.ticket-group-item.is-just-created { animation: just-created 6s ease-out; }
+@keyframes just-created {
+  0%, 60% { box-shadow: 0 0 0 3px #0d946b, 0 0 0 8px rgba(13, 148, 107, 0.18); background-color: #ecfdf5; }
+  100% { box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticket.is-just-created, .ticket-group-item.is-just-created { animation: none; box-shadow: 0 0 0 3px #0d946b; }
+}
