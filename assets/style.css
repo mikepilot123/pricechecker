@@ -24,7 +24,7 @@
   --header-h: 112px; /* fallback; app.js sets the real measured height */
   --workspace-max: 1100px;
   --workspace-pad: clamp(16px, 4vw, 48px);
-  --sidebar-w: 224px;
+  --sidebar-w: 248px;
 }
 
 * { box-sizing: border-box; }
