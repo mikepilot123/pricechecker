@@ -9039,3 +9039,26 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 @media (prefers-reduced-motion: reduce) {
   .ticket.is-just-created, .ticket-group-item.is-just-created { animation: none; box-shadow: 0 0 0 3px #0d946b; }
 }
+
+/* Sidebar sub-category (Devices Under Warranty under Completed Repairs):
+   one level further in, with a connector from its parent. */
+.view-nav .appt-sidebar-subnav .appt-subnav-btn.appt-subnav-nested {
+  margin-left: 18px;
+  padding-left: 26px;
+  font-size: 0.8rem;
+}
+.view-nav .appt-sidebar-subnav .appt-subnav-btn.appt-subnav-nested::before {
+  left: 8px;
+  top: 0;
+  width: 9px;
+  height: 50%;
+  border: 0;
+  border-left: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  border-radius: 0 0 0 4px;
+  transform: none;
+  opacity: 0.55;
+}
+.view-nav .appt-sidebar-subnav .appt-subnav-btn.appt-subnav-nested.active::before { background: none; opacity: 1; }
+.view-nav .appt-sidebar-subnav .appt-subnav-btn.is-parent-of-active { color: var(--accent); font-weight: 600; }
+.view-nav .appt-sidebar-subnav .appt-subnav-btn.is-parent-of-active::before { background: currentColor; }

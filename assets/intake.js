@@ -441,9 +441,13 @@
     document.querySelectorAll("[data-repairs-panel-section]").forEach((section) => {
       section.hidden = section.dataset.repairsPanelSection !== panel;
     });
+    // Devices Under Warranty sits under Completed Repairs; while it's open,
+    // Completed Repairs shows as its (open) parent.
+    const parent = document.querySelector(`.appt-subnav-btn[data-repairs-panel="${panel}"]`)?.dataset.subnavParent || "";
     document.querySelectorAll(".appt-subnav-btn[data-repairs-panel]").forEach((btn) => {
       const active = btn.dataset.repairsPanel === panel;
       btn.classList.toggle("active", active);
+      btn.classList.toggle("is-parent-of-active", btn.dataset.repairsPanel === parent);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
     if (panel === "completed") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
