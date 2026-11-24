@@ -450,9 +450,39 @@
       btn.classList.toggle("is-parent-of-active", btn.dataset.repairsPanel === parent);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
+    // Opening a sub-category (e.g. after a warranty claim jump) shows it.
+    if (parent) setCompletedSubnavOpen(true);
     if (panel === "completed") window.dispatchEvent(new Event("rpc-enter-completed-repairs"));
     if (panel === "warranty") window.dispatchEvent(new Event("rpc-enter-warranty"));
   }
+
+  // The chevron beside Completed Repairs shows or hides Devices Under
+  // Warranty in the sidebar. Hidden until opened; remembered per device.
+  const LS_COMPLETED_SUBNAV = "rpc_completed_subnav_open";
+  function setCompletedSubnavOpen(open, { remember = true } = {}) {
+    const toggle = $("completedSubnavToggle");
+    const item = $("warrantySubnavBtn");
+    if (!toggle || !item) return;
+    item.classList.toggle("is-collapsed", !open);
+    toggle.classList.toggle("is-open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    const label = `${open ? "Hide" : "Show"} Devices Under Warranty`;
+    toggle.setAttribute("aria-label", label);
+    toggle.title = label;
+    if (remember) { try { localStorage.setItem(LS_COMPLETED_SUBNAV, open ? "1" : "0"); } catch (_) {} }
+  }
+  {
+    let open = false;
+    try { open = localStorage.getItem(LS_COMPLETED_SUBNAV) === "1"; } catch (_) {}
+    setCompletedSubnavOpen(open, { remember: false });
+  }
+  $("completedSubnavToggle")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const opening = $("completedSubnavToggle").getAttribute("aria-expanded") !== "true";
+    // Hiding it while it's the page being shown: go to its parent instead.
+    if (!opening && $("warrantySubnavBtn")?.classList.contains("active")) setRepairsPanel("completed");
+    setCompletedSubnavOpen(opening);
+  });
   document.querySelectorAll(".appt-subnav-btn[data-repairs-panel]").forEach((btn) => {
     btn.addEventListener("click", () => {
       navigateTo("intake");
