@@ -6598,12 +6598,14 @@
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
         ${partsBtnHtml}
         ${duePill}
+        <div class="ticket-action-row">
         <button type="button" class="ticket-tech-btn${t.technician ? " is-assigned" : ""}" aria-label="${esc(t.technician ? `Technician: ${t.technician}. Reassign` : "Assign technician")}">
           <svg class="icon" aria-hidden="true"><use href="#${t.technician ? "i-user" : "i-user-plus"}"></use></svg><span>${esc(t.technician || "Assign technician")}</span>
         </button>
         <button type="button" class="ticket-reminder-btn" aria-label="Add a reminder for ${esc(t.device || "this repair")}" title="Add a reminder for this repair">
           <svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg><span>Reminder</span>
         </button>
+        </div>
       </div>
       <div class="ticket-activity">
         ${activityLogBtnHtml(t, "")}
