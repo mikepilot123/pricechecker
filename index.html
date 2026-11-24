@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=devices-all-1" />
+  <link rel="stylesheet" href="assets/style.css?v=no-chevron-1" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -147,13 +147,9 @@
       </button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Repairs sections">
         <button type="button" class="appt-subnav-btn active" data-repairs-panel="existing" aria-selected="true">Existing repairs</button>
-        <!-- Completed Repairs, with a chevron that shows or hides its
-             sub-category (Devices Under Warranty) — assets/intake.js. -->
-        <div class="appt-subnav-row">
-          <button type="button" class="appt-subnav-btn" data-repairs-panel="completed" aria-selected="false">Completed Repairs</button>
-          <button type="button" class="appt-subnav-expand" id="completedSubnavToggle" aria-expanded="false" aria-controls="warrantySubnavBtn" aria-label="Show Devices Under Warranty" title="Show Devices Under Warranty"><svg class="icon" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
-        </div>
-        <button type="button" class="appt-subnav-btn appt-subnav-nested is-collapsed" id="warrantySubnavBtn" data-repairs-panel="warranty" data-subnav-parent="completed" aria-selected="false">Devices Under Warranty</button>
+        <button type="button" class="appt-subnav-btn" data-repairs-panel="completed" aria-selected="false">Completed Repairs</button>
+        <!-- A sub-category of Completed Repairs: indented under it. -->
+        <button type="button" class="appt-subnav-btn appt-subnav-nested" id="warrantySubnavBtn" data-repairs-panel="warranty" data-subnav-parent="completed" aria-selected="false">Devices Under Warranty</button>
       </div>
       <button class="nav-btn" data-target="reminders" role="tab" aria-selected="false"><svg class="icon icon-reminders"><use href="#i-clock"></use></svg>Reminders</button>
       <button class="nav-btn" data-target="diagnostics" role="tab" aria-selected="false"><svg class="icon"><use href="#i-diagnose"></use></svg>Diagnostics</button>
@@ -2900,7 +2896,7 @@
   <script defer src="assets/inventory.js?v=inventory-new-category-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=card-reminder-1"></script>
+  <script defer src="assets/intake.js?v=no-chevron-1"></script>
   <script defer src="assets/invoice.js?v=warranty-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>
