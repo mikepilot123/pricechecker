@@ -1,6 +1,12 @@
 # Deploys the static site to GitHub Pages via Actions instead of the legacy
 # "deploy from branch" pipeline, whose builds regularly got stuck in
 # "building" for 20+ minutes and needed empty commits to unstick.
+#
+# Upload and deploy are separate jobs (GitHub's own Pages template does the
+# same). In one job, deploy-pages looked the artifact up a split second
+# after the upload finished and GitHub sometimes hadn't listed it yet — "No
+# artifacts named github-pages were found" — failing the deploy until a
+# re-run. Starting a second job only once the first has finished avoids that.
 name: Deploy to GitHub Pages
 
 on:
@@ -18,16 +24,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
