@@ -5515,8 +5515,14 @@
     const ends = warrantyEnds(t);
     return ends ? Math.ceil((ends.getTime() - Date.now()) / DAY_MS) : -1;
   }
+  // A diagnostic-only job (every issue is a diagnostic) fixed nothing, so it
+  // carries no warranty. A diagnostic alongside a real repair still does.
+  function isDiagnosticOnlyRepair(t) {
+    const parts = String(t.issues || "").split(",").map((p) => p.trim()).filter(Boolean);
+    return parts.length > 0 && parts.every((p) => /diagnos/i.test(p));
+  }
   function underWarranty(t) {
-    return warrantyDaysLeft(t) > 0;
+    return warrantyDaysLeft(t) > 0 && !isDiagnosticOnlyRepair(t);
   }
   const shortDate = (v) => {
     const d = new Date(v);

@@ -98,6 +98,17 @@ await test(`after ${WARRANTY_DAYS} days the warranty has ended`, async () => {
   await repairs({ action: "claimWarranty", id: old.id, problem: "Port loose" });
 });
 
+await test("diagnostic-only jobs have no warranty; a diagnostic plus a real repair does", async () => {
+  const { ticket: diag } = await repairs({ action: "add", customerName: "Diag (fake)", phone: "8680000014", device: "iPhone 11", issues: "Diagnostic Needed", repairCost: "100", amountPaid: "100" });
+  await repairs({ action: "update", id: diag.id, status: "Picked Up" });
+  const res = await call(intake, { action: "claimWarranty", id: diag.id, problem: "Still broken" });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /diagnostic-only/);
+  const { ticket: both } = await repairs({ action: "add", customerName: "Diag+Fix (fake)", phone: "8680000015", device: "iPhone 11", issues: "Diagnostic Needed, Battery", repairCost: "400", amountPaid: "400" });
+  await repairs({ action: "update", id: both.id, status: "Picked Up" });
+  await repairs({ action: "claimWarranty", id: both.id, problem: "Battery draining fast" });
+});
+
 await test("taking a repair back off Picked Up clears its warranty clock", async () => {
   const { ticket } = await repairs({ action: "update", id: fixed.id, status: "Repaired" });
   assert.equal(ticket.pickedUpAt, null);
