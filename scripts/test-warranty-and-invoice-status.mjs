@@ -24,7 +24,7 @@ const { default: intake } = await import("../api/intake.js");
 const { default: invoiceApi } = await import("../api/invoice.js");
 const { sql } = await import("../lib/db.js");
 const { WARRANTY_DAYS } = await import("../lib/tickets.js");
-const { updateDevice, getDevice } = await import("../lib/devices.js");
+const { updateDevice, getDevice, setPartsAlertForAll, registerDevice } = await import("../lib/devices.js");
 
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log("  ok  " + name); }
@@ -122,6 +122,22 @@ await test("a device can hide the parts notice; it's off by default", async () =
   const renamed = await updateDevice({ id: device.id, name: "Front counter", hidden: [] });
   assert.equal(renamed.hidePartsAlert, true);
   assert.equal((await updateDevice({ id: device.id, hidePartsAlert: false })).hidePartsAlert, false);
+});
+
+await test("one button turns the parts notice off (and back on) on every device, including new ones", async () => {
+  await getDevice("DEVICE_FAKE_2", { userAgent: "Mozilla/5.0 (iPhone)" });
+  await getDevice("DEVICE_FAKE_3", { userAgent: "Mozilla/5.0 (Windows)" });
+  const changed = await setPartsAlertForAll(true);
+  assert.ok(changed >= 3, String(changed));
+  const all = await sql`SELECT bool_and(hide_parts_alert) AS all_hidden FROM devices`;
+  assert.equal(all[0].all_hidden, true);
+  await registerDevice("DEVICE_FAKE_NEW", { userAgent: "Mozilla/5.0 (Android)" });
+  assert.equal((await getDevice("DEVICE_FAKE_NEW")).hidePartsAlert, true, "a device signing in later starts hidden");
+  await setPartsAlertForAll(false);
+  const none = await sql`SELECT bool_or(hide_parts_alert) AS any_hidden FROM devices`;
+  assert.equal(none[0].any_hidden, false);
+  await registerDevice("DEVICE_FAKE_NEW_2", { userAgent: "Mozilla/5.0 (Android)" });
+  assert.equal((await getDevice("DEVICE_FAKE_NEW_2")).hidePartsAlert, false);
 });
 
 // ---- Invoice ↔ repair status ----------------------------------------------------

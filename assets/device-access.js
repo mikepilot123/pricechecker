@@ -176,6 +176,13 @@
       list.innerHTML = '<p class="settings-help">No devices have signed in yet.</p>';
       return;
     }
+    // The all-devices button offers whichever way most devices aren't yet.
+    const allHidden = devices.length > 0 && devices.every((d) => d.hidePartsAlert);
+    const allBtn = $("devicesPartsAlertAllBtn");
+    if (allBtn) {
+      allBtn.dataset.hide = allHidden ? "0" : "1";
+      allBtn.textContent = allHidden ? "Turn on “waiting on parts” on all devices" : "Turn off “waiting on parts” on all devices";
+    }
     list.innerHTML = devices.map((device) => {
       const isThis = device.id === thisDeviceId;
       const toggles = SECTIONS.map((section) => `
@@ -189,7 +196,7 @@
       const allOn = restricted === 0;
       const partly = restricted > 0 && restricted < SECTIONS.length;
       return `
-        <article class="device-card" data-device-card="${escapeHtml(device.id)}">
+        <article class="device-card${isThis ? " is-this-device" : ""}" data-device-card="${escapeHtml(device.id)}"${isThis ? ' aria-current="true"' : ""}>
           <div class="device-card-head">
             <input class="text-input device-name" type="text" maxlength="60" value="${escapeHtml(device.name)}"
                    data-device-name="${escapeHtml(device.id)}" aria-label="Device name" />
@@ -309,6 +316,30 @@
         renderDevices();
         window.RPC_TOAST?.(
           `Restricted ${data.restricted} device${data.restricted === 1 ? "" : "s"}. Any device not listed yet is restricted as soon as it opens the app.`,
+          { tone: "info", duration: 5000 }
+        );
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $("devicesPartsAlertAllBtn").addEventListener("click", async () => {
+      showError("");
+      const btn = $("devicesPartsAlertAllBtn");
+      const hide = btn.dataset.hide !== "0";
+      btn.disabled = true;
+      try {
+        const data = await post({ action: "setPartsAlertForAll", ownerPin, hide });
+        devices = data.devices || [];
+        if (data.deviceId) thisDeviceId = data.deviceId;
+        renderDevices();
+        refresh({ force: true }); // this device too, straight away
+        window.RPC_TOAST?.(
+          hide
+            ? "“Waiting on parts” notice turned off on every device. Devices that sign in later start with it off too."
+            : "“Waiting on parts” notice turned back on on every device.",
           { tone: "info", duration: 5000 }
         );
       } catch (err) {

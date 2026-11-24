@@ -9115,3 +9115,10 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .repair-reminder-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .repair-reminder-grid { margin-top: 12px; }
 #repairReminderSub { margin-bottom: 12px; }
+
+/* Settings → Devices: the device you're on, bracketed in the accent colour. */
+.device-card.is-this-device {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft, rgba(31, 95, 191, 0.12)), var(--shadow);
+}
+.device-card.is-this-device .device-badge { background: var(--accent); color: #fff; }

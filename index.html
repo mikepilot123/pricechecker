@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=card-reminder-1" />
+  <link rel="stylesheet" href="assets/style.css?v=devices-all-1" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -1995,6 +1995,7 @@
             <div id="devicesLock" class="settings-actions" hidden>
               <button id="devicesRefreshBtn" class="ghost-btn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
               <button id="devicesRestrictOthersBtn" class="ghost-btn danger-btn" type="button">Restrict all other devices</button>
+              <button id="devicesPartsAlertAllBtn" class="ghost-btn" type="button">Turn off “waiting on parts” on all devices</button>
               <button id="devicesChangePinToggle" class="ghost-btn" type="button">Change owner PIN</button>
               <button id="devicesLockBtn" class="ghost-btn" type="button">Lock</button>
             </div>
@@ -2893,7 +2894,7 @@
        DOMContentLoaded restore runs), and defer preserves it — deferred
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
-  <script defer src="assets/device-access.js?v=warranty-1"></script>
+  <script defer src="assets/device-access.js?v=devices-all-1"></script>
   <script defer src="assets/device-search.js?v=device-search-1"></script>
   <script defer src="assets/app.js?v=device-search-1"></script>
   <script defer src="assets/inventory.js?v=inventory-new-category-1"></script>
