@@ -9087,3 +9087,31 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .appt-subnav-expand.is-open .icon { transform: none; }
 .appt-subnav-btn.is-collapsed { display: none !important; }
 @media (prefers-reduced-motion: reduce) { .appt-subnav-expand .icon { transition: none; } }
+
+/* "Reminder" on repair cards, under Assign technician — same size, quieter. */
+.ticket-reminder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text-dim);
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ticket-reminder-btn .icon { width: 14px; height: 14px; flex: none; }
+.ticket-reminder-btn:hover,
+.ticket-reminder-btn:focus-visible { border-color: #c8791a; background: #fffbeb; color: #a85f12; }
+.ticket-reminder-btn:focus-visible { outline: 2px solid #c8791a; outline-offset: 2px; }
+.repair-reminder-when { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.repair-reminder-chip { min-height: 34px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-soft); color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer; }
+.repair-reminder-chip:hover { border-color: var(--accent); }
+.repair-reminder-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.repair-reminder-grid { margin-top: 12px; }
+#repairReminderSub { margin-bottom: 12px; }

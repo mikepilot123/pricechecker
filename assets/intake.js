@@ -5385,6 +5385,149 @@
     }
   }
 
+  // ---- Reminder from a repair card ----------------------------------------------
+  // The "Reminder" button under Assign technician on every card: a short form
+  // with the title filled in, one-tap "when" choices, and the repair linked,
+  // so it shows on the Reminders tab with a link back to this repair.
+  const REMINDER_LABELS = [
+    ["", "No label"], ["urgent", "Urgent"], ["customer_update", "Customer update"],
+    ["parts", "Parts"], ["repair", "Repair"], ["pickup", "Pickup"],
+  ];
+  // Quick "when" choices, as local Date objects.
+  function reminderWhenOptions() {
+    const at = (days, hour) => {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      d.setHours(hour, 0, 0, 0);
+      return d;
+    };
+    const inHours = (h) => { const d = new Date(Date.now() + h * 3600 * 1000); d.setSeconds(0, 0); return d; };
+    return [
+      { key: "2h", label: "In 2 hours", date: inHours(2) },
+      { key: "tomorrow", label: "Tomorrow 9 AM", date: at(1, 9) },
+      { key: "3d", label: "In 3 days", date: at(3, 9) },
+      { key: "week", label: "Next week", date: at(7, 9) },
+    ];
+  }
+  const localInputValue = (d) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const reminderWhenText = (d) => d.toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+  function openRepairReminder(t) {
+    let modal = $("repairReminderModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "repairReminderModal";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel pickup-pay-panel" role="dialog" aria-modal="true" aria-labelledby="repairReminderTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow">Reminder</p><h3 id="repairReminderTitle">Add a reminder</h3></div>
+            <button type="button" class="modal-close" data-repair-reminder-cancel aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <p class="empty-sub" id="repairReminderSub"></p>
+            <label class="field-label" for="repairReminderText">Remind me to</label>
+            <input id="repairReminderText" class="text-input" type="text" maxlength="160" />
+            <p class="field-label">When</p>
+            <div class="repair-reminder-when" id="repairReminderWhen" role="radiogroup" aria-label="When"></div>
+            <input id="repairReminderDue" class="text-input" type="datetime-local" aria-label="Date and time" />
+            <div class="form-grid repair-reminder-grid">
+              <div class="form-field">
+                <label class="field-label" for="repairReminderLabel">Label</label>
+                <select id="repairReminderLabel" class="text-input select-input">${REMINDER_LABELS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+              </div>
+              <div class="form-field">
+                <label class="field-label" for="repairReminderAssignee">Assign to</label>
+                <select id="repairReminderAssignee" class="text-input select-input"></select>
+              </div>
+            </div>
+            <label class="field-label" for="repairReminderNotes">Notes <span class="field-optional">(optional)</span></label>
+            <textarea id="repairReminderNotes" class="text-input" rows="2" maxlength="500"></textarea>
+            <p class="field-error" id="repairReminderError" hidden></p>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-repair-reminder-cancel>Cancel</button>
+            <button type="button" class="primary-btn" id="repairReminderSave"><svg class="icon"><use href="#i-check"></use></svg><span>Save reminder</span></button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const firstName = (t.customerName || "").trim().split(/\s+/)[0] || "the client";
+    $("repairReminderSub").textContent = `${t.customerName || "Customer"} · ${t.device || "Device"} · #${t.id}`;
+    const text = $("repairReminderText");
+    text.value = `Follow up with ${firstName} — ${t.device || "repair"}`;
+    const due = $("repairReminderDue");
+    const options = reminderWhenOptions();
+    const when = $("repairReminderWhen");
+    when.innerHTML = options.map((o) => `<button type="button" class="repair-reminder-chip" role="radio" aria-checked="false" data-when="${o.key}">${esc(o.label)}</button>`).join("");
+    const pick = (key) => {
+      when.querySelectorAll("[data-when]").forEach((b) => {
+        const on = b.dataset.when === key;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-checked", on ? "true" : "false");
+      });
+      const option = options.find((o) => o.key === key);
+      if (option) due.value = localInputValue(option.date);
+    };
+    when.onclick = (e) => { const b = e.target.closest("[data-when]"); if (b) pick(b.dataset.when); };
+    // Typing a date yourself un-selects the quick choices.
+    due.oninput = () => when.querySelectorAll("[data-when]").forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-checked", "false"); });
+    pick("tomorrow");
+    $("repairReminderLabel").value = PARTS_STATUSES.has(t.status) ? "parts" : t.status === "Repaired" ? "pickup" : "customer_update";
+    const assignee = $("repairReminderAssignee");
+    const names = TECHNICIANS.map((x) => x.name);
+    if (t.technician && !names.includes(t.technician)) names.push(t.technician);
+    assignee.innerHTML = `<option value="">Unassigned</option>` + names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    assignee.value = t.technician || "";
+    $("repairReminderNotes").value = "";
+    const error = $("repairReminderError");
+    error.hidden = true;
+    modal.hidden = false;
+    text.focus();
+    text.select();
+
+    const close = () => {
+      modal.hidden = true;
+      document.removeEventListener("keydown", onKey, true);
+    };
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    document.addEventListener("keydown", onKey, true);
+    modal.querySelectorAll("[data-repair-reminder-cancel]").forEach((b) => { b.onclick = close; });
+    const saveBtn = $("repairReminderSave");
+    saveBtn.disabled = false;
+    saveBtn.onclick = async () => {
+      const title = text.value.trim();
+      const dueDate = due.value ? new Date(due.value) : null;
+      const fail = (msg) => { error.textContent = msg; error.hidden = false; };
+      if (!title) return fail("Say what the reminder is for.");
+      if (dueDate && isNaN(dueDate)) return fail("That date and time isn't valid.");
+      saveBtn.disabled = true;
+      try {
+        const res = await api({
+          action: "addReminder",
+          title,
+          notes: $("repairReminderNotes").value.trim(),
+          dueAt: dueDate ? dueDate.toISOString() : null,
+          priority: $("repairReminderLabel").value,
+          assignee: assignee.value,
+          ticketId: t.id,
+          ticketLabel: `${t.customerName || "Unknown customer"} — ${t.device || "Device"}`,
+        });
+        if (!res.ok) throw new Error(res.error || "Save failed");
+        close();
+        if (typeof window.RPC_REFRESH_REMINDERS === "function") window.RPC_REFRESH_REMINDERS();
+        toast(`Reminder set${dueDate ? ` for ${reminderWhenText(dueDate)}` : ""} — it's on the Reminders tab.`, { tone: "info", duration: 4000 });
+      } catch (err) {
+        saveBtn.disabled = false;
+        fail("Couldn't save the reminder: " + err.message);
+      }
+    };
+  }
+
   // ---- Devices Under Warranty ---------------------------------------------------
   // Repairs → Devices Under Warranty. A repair fixed and picked up carries the
   // shop's 60-day warranty (as printed on its invoices), counted from pickup
@@ -6482,6 +6625,9 @@
         <button type="button" class="ticket-tech-btn${t.technician ? " is-assigned" : ""}" aria-label="${esc(t.technician ? `Technician: ${t.technician}. Reassign` : "Assign technician")}">
           <svg class="icon" aria-hidden="true"><use href="#${t.technician ? "i-user" : "i-user-plus"}"></use></svg><span>${esc(t.technician || "Assign technician")}</span>
         </button>
+        <button type="button" class="ticket-reminder-btn" aria-label="Add a reminder for ${esc(t.device || "this repair")}" title="Add a reminder for this repair">
+          <svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg><span>Reminder</span>
+        </button>
       </div>
       <div class="ticket-activity">
         ${activityLogBtnHtml(t, "")}
@@ -6505,6 +6651,14 @@
         togglePartsOrdered(t);
       };
       partsBtn.onkeydown = (e) => e.stopPropagation();
+    }
+    const reminderBtn = head.querySelector(".ticket-reminder-btn");
+    if (reminderBtn) {
+      reminderBtn.onclick = (e) => {
+        e.stopPropagation();
+        openRepairReminder(t);
+      };
+      reminderBtn.onkeydown = (e) => e.stopPropagation();
     }
     const techBtn = head.querySelector(".ticket-tech-btn");
     if (techBtn) {
