@@ -9024,7 +9024,7 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .warranty-claims li { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
 .warranty-claim-link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
 .warranty-claim-terms { margin: 4px 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); font-size: 0.85rem; line-height: 1.45; }
-.warranty-claim-tag { display: inline-flex; align-items: center; gap: 4px; width: fit-content; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: #ecfdf5; border: 1px solid #bfe8d8; color: #047857; font-size: 0.74rem; font-weight: 600; }
+.warranty-claim-tag { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; width: fit-content; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: #ecfdf5; border: 1px solid #bfe8d8; color: #047857; font-size: 0.74rem; font-weight: 600; }
 .warranty-claim-tag .icon { width: 12px; height: 12px; }
 @media (max-width: 559px) { .warranty-card-actions { width: 100%; } .warranty-card-actions > * { flex: 1; justify-content: center; } }
 

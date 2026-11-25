@@ -5531,7 +5531,7 @@
 
   function warrantyClaimTagHtml(t) {
     if (!t.warrantyOf) return "";
-    return `<span class="warranty-claim-tag" title="Free repair under the warranty on repair #${esc(t.warrantyOf)}"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Warranty claim · #${esc(t.warrantyOf)}</span>`;
+    return `<span class="warranty-claim-tag" title="Free repair under the warranty on repair #${esc(t.warrantyOf)}"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>Warranty claim</span>`;
   }
 
   window.addEventListener("rpc-enter-warranty", async () => {
