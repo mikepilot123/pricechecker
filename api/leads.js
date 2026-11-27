@@ -1,10 +1,11 @@
-import { ensureSchema } from "../lib/db.js";
+import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { addLead, addLeadNote, deleteLead, listLeadNotes, listLeads, updateLead } from "../lib/leads.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (blockWritesOnReadOnlyDeployment(req, res)) return;
 
   const body = req.method === "GET" ? (req.query || {}) : readBody(req);
   const denied = checkPin(req, body.pin);

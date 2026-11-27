@@ -1,3 +1,4 @@
+import { blockWritesOnReadOnlyDeployment } from "../lib/deployment.js";
 import crypto from "node:crypto";
 import { applyCors, checkPin } from "../lib/security.js";
 import { getUploadUrl, r2PublicUrl } from "../lib/r2.js";
@@ -18,6 +19,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (blockWritesOnReadOnlyDeployment(req, res)) return;
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

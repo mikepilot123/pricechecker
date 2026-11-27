@@ -1,11 +1,12 @@
 import { addInventoryItem, adjustInventoryItem, inventoryKey, listInventory, stockPartsOrderToInventory } from "../lib/inventory.js";
 import { deleteInventoryLink, listInventoryLinks, saveInventoryLink } from "../lib/inventory-links.js";
-import { ensureSchema } from "../lib/db.js";
+import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { applyCors, checkPin } from "../lib/security.js";
 
 export default async function handler(req, res) {
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (blockWritesOnReadOnlyDeployment(req, res)) return;
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }

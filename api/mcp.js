@@ -1,6 +1,8 @@
+import { blockWritesOnReadOnlyDeployment } from "../lib/deployment.js";
 import { handleMcpHttp } from "../mcp/http.js";
 
 export default async function handler(req, res) {
+  if (blockWritesOnReadOnlyDeployment(req, res)) return;
   try {
     await handleMcpHttp(req, res);
   } catch (error) {

@@ -32,8 +32,10 @@ function query(strings, ...params) {
 
 // PGlite's transaction queue keeps concurrent HTTP requests isolated, like
 // separate Neon transactions, rather than interleaving manual BEGIN calls.
-query.transaction = async function transaction(queries) {
+query.transaction = async function transaction(queries, opts = {}) {
   return db.transaction(async (tx) => {
+    // Like Neon's readOnly transaction option (lib/db.js uses it on previews).
+    if (opts && opts.readOnly) await tx.query("SET TRANSACTION READ ONLY");
     const results = [];
     for (const q of queries) results.push((await tx.query(q.text, q.params)).rows);
     return results;

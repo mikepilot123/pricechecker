@@ -34,7 +34,7 @@ import { accountSummary } from "../lib/card-payments.js";
 import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBankTransaction, deleteBankTransaction, addCashDepositToBank, depositRepairPayment, refundRepairPayment } from "../lib/bank-transactions.js";
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
-import { ensureSchema } from "../lib/db.js";
+import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
@@ -87,6 +87,7 @@ export default async function handler(req, res) {
   // The frontend (GitHub Pages) is cross-origin from this Vercel deployment.
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (blockWritesOnReadOnlyDeployment(req, res)) return;
 
   const body = req.method === "GET" ? (req.query || {}) : readBody(req);
 

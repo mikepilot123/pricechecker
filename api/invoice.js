@@ -1,4 +1,4 @@
-import { ensureSchema } from "../lib/db.js";
+import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { readyEmailDraft, sendReadyEmail, deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
 import { checkinInvoice, createInvoice, DEFAULT_INVOICE_NOTES, findCheckinInvoice, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
 import { isRepairSyncPaymentUpdate } from "../lib/invoice-payment-sync.js";
@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   // where CORS doesn't apply — the allowlist only affects staff-app POSTs.
   applyCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
+  if (blockWritesOnReadOnlyDeployment(req, res)) return;
 
   try {
     await ensureSchema();
