@@ -17,6 +17,7 @@ import {
   addTicketNote,
   deleteTicketNote,
   refundTicket,
+  addTicketOnce,
   claimWarranty,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
@@ -164,11 +165,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, tickets: await listTickets({ includeDeleted: !!body.includeDeleted }) });
     }
     if (action === "add") {
-      const ticket = await addTicket(body);
-      const accountDeposit = body.depositToAccount
+      // A retry of an attempt that already saved gets that repair back —
+      // and its payment isn't deposited a second time.
+      const { ticket, created } = await addTicketOnce(body);
+      const accountDeposit = created && body.depositToAccount
         ? await depositForRepair(ticket, body.paymentMethod, Number(ticket.amountPaid) || 0)
         : null;
-      return res.status(200).json({ ok: true, ticket, accountDeposit });
+      return res.status(200).json({ ok: true, ticket, accountDeposit, ...(created ? {} : { alreadySaved: true }) });
     }
     if (action === "update") {
       const before = body.depositToAccount ? await getTicketById(body.id) : null;

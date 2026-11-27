@@ -166,6 +166,11 @@
   // Devices already confirmed via "Add another device" for the client
   // currently being checked in — each becomes its own ticket on save.
   let formDevices = [];
+  // One id per device being logged, kept across retries, so a save whose
+  // answer was lost can be retried without logging the repair twice (the
+  // server returns the one already saved — see addTicketOnce in lib/tickets.js).
+  let currentDeviceRequestId = "";
+  const newRequestId = () => "R" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   // True when the form was opened from a Prices-tab repair click — device and
   // issue are already known, so the wizard skips straight to Payment.
   let quickLogMode = false;
@@ -3902,6 +3907,7 @@
     }
     const inventoryOption = $("fInventoryItem").selectedOptions[0];
     formDevices.push({
+      requestId: currentDeviceRequestId || newRequestId(),
       device: $("fDevice").value.trim(),
       issues: issuesStr,
       status: $("fStatus").value,
@@ -3915,6 +3921,7 @@
       amountPaid: "",
       priceChoices: { ...priceChoices },
     });
+    currentDeviceRequestId = ""; // the next device is a new attempt
     renderAddedDevices();
     // The next device starts with a fresh price suggestion.
     if ($("fRepairCost").value.trim() === autoRepairCost) $("fRepairCost").value = "";
@@ -4107,6 +4114,7 @@
 
   function openForm(ticket) {
     editingId = ticket ? ticket.id : null;
+    currentDeviceRequestId = "";
     addToCheckinGroup = "";
     priceChoices = {};
     autoRepairCost = "";
@@ -4782,7 +4790,10 @@
     // New check-in: one ticket per device, all sharing this client's details.
     // formDevices holds everything confirmed via "Add another device"; the
     // fields still on screen are always the last (or only) device.
+    formDevices.forEach((d) => { if (!d.requestId) d.requestId = newRequestId(); });
+    if (!currentDeviceRequestId) currentDeviceRequestId = newRequestId();
     const devices = formDevices.map((d, i) => ({
+      requestId: d.requestId,
       device: d.device,
       issues: d.issues,
       status: d.status,
@@ -4797,6 +4808,7 @@
     }));
     if (!pendingDeviceBlank) {
       devices.push({
+        requestId: currentDeviceRequestId,
         device: currentDeviceValue,
         issues: currentIssuesStr,
         status: $("fStatus").value,
@@ -4844,6 +4856,7 @@
           amountPaid: dev.amountPaid,
           inventoryItemKey: dev.inventoryItemKey,
           checkinGroup: addToCheckinGroup,
+          clientRequestId: dev.requestId,
           ...(formPaymentMethod && Number(dev.amountPaid) > 0 ? { paymentMethod: formPaymentMethod, depositToAccount: true } : {}),
         });
         if (!res.ok) throw new Error(res.error || "Rejected");
@@ -4918,6 +4931,7 @@
     if (pendingDeviceBlank) pendingFormMedia.forEach((m) => URL.revokeObjectURL(m.url));
     formDevices = [];
     pendingFormMedia = [];
+    currentDeviceRequestId = "";
 
     const wasPartial = false;
     $("intakeFormTitle").textContent = savedTickets.length > 1 ? "Devices logged" : "Device logged";
