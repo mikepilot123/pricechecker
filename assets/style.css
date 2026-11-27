@@ -4268,28 +4268,23 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
 .ticket-status button[data-delete] { color: #c0392b; border-color: #f3c9c2; }
 .ticket-status button[data-delete]:hover { background: #fdf0ee; }
 .ticket-activity .activity-log-btn { width: 44px; height: 44px; }
-@media (max-width: 760px) {
+@media (max-width: 767.98px) {
   .ticket-head {
     position: relative;
     grid-template-columns: 64px minmax(0, 1fr) auto;
     grid-template-areas:
       "thumb identity identity"
       "phone phone phone"
-      "repair repair status";
+      "repair repair repair"
+      "status status status";
     align-items: start;
     gap: 12px;
     padding: 14px;
   }
-  .ticket-status { min-width: 0; align-self: center; }
   .ticket-repair { padding-top: 2px; }
   .ticket-identity .ticket-phone { display: none; }
   .ticket-head .ticket-phone-row { display: block; grid-area: phone; }
-  /* The identity row spans the full card width so the client name gets the
-     whole line. That only works with the activity button lifted out of the
-     grid: as a third column it shares its track with .ticket-status, whose
-     nowrap status badge sizes the column to ~250px and squeezes the name
-     down to a few characters. Absolutely positioned, it keeps its top-right
-     spot and identity just reserves room for it. */
+  /* Keep the activity button in the top-right corner of the identity row. */
   .ticket-activity {
     position: absolute;
     top: 14px;
@@ -8374,7 +8369,8 @@ video.media-viewer-media {
      [thumb] #ticket ................ [notes]
              Device model
              [issue chips]
-             [technician] [due/parts] */
+             [status] [due/parts]
+             [technician] [reminder] */
   .ticket-head.ticket-head-compact {
     position: static;
     grid-template-columns: 56px minmax(0, 1fr) var(--m-touch);
@@ -8407,7 +8403,7 @@ video.media-viewer-media {
   .ticket-head-compact .issue-notes-btn { display: none; }
   .ticket-head-compact .issue-tags { gap: 6px; }
   .ticket-head-compact .issue-chip { margin: 0; font-size: 0.8rem; }
-  .ticket-head-compact .ticket-status {
+  .ticket-head .ticket-status {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
@@ -8416,7 +8412,7 @@ video.media-viewer-media {
     min-width: 0;
     text-align: left;
   }
-  .ticket-head-compact .ticket-status > * { max-width: 100%; }
+  .ticket-head .ticket-status > * { max-width: 100%; }
   .ticket-head-compact .status-badge-btn,
   .ticket-head-compact .ticket-parts-btn,
   .ticket-head-compact .ticket-due-pill { min-height: 36px; font-size: 0.78rem; }
@@ -8425,14 +8421,6 @@ video.media-viewer-media {
   #intakeList.is-grouped-by-status .ticket-head-compact .status-badge-btn { display: none; }
   /* ...and when that badge was all the column held, drop the empty row. */
   #intakeList.is-grouped-by-status .ticket-head-compact .ticket-status:not(:has(> :not(.status-badge-btn))) { display: none; }
-  .ticket-head-compact .ticket-tech-btn {
-    min-height: var(--m-touch);
-    max-width: 100%;
-    padding: 0 14px;
-    border-radius: 10px;
-    font-size: 0.84rem;
-  }
-  .ticket-head-compact .ticket-tech-btn .icon { width: 16px; height: 16px; }
 
   /* ---- Reminders ----
      A newly due reminder still pops up as cards (an interruption, on
@@ -9064,7 +9052,7 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .view-nav .appt-sidebar-subnav .appt-subnav-btn.is-parent-of-active::before { background: currentColor; }
 
 
-/* "Reminder" on repair cards, under Assign technician — same size, quieter. */
+/* Secondary reminder action on repair cards. */
 .ticket-reminder-btn {
   display: inline-flex;
   align-items: center;
@@ -9099,20 +9087,29 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 }
 .device-card.is-this-device .device-badge { background: var(--accent); color: #fff; }
 
-/* Assign technician and Reminder side by side on repair cards. */
 .ticket-action-row { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
 @media (max-width: 767.98px) {
-  /* Phones: keep the pair on one line — the technician name shortens with
-     "…" rather than pushing Reminder onto its own row. */
-  .ticket-head .ticket-action-row { flex-wrap: nowrap; justify-content: flex-start; max-width: 100%; }
-  .ticket-head .ticket-action-row .ticket-tech-btn { flex: 0 1 auto; min-width: 0; }
-  .ticket-head .ticket-action-row .ticket-reminder-btn { flex: none; }
-  .ticket-head-compact .ticket-reminder-btn { min-height: var(--m-touch); padding: 0 12px; border-radius: 10px; font-size: 0.84rem; }
-}
-@media (max-width: 767.98px) {
-  /* Too narrow for both labels: Reminder becomes its clock icon (the
-     button keeps its "Add a reminder…" label for screen readers). */
-  .ticket-head-compact .ticket-reminder-btn { width: var(--m-touch); padding: 0; justify-content: center; }
-  .ticket-head-compact .ticket-reminder-btn span { display: none; }
-  .ticket-head-compact .ticket-reminder-btn .icon { width: 18px; height: 18px; }
+  .ticket-head .ticket-action-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    flex: 0 0 100%;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .ticket-action-row > button {
+    justify-content: center;
+    min-width: 0;
+    min-height: var(--m-touch);
+    max-width: none;
+    padding: 6px 8px;
+    border-radius: 10px;
+    font-size: 0.84rem;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .ticket-action-row .ticket-tech-btn.is-assigned span {
+    white-space: nowrap;
+  }
+  .ticket-action-row .icon { width: 16px; height: 16px; }
 }
