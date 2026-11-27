@@ -9134,3 +9134,27 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .save-failure-source.is-client { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
 .save-failure-error { margin: 8px 0 4px; color: var(--danger); font-weight: 500; }
 .save-failure-body { max-height: 260px; overflow: auto; margin: 6px 0 0; padding: 8px; background: var(--bg-soft); border-radius: var(--radius-sm); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; }
+
+/* "+N more" issues on a repair card, and its pop-up. */
+.issue-more-btn {
+  cursor: pointer;
+  border: 1px dashed var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-family: inherit;
+}
+.issue-more-btn:hover, .issue-more-btn:focus-visible { background: var(--accent); color: #fff; border-style: solid; outline: none; }
+.issues-popup-panel { max-width: 440px; }
+.issues-popup-list { gap: 8px; }
+.issues-popup-notes { margin-top: 14px; }
+.issues-popup-notes p:not(.field-label) { margin: 4px 0 0; font-size: 0.9rem; white-space: pre-wrap; }
+/* A short list shouldn't take over the phone: bottom sheet, sized to fit
+   (same as .confirm-dialog). */
+@media (max-width: 559px) {
+  .modal-panel.issues-popup-panel {
+    height: auto;
+    max-height: 90dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+}

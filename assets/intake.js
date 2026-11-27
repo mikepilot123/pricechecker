@@ -6606,9 +6606,18 @@
   // Compact chip row for a ticket card: short preset issues render as chips
   // as before; any long free-text issue collapses into a "View notes"
   // button instead of sprawling across the card.
+  // How many issue chips a repair card shows before the rest fold into a
+  // "+N more" button (which opens them all in a small pop-up).
+  const CARD_ISSUE_LIMIT = 2;
+
   function ticketRepairChipsHtml(t) {
     const { short, long } = splitIssueParts(t.issues);
-    const chips = short.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
+    const shown = short.length > CARD_ISSUE_LIMIT + 1 ? short.slice(0, CARD_ISSUE_LIMIT) : short;
+    const hiddenCount = short.length - shown.length;
+    const chips = shown.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("") +
+      (hiddenCount
+        ? `<button type="button" class="issue-chip issue-more-btn" data-more-issues aria-label="Show all ${short.length} issues">+${hiddenCount} more</button>`
+        : "");
     const notesBtn = long.length
       ? `<button type="button" class="issue-chip issue-notes-btn" data-view-notes>
           <svg class="icon"><use href="#i-note"></use></svg>View notes
@@ -6616,6 +6625,54 @@
       : "";
     if (!chips && !notesBtn) return `<span class="issue-chip muted">No issues recorded</span>`;
     return chips + notesBtn;
+  }
+
+  // The "+N more" pop-up: every issue on the repair, with a way into its
+  // details (to edit them) and its notes.
+  function openIssuesPopup(t, returnFocusTo) {
+    let modal = $("issuesPopup");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "issuesPopup";
+      modal.className = "modal-backdrop";
+      modal.hidden = true;
+      modal.innerHTML = `
+        <div class="modal-panel issues-popup-panel" role="dialog" aria-modal="true" aria-labelledby="issuesPopupTitle">
+          <div class="modal-header">
+            <div><p class="modal-eyebrow" id="issuesPopupEyebrow"></p><h3 id="issuesPopupTitle">Issues</h3></div>
+            <button type="button" class="modal-close" data-issues-popup-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+          </div>
+          <div class="modal-body">
+            <div class="issue-tags issue-tags-readonly issues-popup-list" id="issuesPopupList"></div>
+            <div class="issues-popup-notes" id="issuesPopupNotes" hidden></div>
+          </div>
+          <div class="modal-footer"><div class="form-actions">
+            <button type="button" class="ghost-btn" data-issues-popup-close>Close</button>
+            <button type="button" class="primary-btn" id="issuesPopupOpen"><svg class="icon"><use href="#i-pencil"></use></svg><span>Open repair</span></button>
+          </div></div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    const { short, long } = splitIssueParts(t.issues);
+    $("issuesPopupEyebrow").textContent = `${t.device || "Device"} · #${t.id}`;
+    $("issuesPopupTitle").textContent = `${short.length} issue${short.length === 1 ? "" : "s"}`;
+    $("issuesPopupList").innerHTML = short.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
+    const notes = $("issuesPopupNotes");
+    notes.hidden = !long.length;
+    notes.innerHTML = long.length
+      ? `<p class="field-label">Details</p>${long.map((p) => `<p>${esc(p)}</p>`).join("")}`
+      : "";
+    modal.hidden = false;
+    modal.querySelector(".modal-close").focus();
+    const close = () => {
+      modal.hidden = true;
+      document.removeEventListener("keydown", onKey, true);
+      returnFocusTo?.focus?.();
+    };
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    document.addEventListener("keydown", onKey, true);
+    modal.onclick = (e) => { if (e.target === modal || e.target.closest("[data-issues-popup-close]")) close(); };
+    $("issuesPopupOpen").onclick = () => { close(); openTicketModal(TICKETS.find((x) => x.id === t.id) || t); };
   }
 
   // Full days elapsed since an ISO timestamp (0 if missing/invalid).
@@ -6849,6 +6906,14 @@
       techBtn.onkeydown = (e) => e.stopPropagation();
     }
     bindActivityLogBtn(head.querySelector(".activity-log-btn"), t);
+    const moreBtn = head.querySelector("[data-more-issues]");
+    if (moreBtn) {
+      moreBtn.onclick = (e) => {
+        e.stopPropagation();
+        openIssuesPopup(t, moreBtn);
+      };
+      moreBtn.onkeydown = (e) => e.stopPropagation();
+    }
     const notesBtn = head.querySelector("[data-view-notes]");
     if (notesBtn) {
       notesBtn.onclick = (e) => {
