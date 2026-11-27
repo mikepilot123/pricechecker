@@ -8372,25 +8372,21 @@ video.media-viewer-media {
   .ticket-group-add { width: var(--m-touch); height: var(--m-touch); }
   .ticket-group-add .icon { width: 18px; height: 18px; }
 
-  /* Device row:
-     [thumb] #ticket ................ [notes]
-             Device model
-             [issue chips]
-             [status] [due/parts]
-             [technician] [reminder] */
+  /* Keep the thumbnail and notes in the heading so the rows below use
+     the full card width. */
   .ticket-head.ticket-head-compact {
     position: static;
-    grid-template-columns: 56px minmax(0, 1fr) var(--m-touch);
+    grid-template-columns: 48px minmax(0, 1fr) var(--m-touch);
     grid-template-areas:
       "thumb identity activity"
-      "thumb repair repair"
-      "thumb status status";
+      "repair repair repair"
+      "status status status";
     align-items: start;
-    gap: 6px 12px;
+    gap: 8px 10px;
     min-height: 0;
-    padding: 12px 10px 12px 12px;
+    padding: 12px;
   }
-  .ticket-head-compact .ticket-device-thumb { width: 56px; height: 56px; border-radius: 12px; }
+  .ticket-head-compact .ticket-device-thumb { width: 48px; height: 48px; border-radius: 10px; }
   .ticket-head-compact .ticket-device-thumb img { padding: 7px; }
   .ticket-head-compact .ticket-identity { padding-right: 0; align-self: center; }
   .ticket-head-compact .ticket-num { margin-bottom: 1px; font-size: 0.78rem; }
@@ -8408,8 +8404,9 @@ video.media-viewer-media {
   .ticket-head-compact .ticket-repair-label,
   /* Same activity log as the notes button (with its count) on the row. */
   .ticket-head-compact .issue-notes-btn { display: none; }
-  .ticket-head-compact .issue-tags { gap: 6px; }
-  .ticket-head-compact .issue-chip { margin: 0; font-size: 0.8rem; }
+  .ticket-head .ticket-repair .issue-tags { gap: 4px 6px; }
+  .ticket-head .ticket-repair .issue-chip { margin: 0; overflow-wrap: anywhere; }
+  .ticket-head-compact .issue-chip { font-size: 0.8rem; }
   .ticket-head .ticket-status {
     flex-direction: row;
     flex-wrap: wrap;
@@ -8466,8 +8463,6 @@ video.media-viewer-media {
 @media (max-width: 359.98px) {
   :root { --m-pad: 12px; }
   .bottom-nav-btn { font-size: 0.64rem; }
-  .ticket-head.ticket-head-compact { grid-template-columns: 48px minmax(0, 1fr) var(--m-touch); gap: 6px 10px; }
-  .ticket-head-compact .ticket-device-thumb { width: 48px; height: 48px; }
   .ticket-group-head .ticket-phone { font-size: 0.86rem; }
 }
 
@@ -9097,13 +9092,12 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .ticket-action-row { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
 @media (max-width: 767.98px) {
   .ticket-head .ticket-action-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     flex: 0 0 100%;
     align-items: stretch;
-    gap: 8px;
+    gap: 6px;
   }
   .ticket-action-row > button {
+    flex: 1 1 102px;
     justify-content: center;
     min-width: 0;
     min-height: var(--m-touch);
@@ -9115,9 +9109,8 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .ticket-action-row .ticket-tech-btn.is-assigned span {
-    white-space: nowrap;
-  }
+  .ticket-action-row .ticket-tech-btn { flex-basis: 150px; }
+  .ticket-action-row .ticket-tech-btn.is-assigned span { white-space: nowrap; }
   .ticket-action-row .icon { width: 16px; height: 16px; }
 }
 
