@@ -1,0 +1,72 @@
+# Daily backup of the Neon database. Neon's free plan only restores up to 6
+# hours back, so this keeps 30 days of our own copies.
+#
+# Each run dumps the database (pg_dump, Postgres 17 client, compressed custom
+# format), checks the dump looks complete, ENCRYPTS it (this repository is
+# public, so an unencrypted artifact could be downloaded by anyone signed in
+# to GitHub), and stores it as a workflow artifact kept for 30 days.
+#
+# Secrets (Settings → Secrets and variables → Actions → New repository secret):
+#   DATABASE_URL_UNPOOLED  Neon's direct (unpooled) connection string
+#   BACKUP_PASSPHRASE      a long random passphrase — keep a copy somewhere
+#                          safe outside GitHub; without it a backup can't be
+#                          opened. See RESTORE.md.
+#
+# A failed run (bad secret, unreachable database, empty or tiny dump) fails
+# the workflow, and GitHub emails a failed scheduled run to whoever last
+# edited this schedule.
+name: Database backup
+
+on:
+  schedule:
+    # 07:23 UTC = 3:23 AM in Trinidad, after closing. Off the hour on purpose:
+    # GitHub delays jobs scheduled exactly on the hour.
+    - cron: "23 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the PostgreSQL 17 client
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Dump, check and encrypt
+        id: dump
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          PG_BIN: /usr/lib/postgresql/17/bin
+          BACKUP_DIR: backup-out
+          # Raise this once you know the usual size (shown in each run's log),
+          # e.g. to half of it, so a broken dump is caught sooner.
+          BACKUP_MIN_BYTES: ${{ vars.BACKUP_MIN_BYTES || '20000' }}
+        run: bash scripts/backup/backup.sh
+
+      - name: Store the encrypted backup (kept 30 days)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.dump.outputs.name }}
+          path: backup-out/
+          retention-days: 30
+          if-no-files-found: error
+          # Already compressed and encrypted — zipping again only wastes time.
+          compression-level: 0
