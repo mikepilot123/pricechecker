@@ -9123,3 +9123,14 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
   .ticket-head-compact .ticket-reminder-btn span { display: none; }
   .ticket-head-compact .ticket-reminder-btn .icon { width: 18px; height: 18px; }
 }
+
+/* Settings → Failed saves */
+.save-failures-list { display: grid; gap: 8px; margin-top: 10px; }
+.save-failure { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); padding: 10px 12px; }
+.save-failure summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; cursor: pointer; }
+.save-failure-when { color: var(--text-dim); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.save-failure-what { flex: 1; min-width: 0; }
+.save-failure-source { font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #fff5f4; color: #b42318; border: 1px solid #f1c7c2; }
+.save-failure-source.is-client { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
+.save-failure-error { margin: 8px 0 4px; color: var(--danger); font-weight: 500; }
+.save-failure-body { max-height: 260px; overflow: auto; margin: 6px 0 0; padding: 8px; background: var(--bg-soft); border-radius: var(--radius-sm); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; }

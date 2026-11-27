@@ -589,12 +589,22 @@
   }
 
   async function expensesApi(payload) {
-    const res = await fetch(INTAKE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(Object.assign({ pin: pin() }, payload)),
-    });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    let res;
+    try {
+      res = await fetch(INTAKE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(Object.assign({ pin: pin() }, payload)),
+      });
+    } catch (networkErr) {
+      // Never reached the server: the device reports it later (assets/intake.js).
+      window.RPC_REPORT_UNSENT_SAVE?.(INTAKE_URL, payload, "No answer from the server (" + (networkErr.message || "network error") + ")");
+      throw new Error("No connection to the server — not saved. Check the internet and try again.");
+    }
+    if (!res.ok) {
+      window.RPC_REPORT_UNSENT_SAVE?.(INTAKE_URL, payload, "HTTP " + res.status + " from the server");
+      throw new Error("HTTP " + res.status);
+    }
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "Rejected");
     return data;

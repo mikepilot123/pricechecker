@@ -59,12 +59,22 @@
   async function api(payload) {
     const pin = localStorage.getItem(LS_PIN) || "";
     // text/plain avoids a CORS preflight, matching how Check-In calls the API.
-    const res = await fetch(SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(Object.assign({ pin }, payload)),
-    });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    let res;
+    try {
+      res = await fetch(SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(Object.assign({ pin }, payload)),
+      });
+    } catch (networkErr) {
+      // Never reached the server: the device reports it later (assets/intake.js).
+      window.RPC_REPORT_UNSENT_SAVE?.(SCRIPT_URL, payload, "No answer from the server (" + (networkErr.message || "network error") + ")");
+      throw new Error("No connection to the server — not saved. Check the internet and try again.");
+    }
+    if (!res.ok) {
+      window.RPC_REPORT_UNSENT_SAVE?.(SCRIPT_URL, payload, "HTTP " + res.status + " from the server");
+      throw new Error("HTTP " + res.status);
+    }
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || "Rejected");
     return data;

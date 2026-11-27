@@ -385,6 +385,7 @@
       section.hidden = section.dataset.settingsPanelSection !== panel;
     });
     if (panel === "email") window.dispatchEvent(new Event("rpc-enter-email-settings"));
+    if (panel === "failures") loadSaveFailures();
     if (panel === "zoho") window.dispatchEvent(new Event("rpc-enter-zoho-settings"));
     document.querySelectorAll(".appt-subnav-btn[data-settings-panel]").forEach((btn) => {
       const active = btn.dataset.settingsPanel === panel;
@@ -400,6 +401,41 @@
       setSettingsPanel(btn.dataset.settingsPanel);
     });
   });
+  // Settings → Failed saves: saves that failed on the server, or that never
+  // reached it (reported by the device later). Each keeps what was being
+  // saved (PIN removed), so it can be re-entered.
+  async function loadSaveFailures() {
+    const list = $("saveFailuresList");
+    if (!list) return;
+    list.innerHTML = `<p class="ops-empty">Loading…</p>`;
+    try {
+      const res = await api({ action: "listSaveFailures", limit: 100 });
+      if (!res.ok) throw new Error(res.error || "Rejected");
+      const failures = res.failures || [];
+      if (!failures.length) {
+        list.innerHTML = `<p class="ops-empty">No failed saves recorded. 🎉</p>`;
+        return;
+      }
+      list.innerHTML = failures.map((f) => {
+        const b = f.body || {};
+        const what = [b.customerName || b.client || b.billTo?.name, b.device, b.id ? "#" + b.id : ""].filter(Boolean).join(" · ");
+        return `<details class="save-failure">
+          <summary>
+            <span class="save-failure-when">${esc(fmtDate(f.at))}</span>
+            <span class="save-failure-what"><strong>${esc(f.action || "save")}</strong>${what ? " — " + esc(what) : ""}</span>
+            <span class="save-failure-source ${f.source === "client" ? "is-client" : ""}">${f.source === "client" ? "Never reached the server" : "Failed on the server"}</span>
+          </summary>
+          <p class="save-failure-error">${esc(f.error)}</p>
+          <p class="field-hint">${esc(f.route)} · ${esc(f.method)}${f.deviceId ? " · device " + esc(String(f.deviceId).slice(0, 10)) : ""}</p>
+          <pre class="save-failure-body">${esc(JSON.stringify(f.body, null, 2))}</pre>
+        </details>`;
+      }).join("");
+    } catch (e) {
+      list.innerHTML = `<p class="field-error">Couldn't load failed saves: ${esc(e.message)}</p>`;
+    }
+  }
+  $("saveFailuresRefresh")?.addEventListener("click", loadSaveFailures);
+
   // Jump straight to a Settings section (e.g. "Link an email account").
   window.RPC_OPEN_SETTINGS_PANEL = (panel) => {
     settingsNavBtn?.click();
@@ -577,19 +613,84 @@
     const cfg = override || getCfg();
     const body = Object.assign({ pin: cfg.pin }, payload);
     let res;
-    if (payload.action === "list") {
-      const q = new URLSearchParams({ action: "list", pin: cfg.pin, _: Date.now() });
-      res = await fetch(cfg.url + "?" + q.toString(), { method: "GET" });
-    } else {
-      res = await fetch(cfg.url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(body),
-      });
+    try {
+      if (payload.action === "list") {
+        const q = new URLSearchParams({ action: "list", pin: cfg.pin, _: Date.now() });
+        res = await fetch(cfg.url + "?" + q.toString(), { method: "GET" });
+      } else {
+        res = await fetch(cfg.url, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(body),
+        });
+      }
+    } catch (networkErr) {
+      // Offline, or the server never answered: the server can't have
+      // recorded this, so the device reports it once it can.
+      reportUnsentSave(cfg.url, payload, "No answer from the server (" + (networkErr.message || "network error") + ")");
+      throw new Error("no connection to the server");
     }
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    if (!res.ok) {
+      if (res.status !== 503 || !(await res.clone().json().catch(() => ({}))).previewReadOnly) {
+        reportUnsentSave(cfg.url, payload, "HTTP " + res.status + " from the server");
+      }
+      throw new Error("HTTP " + res.status);
+    }
+    if (unsentReportsWaiting()) setTimeout(flushUnsentSaveReports, 0);
     return res.json();
   }
+
+  // ---- Saves that never reached the server ---------------------------------
+  // The server records the saves that fail on its side (Settings → Failed
+  // saves). When it can't even be reached — offline, a timeout, a crash — the
+  // device keeps a note (PIN removed) and sends it once the server answers
+  // again, so those leave a trace too.
+  const LS_UNSENT_REPORTS = "rpc_unsent_save_reports";
+  const READ_ACTION_RE = /^(list|get|search|preview|check|view|load|find|deviceAccess|accountSummary|bankAccountSummary|emailTemplate|emailDraft|readyEmailDraft|senders|zohoStatus|forTicket|checkinCandidate|registerBrowser|reportClientSaveFailure)/;
+  let flushingReports = false;
+  const readUnsent = () => { try { return JSON.parse(localStorage.getItem(LS_UNSENT_REPORTS) || "[]"); } catch (_) { return []; } };
+  const writeUnsent = (list) => { try { localStorage.setItem(LS_UNSENT_REPORTS, JSON.stringify(list.slice(-20))); } catch (_) {} };
+  const unsentReportsWaiting = () => { try { return !!localStorage.getItem(LS_UNSENT_REPORTS); } catch (_) { return false; } };
+  function trimForReport(value, depth = 0) {
+    if (typeof value === "string") return value.length > 2000 ? value.slice(0, 200) + "… [cut]" : value;
+    if (!value || typeof value !== "object" || depth > 5) return value;
+    if (Array.isArray(value)) return value.slice(0, 50).map((v) => trimForReport(v, depth + 1));
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = /pin|secret|token|password|credential/i.test(k) ? "[removed]" : trimForReport(v, depth + 1);
+    return out;
+  }
+  function reportUnsentSave(url, payload, error) {
+    if (!payload || READ_ACTION_RE.test(String(payload.action || "list"))) return;
+    const route = /\/api\/[a-z-]+/.exec(String(url || ""))?.[0] || "/api/intake";
+    const list = readUnsent();
+    list.push({ route, action: payload.action || "", error, at: new Date().toISOString(), body: trimForReport(payload) });
+    writeUnsent(list);
+  }
+  async function flushUnsentSaveReports() {
+    if (flushingReports || !isConfigured()) return;
+    const list = readUnsent();
+    if (!list.length) { try { localStorage.removeItem(LS_UNSENT_REPORTS); } catch (_) {} return; }
+    flushingReports = true;
+    try {
+      while (list.length) {
+        const res = await fetch(SCRIPT_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ pin: getCfg().pin, action: "reportClientSaveFailure", report: list[0] }),
+        });
+        if (!res.ok) break;
+        list.shift();
+        writeUnsent(list);
+      }
+      if (!list.length) localStorage.removeItem(LS_UNSENT_REPORTS);
+    } catch (_) {
+      // Still can't reach the server — the reports wait for the next try.
+    } finally {
+      flushingReports = false;
+    }
+  }
+  window.addEventListener("online", () => flushUnsentSaveReports());
+  window.RPC_REPORT_UNSENT_SAVE = reportUnsentSave;
 
   upgradeStoredPinToBrowserCredential();
 
@@ -4708,12 +4809,12 @@
         repairCost: $("fRepairCost").value.trim(),
         amountPaid: $("fAmountPaid").value.trim(),
       });
-    } else {
-      // No second device after all — release its queued media, if any.
-      pendingFormMedia.forEach((m) => URL.revokeObjectURL(m.url));
     }
-    formDevices = [];
-    pendingFormMedia = [];
+    // formDevices and the on-screen fields (with their queued photos) are
+    // only cleared once their devices are saved — a failed save keeps
+    // everything for another try. devices = formDevices…, then the on-screen
+    // device last.
+    const listedCount = formDevices.length;
 
     const invoiceNote = shouldSendInvoice
       ? `Invoice requested by ${invoiceDelivery === "whatsapp" ? "WhatsApp" : "email"}.`
@@ -4793,13 +4894,32 @@
     saveBtn.disabled = false;
     saveBtn.textContent = original;
 
-    if (!savedTickets.length) {
-      err.textContent = failureMessage || "Couldn't save: nothing was logged.";
+    if (savedTickets.length < devices.length) {
+      // Keep every device that wasn't saved in the form, with the amounts
+      // typed on this step, so Save can simply be tapped again.
+      const saved = savedTickets.length;
+      formDevices = formDevices
+        .map((d, i) => ({ ...d, repairCost: devices[i].repairCost, amountPaid: devices[i].amountPaid }))
+        .slice(Math.min(saved, listedCount));
+      // Devices saved already joined this check-in: the retry joins it too.
+      if (saved && !addToCheckinGroup) addToCheckinGroup = savedTickets[0].checkinGroup || savedTickets[0].id;
+      renderAddedDevices();
+      renderPaymentCards();
+      savedTickets.forEach((ticket, i) => uploadMediaQueueForTicket(ticket, devices[i].media, { narrate: false }));
+      const notSaved = devices.slice(saved).map((d) => d.device || "a device").join(", ");
+      const reason = failureMessage.replace(/^Couldn't save [^:]*: /, "").replace(/[.\s]+$/, "") || "nothing was logged";
+      err.textContent = saved
+        ? `Only ${saved} of ${devices.length} devices saved. Not saved: ${notSaved} (${reason}). Their details are still here — check the connection and tap Save to try again.`
+        : `Not saved (${reason}). Nothing you entered was lost — check the connection and tap Save to try again.`;
       err.hidden = false;
       return;
     }
+    // Everything saved: now the form can let go of it.
+    if (pendingDeviceBlank) pendingFormMedia.forEach((m) => URL.revokeObjectURL(m.url));
+    formDevices = [];
+    pendingFormMedia = [];
 
-    const wasPartial = savedTickets.length < devices.length;
+    const wasPartial = false;
     $("intakeFormTitle").textContent = savedTickets.length > 1 ? "Devices logged" : "Device logged";
     $("formSuccessTitle").textContent = savedTickets.length > 1
       ? `${savedTickets.length} devices successfully logged`

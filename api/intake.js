@@ -35,6 +35,7 @@ import { listBankTransactions, bankAccountSummary, addBankTransaction, updateBan
 import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, renamePartsShipment, setPartsShipmentPaymentStatus } from "../lib/parts-orders.js";
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
+import { recordSaveFailure, listSaveFailures, isReadAction } from "../lib/save-failures.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
@@ -390,10 +391,37 @@ export default async function handler(req, res) {
     if (action === "accountSummary") {
       return res.status(200).json({ ok: true, summary: await accountSummary() });
     }
+    // Settings → Failed saves (team PIN, like every other action here).
+    if (action === "listSaveFailures") {
+      return res.status(200).json({ ok: true, failures: await listSaveFailures({ limit: body.limit }) });
+    }
+    // The app couldn't reach us when it tried to save (offline, timeout,
+    // server error) and reports it now that it can. Records only.
+    if (action === "reportClientSaveFailure") {
+      const report = body.report && typeof body.report === "object" ? body.report : {};
+      const recorded = await recordSaveFailure({
+        route: String(report.route || "/api/intake"), method: "POST", action: String(report.action || ""),
+        error: `${report.error || "No answer from the server"}${report.at ? ` (on the device at ${report.at})` : ""}`,
+        body: report.body, source: "client", deviceId,
+      });
+      return res.status(200).json({ ok: true, recorded });
+    }
     return res.status(200).json({ ok: false, error: "Unknown action: " + action });
   } catch (err) {
+    // A save that threw leaves a lasting record (lib/save-failures.js). That
+    // never changes what the caller gets back.
+    if (!isReadAction(action)) {
+      await recordSaveFailure({
+        route: "/api/intake", method: req.method, action, error: err, body,
+        deviceId: safeDeviceId(body.pin),
+      });
+    }
     return res.status(200).json({ ok: false, error: String((err && err.message) || err), ...(err?.code ? { code: err.code } : {}) });
   }
+}
+
+function safeDeviceId(pin) {
+  try { return deviceIdForCredential(pin) || ""; } catch (_) { return ""; }
 }
 
 // A repair payment staff confirmed as cash or bank transfer is deposited to

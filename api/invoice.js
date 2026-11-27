@@ -1,4 +1,5 @@
 import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
+import { recordSaveFailure, isReadAction } from "../lib/save-failures.js";
 import { readyEmailDraft, sendReadyEmail, deleteSender, EMAIL_PLACEHOLDERS, EMAIL_TEMPLATE_DEFAULTS, fillPlaceholders, getEmailTemplate, invoiceEmailHtml, listSenders, resetEmailTemplate, sampleInvoice, saveEmailTemplate, saveSender, sendInvoiceMail, setDefaultSender, testSender } from "../lib/email.js";
 import { checkinInvoice, createInvoice, DEFAULT_INVOICE_NOTES, findCheckinInvoice, deleteInvoice, recordInvoiceEmail, getInvoiceById, getInvoiceByToken, getInvoiceForTicket, INVOICE_BUSINESS, invoiceHtml, invoiceWhatsAppUrl, listInvoices, sendInvoiceEmail, syncInvoicePaymentForTicket, updateInvoice } from "../lib/invoices.js";
 import { isRepairSyncPaymentUpdate } from "../lib/invoice-payment-sync.js";
@@ -28,6 +29,13 @@ export default async function handler(req, res) {
     if (req.method === "POST") return await createAndDeliverInvoice(req, res);
     return res.status(405).json({ ok: false, error: "GET or POST only" });
   } catch (err) {
+    // A failed save leaves a lasting record (lib/save-failures.js); the
+    // response is the same as before.
+    if (req.method === "POST") {
+      const body = typeof req.body === "string" ? safeJson(req.body) : (req.body || {});
+      const action = req.query?.pickup ? "bookCollection" : (body.action || "legacy");
+      if (!isReadAction(action)) await recordSaveFailure({ route: "/api/invoice", method: req.method, action, error: err, body });
+    }
     return res.status(200).json({ ok: false, error: String((err && err.message) || err) });
   }
 }
