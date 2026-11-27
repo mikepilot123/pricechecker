@@ -619,8 +619,8 @@
     const body = Object.assign({ pin: cfg.pin }, payload);
     let res;
     try {
-      if (payload.action === "list") {
-        const q = new URLSearchParams({ action: "list", pin: cfg.pin, _: Date.now() });
+      if (payload.action === "list" || payload.action === "ticketsVersion") {
+        const q = new URLSearchParams({ action: payload.action, pin: cfg.pin, _: Date.now() });
         res = await fetch(cfg.url + "?" + q.toString(), { method: "GET" });
       } else {
         res = await fetch(cfg.url, {
@@ -651,7 +651,7 @@
   // device keeps a note (PIN removed) and sends it once the server answers
   // again, so those leave a trace too.
   const LS_UNSENT_REPORTS = "rpc_unsent_save_reports";
-  const READ_ACTION_RE = /^(list|get|search|preview|check|view|load|find|deviceAccess|accountSummary|bankAccountSummary|emailTemplate|emailDraft|readyEmailDraft|senders|zohoStatus|forTicket|checkinCandidate|registerBrowser|reportClientSaveFailure)/;
+  const READ_ACTION_RE = /^(list|get|search|preview|check|view|load|find|ticketsVersion|deviceAccess|accountSummary|bankAccountSummary|emailTemplate|emailDraft|readyEmailDraft|senders|zohoStatus|forTicket|checkinCandidate|registerBrowser|reportClientSaveFailure)/;
   let flushingReports = false;
   const readUnsent = () => { try { return JSON.parse(localStorage.getItem(LS_UNSENT_REPORTS) || "[]"); } catch (_) { return []; } };
   const writeUnsent = (list) => { try { localStorage.setItem(LS_UNSENT_REPORTS, JSON.stringify(list.slice(-20))); } catch (_) {} };
@@ -717,6 +717,7 @@
       const res = await api({ action: "list" });
       if (!res.ok) throw new Error(res.error || "Rejected");
       TICKETS = (res.tickets || []).map(normalizeTicket);
+      knownTicketsVersion = res.version || "";
       await loadTechnicians();
       loadedOnce = true;
       renderStatusChips();
@@ -745,10 +746,14 @@
   // never saw repairs logged on another device until the app was fully
   // reloaded — it looked as if the other device hadn't saved. Now the list
   // refreshes quietly: when the app comes back to the front, when Repairs is
-  // opened, when the connection returns, and every 30 seconds while the app
-  // is on screen. It only redraws when something actually changed.
-  const AUTO_REFRESH_MS = 30 * 1000;
+  // opened, when the connection returns, and every 60 seconds while someone
+  // is using the app (assets/activity.js — nothing at all while it's hidden
+  // or idle, so the database can sleep). Each round first asks the server
+  // for a tiny fingerprint of the repairs (ticketsVersion) and only
+  // downloads the list when it changed.
+  const AUTO_REFRESH_MS = 60 * 1000;
   const MIN_REFRESH_GAP_MS = 5 * 1000;
+  let knownTicketsVersion = "";
   let localTicketChanges = 0;
   let refreshInFlight = null;
   let lastQuietRefresh = 0;
@@ -761,8 +766,13 @@
     const changesBefore = localTicketChanges;
     refreshInFlight = (async () => {
       try {
+        if (knownTicketsVersion) {
+          const check = await api({ action: "ticketsVersion" });
+          if (check.ok && check.version === knownTicketsVersion) return false; // nothing new
+        }
         const res = await api({ action: "list" });
         if (!res.ok) return false;
+        knownTicketsVersion = res.version || "";
         // Something was saved on this device while the list was on its way:
         // it may not include that, so skip this round rather than lose it.
         if (localTicketChanges !== changesBefore) return false;
@@ -788,8 +798,9 @@
   });
   window.addEventListener("focus", () => refreshTicketsQuietly());
   window.addEventListener("online", () => refreshTicketsQuietly({ force: true }));
+  window.addEventListener("rpc-active", () => refreshTicketsQuietly({ force: true }));
   setInterval(() => {
-    if (document.visibilityState === "visible") refreshTicketsQuietly();
+    if (document.visibilityState === "visible" && !window.RPC_ACTIVITY?.isIdle()) refreshTicketsQuietly();
   }, AUTO_REFRESH_MS);
 
   function publishTickets() {

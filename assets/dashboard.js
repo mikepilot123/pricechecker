@@ -3125,7 +3125,9 @@
     // someone comes back, and an embedded/webview context that never reports
     // itself visible still gets its alerts. No PIN means the API would reject
     // us anyway; the cached list is rendered either way.
-    const fresh = !document.hidden && pin() ? await loadReminders({ quiet: true }) : false;
+    // Nobody using the app (assets/activity.js): skip the fetch so the
+    // database can sleep — due cards still show from the loaded list.
+    const fresh = !document.hidden && pin() && !window.RPC_ACTIVITY?.isIdle() ? await loadReminders({ quiet: true }) : false;
     // Only prune against a list this tab just fetched. A background tab skips
     // the fetch and still holds the list from when it was opened, so it
     // doesn't know about reminders created since — pruning there wiped the
@@ -3136,6 +3138,7 @@
 
   function startReminderAlerts() {
     if (alertPollTimer) return;
+    window.addEventListener("rpc-active", () => pollReminderAlerts());
     bindAlertPrefsOnce();
     setTimeout(() => { pollReminderAlerts(); }, ALERT_FIRST_RUN_MS);
     alertPollTimer = setInterval(pollReminderAlerts, ALERT_POLL_MS);

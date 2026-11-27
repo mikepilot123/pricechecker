@@ -1188,7 +1188,10 @@
   }
 
   setTimeout(checkNewBookings, 2500);
-  setInterval(() => { if (!document.hidden) checkNewBookings(); }, NEW_BOOKINGS_POLL_MS);
+  // Not while nobody is using the app (assets/activity.js), so the database
+  // can sleep; it catches up the moment someone comes back.
+  setInterval(() => { if (!document.hidden && !window.RPC_ACTIVITY?.isIdle()) checkNewBookings(); }, NEW_BOOKINGS_POLL_MS);
+  window.addEventListener("rpc-active", () => checkNewBookings());
   document.addEventListener("visibilitychange", () => { if (!document.hidden) checkNewBookings(); });
 
   function init() {

@@ -778,9 +778,9 @@
   });
   window.addEventListener("rpc-enter-inventory", () => loadInventory({ force: !loadedOnce }));
   setInterval(() => {
-    // No background refreshes while the tab is hidden — the visibilitychange
-    // handler below catches up when the tab comes back.
-    if (document.hidden) return;
+    // No background refreshes while the tab is hidden or nobody is using the
+    // app (assets/activity.js) — the visibilitychange handler below catches up.
+    if (document.hidden || window.RPC_ACTIVITY?.isIdle()) return;
     if (!$("view-inventory")?.hidden) loadInventory({ force: true });
     if (lastUpdated) setStatus("live");
   }, AUTO_REFRESH_MS);

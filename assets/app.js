@@ -1518,6 +1518,13 @@ window.addEventListener("rpc-inventory", (event) => {
   if (Array.isArray(links)) INVENTORY_LINKS = links.slice();
   if (MODELS.length) render();
 });
+// Someone is back after the app sat idle: catch up.
+window.addEventListener("rpc-active", () => {
+  if (lastFetchTime && Date.now() - lastFetchTime > 60000) {
+    loadData({ reason: "focus" });
+    loadInventoryForPrices({ force: true });
+  }
+});
 // Refresh when the tab regains focus (counter staff reopening the app).
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && lastFetchTime && Date.now() - lastFetchTime > 60000) {
@@ -1533,9 +1540,9 @@ document.addEventListener("visibilitychange", () => {
 function startAutoSync() {
   if (syncTimer) clearInterval(syncTimer);
   syncTimer = setInterval(() => {
-    // Skip background refreshes while the tab is hidden — the
-    // visibilitychange handler above catches the app up on return.
-    if (document.hidden) return;
+    // Skip background refreshes while the tab is hidden or nobody is using
+    // the app (assets/activity.js) — the handlers above catch up on return.
+    if (document.hidden || window.RPC_ACTIVITY?.isIdle()) return;
     loadData({ reason: "interval" });
     // Stock changes made on another device (or straight in the sheet) reach
     // the ticks without a reload.

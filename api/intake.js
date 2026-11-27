@@ -18,6 +18,7 @@ import {
   deleteTicketNote,
   refundTicket,
   addTicketOnce,
+  ticketsVersion,
   claimWarranty,
 } from "../lib/tickets.js";
 import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
@@ -162,7 +163,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, deviceId, devices: await listDevices() });
     }
     if (action === "list") {
-      return res.status(200).json({ ok: true, tickets: await listTickets({ includeDeleted: !!body.includeDeleted }) });
+      const tickets = await listTickets({ includeDeleted: !!body.includeDeleted });
+      return res.status(200).json({ ok: true, tickets, version: await ticketsVersion() });
+    }
+    // The app's once-a-minute "anything new?" check (assets/intake.js).
+    if (action === "ticketsVersion") {
+      return res.status(200).json({ ok: true, version: await ticketsVersion() });
     }
     if (action === "add") {
       // A retry of an attempt that already saved gets that repair back —
