@@ -598,6 +598,7 @@
     }
     showMain();
     if (!loadedOnce) loadTickets();
+    else refreshTicketsQuietly({ force: true });
   }
 
   async function loadTickets() {
@@ -629,6 +630,58 @@
       $("intakeLoading").style.display = "none";
     }
   }
+
+  // ---- Keeping every device up to date -------------------------------------
+  // Repairs used to load once per page load, so a phone or tablet left open
+  // never saw repairs logged on another device until the app was fully
+  // reloaded — it looked as if the other device hadn't saved. Now the list
+  // refreshes quietly: when the app comes back to the front, when Repairs is
+  // opened, when the connection returns, and every 30 seconds while the app
+  // is on screen. It only redraws when something actually changed.
+  const AUTO_REFRESH_MS = 30 * 1000;
+  const MIN_REFRESH_GAP_MS = 5 * 1000;
+  let localTicketChanges = 0;
+  let refreshInFlight = null;
+  let lastQuietRefresh = 0;
+  const ticketsSignature = (list) => list.map((t) => `${t.id}|${t.updated}|${t.currentVersion}`).sort().join(",");
+
+  function refreshTicketsQuietly({ force = false } = {}) {
+    if (!loadedOnce || !isConfigured() || refreshInFlight) return refreshInFlight;
+    if (!force && Date.now() - lastQuietRefresh < MIN_REFRESH_GAP_MS) return null;
+    lastQuietRefresh = Date.now();
+    const changesBefore = localTicketChanges;
+    refreshInFlight = (async () => {
+      try {
+        const res = await api({ action: "list" });
+        if (!res.ok) return false;
+        // Something was saved on this device while the list was on its way:
+        // it may not include that, so skip this round rather than lose it.
+        if (localTicketChanges !== changesBefore) return false;
+        const next = (res.tickets || []).map(normalizeTicket);
+        if (ticketsSignature(next) === ticketsSignature(TICKETS)) return false;
+        TICKETS = next;
+        if (currentModalTicket) currentModalTicket = TICKETS.find((t) => t.id === currentModalTicket.id) || currentModalTicket;
+        renderStatusChips();
+        render();
+        publishTickets();
+        return true;
+      } catch (_) {
+        return false; // offline or a blip — the next round tries again
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+    return refreshInFlight;
+  }
+  window.RPC_REFRESH_TICKETS = refreshTicketsQuietly;
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshTicketsQuietly({ force: true });
+  });
+  window.addEventListener("focus", () => refreshTicketsQuietly());
+  window.addEventListener("online", () => refreshTicketsQuietly({ force: true }));
+  setInterval(() => {
+    if (document.visibilityState === "visible") refreshTicketsQuietly();
+  }, AUTO_REFRESH_MS);
 
   function publishTickets() {
     window.RPC_INTAKE_TICKETS = TICKETS.slice();
@@ -4773,6 +4826,7 @@
 
   function mergeTicket(t) {
     if (!t) return;
+    localTicketChanges++;
     t = normalizeTicket(t);
     const i = TICKETS.findIndex((x) => x.id === t.id);
     if (i >= 0) TICKETS[i] = t;
@@ -6106,7 +6160,7 @@
 
   window.addEventListener("rpc-enter-completed-repairs", () => {
     if (!loadedOnce && isConfigured()) loadTickets();
-    else renderCompletedTickets();
+    else { renderCompletedTickets(); refreshTicketsQuietly({ force: true }); }
   });
 
   function renderStatusChips() {
