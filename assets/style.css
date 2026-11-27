@@ -4234,6 +4234,9 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   margin-top: 0;
   max-width: 100%;
 }
+.ticket-issue-list { max-width: 100%; min-width: 0; }
+.ticket-issues-mobile,
+.ticket-extra-issues[hidden] { display: none; }
 .ticket-status {
   grid-area: status;
   justify-self: end;
@@ -8404,6 +8407,35 @@ video.media-viewer-media {
   .ticket-head-compact .ticket-repair-label,
   /* Same activity log as the notes button (with its count) on the row. */
   .ticket-head-compact .issue-notes-btn { display: none; }
+  .ticket-repair .ticket-issues-desktop { display: none; }
+  .ticket-issues-mobile { display: grid; gap: 4px; }
+  .ticket-issues-preview { display: flex; align-items: center; gap: 6px; }
+  .ticket-issue-toggle {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: var(--m-touch);
+    height: var(--m-touch);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    font: 600 0.8rem var(--font-display);
+    cursor: pointer;
+  }
+  .ticket-issue-toggle span {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #047857;
+  }
+  .ticket-issue-toggle:focus-visible {
+    outline: 2px solid #047857;
+    outline-offset: -2px;
+  }
   .ticket-head .ticket-repair .issue-tags { gap: 4px 6px; }
   .ticket-head .ticket-repair .issue-chip { margin: 0; overflow-wrap: anywhere; }
   .ticket-head-compact .issue-chip { font-size: 0.8rem; }

@@ -6598,16 +6598,16 @@
   function splitIssueParts(issuesStr) {
     const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
     return {
+      parts,
       short: parts.filter((p) => p.length <= ISSUE_CHIP_MAX_LEN),
       long: parts.filter((p) => p.length > ISSUE_CHIP_MAX_LEN),
     };
   }
 
-  // Compact chip row for a ticket card: short preset issues render as chips
-  // as before; any long free-text issue collapses into a "View notes"
-  // button instead of sprawling across the card.
+  // Desktop groups long issues behind View notes. Mobile previews the
+  // first issue in recorded order and expands the rest on demand.
   function ticketRepairChipsHtml(t) {
-    const { short, long } = splitIssueParts(t.issues);
+    const { parts, short, long } = splitIssueParts(t.issues);
     const chips = short.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("");
     const notesBtn = long.length
       ? `<button type="button" class="issue-chip issue-notes-btn" data-view-notes>
@@ -6615,7 +6615,17 @@
         </button>`
       : "";
     if (!chips && !notesBtn) return `<span class="issue-chip muted">No issues recorded</span>`;
-    return chips + notesBtn;
+    const [first, ...remaining] = parts;
+    const count = remaining.length;
+    const issueLabel = `${count} more ${count === 1 ? "issue" : "issues"}`;
+    return `<div class="ticket-issues-desktop issue-tags">${chips}${notesBtn}</div>
+      <div class="ticket-issues-mobile">
+        <div class="ticket-issues-preview">
+          <span class="issue-chip">${esc(first)}</span>
+          ${count ? `<button type="button" class="ticket-issue-toggle" aria-expanded="false" aria-label="Show ${issueLabel}" data-issue-label="${issueLabel}"><span aria-hidden="true">+${count}</span></button>` : ""}
+        </div>
+        ${count ? `<div class="ticket-extra-issues issue-tags" hidden>${remaining.map((issue) => `<span class="issue-chip">${esc(issue)}</span>`).join("")}</div>` : ""}
+      </div>`;
   }
 
   // Full days elapsed since an ISO timestamp (0 if missing/invalid).
@@ -6794,7 +6804,7 @@
       ${identityHtml}
       <div class="ticket-repair">
         <span class="ticket-repair-label">Repair</span>
-        <div class="issue-tags issue-tags-readonly">${ticketRepairChipsHtml(t)}</div>
+        <div class="ticket-issue-list">${ticketRepairChipsHtml(t)}</div>
       </div>
       <div class="ticket-status">
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
@@ -6849,6 +6859,18 @@
       techBtn.onkeydown = (e) => e.stopPropagation();
     }
     bindActivityLogBtn(head.querySelector(".activity-log-btn"), t);
+    const issueToggle = head.querySelector(".ticket-issue-toggle");
+    if (issueToggle) {
+      const extraIssues = head.querySelector(".ticket-extra-issues");
+      issueToggle.onclick = (e) => {
+        e.stopPropagation();
+        const show = extraIssues.hidden;
+        extraIssues.hidden = !show;
+        issueToggle.setAttribute("aria-expanded", String(show));
+        issueToggle.setAttribute("aria-label", `${show ? "Hide" : "Show"} ${issueToggle.dataset.issueLabel}`);
+      };
+      issueToggle.onkeydown = (e) => e.stopPropagation();
+    }
     const notesBtn = head.querySelector("[data-view-notes]");
     if (notesBtn) {
       notesBtn.onclick = (e) => {
