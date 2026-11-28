@@ -1878,6 +1878,7 @@
         ${detailRow("i-cash", "Paid by", fieldDisplayHtml("paymentMethod", ticket), "", "paymentMethod")}
         ${Number(ticket.refunded) > 0 ? detailRow("i-restore", "Refunded", esc(formatMoney(ticket.refunded)), "money-due") : ""}
       </div><div id="ticketRecordPayment">${paymentActionsHtml(ticket)}</div></section>
+      ${supplierSectionHtml(ticket)}
       <section class="ticket-detail-section" id="ticketIssuesSection">${issuesSectionStaticHtml(ticket)}</section>
       <section class="ticket-detail-section"><p class="field-label">Diagnostics</p>
         <div id="ticketDiagnostics" data-ticket-id="${esc(ticket.id || "")}"><p class="ops-empty">Loading…</p></div>
@@ -1891,6 +1892,7 @@
         <p class="field-error" id="ticketMediaError" hidden></p>
       </section>`;
 
+    loadSupplierCost(ticket);
     $("ticketModalFooter").innerHTML = `
       ${hasPhone ? `<a class="primary-btn" href="tel:${esc(ticket.phone)}"><svg class="icon"><use href="#i-phone"></use></svg>Call client</a>` : ""}
       ${refundButtonHtml(ticket)}
@@ -5789,6 +5791,130 @@
   $("partsCheckBanner")?.addEventListener("click", (e) => { if (e.target.closest("[data-parts-check-open]")) navigateTo("pendingExpenses"); });
   window.RPC_OPEN_PARTS_CHECK = () => navigateTo("pendingExpenses");
 
+  // Repairs that went out to Ainsley were paid to Ainsley.
+  function defaultSupplierFor(t) {
+    return /ainsley/i.test(`${t.status || ""} ${t.history || ""}`) ? "Ainsley" : "";
+  }
+  // "Charged TT$450 · paid TT$300 · TT$150 profit" under the amount field.
+  function supplierProfitHtml(t, paidValue) {
+    const charged = Number(t.repairCost) || 0;
+    const paid = Number(paidValue) || 0;
+    if (!charged || !paid) return charged ? `Charged the client ${esc(formatMoney(charged))}.` : "";
+    const profit = Math.round((charged - paid) * 100) / 100;
+    return `Charged ${esc(formatMoney(charged))} · paid ${esc(formatMoney(paid))} · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong>`;
+  }
+
+  // ---- Repair window: "Supplier cost" ----
+  // What we paid out for this repair — set or corrected here at any time
+  // (lib/parts-check.js setSupplierCost). Shown to devices that can see
+  // Accounting, since it's an expense.
+  function supplierSectionHtml(ticket) {
+    if (window.RPC_DEVICE_ACCESS?.isHidden?.("accounting")) return "";
+    return `<section class="ticket-detail-section" id="ticketSupplierSection" data-ticket="${esc(ticket.id)}">
+      <p class="field-label">Supplier cost</p><div id="ticketSupplierBody"><p class="supplier-muted">Loading…</p></div></section>`;
+  }
+  let supplierState = null;
+  async function loadSupplierCost(ticket) {
+    if (!$("ticketSupplierBody")) return;
+    supplierState = null;
+    try {
+      const res = await api({ action: "getSupplierCost", id: ticket.id });
+      if (!res.ok) throw new Error(res.error || "Couldn't load");
+      if (currentModalTicket?.id !== ticket.id) return;
+      supplierState = res;
+      renderSupplierStatic();
+    } catch (err) {
+      if ($("ticketSupplierBody")) $("ticketSupplierBody").innerHTML = `<p class="supplier-muted">Couldn't load the supplier cost: ${esc(err.message)}</p>`;
+    }
+  }
+  function renderSupplierStatic() {
+    const body = $("ticketSupplierBody");
+    const t = currentModalTicket;
+    if (!body || !t || !supplierState) return;
+    const s = supplierState;
+    let line;
+    let action = `<button type="button" class="ghost-btn small-btn" data-supplier-edit><svg class="icon"><use href="#i-pencil"></use></svg>${s.partsCheck ? "Edit" : "Record"}</button>`;
+    if (s.partsCheck === "stock") {
+      line = `Part from our stock${s.stockItem ? `: ${esc(s.stockItem)}` : ""}`;
+      action = "";
+    } else if (s.partsCheck === "expense" && s.expense) {
+      const charged = Number(t.repairCost) || 0;
+      const profit = Math.round((charged - Number(s.expense.amount)) * 100) / 100;
+      line = `Paid <strong>${esc(s.expense.vendor || "supplier")}</strong> ${esc(formatMoney(s.expense.amount))}${charged ? `<span class="supplier-profit-inline"> · charged ${esc(formatMoney(charged))} · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong></span>` : ""}`;
+    } else if (s.partsCheck === "none" || s.partsCheck === "expense") {
+      line = "Nothing spent on this repair";
+    } else {
+      line = `<span class="supplier-muted">Not recorded yet</span>`;
+    }
+    body.innerHTML = `<div class="supplier-row"><p class="supplier-line">${line}</p>${action}</div>`;
+  }
+  function renderSupplierEdit() {
+    const body = $("ticketSupplierBody");
+    const t = currentModalTicket;
+    if (!body || !t || !supplierState) return;
+    const e = supplierState.expense;
+    body.innerHTML = `
+      <div class="supplier-form">
+        <div class="form-grid">
+          <div class="form-field"><label class="field-label" for="supplierAmount">Amount we paid (TTD)</label>
+            <input id="supplierAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 300.00" value="${e ? Number(e.amount).toFixed(2) : ""}" /></div>
+          <div class="form-field"><label class="field-label" for="supplierVendor">Supplier</label>
+            <input id="supplierVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Ainsley" value="${esc(e?.vendor || defaultSupplierFor(t))}" /></div>
+        </div>
+        <p class="supplier-profit" id="supplierProfit"></p>
+        <p class="field-error" id="supplierError" hidden></p>
+        <div class="supplier-actions">
+          <button type="button" class="ghost-btn" data-supplier-none>Nothing spent</button>
+          <span class="supplier-actions-gap"></span>
+          <button type="button" class="ghost-btn" data-supplier-cancel>Cancel</button>
+          <button type="button" class="primary-btn" data-supplier-save>Save</button>
+        </div>
+      </div>`;
+    const amount = $("supplierAmount");
+    const profit = () => { $("supplierProfit").innerHTML = supplierProfitHtml(t, amount.value); };
+    amount.addEventListener("input", profit);
+    profit();
+    amount.focus();
+  }
+  async function saveSupplierCost(spent) {
+    const t = currentModalTicket;
+    if (!t) return;
+    const err = (m) => { const el = $("supplierError"); if (el) { el.textContent = m || ""; el.hidden = !m; } };
+    const payload = { action: "setSupplierCost", id: t.id, spent };
+    if (spent) {
+      payload.amount = $("supplierAmount").value.trim();
+      payload.vendor = $("supplierVendor").value.trim();
+      if (!(Number(payload.amount) > 0)) return err("Enter the amount we paid the supplier.");
+      if (!payload.vendor) return err("Enter the supplier's name.");
+    } else if (supplierState?.expense && !confirm(`Mark this repair as nothing spent? The ${formatMoney(supplierState.expense.amount)} expense to ${supplierState.expense.vendor || "the supplier"} will be taken off Expenses.`)) {
+      return;
+    }
+    $("ticketSupplierBody").querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    try {
+      const res = await api(payload);
+      if (!res.ok) throw new Error(res.error || "Couldn't save");
+      mergeTicket(res.ticket);
+      currentModalTicket = TICKETS.find((x) => x.id === t.id) || currentModalTicket;
+      supplierState = {
+        partsCheck: res.ticket.partsCheck,
+        stockItem: "",
+        expense: res.expense ? { id: res.expense.id, amount: Number(res.expense.amount), vendor: res.expense.vendor, date: res.expense.date } : null,
+      };
+      renderSupplierStatic();
+      toast(spent ? `Supplier cost saved: ${payload.vendor} ${formatMoney(payload.amount)}.` : "Marked as nothing spent.", { tone: "info", duration: 2500 });
+      refreshPendingCount({ force: true });
+    } catch (e) {
+      $("ticketSupplierBody").querySelectorAll("button").forEach((b) => { b.disabled = false; });
+      err(e.message);
+    }
+  }
+  $("ticketModalBody")?.addEventListener("click", (e) => {
+    if (e.target.closest("[data-supplier-edit]")) { renderSupplierEdit(); return; }
+    if (e.target.closest("[data-supplier-cancel]")) { renderSupplierStatic(); return; }
+    if (e.target.closest("[data-supplier-save]")) { saveSupplierCost(true); return; }
+    if (e.target.closest("[data-supplier-none]")) { saveSupplierCost(false); return; }
+  });
+
   // ---- The Pending expenses tab ----
   window.addEventListener("rpc-enter-pending-expenses", () => {
     pendingViewOpen = true;
@@ -5849,7 +5975,7 @@
     }
     if (countEl) countEl.textContent = partsQueue.length ? String(partsQueue.length) : "";
     if (!partsQueue.length) {
-      body.innerHTML = `<div class="pending-exp-empty"><p><strong>All caught up.</strong></p><p>Every finished or paid repair has its parts and expenses confirmed.</p></div>`;
+      body.innerHTML = `<div class="pending-exp-empty"><p><strong>All caught up.</strong></p><p>Every finished or paid repair has what we spent on it confirmed.</p></div>`;
       return;
     }
     body.innerHTML = `
@@ -5981,8 +6107,8 @@
       </div>
       <div class="parts-check-choices" role="radiogroup" aria-label="What did this repair use?">
         <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="stock"><strong>Part from our stock</strong><small>Take one off inventory</small></button>
-        <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="expense"><strong>Bought a part for it</strong><small>Record it on Expenses</small></button>
-        <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="none"><strong>No part needed</strong><small>Labour / software only</small></button>
+        <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="expense"><strong>Paid a supplier</strong><small>Bought a part or sent it out</small></button>
+        <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="none"><strong>Nothing spent</strong><small>No money paid out</small></button>
       </div>
       <div class="parts-check-detail" data-detail="stock" hidden>
         <label class="field-label" for="partsCheckItem">Stock item used</label>
@@ -5991,13 +6117,14 @@
       </div>
       <div class="parts-check-detail" data-detail="expense" hidden>
         <div class="form-grid">
-          <div class="form-field"><label class="field-label" for="partsCheckAmount">Part cost (TTD)</label>
-            <input id="partsCheckAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 350.00" value="${orders?.total ? orders.total.toFixed(2) : ""}" /></div>
-          <div class="form-field"><label class="field-label" for="partsCheckDate">Date bought</label>
+          <div class="form-field"><label class="field-label" for="partsCheckAmount">Amount we paid (TTD)</label>
+            <input id="partsCheckAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 300.00" value="${orders?.total ? orders.total.toFixed(2) : ""}" /></div>
+          <div class="form-field"><label class="field-label" for="partsCheckDate">Date paid</label>
             <input id="partsCheckDate" class="text-input" type="date" value="${ymd}" /></div>
         </div>
-        <label class="field-label" for="partsCheckVendor">Supplier <span class="field-optional">(optional)</span></label>
-        <input id="partsCheckVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Mobile Sentrix" value="${esc(orders?.vendor || "")}" />
+        <p class="supplier-profit" id="partsCheckProfit"></p>
+        <label class="field-label" for="partsCheckVendor">Supplier</label>
+        <input id="partsCheckVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Ainsley, Mobile Sentrix" value="${esc(orders?.vendor || defaultSupplierFor(t))}" />
         <label class="field-label" for="partsCheckNotes">Notes <span class="field-optional">(optional)</span></label>
         <input id="partsCheckNotes" class="text-input" type="text" maxlength="300" placeholder="e.g. OLED screen" value="${esc(orders?.parts || "")}" />
       </div>`;
@@ -6018,8 +6145,12 @@
       partsCheckError("");
     };
     body.querySelectorAll("[data-choice]").forEach((btn) => { btn.onclick = () => pick(btn.dataset.choice); });
-    // A part was ordered for this repair: most likely bought for it.
-    if (orders) pick("expense");
+    // A part was ordered for this repair, or it went out to Ainsley: most
+    // likely we paid a supplier.
+    if (orders || defaultSupplierFor(t)) pick("expense");
+    const profit = () => { $("partsCheckProfit").innerHTML = supplierProfitHtml(t, $("partsCheckAmount").value); };
+    $("partsCheckAmount").addEventListener("input", profit);
+    profit();
     $("partsCheckSkip").onclick = () => { partsQueueIndex++; showPartsQueueItem(); };
     $("partsCheckSave").onclick = async () => {
       const payload = { action: "recordPartsCheck", id: t.id, choice };
@@ -6032,7 +6163,8 @@
         payload.date = $("partsCheckDate").value;
         payload.vendor = $("partsCheckVendor").value.trim();
         payload.notes = $("partsCheckNotes").value.trim();
-        if (!(Number(payload.amount) > 0)) return partsCheckError("Enter what the part cost.");
+        if (!(Number(payload.amount) > 0)) return partsCheckError("Enter the amount we paid the supplier.");
+        if (!payload.vendor) return partsCheckError("Enter the supplier's name.");
       }
       const save = $("partsCheckSave");
       save.disabled = true;
@@ -6041,7 +6173,7 @@
         const res = await partsCheckApi(payload);
         mergeTicket(res.ticket);
         if (choice === "stock") refreshInventoryAfterStockChange();
-        toast(choice === "expense" ? `Expense of ${formatMoney(payload.amount)} recorded.` : choice === "stock" ? "Stock updated." : "Noted — no part needed.", { tone: "info", duration: 2500 });
+        toast(choice === "expense" ? `Paid ${payload.vendor} ${formatMoney(payload.amount)} — recorded on Expenses.` : choice === "stock" ? "Stock updated." : "Noted — nothing spent.", { tone: "info", duration: 2500 });
         partsQueue.splice(partsQueueIndex, 1);
         setPendingCount(partsQueue.length);
         pendingCountAt = Date.now();

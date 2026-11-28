@@ -38,7 +38,7 @@ import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, ren
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { recordSaveFailure, listSaveFailures, isReadAction } from "../lib/save-failures.js";
-import { listPartsChecks, countPartsChecks, recordPartsCheck } from "../lib/parts-check.js";
+import { listPartsChecks, countPartsChecks, recordPartsCheck, getSupplierCost, setSupplierCost } from "../lib/parts-check.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
@@ -64,6 +64,9 @@ const SECTION_GUARDED_ACTIONS = {
   addCashDepositToBank: ["accounting"],
   listExpenses: ["accounting"],
   deleteExpense: ["accounting"],
+  // A repair's "Supplier cost" (lib/parts-check.js) is an expense too.
+  getSupplierCost: ["accounting"],
+  setSupplierCost: ["accounting"],
   addExpenseCollection: ["accounting"],
   undoExpenseCollection: ["accounting"],
   listPartsOrders: ["partsOrders"],
@@ -322,6 +325,12 @@ export default async function handler(req, res) {
     }
     if (action === "undoExpenseCollection") {
       return res.status(200).json({ ok: true, expense: await undoExpenseCollection(body) });
+    }
+    if (action === "getSupplierCost") {
+      return res.status(200).json({ ok: true, ...(await getSupplierCost(body)) });
+    }
+    if (action === "setSupplierCost") {
+      return res.status(200).json({ ok: true, ...(await setSupplierCost(body)) });
     }
     if (action === "deleteExpense") {
       return res.status(200).json({ ok: true, deletedId: await deleteExpense(body) });

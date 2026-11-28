@@ -9249,3 +9249,16 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
   .pending-exp-row { flex-direction: column; align-items: stretch; }
   .pending-exp-lock-row .text-input { max-width: none; }
 }
+
+/* Repair window: Supplier cost */
+.supplier-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.supplier-line { margin: 0; flex: 1; min-width: 200px; }
+.supplier-muted { margin: 0; color: var(--text-dim); }
+.supplier-profit { margin: 4px 0 0; font-size: 0.85rem; color: var(--text-dim); min-height: 1em; }
+.supplier-profit-inline { color: var(--text-dim); font-size: 0.88rem; }
+.supplier-form { display: grid; gap: 8px; }
+.supplier-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.supplier-actions-gap { flex: 1; }
+.small-btn { min-height: 32px; padding: 4px 10px; font-size: 0.85rem; }
+.supplier-profit .money-positive, .supplier-profit-inline .money-positive { color: var(--price); }
+.supplier-profit .money-due, .supplier-profit-inline .money-due { color: var(--danger); }

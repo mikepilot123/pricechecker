@@ -111,7 +111,7 @@ await test("bought for it: an expense (Parts) linked to the repair", async () =>
   assert.equal(expense.category, "Parts");
   assert.equal(Number(expense.amount), 350);
   assert.match(expense.notes, new RegExp(`repair #${b.id}`));
-  assert.match(ticket.history, /TT\$350\.00 from Mobile Sentrix recorded on Expenses/);
+  assert.match(ticket.history, /paid Mobile Sentrix TT\$350\.00 for this repair/);
 });
 
 await test("no part needed, and each repair is only checked once", async () => {
@@ -125,7 +125,7 @@ await test("no part needed, and each repair is only checked once", async () => {
 
 await test("bad answers are refused", async () => {
   const d = await finished("Bad Fake (test)");
-  for (const body of [{ choice: "maybe" }, { choice: "expense", amount: "0" }, { choice: "stock" }]) {
+  for (const body of [{ choice: "maybe" }, { choice: "expense", amount: "0", vendor: "Ainsley" }, { choice: "expense", amount: "100" }, { choice: "stock" }]) {
     assert.equal((await call({ action: "recordPartsCheck", id: d.id, ownerPin: "9876", ...body }, owner)).payload.ok, false, JSON.stringify(body));
   }
 });
@@ -153,6 +153,39 @@ await test("a parts order for the repair comes with the queue item", async () =>
   await db.query("INSERT INTO parts_orders (id, batch_id, vendor, part, quantity, unit_cost, ticket_id) VALUES ('PO-T1', 'B1', 'Mobile Sentrix', 'OLED screen', 1, 350, $1)", [t.id]);
   const item = (await ok({ action: "partsCheckList", ownerPin: "9876" }, owner)).tickets.find((x) => x.id === t.id);
   assert.deepEqual(item.partsOrders, [{ vendor: "Mobile Sentrix", part: "OLED screen", quantity: 1, unitCost: 350 }]);
+});
+
+await test("supplier cost on the repair: correct what we paid, then switch to nothing spent", async () => {
+  // The owner's login can see Accounting (devices start with it hidden).
+  await ok({ action: "updateDevice", id: ownerDevice, hidden: [], ownerPin: "9876" }, owner);
+  // b was confirmed in the queue as TT$350 to Mobile Sentrix.
+  const before = await ok({ action: "getSupplierCost", id: b.id }, owner);
+  assert.equal(before.partsCheck, "expense");
+  assert.equal(before.expense.amount, 350);
+  const changed = await ok({ action: "setSupplierCost", id: b.id, spent: true, amount: "300", vendor: "Ainsley" }, owner);
+  assert.equal(changed.expense.id, before.expense.id, "same expense, corrected");
+  assert.equal(Number(changed.expense.amount), 300);
+  assert.equal(changed.expense.vendor, "Ainsley");
+  assert.match(changed.ticket.history, /Supplier cost changed: TT\$350\.00 to Mobile Sentrix → TT\$300\.00 to Ainsley/);
+  assert.equal((await call({ action: "setSupplierCost", id: b.id, spent: true, amount: "300" }, owner)).payload.ok, false, "supplier name required");
+  const none = await ok({ action: "setSupplierCost", id: b.id, spent: false }, owner);
+  assert.equal(none.ticket.partsCheck, "none");
+  assert.equal((await db.query("SELECT count(*) AS n FROM expenses WHERE id = $1 AND deleted_at IS NULL", [before.expense.id])).rows[0].n, 0, "expense taken off");
+  assert.equal((await ok({ action: "getSupplierCost", id: b.id }, owner)).expense, null);
+  // …and back: a new expense.
+  const again = await ok({ action: "setSupplierCost", id: b.id, spent: true, amount: "275", vendor: "Ainsley" }, owner);
+  assert.equal(again.ticket.partsCheck, "expense");
+  assert.notEqual(again.expense.id, before.expense.id);
+  // Stock repairs can't be changed here.
+  assert.equal((await call({ action: "setSupplierCost", id: a.id, spent: false }, owner)).payload.ok, false);
+});
+
+await test("supplier cost straight from a repair that hasn't been through the queue", async () => {
+  const t = await finished("Direct Fake (test)");
+  const res = await ok({ action: "setSupplierCost", id: t.id, spent: false }, owner);
+  assert.equal(res.ticket.partsCheck, "none");
+  const queue = (await ok({ action: "partsCheckList", ownerPin: "9876" }, owner)).tickets.map((x) => x.id);
+  assert.ok(!queue.includes(t.id), "answered, so out of the queue");
 });
 
 await test("moving the master keeps the start date; clearing it closes the queue", async () => {
