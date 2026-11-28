@@ -5794,6 +5794,39 @@
   $("partsCheckBanner")?.addEventListener("click", (e) => { if (e.target.closest("[data-parts-check-open]")) navigateTo("pendingExpenses"); });
   window.RPC_OPEN_PARTS_CHECK = () => navigateTo("pendingExpenses");
 
+  // Suppliers we've paid before (lib/parts-check.js listSuppliers), offered
+  // as suggestions in every Supplier field. A new name typed and saved joins
+  // the list straight away, so it's there next time.
+  let SUPPLIERS = ["Ainsley"];
+  function supplierDatalist() {
+    let list = $("supplierList");
+    if (!list) {
+      list = document.createElement("datalist");
+      list.id = "supplierList";
+      document.body.appendChild(list);
+    }
+    return list;
+  }
+  function setSuppliers(names) {
+    if (Array.isArray(names) && names.length) SUPPLIERS = names.slice();
+    supplierDatalist().innerHTML = SUPPLIERS.map((n) => `<option value="${esc(n)}"></option>`).join("");
+  }
+  function rememberSupplier(name) {
+    const clean = String(name || "").trim();
+    if (!clean) return;
+    SUPPLIERS = [clean, ...SUPPLIERS.filter((n) => n.toLowerCase() !== clean.toLowerCase())];
+    setSuppliers();
+  }
+  // Enter in a supplier / amount field saves, like pressing the button.
+  function enterSaves(input, save) {
+    input?.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || e.isComposing) return;
+      e.preventDefault();
+      // Let a suggestion picked with Enter fill the field first.
+      setTimeout(save, 0);
+    });
+  }
+
   // Repairs that went out to Ainsley were paid to Ainsley.
   function defaultSupplierFor(t) {
     return /ainsley/i.test(`${t.status || ""} ${t.history || ""}`) ? "Ainsley" : "";
@@ -5823,6 +5856,7 @@
     try {
       const res = await api({ action: "getSupplierCost", id: ticket.id });
       if (!res.ok) throw new Error(res.error || "Couldn't load");
+      setSuppliers(res.suppliers);
       if (currentModalTicket?.id !== ticket.id) return;
       supplierState = res;
       renderSupplierStatic();
@@ -5862,7 +5896,7 @@
           <div class="form-field"><label class="field-label" for="supplierAmount">Amount we paid (TTD)</label>
             <input id="supplierAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 300.00" value="${e ? Number(e.amount).toFixed(2) : ""}" /></div>
           <div class="form-field"><label class="field-label" for="supplierVendor">Supplier</label>
-            <input id="supplierVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Ainsley" value="${esc(e?.vendor || defaultSupplierFor(t))}" /></div>
+            <input id="supplierVendor" class="text-input" type="text" maxlength="120" list="supplierList" autocomplete="off" placeholder="Start typing — past suppliers are suggested" value="${esc(e?.vendor || defaultSupplierFor(t))}" /></div>
         </div>
         <p class="supplier-profit" id="supplierProfit"></p>
         <p class="field-error" id="supplierError" hidden></p>
@@ -5877,6 +5911,9 @@
     const profit = () => { $("supplierProfit").innerHTML = supplierProfitHtml(t, amount.value); };
     amount.addEventListener("input", profit);
     profit();
+    supplierDatalist();
+    enterSaves(amount, () => saveSupplierCost(true));
+    enterSaves($("supplierVendor"), () => saveSupplierCost(true));
     amount.focus();
   }
   async function saveSupplierCost(spent) {
@@ -5904,6 +5941,7 @@
         expense: res.expense ? { id: res.expense.id, amount: Number(res.expense.amount), vendor: res.expense.vendor, date: res.expense.date } : null,
       };
       renderSupplierStatic();
+      if (spent) rememberSupplier(payload.vendor);
       toast(spent ? `Supplier cost saved: ${payload.vendor} ${formatMoney(payload.amount)}.` : "Marked as nothing spent.", { tone: "info", duration: 2500 });
       refreshPendingCount({ force: true });
     } catch (e) {
@@ -5995,6 +6033,23 @@
       </li>`;
     const statusTag = (t) => `<span class="pending-exp-tag">${esc(t.status)}</span>`;
     const sections = [];
+    // Profit over the recorded repairs: what clients were charged minus what
+    // we paid suppliers. Stock parts have no price here, so they're left out.
+    const costed = recorded.filter(({ r }) => r.expense || r.namedExpense || (r.partsCheck === "none" && !r.stockItem));
+    const fromStock = recorded.length - costed.length;
+    if (costed.length) {
+      const charged = costed.reduce((sum, { t }) => sum + (Number(t.repairCost) || 0), 0);
+      const paid = costed.reduce((sum, { r }) => sum + (r.expense?.amount || r.namedExpense?.amount || 0), 0);
+      const profit = Math.round((charged - paid) * 100) / 100;
+      const margin = charged > 0 ? Math.round((profit / charged) * 100) : 0;
+      sections.push(`
+        <div class="pending-exp-summary" aria-label="Profit, last 30 days">
+          <div class="pending-exp-stat"><span>Charged clients</span><strong>${esc(formatMoney(charged))}</strong></div>
+          <div class="pending-exp-stat"><span>Paid suppliers</span><strong>${esc(formatMoney(paid))}</strong></div>
+          <div class="pending-exp-stat pending-exp-stat-profit"><span>Profit</span><strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))}</strong>${charged > 0 ? `<small>${margin}% of what we charged</small>` : ""}</div>
+        </div>
+        <p class="pending-exp-help">Last 30 days · ${costed.length} recorded repair${costed.length === 1 ? "" : "s"}${fromStock ? ` · ${fromStock} using stock parts not counted` : ""}${partsQueue.length ? ` · ${partsQueue.length} still to confirm` : ""}</p>`);
+    }
     if (partsQueue.length) {
       sections.push(`
         <div class="pending-exp-section-head">
@@ -6064,7 +6119,7 @@
         <div class="form-field"><label class="field-label">Amount we paid (TTD)</label>
           <input class="text-input pe-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 300.00" value="${r.expense ? r.expense.amount.toFixed(2) : ""}" /></div>
         <div class="form-field"><label class="field-label">Supplier</label>
-          <input class="text-input pe-vendor" type="text" maxlength="120" placeholder="e.g. Ainsley" value="${esc(r.expense?.vendor || defaultSupplierFor(t))}" /></div>
+          <input class="text-input pe-vendor" type="text" maxlength="120" list="supplierList" autocomplete="off" placeholder="Start typing — past suppliers are suggested" value="${esc(r.expense?.vendor || defaultSupplierFor(t))}" /></div>
       </div>
       <p class="supplier-profit pe-profit"></p>
       <p class="field-error pe-error" hidden></p>
@@ -6078,6 +6133,9 @@
     const profit = () => { editor.querySelector(".pe-profit").innerHTML = supplierProfitHtml(t, amount.value); };
     amount.addEventListener("input", profit);
     profit();
+    supplierDatalist();
+    enterSaves(amount, () => saveRowEditor(id, true));
+    enterSaves(editor.querySelector(".pe-vendor"), () => saveRowEditor(id, true));
     amount.focus();
   }
   async function saveRowEditor(id, spent) {
@@ -6102,6 +6160,7 @@
       mergeTicket(res.ticket);
       r.partsCheck = res.ticket.partsCheck;
       r.expense = res.expense ? { id: res.expense.id, amount: Number(res.expense.amount), vendor: res.expense.vendor || "" } : null;
+      if (spent) rememberSupplier(payload.vendor);
       toast(spent ? `Updated: paid ${payload.vendor} ${formatMoney(payload.amount)}.` : "Updated: nothing spent.", { tone: "info", duration: 2500 });
       renderPendingView();
     } catch (e) {
@@ -6168,6 +6227,7 @@
       const [res] = await Promise.all([partsCheckApi({ action: "partsCheckOverview" }), loadInventoryForForm().catch(() => [])]);
       partsQueue = res.pending || [];
       partsOverview = { notRecorded: res.notRecorded || [], recorded: res.recorded || [] };
+      setSuppliers(res.suppliers);
       partsQueueLoaded = true;
       setPendingCount(partsQueue.length);
       pendingCountAt = Date.now();
@@ -6258,7 +6318,7 @@
         </div>
         <p class="supplier-profit" id="partsCheckProfit"></p>
         <label class="field-label" for="partsCheckVendor">Supplier</label>
-        <input id="partsCheckVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Ainsley, Mobile Sentrix" value="${esc(orders?.vendor || defaultSupplierFor(t))}" />
+        <input id="partsCheckVendor" class="text-input" type="text" maxlength="120" list="supplierList" autocomplete="off" placeholder="Start typing — past suppliers are suggested" value="${esc(orders?.vendor || defaultSupplierFor(t))}" />
         <label class="field-label" for="partsCheckNotes">Notes <span class="field-optional">(optional)</span></label>
         <input id="partsCheckNotes" class="text-input" type="text" maxlength="300" placeholder="e.g. OLED screen" value="${esc(orders?.parts || "")}" />
       </div>`;
@@ -6285,6 +6345,9 @@
     const profit = () => { $("partsCheckProfit").innerHTML = supplierProfitHtml(t, $("partsCheckAmount").value); };
     $("partsCheckAmount").addEventListener("input", profit);
     profit();
+    supplierDatalist();
+    enterSaves($("partsCheckVendor"), () => $("partsCheckSave").click());
+    enterSaves($("partsCheckAmount"), () => $("partsCheckSave").click());
     $("partsCheckSkip").onclick = () => { partsQueueIndex++; showPartsQueueItem(); };
     $("partsCheckSave").onclick = async () => {
       const payload = { action: "recordPartsCheck", id: t.id, choice };
@@ -6306,6 +6369,7 @@
       try {
         const res = await partsCheckApi(payload);
         mergeTicket(res.ticket);
+        if (choice === "expense") rememberSupplier(payload.vendor);
         if (choice === "stock") refreshInventoryAfterStockChange();
         toast(choice === "expense" ? `Paid ${payload.vendor} ${formatMoney(payload.amount)} — recorded on Expenses.` : choice === "stock" ? "Stock updated." : "Noted — nothing spent.", { tone: "info", duration: 2500 });
         modalQueue.splice(partsQueueIndex, 1);

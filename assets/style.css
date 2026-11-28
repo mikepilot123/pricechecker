@@ -9277,3 +9277,17 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .pending-exp-editor { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: grid; gap: 8px; }
 .pending-exp-editor[hidden] { display: none; }
 .pending-exp-empty + .pending-exp-section-head { margin-top: 22px; }
+
+/* Pending expenses: profit summary */
+.pending-exp-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 4px 0 6px; }
+.pending-exp-stat { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); display: grid; gap: 2px; min-width: 0; }
+.pending-exp-stat span { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+.pending-exp-stat strong { font-size: 1.25rem; overflow-wrap: anywhere; }
+.pending-exp-stat small { color: var(--text-dim); font-size: 0.78rem; }
+.pending-exp-stat .money-positive { color: var(--price); }
+.pending-exp-stat .money-due { color: var(--danger); }
+.pending-exp-stat-profit { border-color: var(--price); }
+@media (max-width: 560px) {
+  .pending-exp-summary { grid-template-columns: 1fr 1fr; }
+  .pending-exp-stat-profit { grid-column: 1 / -1; }
+}

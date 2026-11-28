@@ -205,6 +205,15 @@ await test("overview: recorded repairs (with what was paid) and the past month's
   assert.equal((await call({ action: "partsCheckOverview", ownerPin: "9876" }, staff)).status, 403);
 });
 
+await test("suppliers we've paid are remembered for next time, most used first", async () => {
+  const o = await ok({ action: "partsCheckOverview", ownerPin: "9876" }, owner);
+  assert.equal(o.suppliers[0], "Ainsley", "used most so far");
+  assert.ok(o.suppliers.includes("Mobile Sentrix"));
+  assert.equal(o.suppliers.filter((s) => s.toLowerCase() === "ainsley").length, 1, "no duplicates");
+  const { suppliers } = await ok({ action: "getSupplierCost", id: b.id }, owner);
+  assert.deepEqual(suppliers, o.suppliers);
+});
+
 await test("moving the master keeps the start date; clearing it closes the queue", async () => {
   const before = (await ok({ action: "deviceAccess" }, owner)).partsCheckSince;
   const { deviceId: staffDevice } = await ok({ action: "deviceAccess" }, staff);
