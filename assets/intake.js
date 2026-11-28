@@ -6104,16 +6104,102 @@
     statusModalTicket = null;
   }
 
+  // Change status: a search box with suggestions instead of a wall of
+  // buttons. "Suggested next" lists where a repair usually goes from its
+  // current status; typing filters every status (all words must match, in
+  // any order). Arrow keys move, Enter picks, Escape closes.
+  const NEXT_STATUS_SUGGESTIONS = {
+    "Received": ["Diagnosing", "Part to be Ordered", "In Progress"],
+    "Diagnosing": ["Part to be Ordered", "In Progress", NO_FIX_TO_COLLECT],
+    "Waiting for Parts": ["Part Ordered", "In Progress"],
+    "Part to be Ordered": ["Part Ordered"],
+    "Part Ordered": ["In Progress", "Repaired"],
+    "In Progress": ["Repaired", "To Be Dropped by Ainsley", NO_FIX_TO_COLLECT],
+    "To Be Dropped by Ainsley": ["Being Repaired by Ainsley"],
+    "Being Repaired by Ainsley": ["Repaired", NO_FIX_TO_COLLECT],
+    "Repaired": ["Picked Up", "Checked Out - Waiting on Client"],
+    "Checked Out - Waiting on Client": ["Picked Up"],
+    [NO_FIX_TO_COLLECT]: [NO_FIX_COLLECTED],
+    "No Fix": [NO_FIX_COLLECTED],
+  };
+
+  function statusOptionHtml(s, ticket) {
+    const current = s === ticket.status;
+    return `<button type="button" role="option" class="status-option ${STATUS_CLASS[s] || ""}${current ? " current" : ""}" data-status="${esc(s)}" aria-selected="false">
+      <span class="status-option-dot" aria-hidden="true"></span>
+      <span class="status-option-label">${esc(s)}</span>
+      ${current ? `<span class="status-option-current">Current</span>` : ""}
+    </button>`;
+  }
+
   function renderStatusModalOptions() {
     const ticket = statusModalTicket;
     if (!ticket) return;
     const box = $("statusModalOptions");
-    box.innerHTML = STATUSES.map((s) =>
-      `<button type="button" class="status-set ${STATUS_CLASS[s]} ${s === ticket.status ? "current" : ""}" data-status="${esc(s)}">${esc(s)}</button>`
-    ).join("");
-    box.querySelectorAll("[data-status]").forEach((btn) => {
-      btn.addEventListener("click", () => chooseStatusOption(btn.dataset.status));
+    box.className = "status-picker";
+    box.innerHTML = `
+      <div class="status-picker-search">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <input id="statusPickerInput" class="text-input" type="search" autocomplete="off" placeholder="Search statuses…"
+               role="combobox" aria-expanded="true" aria-controls="statusPickerList" aria-label="Search statuses" />
+      </div>
+      <div id="statusPickerList" class="status-picker-list" role="listbox" aria-label="Statuses"></div>`;
+    const input = $("statusPickerInput");
+    const list = $("statusPickerList");
+    let active = 0;
+
+    const draw = () => {
+      const words = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const all = STATUSES.includes(ticket.status) || !ticket.status ? STATUSES : [ticket.status, ...STATUSES];
+      let html = "";
+      if (!words.length) {
+        const next = (NEXT_STATUS_SUGGESTIONS[ticket.status] || []).filter((s) => STATUSES.includes(s));
+        if (next.length) {
+          html += `<p class="status-picker-heading">Suggested next</p>` + next.map((s) => statusOptionHtml(s, ticket)).join("");
+        }
+        html += `<p class="status-picker-heading">All statuses</p>` + all.map((s) => statusOptionHtml(s, ticket)).join("");
+      } else {
+        const matches = all.filter((s) => words.every((w) => s.toLowerCase().includes(w)));
+        html = matches.length
+          ? matches.map((s) => statusOptionHtml(s, ticket)).join("")
+          : `<p class="status-picker-empty">No status matches “${esc(input.value.trim())}”.</p>`;
+      }
+      list.innerHTML = html;
+      active = 0;
+      highlight();
+    };
+    const options = () => [...list.querySelectorAll("[data-status]")];
+    const highlight = () => {
+      options().forEach((btn, i) => {
+        btn.classList.toggle("is-active", i === active);
+        btn.setAttribute("aria-selected", i === active ? "true" : "false");
+      });
+      const btn = options()[active];
+      if (btn) {
+        input.setAttribute("aria-activedescendant", "");
+        btn.scrollIntoView({ block: "nearest" });
+      }
+    };
+
+    input.addEventListener("input", draw);
+    input.addEventListener("keydown", (e) => {
+      const count = options().length;
+      if (e.key === "ArrowDown" && count) { e.preventDefault(); active = (active + 1) % count; highlight(); }
+      else if (e.key === "ArrowUp" && count) { e.preventDefault(); active = (active - 1 + count) % count; highlight(); }
+      else if (e.key === "Enter") {
+        e.preventDefault();
+        const btn = options()[active];
+        if (btn && !btn.disabled) chooseStatusOption(btn.dataset.status);
+      }
     });
+    list.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-status]");
+      if (btn && !btn.disabled) chooseStatusOption(btn.dataset.status);
+    });
+    draw();
+    // Straight into the search box with a keyboard; on touch screens wait
+    // for a tap, so the keyboard doesn't cover the list.
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) setTimeout(() => input.focus(), 30);
   }
 
   async function chooseStatusOption(status) {
