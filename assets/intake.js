@@ -6912,20 +6912,20 @@
   function splitIssueParts(issuesStr) {
     const parts = (issuesStr || "").split(",").map((s) => s.trim()).filter(Boolean);
     return {
+      parts,
       short: parts.filter((p) => p.length <= ISSUE_CHIP_MAX_LEN),
       long: parts.filter((p) => p.length > ISSUE_CHIP_MAX_LEN),
     };
   }
 
-  // Compact chip row for a ticket card: short preset issues render as chips
-  // as before; any long free-text issue collapses into a "View notes"
-  // button instead of sprawling across the card.
-  // How many issue chips a repair card shows before the rest fold into a
-  // "+N more" button (which opens them all in a small pop-up).
+  // How many issue chips a repair card shows on desktop before the rest fold
+  // into a "+N more" button (which opens them all in a small pop-up). Long
+  // free-text issues sit behind View notes. Mobile previews the first issue
+  // in recorded order and expands the rest on demand.
   const CARD_ISSUE_LIMIT = 2;
 
   function ticketRepairChipsHtml(t) {
-    const { short, long } = splitIssueParts(t.issues);
+    const { parts, short, long } = splitIssueParts(t.issues);
     const shown = short.length > CARD_ISSUE_LIMIT + 1 ? short.slice(0, CARD_ISSUE_LIMIT) : short;
     const hiddenCount = short.length - shown.length;
     const chips = shown.map((p) => `<span class="issue-chip">${esc(p)}</span>`).join("") +
@@ -6938,7 +6938,17 @@
         </button>`
       : "";
     if (!chips && !notesBtn) return `<span class="issue-chip muted">No issues recorded</span>`;
-    return chips + notesBtn;
+    const [first, ...remaining] = parts;
+    const count = remaining.length;
+    const issueLabel = `${count} more ${count === 1 ? "issue" : "issues"}`;
+    return `<div class="ticket-issues-desktop issue-tags">${chips}${notesBtn}</div>
+      <div class="ticket-issues-mobile">
+        <div class="ticket-issues-preview">
+          <span class="issue-chip">${esc(first)}</span>
+          ${count ? `<button type="button" class="ticket-issue-toggle" aria-expanded="false" aria-label="Show ${issueLabel}" data-issue-label="${issueLabel}"><span aria-hidden="true">+${count}</span></button>` : ""}
+        </div>
+        ${count ? `<div class="ticket-extra-issues issue-tags" hidden>${remaining.map((issue) => `<span class="issue-chip">${esc(issue)}</span>`).join("")}</div>` : ""}
+      </div>`;
   }
 
   // The "+N more" pop-up: every issue on the repair, with a way into its
@@ -7165,7 +7175,7 @@
       ${identityHtml}
       <div class="ticket-repair">
         <span class="ticket-repair-label">Repair</span>
-        <div class="issue-tags issue-tags-readonly">${ticketRepairChipsHtml(t)}</div>
+        <div class="ticket-issue-list">${ticketRepairChipsHtml(t)}</div>
       </div>
       <div class="ticket-status">
         <button type="button" class="status-badge status-badge-btn ${statusClass}" aria-label="Change status (currently ${esc(t.status || "—")})">${esc(t.status || "—")}</button>
@@ -7227,6 +7237,18 @@
         openIssuesPopup(t, moreBtn);
       };
       moreBtn.onkeydown = (e) => e.stopPropagation();
+    }
+    const issueToggle = head.querySelector(".ticket-issue-toggle");
+    if (issueToggle) {
+      const extraIssues = head.querySelector(".ticket-extra-issues");
+      issueToggle.onclick = (e) => {
+        e.stopPropagation();
+        const show = extraIssues.hidden;
+        extraIssues.hidden = !show;
+        issueToggle.setAttribute("aria-expanded", String(show));
+        issueToggle.setAttribute("aria-label", `${show ? "Hide" : "Show"} ${issueToggle.dataset.issueLabel}`);
+      };
+      issueToggle.onkeydown = (e) => e.stopPropagation();
     }
     const notesBtn = head.querySelector("[data-view-notes]");
     if (notesBtn) {
