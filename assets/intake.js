@@ -5721,9 +5721,12 @@
   let pendingCount = 0;
   let pendingCountAt = 0;
   let pendingCountTimer = null;
-  let partsQueue = [];        // the list shown in the tab (and walked by the pop-up)
+  let partsQueue = [];        // repairs waiting for an answer ("Needs confirming")
+  let partsOverview = { notRecorded: [], recorded: [] }; // the past month's other repairs
   let partsQueueLoaded = false;
+  let modalQueue = [];        // what the pop-up walks through
   let partsQueueIndex = 0;
+  let partsSavedInModal = false;
   let pendingViewOpen = false;
 
   function setPendingCount(count) {
@@ -5974,26 +5977,137 @@
       return;
     }
     if (countEl) countEl.textContent = partsQueue.length ? String(partsQueue.length) : "";
-    if (!partsQueue.length) {
-      body.innerHTML = `<div class="pending-exp-empty"><p><strong>All caught up.</strong></p><p>Every finished or paid repair has what we spent on it confirmed.</p></div>`;
+    // The overview rows carry the repair's details; prefer the app's own copy
+    // when it has one (it may be newer).
+    const ticketFor = (r) => TICKETS.find((x) => x.id === r.id) || r;
+    const notRecorded = partsOverview.notRecorded.map((r) => ({ r, t: ticketFor(r) }));
+    const recorded = partsOverview.recorded.map((r) => ({ r, t: ticketFor(r) }));
+    const rowHtml = (t, { tags = "", line = "", button = "", id = t.id }) => `
+      <li class="pending-exp-row" data-row-id="${esc(id)}">
+        <div class="pending-exp-main">
+          <p class="pending-exp-title"><strong>${esc(t.customerName || "Customer")}</strong> · ${esc(t.device || "Device")} <span class="mono pending-exp-id">#${esc(t.id)}</span></p>
+          <p class="pending-exp-meta">${esc(issueSummaryText(t.issues) || "No issues recorded")} · charged ${esc(formatMoney(t.repairCost || 0))}</p>
+          ${line ? `<p class="pending-exp-result">${line}</p>` : ""}
+          <p class="pending-exp-tags">${tags}</p>
+          <div class="pending-exp-editor" hidden></div>
+        </div>
+        ${button}
+      </li>`;
+    const statusTag = (t) => `<span class="pending-exp-tag">${esc(t.status)}</span>`;
+    const sections = [];
+    if (partsQueue.length) {
+      sections.push(`
+        <div class="pending-exp-section-head">
+          <h3>Needs confirming <span class="pending-exp-count">${partsQueue.length}</span></h3>
+          <button type="button" class="primary-btn" data-pending-start="0">Go through all ${partsQueue.length}</button>
+        </div>
+        <p class="pending-exp-help">Finished or fully paid, with nothing recorded for what we spent.</p>
+        <ul class="pending-exp-list">${partsQueue.map((t, i) => {
+          const orders = partsOrdersSummary(t);
+          const tags = `<span class="pending-exp-tag">${esc(t.partsCheckReason === "paid" ? "Paid in full" : t.status)}</span>` +
+            (orders ? `<span class="pending-exp-tag pending-exp-tag-order">Parts order: ${esc(orders.parts || "part")}${orders.total ? ` · ${esc(formatMoney(orders.total))}` : ""}</span>` : "");
+          return rowHtml(t, { tags, button: `<button type="button" class="primary-btn pending-exp-btn" data-pending-start="${i}">Confirm</button>` });
+        }).join("")}</ul>`);
+    } else {
+      sections.push(`<div class="pending-exp-empty"><p><strong>All caught up.</strong> Every finished or paid repair has what we spent on it recorded.</p></div>`);
+    }
+    if (notRecorded.length) {
+      sections.push(`
+        <div class="pending-exp-section-head"><h3>Not recorded yet <span class="pending-exp-count">${notRecorded.length}</span></h3></div>
+        <p class="pending-exp-help">The past month's other repairs (repaired, parts to be ordered, in progress…). Record now, or they'll come up when finished or paid.</p>
+        <ul class="pending-exp-list">${notRecorded.map(({ t }) => rowHtml(t, {
+          tags: statusTag(t),
+          button: `<button type="button" class="ghost-btn pending-exp-btn" data-record-id="${esc(t.id)}">Record</button>`,
+        })).join("")}</ul>`);
+    }
+    if (recorded.length) {
+      sections.push(`
+        <div class="pending-exp-section-head"><h3>Recorded this month <span class="pending-exp-count">${recorded.length}</span></h3></div>
+        <p class="pending-exp-help">Use Update to correct what we paid, the supplier, or to mark it as nothing spent.</p>
+        <ul class="pending-exp-list">${recorded.map(({ r, t }) => {
+          let line;
+          let button = `<button type="button" class="ghost-btn pending-exp-btn" data-update-id="${esc(t.id)}"><svg class="icon"><use href="#i-pencil"></use></svg>Update</button>`;
+          if (r.expense) {
+            const charged = Number(t.repairCost) || 0;
+            const profit = Math.round((charged - r.expense.amount) * 100) / 100;
+            line = `Paid <strong>${esc(r.expense.vendor || "supplier")}</strong> ${esc(formatMoney(r.expense.amount))}${charged ? ` · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong>` : ""}`;
+          } else if (r.partsCheck === "stock" || (r.stockItem && !r.partsCheck)) {
+            line = `Part from our stock${r.stockItem ? `: ${esc(r.stockItem)}` : ""}`;
+            button = "";
+          } else if (r.namedExpense) {
+            line = `On Expenses: ${esc(formatMoney(r.namedExpense.amount))}${r.namedExpense.vendor ? ` to ${esc(r.namedExpense.vendor)}` : ""} <span class="pending-exp-note">(change it under Accounting → Expenses)</span>`;
+            button = "";
+          } else {
+            line = "Nothing spent";
+          }
+          return rowHtml(t, { tags: statusTag(t), line, button });
+        }).join("")}</ul>`);
+    }
+    body.innerHTML = sections.join("");
+  }
+
+  // Update (Recorded this month): correct the amount / supplier, or switch
+  // to nothing spent, in the row itself. Same as the repair window's
+  // Supplier cost (lib/parts-check.js setSupplierCost).
+  function openRowEditor(id) {
+    const row = document.querySelector(`#pendingExpBody [data-row-id="${CSS.escape(id)}"]`);
+    const r = partsOverview.recorded.find((x) => x.id === id);
+    const t = r && (TICKETS.find((x) => x.id === id) || r);
+    if (!row || !r || !t) return;
+    document.querySelectorAll("#pendingExpBody .pending-exp-editor").forEach((el) => { el.hidden = true; el.innerHTML = ""; });
+    document.querySelectorAll("#pendingExpBody [data-update-id]").forEach((btn) => { btn.hidden = false; });
+    row.querySelector("[data-update-id]").hidden = true;
+    const editor = row.querySelector(".pending-exp-editor");
+    editor.hidden = false;
+    editor.innerHTML = `
+      <div class="form-grid">
+        <div class="form-field"><label class="field-label">Amount we paid (TTD)</label>
+          <input class="text-input pe-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 300.00" value="${r.expense ? r.expense.amount.toFixed(2) : ""}" /></div>
+        <div class="form-field"><label class="field-label">Supplier</label>
+          <input class="text-input pe-vendor" type="text" maxlength="120" placeholder="e.g. Ainsley" value="${esc(r.expense?.vendor || defaultSupplierFor(t))}" /></div>
+      </div>
+      <p class="supplier-profit pe-profit"></p>
+      <p class="field-error pe-error" hidden></p>
+      <div class="supplier-actions">
+        <button type="button" class="ghost-btn" data-pe-none>Nothing spent</button>
+        <span class="supplier-actions-gap"></span>
+        <button type="button" class="ghost-btn" data-pe-cancel>Cancel</button>
+        <button type="button" class="primary-btn" data-pe-save>Save</button>
+      </div>`;
+    const amount = editor.querySelector(".pe-amount");
+    const profit = () => { editor.querySelector(".pe-profit").innerHTML = supplierProfitHtml(t, amount.value); };
+    amount.addEventListener("input", profit);
+    profit();
+    amount.focus();
+  }
+  async function saveRowEditor(id, spent) {
+    const row = document.querySelector(`#pendingExpBody [data-row-id="${CSS.escape(id)}"]`);
+    const r = partsOverview.recorded.find((x) => x.id === id);
+    if (!row || !r) return;
+    const editor = row.querySelector(".pending-exp-editor");
+    const err = (m) => { const el = editor.querySelector(".pe-error"); el.textContent = m || ""; el.hidden = !m; };
+    const payload = { action: "setSupplierCost", id, spent };
+    if (spent) {
+      payload.amount = editor.querySelector(".pe-amount").value.trim();
+      payload.vendor = editor.querySelector(".pe-vendor").value.trim();
+      if (!(Number(payload.amount) > 0)) return err("Enter the amount we paid the supplier.");
+      if (!payload.vendor) return err("Enter the supplier's name.");
+    } else if (r.expense && !confirm(`Mark this repair as nothing spent? The ${formatMoney(r.expense.amount)} expense to ${r.expense.vendor || "the supplier"} will be taken off Expenses.`)) {
       return;
     }
-    body.innerHTML = `
-      <div class="pending-exp-actions">
-        <button type="button" class="primary-btn" data-pending-start="0">Go through all ${partsQueue.length}</button>
-      </div>
-      <ul class="pending-exp-list">${partsQueue.map((t, i) => {
-        const orders = partsOrdersSummary(t);
-        const reason = t.partsCheckReason === "paid" ? "Paid in full" : t.status;
-        return `<li class="pending-exp-row">
-          <div class="pending-exp-main">
-            <p class="pending-exp-title"><strong>${esc(t.customerName || "Customer")}</strong> · ${esc(t.device || "Device")} <span class="mono pending-exp-id">#${esc(t.id)}</span></p>
-            <p class="pending-exp-meta">${esc(issueSummaryText(t.issues) || "No issues recorded")} · charged ${esc(formatMoney(t.repairCost || 0))}</p>
-            <p class="pending-exp-tags"><span class="pending-exp-tag">${esc(reason)}</span>${orders ? `<span class="pending-exp-tag pending-exp-tag-order">Parts order: ${esc(orders.parts || "part")}${orders.total ? ` · ${esc(formatMoney(orders.total))}` : ""}</span>` : ""}</p>
-          </div>
-          <button type="button" class="ghost-btn" data-pending-start="${i}">Confirm</button>
-        </li>`;
-      }).join("")}</ul>`;
+    editor.querySelectorAll("button").forEach((btn) => { btn.disabled = true; });
+    try {
+      const res = await api(payload);
+      if (!res.ok) throw new Error(res.error || "Couldn't save");
+      mergeTicket(res.ticket);
+      r.partsCheck = res.ticket.partsCheck;
+      r.expense = res.expense ? { id: res.expense.id, amount: Number(res.expense.amount), vendor: res.expense.vendor || "" } : null;
+      toast(spent ? `Updated: paid ${payload.vendor} ${formatMoney(payload.amount)}.` : "Updated: nothing spent.", { tone: "info", duration: 2500 });
+      renderPendingView();
+    } catch (e) {
+      editor.querySelectorAll("button").forEach((btn) => { btn.disabled = false; });
+      err(e.message);
+    }
   }
   function pendingViewError(message) {
     const el = $("pendingExpError");
@@ -6003,8 +6117,25 @@
   }
   $("pendingExpBody")?.addEventListener("click", (e) => {
     const start = e.target.closest("[data-pending-start]");
-    if (!start) return;
-    partsQueueIndex = Number(start.dataset.pendingStart) || 0;
+    const record = e.target.closest("[data-record-id]");
+    const update = e.target.closest("[data-update-id]");
+    const rowId = e.target.closest("[data-row-id]")?.dataset.rowId;
+    if (update) { openRowEditor(update.dataset.updateId); return; }
+    if (e.target.closest("[data-pe-cancel]")) { renderPendingView(); return; }
+    if (e.target.closest("[data-pe-save]") && rowId) { saveRowEditor(rowId, true); return; }
+    if (e.target.closest("[data-pe-none]") && rowId) { saveRowEditor(rowId, false); return; }
+    if (start) {
+      modalQueue = partsQueue.slice();
+      partsQueueIndex = Number(start.dataset.pendingStart) || 0;
+    } else if (record) {
+      const id = record.dataset.recordId;
+      const t = TICKETS.find((x) => x.id === id) || partsOverview.notRecorded.find((x) => x.id === id);
+      if (!t) return;
+      modalQueue = [t];
+      partsQueueIndex = 0;
+    } else {
+      return;
+    }
     partsCheckModal().hidden = false;
     showPartsQueueItem();
   });
@@ -6015,6 +6146,7 @@
   $("pendingExpLock")?.addEventListener("click", () => {
     partsOwnerPin = { pin: "", at: 0 };
     partsQueue = [];
+    partsOverview = { notRecorded: [], recorded: [] };
     partsQueueLoaded = false;
     renderPendingView();
   });
@@ -6033,8 +6165,9 @@
     partsQueueLoaded = false;
     renderPendingView();
     try {
-      const [res] = await Promise.all([partsCheckApi({ action: "partsCheckList" }), loadInventoryForForm().catch(() => [])]);
-      partsQueue = res.tickets || [];
+      const [res] = await Promise.all([partsCheckApi({ action: "partsCheckOverview" }), loadInventoryForForm().catch(() => [])]);
+      partsQueue = res.pending || [];
+      partsOverview = { notRecorded: res.notRecorded || [], recorded: res.recorded || [] };
       partsQueueLoaded = true;
       setPendingCount(partsQueue.length);
       pendingCountAt = Date.now();
@@ -6071,6 +6204,8 @@
   function closePartsCheck() {
     const modal = $("partsCheckModal");
     if (modal) modal.hidden = true;
+    // Something was recorded: reload so it moves to "Recorded this month".
+    if (partsSavedInModal && ownerPinFresh()) { partsSavedInModal = false; loadPartsQueue(); return; }
     renderPendingView();
   }
   function partsCheckError(message) {
@@ -6080,15 +6215,14 @@
   }
 
   function showPartsQueueItem() {
-    const t = partsQueue[partsQueueIndex];
+    const t = modalQueue[partsQueueIndex];
     partsCheckError("");
     if (!t) {
       // Reached the end (some may have been skipped): back to the list.
       closePartsCheck();
-      if (!partsQueue.length) toast("All caught up — every repair's expenses are confirmed.", { tone: "info", duration: 3000 });
       return;
     }
-    $("partsCheckEyebrow").textContent = `Pending expenses · ${partsQueueIndex + 1} of ${partsQueue.length}`;
+    $("partsCheckEyebrow").textContent = modalQueue.length > 1 ? `Pending expenses · ${partsQueueIndex + 1} of ${modalQueue.length}` : "Pending expenses";
     $("partsCheckTitle").textContent = "What did this repair use?";
     const orders = partsOrdersSummary(t);
     const suggested = matchingInventoryItems(t.device || "", t.issues || "").filter((i) => i.quantity > 0);
@@ -6174,7 +6308,9 @@
         mergeTicket(res.ticket);
         if (choice === "stock") refreshInventoryAfterStockChange();
         toast(choice === "expense" ? `Paid ${payload.vendor} ${formatMoney(payload.amount)} — recorded on Expenses.` : choice === "stock" ? "Stock updated." : "Noted — nothing spent.", { tone: "info", duration: 2500 });
-        partsQueue.splice(partsQueueIndex, 1);
+        modalQueue.splice(partsQueueIndex, 1);
+        partsQueue = partsQueue.filter((x) => x.id !== t.id);
+        partsSavedInModal = true;
         setPendingCount(partsQueue.length);
         pendingCountAt = Date.now();
         showPartsQueueItem();

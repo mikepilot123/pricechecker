@@ -38,7 +38,7 @@ import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, ren
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { recordSaveFailure, listSaveFailures, isReadAction } from "../lib/save-failures.js";
-import { listPartsChecks, countPartsChecks, recordPartsCheck, getSupplierCost, setSupplierCost } from "../lib/parts-check.js";
+import { listPartsChecks, countPartsChecks, recordPartsCheck, partsCheckOverview, getSupplierCost, setSupplierCost } from "../lib/parts-check.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
@@ -424,7 +424,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, summary: await accountSummary() });
     }
     // Parts check — the master device only (lib/parts-check.js).
-    if (action === "partsCheckList" || action === "recordPartsCheck" || action === "partsCheckCount") {
+    if (action === "partsCheckList" || action === "partsCheckOverview" || action === "recordPartsCheck" || action === "partsCheckCount") {
       if (!(await isMasterDevice(deviceId))) {
         return res.status(403).json({ ok: false, error: "Only the master device does parts checks. Set it in Settings → Devices (owner PIN)." });
       }
@@ -436,6 +436,7 @@ export default async function handler(req, res) {
       const ownerDenied = await checkOwnerPin(req, body.ownerPin, verifyOwnerPin);
       if (ownerDenied) return res.status(ownerDenied.status).json({ ok: false, error: ownerDenied.error });
       if (action === "partsCheckList") return res.status(200).json({ ok: true, tickets: await listPartsChecks() });
+      if (action === "partsCheckOverview") return res.status(200).json({ ok: true, ...(await partsCheckOverview()) });
       const result = await recordPartsCheck(body);
       return res.status(200).json({ ok: true, ...result });
     }

@@ -188,6 +188,23 @@ await test("supplier cost straight from a repair that hasn't been through the qu
   assert.ok(!queue.includes(t.id), "answered, so out of the queue");
 });
 
+await test("overview: recorded repairs (with what was paid) and the past month's unrecorded ones", async () => {
+  const { ticket: ordered } = await ok({ action: "add", customerName: "Part Wait Fake (test)", phone: "8680001204", device: "iPhone 13", issues: "Screen Cracked / Broken", repairCost: "700" });
+  await ok({ action: "update", id: ordered.id, status: "Part to be Ordered" });
+  const { ticket: fresh } = await ok({ action: "add", customerName: "Just In Fake (test)", phone: "8680001205", device: "iPhone 13", issues: "Battery", repairCost: "300" });
+  const o = await ok({ action: "partsCheckOverview", ownerPin: "9876" }, owner);
+  const byId = (list) => new Map(list.map((x) => [x.id, x]));
+  const rec = byId(o.recorded);
+  assert.equal(rec.get(b.id).partsCheck, "expense");
+  assert.equal(rec.get(b.id).expense.vendor, "Ainsley");
+  assert.equal(rec.get(a.id).partsCheck, "stock");
+  assert.equal(rec.get(c.id).partsCheck, "none");
+  assert.ok(byId(o.notRecorded).has(ordered.id), "Part to be Ordered shows as not recorded yet");
+  assert.ok(!byId(o.notRecorded).has(fresh.id) && !rec.has(fresh.id), "just received: not shown");
+  assert.deepEqual(o.pending.map((t) => t.id).sort(), (await ok({ action: "partsCheckList", ownerPin: "9876" }, owner)).tickets.map((t) => t.id).sort());
+  assert.equal((await call({ action: "partsCheckOverview", ownerPin: "9876" }, staff)).status, 403);
+});
+
 await test("moving the master keeps the start date; clearing it closes the queue", async () => {
   const before = (await ok({ action: "deviceAccess" }, owner)).partsCheckSince;
   const { deviceId: staffDevice } = await ok({ action: "deviceAccess" }, staff);

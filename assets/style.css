@@ -9262,3 +9262,18 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .small-btn { min-height: 32px; padding: 4px 10px; font-size: 0.85rem; }
 .supplier-profit .money-positive, .supplier-profit-inline .money-positive { color: var(--price); }
 .supplier-profit .money-due, .supplier-profit-inline .money-due { color: var(--danger); }
+
+/* Pending expenses: sections */
+.pending-exp-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 22px 0 4px; }
+.pending-exp-section-head:first-child { margin-top: 4px; }
+.pending-exp-section-head h3 { margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; }
+.pending-exp-count { min-width: 22px; padding: 0 7px; border-radius: 999px; background: var(--bg-soft); border: 1px solid var(--border); font-size: 0.78rem; line-height: 20px; text-align: center; color: var(--text-dim); }
+.pending-exp-help { margin: 0 0 10px; color: var(--text-dim); font-size: 0.88rem; }
+.pending-exp-result { margin-top: 6px !important; }
+.pending-exp-result .money-positive { color: var(--price); }
+.pending-exp-result .money-due { color: var(--danger); }
+.pending-exp-note { color: var(--text-dim); font-size: 0.85rem; }
+.pending-exp-btn { flex: none; min-width: 96px; }
+.pending-exp-editor { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: grid; gap: 8px; }
+.pending-exp-editor[hidden] { display: none; }
+.pending-exp-empty + .pending-exp-section-head { margin-top: 22px; }
