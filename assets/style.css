@@ -9182,3 +9182,23 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .status-option.current .status-option-label { font-weight: 600; color: var(--status-ink, var(--text)); }
 .status-option-current { font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--status-bg, var(--bg-soft)); color: var(--status-ink, var(--text-dim)); border: 1px solid var(--status-border, var(--border)); }
 .status-picker-empty { margin: 8px 4px; color: var(--text-dim); }
+
+/* Parts & expenses queue (master device) */
+.parts-check-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 14px; border: 1px solid #fcd34d; border-radius: var(--radius-md); background: #fffbeb; color: #92400e; }
+.parts-check-banner[hidden] { display: none; }
+.parts-check-banner .icon { width: 18px; height: 18px; flex: none; }
+.parts-check-banner span { flex: 1; min-width: 180px; }
+.parts-check-banner .primary-btn { min-height: 36px; padding: 6px 14px; }
+.parts-check-panel { max-width: 520px; }
+.parts-check-repair { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-soft); margin-bottom: 12px; }
+.parts-check-repair p { margin: 0; }
+.parts-check-meta { margin-top: 4px !important; color: var(--text-dim); font-size: 0.85rem; }
+.parts-check-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.parts-check-choice { display: grid; gap: 2px; padding: 12px 10px; text-align: center; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); cursor: pointer; font: inherit; color: inherit; }
+.parts-check-choice small { color: var(--text-dim); font-size: 0.75rem; }
+.parts-check-choice:hover { border-color: var(--accent); }
+.parts-check-choice.active { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.parts-check-detail { display: grid; gap: 6px; }
+.parts-check-detail[hidden] { display: none; }
+@media (max-width: 480px) { .parts-check-choices { grid-template-columns: 1fr; } }
+.device-badge-master { background: #92400e; color: #fff; }

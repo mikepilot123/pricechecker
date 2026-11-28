@@ -88,6 +88,12 @@
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ k: credentialTag(cred), hidden: cachedList })); } catch (_) {}
       apply(list);
       applyDisplay({ hidePartsAlert: !!data.hidePartsAlert });
+      // The master device runs the parts & expenses queue (assets/intake.js).
+      const nextMaster = { isMaster: !!data.isMaster, since: data.partsCheckSince || "" };
+      if (nextMaster.isMaster !== master.isMaster || nextMaster.since !== master.since) {
+        master = nextMaster;
+        window.dispatchEvent(new Event("rpc-master-change"));
+      }
       ownerPinSource = data.ownerPin || "";
       renderPanel();
     } catch (_) {
@@ -115,7 +121,11 @@
     return refresh({ force: true });
   }
 
+  let master = { isMaster: false, since: "" };
   window.RPC_DEVICE_ACCESS = {
+    /** This browser is the master device (Settings → Devices). */
+    isMaster: () => master.isMaster,
+    partsCheckSince: () => master.since,
     blocksView,
     isHidden: (section) => hidden.includes(section),
     refresh,
@@ -201,6 +211,7 @@
             <input class="text-input device-name" type="text" maxlength="60" value="${escapeHtml(device.name)}"
                    data-device-name="${escapeHtml(device.id)}" aria-label="Device name" />
             ${isThis ? '<span class="device-badge">This device</span>' : ""}
+            ${device.isMaster ? '<span class="device-badge device-badge-master">Master</span>' : ""}
             ${device.purpose === "backup" ? '<span class="device-badge">Backup · read-only</span>' : ""}
           </div>
           <p class="settings-help device-meta">
@@ -214,6 +225,13 @@
           </label>
           <p class="field-label device-can-see">Can see</p>
           <div class="alert-prefs device-toggles">${toggles}</div>
+          <p class="field-label device-can-see">Master device</p>
+          <div class="alert-prefs device-toggles">
+            <label class="reclaim-toggle device-toggle">
+              <input type="checkbox" data-master-device="${escapeHtml(device.id)}" ${device.isMaster ? "checked" : ""} />
+              <span><strong>Master device</strong><small>Only this device shows the parts &amp; expenses queue for finished repairs, and it still asks for the owner PIN to open it. Each computer login / browser counts as its own device. Only one device can be master.</small></span>
+            </label>
+          </div>
           <p class="field-label device-can-see">Repair cards</p>
           <div class="alert-prefs device-toggles">
             <label class="reclaim-toggle device-toggle">
@@ -232,6 +250,20 @@
     devices = data.devices || [];
     if (data.deviceId) thisDeviceId = data.deviceId;
     renderDevices();
+  }
+
+  async function setMaster(id, makeMaster) {
+    showError("");
+    try {
+      const data = await post({ action: "setMasterDevice", ownerPin, id, master: makeMaster });
+      devices = data.devices || [];
+      renderDevices();
+      refresh({ force: true });
+      window.RPC_TOAST?.(makeMaster ? "Master device set." : "No master device now.", { tone: "info", duration: 2000 });
+    } catch (err) {
+      showError("Couldn't change the master device: " + err.message);
+      renderDevices();
+    }
   }
 
   async function saveDevice(id, changes) {
@@ -388,6 +420,11 @@
       if (master) {
         // Switching on shows every section; switching off hides them all.
         saveDevice(master.dataset.deviceAll, { hidden: master.checked ? [] : ALL_KEYS });
+        return;
+      }
+      const masterBox = e.target.closest("input[type=checkbox][data-master-device]");
+      if (masterBox) {
+        setMaster(masterBox.dataset.masterDevice, masterBox.checked);
         return;
       }
       const display = e.target.closest("input[type=checkbox][data-display]");

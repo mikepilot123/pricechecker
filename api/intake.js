@@ -38,10 +38,11 @@ import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, ren
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { recordSaveFailure, listSaveFailures, isReadAction } from "../lib/save-failures.js";
+import { listPartsChecks, recordPartsCheck } from "../lib/parts-check.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
-import { registerDevice, isBackupDevice, effectiveHidden, getDevice, listDevices, updateDevice, restrictOtherDevices, setPartsAlertForAll } from "../lib/devices.js";
+import { registerDevice, isBackupDevice, effectiveHidden, getDevice, listDevices, updateDevice, restrictOtherDevices, setPartsAlertForAll, setMasterDevice, getMasterSetting, isMasterDevice } from "../lib/devices.js";
 
 // Data behind a section the owner can hide per device (lib/devices.js). An
 // action is refused only when EVERY section listed for it is hidden, since
@@ -132,7 +133,13 @@ export default async function handler(req, res) {
       // Display choices for this device (not permissions — they apply with or
       // without an owner PIN).
       const device = deviceId ? await getDevice(deviceId, { userAgent: req.headers["user-agent"] }) : null;
-      return res.status(200).json({ ok: true, deviceId, managed: !!ownerPin, ownerPin, hidden, hidePartsAlert: !!device?.hidePartsAlert });
+      const master = await getMasterSetting();
+      return res.status(200).json({
+        ok: true, deviceId, managed: !!ownerPin, ownerPin, hidden, hidePartsAlert: !!device?.hidePartsAlert,
+        // The master device runs the parts check (lib/parts-check.js).
+        isMaster: !!deviceId && master.id === deviceId,
+        partsCheckSince: master.since || "",
+      });
     }
     if (action === "setOwnerPin") {
       // Creating the first owner PIN needs only the team PIN (checked above);
@@ -145,9 +152,16 @@ export default async function handler(req, res) {
       await saveOwnerPin(body.newOwnerPin, { replacing });
       return res.status(200).json({ ok: true, ownerPin: await ownerPinSource() });
     }
-    if (action === "listDevices" || action === "updateDevice" || action === "restrictOtherDevices" || action === "setPartsAlertForAll") {
+    if (action === "listDevices" || action === "updateDevice" || action === "restrictOtherDevices" || action === "setPartsAlertForAll" || action === "setMasterDevice") {
       const ownerDenied = await checkOwnerPin(req, body.ownerPin, verifyOwnerPin);
       if (ownerDenied) return res.status(ownerDenied.status).json({ ok: false, error: ownerDenied.error });
+      if (action === "setMasterDevice") {
+        // master: true makes body.id the master; false clears it if it was.
+        const current = await getMasterSetting();
+        const next = body.master ? String(body.id || "") : (current.id === body.id ? "" : current.id);
+        const master = await setMasterDevice(next);
+        return res.status(200).json({ ok: true, master, deviceId, devices: await listDevices() });
+      }
       if (action === "setPartsAlertForAll") {
         const changed = await setPartsAlertForAll(!!body.hide);
         return res.status(200).json({ ok: true, changed, deviceId, devices: await listDevices() });
@@ -399,6 +413,19 @@ export default async function handler(req, res) {
     }
     if (action === "accountSummary") {
       return res.status(200).json({ ok: true, summary: await accountSummary() });
+    }
+    // Parts check — the master device only (lib/parts-check.js).
+    if (action === "partsCheckList" || action === "recordPartsCheck") {
+      if (!(await isMasterDevice(deviceId))) {
+        return res.status(403).json({ ok: false, error: "Only the master device does parts checks. Set it in Settings → Devices (owner PIN)." });
+      }
+      // …and only with the owner PIN, so another person on the same browser
+      // (e.g. a shared laptop login) can't confirm expenses.
+      const ownerDenied = await checkOwnerPin(req, body.ownerPin, verifyOwnerPin);
+      if (ownerDenied) return res.status(ownerDenied.status).json({ ok: false, error: ownerDenied.error });
+      if (action === "partsCheckList") return res.status(200).json({ ok: true, tickets: await listPartsChecks() });
+      const result = await recordPartsCheck(body);
+      return res.status(200).json({ ok: true, ...result });
     }
     // Settings → Failed saves (team PIN, like every other action here).
     if (action === "listSaveFailures") {

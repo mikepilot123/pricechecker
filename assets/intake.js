@@ -5700,6 +5700,233 @@
     };
   }
 
+  // ---- Parts & expenses queue (master device only) -----------------------------
+  // Finished repairs (Repaired / Checked Out / Picked Up) wait here until the
+  // owner confirms what each used: a part from stock (taken off the
+  // inventory sheet), a part bought for it (recorded on Expenses), or no
+  // part. Only shows on the master device (Settings → Devices) and needs the
+  // owner PIN, kept in memory for 15 minutes — so a shared laptop login can't
+  // confirm expenses. Nothing pops up at checkout; it's a queue to work
+  // through when convenient. Server: lib/parts-check.js.
+  const PARTS_CHECK_STATUSES = new Set(["Repaired", "Checked Out - Waiting on Client", "Picked Up"]);
+  const PARTS_CHECK_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+  const OWNER_PIN_TTL_MS = 15 * 60 * 1000;
+  let partsOwnerPin = { pin: "", at: 0 };
+  const ownerPinFresh = () => partsOwnerPin.pin && Date.now() - partsOwnerPin.at < OWNER_PIN_TTL_MS;
+
+  function partsCheckPending() {
+    const access = window.RPC_DEVICE_ACCESS;
+    if (!access?.isMaster?.()) return [];
+    const since = Date.parse(access.partsCheckSince() || "");
+    if (!since) return [];
+    return TICKETS.filter((t) => PARTS_CHECK_STATUSES.has(t.status) && !t.partsCheck && !t.inventoryItemKey &&
+      new Date(t.created).getTime() >= since - PARTS_CHECK_LOOKBACK_MS);
+  }
+
+  function renderPartsCheckBanner() {
+    const banner = $("partsCheckBanner");
+    if (!banner) return;
+    const pending = partsCheckPending();
+    banner.hidden = !pending.length;
+    if (!pending.length) { banner.innerHTML = ""; return; }
+    banner.innerHTML = `
+      <svg class="icon" aria-hidden="true"><use href="#i-receipt"></use></svg>
+      <span><strong>${pending.length} finished repair${pending.length === 1 ? "" : "s"}</strong> need${pending.length === 1 ? "s" : ""} parts &amp; expenses confirmed.</span>
+      <button type="button" class="primary-btn" data-parts-check-open>Review</button>`;
+  }
+  $("partsCheckBanner")?.addEventListener("click", (e) => { if (e.target.closest("[data-parts-check-open]")) openPartsCheckQueue(); });
+  window.addEventListener("rpc-master-change", () => { if (loadedOnce) renderPartsCheckBanner(); });
+  window.RPC_OPEN_PARTS_CHECK = () => openPartsCheckQueue();
+
+  function partsCheckModal() {
+    let modal = $("partsCheckModal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "partsCheckModal";
+    modal.className = "modal-backdrop";
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="modal-panel parts-check-panel" role="dialog" aria-modal="true" aria-labelledby="partsCheckTitle">
+        <div class="modal-header">
+          <div><p class="modal-eyebrow" id="partsCheckEyebrow">Parts &amp; expenses</p><h3 id="partsCheckTitle">Confirm parts used</h3></div>
+          <button type="button" class="modal-close" data-parts-check-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
+        </div>
+        <div class="modal-body" id="partsCheckBody"></div>
+        <div class="modal-footer"><p class="field-error form-toast" id="partsCheckError" hidden></p><div class="form-actions" id="partsCheckActions"></div></div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (e) => { if (e.target === modal || e.target.closest("[data-parts-check-close]")) closePartsCheck(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) closePartsCheck(); });
+    return modal;
+  }
+  function closePartsCheck() {
+    const modal = $("partsCheckModal");
+    if (modal) modal.hidden = true;
+    renderPartsCheckBanner();
+  }
+  function partsCheckError(message) {
+    const el = $("partsCheckError");
+    el.textContent = message || "";
+    el.hidden = !message;
+  }
+  async function partsCheckApi(body) {
+    const res = await api({ ...body, ownerPin: partsOwnerPin.pin });
+    if (!res.ok) {
+      if (/owner pin/i.test(String(res.error))) partsOwnerPin = { pin: "", at: 0 };
+      throw new Error(res.error || "Rejected");
+    }
+    partsOwnerPin.at = Date.now();
+    return res;
+  }
+
+  async function openPartsCheckQueue() {
+    const modal = partsCheckModal();
+    modal.hidden = false;
+    partsCheckError("");
+    if (!ownerPinFresh()) return showOwnerPinStep();
+    await loadPartsQueue();
+  }
+
+  function showOwnerPinStep() {
+    $("partsCheckTitle").textContent = "Owner PIN";
+    $("partsCheckEyebrow").textContent = "Parts & expenses";
+    $("partsCheckBody").innerHTML = `
+      <p class="settings-help">Confirming parts and expenses needs the owner PIN — the same one as Settings → Devices.</p>
+      <label class="field-label" for="partsCheckPin">Owner PIN</label>
+      <input id="partsCheckPin" class="text-input" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />`;
+    $("partsCheckActions").innerHTML = `
+      <button type="button" class="ghost-btn" data-parts-check-close>Cancel</button>
+      <button type="button" class="primary-btn" id="partsCheckUnlock">Unlock</button>`;
+    const input = $("partsCheckPin");
+    const unlock = async () => {
+      const pin = input.value.trim();
+      if (!pin) return partsCheckError("Enter the owner PIN.");
+      partsOwnerPin = { pin, at: Date.now() };
+      await loadPartsQueue();
+    };
+    $("partsCheckUnlock").onclick = unlock;
+    input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); unlock(); } };
+    setTimeout(() => input.focus(), 30);
+  }
+
+  let partsQueue = [];
+  let partsQueueIndex = 0;
+  async function loadPartsQueue() {
+    partsCheckError("");
+    $("partsCheckBody").innerHTML = `<p class="ops-empty">Loading…</p>`;
+    $("partsCheckActions").innerHTML = "";
+    try {
+      const [res] = await Promise.all([partsCheckApi({ action: "partsCheckList" }), loadInventoryForForm().catch(() => [])]);
+      partsQueue = res.tickets || [];
+      partsQueueIndex = 0;
+      showPartsQueueItem();
+    } catch (err) {
+      if (!ownerPinFresh()) { showOwnerPinStep(); partsCheckError(err.message); return; }
+      $("partsCheckBody").innerHTML = "";
+      partsCheckError("Couldn't load the queue: " + err.message);
+      $("partsCheckActions").innerHTML = `<button type="button" class="ghost-btn" data-parts-check-close>Close</button>`;
+    }
+  }
+
+  function showPartsQueueItem() {
+    const t = partsQueue[partsQueueIndex];
+    partsCheckError("");
+    if (!t) {
+      $("partsCheckTitle").textContent = "All caught up";
+      $("partsCheckEyebrow").textContent = "Parts & expenses";
+      $("partsCheckBody").innerHTML = `<p class="ops-empty">Every finished repair has its parts confirmed. 🎉</p>`;
+      $("partsCheckActions").innerHTML = `<button type="button" class="primary-btn" data-parts-check-close>Done</button>`;
+      renderPartsCheckBanner();
+      return;
+    }
+    $("partsCheckEyebrow").textContent = `Parts & expenses · ${partsQueueIndex + 1} of ${partsQueue.length}`;
+    $("partsCheckTitle").textContent = "What did this repair use?";
+    const suggested = matchingInventoryItems(t.device || "", t.issues || "").filter((i) => i.quantity > 0);
+    const suggestedKeys = new Set(suggested.map((i) => i.key));
+    const others = INVENTORY_ITEMS.filter((i) => i.quantity > 0 && !suggestedKeys.has(i.key));
+    const options = [`<option value="">Choose the part…</option>`];
+    if (suggested.length) options.push(`<optgroup label="Suggested">${suggested.map((i) => inventoryOptionHtml(i, "")).join("")}</optgroup>`);
+    if (others.length) options.push(`<optgroup label="All stock">${others.map((i) => inventoryOptionHtml(i, "")).join("")}</optgroup>`);
+    const today = new Date();
+    const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    $("partsCheckBody").innerHTML = `
+      <div class="parts-check-repair">
+        <p><strong>${esc(t.customerName || "Customer")}</strong> · ${esc(t.device || "Device")} · <span class="mono">#${esc(t.id)}</span></p>
+        <p class="parts-check-meta">${esc(issueSummaryText(t.issues) || "No issues recorded")} · ${esc(t.status)} · charged ${esc(formatMoney(t.repairCost || 0))}</p>
+      </div>
+      <div class="parts-check-choices" role="radiogroup" aria-label="What did this repair use?">
+        <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="stock"><strong>Part from our stock</strong><small>Take one off inventory</small></button>
+        <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="expense"><strong>Bought a part for it</strong><small>Record it on Expenses</small></button>
+        <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="none"><strong>No part needed</strong><small>Labour / software only</small></button>
+      </div>
+      <div class="parts-check-detail" data-detail="stock" hidden>
+        <label class="field-label" for="partsCheckItem">Stock item used</label>
+        <div class="select-wrap"><select id="partsCheckItem" class="text-input select-input">${options.join("")}</select></div>
+        ${INVENTORY_ITEMS.length ? "" : `<p class="field-hint">Inventory couldn't load — try again in a moment.</p>`}
+      </div>
+      <div class="parts-check-detail" data-detail="expense" hidden>
+        <div class="form-grid">
+          <div class="form-field"><label class="field-label" for="partsCheckAmount">Part cost (TTD)</label>
+            <input id="partsCheckAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 350.00" /></div>
+          <div class="form-field"><label class="field-label" for="partsCheckDate">Date bought</label>
+            <input id="partsCheckDate" class="text-input" type="date" value="${ymd}" /></div>
+        </div>
+        <label class="field-label" for="partsCheckVendor">Supplier <span class="field-optional">(optional)</span></label>
+        <input id="partsCheckVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Mobile Sentrix" />
+        <label class="field-label" for="partsCheckNotes">Notes <span class="field-optional">(optional)</span></label>
+        <input id="partsCheckNotes" class="text-input" type="text" maxlength="300" placeholder="e.g. OLED screen" />
+      </div>`;
+    $("partsCheckActions").innerHTML = `
+      <button type="button" class="ghost-btn" id="partsCheckSkip">Skip for now</button>
+      <button type="button" class="primary-btn" id="partsCheckSave" disabled>Confirm</button>`;
+    let choice = "";
+    const body = $("partsCheckBody");
+    body.querySelectorAll("[data-choice]").forEach((btn) => {
+      btn.onclick = () => {
+        choice = btn.dataset.choice;
+        body.querySelectorAll("[data-choice]").forEach((b) => {
+          b.classList.toggle("active", b === btn);
+          b.setAttribute("aria-checked", b === btn ? "true" : "false");
+        });
+        body.querySelectorAll("[data-detail]").forEach((d) => { d.hidden = d.dataset.detail !== choice; });
+        $("partsCheckSave").disabled = false;
+        partsCheckError("");
+      };
+    });
+    $("partsCheckSkip").onclick = () => { partsQueueIndex++; showPartsQueueItem(); };
+    $("partsCheckSave").onclick = async () => {
+      const payload = { action: "recordPartsCheck", id: t.id, choice };
+      if (choice === "stock") {
+        payload.inventoryItemKey = $("partsCheckItem").value;
+        if (!payload.inventoryItemKey) return partsCheckError("Choose the stock item that was used.");
+      }
+      if (choice === "expense") {
+        payload.amount = $("partsCheckAmount").value.trim();
+        payload.date = $("partsCheckDate").value;
+        payload.vendor = $("partsCheckVendor").value.trim();
+        payload.notes = $("partsCheckNotes").value.trim();
+        if (!(Number(payload.amount) > 0)) return partsCheckError("Enter what the part cost.");
+      }
+      const save = $("partsCheckSave");
+      save.disabled = true;
+      save.textContent = "Saving…";
+      try {
+        const res = await partsCheckApi(payload);
+        mergeTicket(res.ticket);
+        if (choice === "stock") refreshInventoryAfterStockChange();
+        if (choice === "expense" && typeof window.RPC_REFRESH_EXPENSES === "function") window.RPC_REFRESH_EXPENSES();
+        toast(choice === "expense" ? `Expense of ${formatMoney(payload.amount)} recorded.` : choice === "stock" ? "Stock updated." : "Noted — no part needed.", { tone: "info", duration: 2500 });
+        partsQueue.splice(partsQueueIndex, 1);
+        showPartsQueueItem();
+      } catch (err) {
+        save.disabled = false;
+        save.textContent = "Confirm";
+        if (!ownerPinFresh()) { showOwnerPinStep(); }
+        partsCheckError("Couldn't save: " + err.message);
+      }
+    };
+  }
+
   // ---- Devices Under Warranty ---------------------------------------------------
   // Repairs → Devices Under Warranty. A repair fixed and picked up carries the
   // shop's 60-day warranty (as printed on its invoices), counted from pickup
@@ -6663,6 +6890,7 @@
     $("intakeList").appendChild(frag);
     renderCompletedTickets();
     renderWarrantyList();
+    renderPartsCheckBanner();
   }
 
   function issueTagsHtml(issuesStr) {
