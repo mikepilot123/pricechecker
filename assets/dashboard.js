@@ -2979,10 +2979,10 @@
   // The phone bottom bar's "More" badge adds up what's waiting behind it:
   // reminders due (here) and new client collection bookings
   // (assets/appointments.js).
-  const moreCounts = { reminders: 0, bookings: 0 };
+  const moreCounts = { reminders: 0, bookings: 0, expenses: 0 };
   window.RPC_SET_NAV_COUNT = (kind, count) => {
     moreCounts[kind] = Math.max(0, Number(count) || 0);
-    const total = moreCounts.reminders + moreCounts.bookings;
+    const total = moreCounts.reminders + moreCounts.bookings + moreCounts.expenses;
     const moreBadge = document.getElementById("bottomNavMoreBadge");
     if (!moreBadge) return;
     moreBadge.hidden = !total;
@@ -2990,6 +2990,7 @@
     const parts = [];
     if (moreCounts.reminders) parts.push(`${moreCounts.reminders} reminder${moreCounts.reminders === 1 ? "" : "s"} due`);
     if (moreCounts.bookings) parts.push(`${moreCounts.bookings} new collection booking${moreCounts.bookings === 1 ? "" : "s"}`);
+    if (moreCounts.expenses) parts.push(`${moreCounts.expenses} repair${moreCounts.expenses === 1 ? "" : "s"} with expenses to confirm`);
     document.getElementById("bottomNavMore")?.setAttribute("aria-label", parts.length ? `More, ${parts.join(", ")}` : "More");
   };
 

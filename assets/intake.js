@@ -239,6 +239,7 @@
     account: $("view-account"),
     reminders: $("view-reminders"),
     diagnostics: $("view-diagnostics"),
+    pendingExpenses: $("view-pendingExpenses"),
   };
   function setActiveNav(target) {
     navBtns.forEach((b) => {
@@ -290,6 +291,7 @@
     if (target === "account") window.dispatchEvent(new Event("rpc-enter-account"));
     if (target === "reminders") window.dispatchEvent(new Event("rpc-enter-reminders"));
     if (target === "diagnostics") window.dispatchEvent(new Event("rpc-enter-diagnostics"));
+    if (target === "pendingExpenses") window.dispatchEvent(new Event("rpc-enter-pending-expenses"));
   }
   window.RPC_SHOW_VIEW = navigateTo;
   navBtns.forEach((btn) => {
@@ -5700,44 +5702,225 @@
     };
   }
 
-  // ---- Parts & expenses queue (master device only) -----------------------------
-  // Finished repairs (Repaired / Checked Out / Picked Up) wait here until the
-  // owner confirms what each used: a part from stock (taken off the
-  // inventory sheet), a part bought for it (recorded on Expenses), or no
-  // part. Only shows on the master device (Settings → Devices) and needs the
-  // owner PIN, kept in memory for 15 minutes — so a shared laptop login can't
-  // confirm expenses. Nothing pops up at checkout; it's a queue to work
-  // through when convenient. Server: lib/parts-check.js.
-  const PARTS_CHECK_STATUSES = new Set(["Repaired", "Checked Out - Waiting on Client", "Picked Up"]);
-  const PARTS_CHECK_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+  // ---- Pending expenses (master device only) ----------------------------------
+  // Repairs that are finished (Repaired / Checked Out / Picked Up) or fully
+  // paid, with no expense recorded for them yet, wait in the Pending expenses
+  // tab until the owner confirms what each used: a part from stock (taken off
+  // the inventory sheet), a part bought for it (recorded on Expenses), or no
+  // part. The tab only shows on the master device (Settings → Devices) and
+  // the list needs the owner PIN, kept in memory for 15 minutes — so a shared
+  // laptop login can't confirm expenses. Nothing pops up at checkout.
+  // Server: lib/parts-check.js.
   const OWNER_PIN_TTL_MS = 15 * 60 * 1000;
+  const PENDING_COUNT_EVERY_MS = 60 * 1000;
   let partsOwnerPin = { pin: "", at: 0 };
   const ownerPinFresh = () => partsOwnerPin.pin && Date.now() - partsOwnerPin.at < OWNER_PIN_TTL_MS;
+  const isMasterDevice = () => !!window.RPC_DEVICE_ACCESS?.isMaster?.();
+  let pendingCount = 0;
+  let pendingCountAt = 0;
+  let pendingCountTimer = null;
+  let partsQueue = [];        // the list shown in the tab (and walked by the pop-up)
+  let partsQueueLoaded = false;
+  let partsQueueIndex = 0;
+  let pendingViewOpen = false;
 
-  function partsCheckPending() {
-    const access = window.RPC_DEVICE_ACCESS;
-    if (!access?.isMaster?.()) return [];
-    const since = Date.parse(access.partsCheckSince() || "");
-    if (!since) return [];
-    return TICKETS.filter((t) => PARTS_CHECK_STATUSES.has(t.status) && !t.partsCheck && !t.inventoryItemKey &&
-      new Date(t.created).getTime() >= since - PARTS_CHECK_LOOKBACK_MS);
+  function setPendingCount(count) {
+    pendingCount = Math.max(0, Number(count) || 0);
+    document.querySelectorAll('.nav-btn[data-target="pendingExpenses"]').forEach((btn) => {
+      let badge = btn.querySelector(".nav-badge");
+      if (!pendingCount) { badge?.remove(); return; }
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "nav-badge nav-badge-warn";
+        btn.appendChild(badge);
+      }
+      badge.textContent = pendingCount > 99 ? "99+" : String(pendingCount);
+      badge.setAttribute("aria-label", `${pendingCount} repair${pendingCount === 1 ? "" : "s"} with expenses to confirm`);
+    });
+    window.RPC_SET_NAV_COUNT?.("expenses", pendingCount);
+    renderPartsCheckBanner();
   }
 
+  async function refreshPendingCount({ force = false } = {}) {
+    if (!isMasterDevice()) { setPendingCount(0); return; }
+    if (!force && Date.now() - pendingCountAt < PENDING_COUNT_EVERY_MS) return;
+    pendingCountAt = Date.now();
+    try {
+      const res = await api({ action: "partsCheckCount" });
+      if (res.ok) setPendingCount(res.count);
+    } catch (_) { /* offline: keep the last count */ }
+  }
+  // Called after every repairs render: a status change or payment can add a
+  // repair to the queue. Throttled to once a minute.
+  function schedulePendingCount() {
+    if (!isMasterDevice()) return;
+    clearTimeout(pendingCountTimer);
+    pendingCountTimer = setTimeout(() => refreshPendingCount(), 1500);
+  }
+
+  function applyMasterNav() {
+    const master = isMasterDevice();
+    document.querySelectorAll('.nav-btn[data-target="pendingExpenses"]').forEach((btn) => { btn.hidden = !master; });
+    if (!master) {
+      partsOwnerPin = { pin: "", at: 0 };
+      partsQueue = [];
+      partsQueueLoaded = false;
+      setPendingCount(0);
+    } else {
+      refreshPendingCount({ force: true });
+    }
+    if (pendingViewOpen) renderPendingView();
+  }
+  window.addEventListener("rpc-master-change", applyMasterNav);
+  if (isMasterDevice()) applyMasterNav();
+
+  // Repairs list: a one-line nudge when something is waiting.
   function renderPartsCheckBanner() {
     const banner = $("partsCheckBanner");
     if (!banner) return;
-    const pending = partsCheckPending();
-    banner.hidden = !pending.length;
-    if (!pending.length) { banner.innerHTML = ""; return; }
+    const show = isMasterDevice() && pendingCount > 0;
+    banner.hidden = !show;
+    if (!show) { banner.innerHTML = ""; return; }
     banner.innerHTML = `
       <svg class="icon" aria-hidden="true"><use href="#i-receipt"></use></svg>
-      <span><strong>${pending.length} finished repair${pending.length === 1 ? "" : "s"}</strong> need${pending.length === 1 ? "s" : ""} parts &amp; expenses confirmed.</span>
+      <span><strong>${pendingCount} repair${pendingCount === 1 ? "" : "s"}</strong> ${pendingCount === 1 ? "has" : "have"} no expense recorded yet.</span>
       <button type="button" class="primary-btn" data-parts-check-open>Review</button>`;
   }
-  $("partsCheckBanner")?.addEventListener("click", (e) => { if (e.target.closest("[data-parts-check-open]")) openPartsCheckQueue(); });
-  window.addEventListener("rpc-master-change", () => { if (loadedOnce) renderPartsCheckBanner(); });
-  window.RPC_OPEN_PARTS_CHECK = () => openPartsCheckQueue();
+  $("partsCheckBanner")?.addEventListener("click", (e) => { if (e.target.closest("[data-parts-check-open]")) navigateTo("pendingExpenses"); });
+  window.RPC_OPEN_PARTS_CHECK = () => navigateTo("pendingExpenses");
 
+  // ---- The Pending expenses tab ----
+  window.addEventListener("rpc-enter-pending-expenses", () => {
+    pendingViewOpen = true;
+    if (isMasterDevice() && ownerPinFresh()) loadPartsQueue();
+    else renderPendingView();
+  });
+  // Leaving the tab (any other view shown) stops re-rendering it.
+  document.addEventListener("click", (e) => {
+    const nav = e.target.closest(".nav-btn[data-target], .bottom-nav-btn[data-bottom-target]");
+    if (nav && (nav.dataset.target || nav.dataset.bottomTarget) !== "pendingExpenses") pendingViewOpen = false;
+  }, true);
+
+  function partsOrdersSummary(t) {
+    const orders = t.partsOrders || [];
+    if (!orders.length) return null;
+    const total = orders.reduce((sum, o) => sum + o.quantity * o.unitCost, 0);
+    const vendors = [...new Set(orders.map((o) => o.vendor).filter(Boolean))];
+    const parts = orders.map((o) => (o.quantity > 1 ? `${o.quantity} × ` : "") + o.part).filter(Boolean);
+    return { total: Math.round(total * 100) / 100, vendor: vendors.join(", "), parts: parts.join(", ") };
+  }
+
+  function renderPendingView() {
+    const body = $("pendingExpBody");
+    if (!body) return;
+    const countEl = $("pendingExpCount");
+    $("pendingExpLock").hidden = !(isMasterDevice() && ownerPinFresh());
+    if (!isMasterDevice()) {
+      if (countEl) countEl.textContent = "";
+      body.innerHTML = `<div class="pending-exp-empty"><p><strong>Only the master device shows this list.</strong></p>
+        <p>Set it in Settings → Devices with the owner PIN. Each computer login or browser counts as its own device.</p></div>`;
+      return;
+    }
+    if (!ownerPinFresh()) {
+      if (countEl) countEl.textContent = pendingCount ? String(pendingCount) : "";
+      body.innerHTML = `
+        <form class="pending-exp-lock" id="pendingExpPinForm" autocomplete="off">
+          <p>${pendingCount ? `<strong>${pendingCount} repair${pendingCount === 1 ? "" : "s"}</strong> waiting. ` : ""}Enter the owner PIN to see and confirm them.</p>
+          <label class="field-label" for="pendingExpPin">Owner PIN</label>
+          <div class="pending-exp-lock-row">
+            <input id="pendingExpPin" class="text-input" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
+            <button type="submit" class="primary-btn" id="pendingExpUnlock">Unlock</button>
+          </div>
+          <p class="field-error" id="pendingExpError" hidden></p>
+        </form>`;
+      $("pendingExpPinForm").onsubmit = (e) => {
+        e.preventDefault();
+        const pin = $("pendingExpPin").value.trim();
+        if (!pin) return pendingViewError("Enter the owner PIN.");
+        partsOwnerPin = { pin, at: Date.now() };
+        loadPartsQueue();
+      };
+      setTimeout(() => $("pendingExpPin")?.focus(), 30);
+      return;
+    }
+    if (!partsQueueLoaded) {
+      body.innerHTML = `<p class="ops-empty">Loading…</p>`;
+      return;
+    }
+    if (countEl) countEl.textContent = partsQueue.length ? String(partsQueue.length) : "";
+    if (!partsQueue.length) {
+      body.innerHTML = `<div class="pending-exp-empty"><p><strong>All caught up.</strong></p><p>Every finished or paid repair has its parts and expenses confirmed.</p></div>`;
+      return;
+    }
+    body.innerHTML = `
+      <div class="pending-exp-actions">
+        <button type="button" class="primary-btn" data-pending-start="0">Go through all ${partsQueue.length}</button>
+      </div>
+      <ul class="pending-exp-list">${partsQueue.map((t, i) => {
+        const orders = partsOrdersSummary(t);
+        const reason = t.partsCheckReason === "paid" ? "Paid in full" : t.status;
+        return `<li class="pending-exp-row">
+          <div class="pending-exp-main">
+            <p class="pending-exp-title"><strong>${esc(t.customerName || "Customer")}</strong> · ${esc(t.device || "Device")} <span class="mono pending-exp-id">#${esc(t.id)}</span></p>
+            <p class="pending-exp-meta">${esc(issueSummaryText(t.issues) || "No issues recorded")} · charged ${esc(formatMoney(t.repairCost || 0))}</p>
+            <p class="pending-exp-tags"><span class="pending-exp-tag">${esc(reason)}</span>${orders ? `<span class="pending-exp-tag pending-exp-tag-order">Parts order: ${esc(orders.parts || "part")}${orders.total ? ` · ${esc(formatMoney(orders.total))}` : ""}</span>` : ""}</p>
+          </div>
+          <button type="button" class="ghost-btn" data-pending-start="${i}">Confirm</button>
+        </li>`;
+      }).join("")}</ul>`;
+  }
+  function pendingViewError(message) {
+    const el = $("pendingExpError");
+    if (!el) return;
+    el.textContent = message || "";
+    el.hidden = !message;
+  }
+  $("pendingExpBody")?.addEventListener("click", (e) => {
+    const start = e.target.closest("[data-pending-start]");
+    if (!start) return;
+    partsQueueIndex = Number(start.dataset.pendingStart) || 0;
+    partsCheckModal().hidden = false;
+    showPartsQueueItem();
+  });
+  $("pendingExpRefresh")?.addEventListener("click", () => {
+    if (isMasterDevice() && ownerPinFresh()) loadPartsQueue();
+    else refreshPendingCount({ force: true }).then(renderPendingView);
+  });
+  $("pendingExpLock")?.addEventListener("click", () => {
+    partsOwnerPin = { pin: "", at: 0 };
+    partsQueue = [];
+    partsQueueLoaded = false;
+    renderPendingView();
+  });
+
+  async function partsCheckApi(body) {
+    const res = await api({ ...body, ownerPin: partsOwnerPin.pin });
+    if (!res.ok) {
+      if (/owner pin/i.test(String(res.error))) partsOwnerPin = { pin: "", at: 0 };
+      throw new Error(res.error || "Rejected");
+    }
+    partsOwnerPin.at = Date.now();
+    return res;
+  }
+
+  async function loadPartsQueue() {
+    partsQueueLoaded = false;
+    renderPendingView();
+    try {
+      const [res] = await Promise.all([partsCheckApi({ action: "partsCheckList" }), loadInventoryForForm().catch(() => [])]);
+      partsQueue = res.tickets || [];
+      partsQueueLoaded = true;
+      setPendingCount(partsQueue.length);
+      pendingCountAt = Date.now();
+      renderPendingView();
+    } catch (err) {
+      renderPendingView();
+      pendingViewError(err.message);
+      if (ownerPinFresh()) $("pendingExpBody").innerHTML = `<p class="field-error">Couldn't load the list: ${esc(err.message)}</p>`;
+    }
+  }
+
+  // The pop-up that walks through the list, one repair at a time.
   function partsCheckModal() {
     let modal = $("partsCheckModal");
     if (modal) return modal;
@@ -5748,7 +5931,7 @@
     modal.innerHTML = `
       <div class="modal-panel parts-check-panel" role="dialog" aria-modal="true" aria-labelledby="partsCheckTitle">
         <div class="modal-header">
-          <div><p class="modal-eyebrow" id="partsCheckEyebrow">Parts &amp; expenses</p><h3 id="partsCheckTitle">Confirm parts used</h3></div>
+          <div><p class="modal-eyebrow" id="partsCheckEyebrow">Pending expenses</p><h3 id="partsCheckTitle">What did this repair use?</h3></div>
           <button type="button" class="modal-close" data-parts-check-close aria-label="Close"><svg class="icon"><use href="#i-xmark"></use></svg></button>
         </div>
         <div class="modal-body" id="partsCheckBody"></div>
@@ -5762,85 +5945,26 @@
   function closePartsCheck() {
     const modal = $("partsCheckModal");
     if (modal) modal.hidden = true;
-    renderPartsCheckBanner();
+    renderPendingView();
   }
   function partsCheckError(message) {
     const el = $("partsCheckError");
     el.textContent = message || "";
     el.hidden = !message;
   }
-  async function partsCheckApi(body) {
-    const res = await api({ ...body, ownerPin: partsOwnerPin.pin });
-    if (!res.ok) {
-      if (/owner pin/i.test(String(res.error))) partsOwnerPin = { pin: "", at: 0 };
-      throw new Error(res.error || "Rejected");
-    }
-    partsOwnerPin.at = Date.now();
-    return res;
-  }
-
-  async function openPartsCheckQueue() {
-    const modal = partsCheckModal();
-    modal.hidden = false;
-    partsCheckError("");
-    if (!ownerPinFresh()) return showOwnerPinStep();
-    await loadPartsQueue();
-  }
-
-  function showOwnerPinStep() {
-    $("partsCheckTitle").textContent = "Owner PIN";
-    $("partsCheckEyebrow").textContent = "Parts & expenses";
-    $("partsCheckBody").innerHTML = `
-      <p class="settings-help">Confirming parts and expenses needs the owner PIN — the same one as Settings → Devices.</p>
-      <label class="field-label" for="partsCheckPin">Owner PIN</label>
-      <input id="partsCheckPin" class="text-input" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />`;
-    $("partsCheckActions").innerHTML = `
-      <button type="button" class="ghost-btn" data-parts-check-close>Cancel</button>
-      <button type="button" class="primary-btn" id="partsCheckUnlock">Unlock</button>`;
-    const input = $("partsCheckPin");
-    const unlock = async () => {
-      const pin = input.value.trim();
-      if (!pin) return partsCheckError("Enter the owner PIN.");
-      partsOwnerPin = { pin, at: Date.now() };
-      await loadPartsQueue();
-    };
-    $("partsCheckUnlock").onclick = unlock;
-    input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); unlock(); } };
-    setTimeout(() => input.focus(), 30);
-  }
-
-  let partsQueue = [];
-  let partsQueueIndex = 0;
-  async function loadPartsQueue() {
-    partsCheckError("");
-    $("partsCheckBody").innerHTML = `<p class="ops-empty">Loading…</p>`;
-    $("partsCheckActions").innerHTML = "";
-    try {
-      const [res] = await Promise.all([partsCheckApi({ action: "partsCheckList" }), loadInventoryForForm().catch(() => [])]);
-      partsQueue = res.tickets || [];
-      partsQueueIndex = 0;
-      showPartsQueueItem();
-    } catch (err) {
-      if (!ownerPinFresh()) { showOwnerPinStep(); partsCheckError(err.message); return; }
-      $("partsCheckBody").innerHTML = "";
-      partsCheckError("Couldn't load the queue: " + err.message);
-      $("partsCheckActions").innerHTML = `<button type="button" class="ghost-btn" data-parts-check-close>Close</button>`;
-    }
-  }
 
   function showPartsQueueItem() {
     const t = partsQueue[partsQueueIndex];
     partsCheckError("");
     if (!t) {
-      $("partsCheckTitle").textContent = "All caught up";
-      $("partsCheckEyebrow").textContent = "Parts & expenses";
-      $("partsCheckBody").innerHTML = `<p class="ops-empty">Every finished repair has its parts confirmed. 🎉</p>`;
-      $("partsCheckActions").innerHTML = `<button type="button" class="primary-btn" data-parts-check-close>Done</button>`;
-      renderPartsCheckBanner();
+      // Reached the end (some may have been skipped): back to the list.
+      closePartsCheck();
+      if (!partsQueue.length) toast("All caught up — every repair's expenses are confirmed.", { tone: "info", duration: 3000 });
       return;
     }
-    $("partsCheckEyebrow").textContent = `Parts & expenses · ${partsQueueIndex + 1} of ${partsQueue.length}`;
+    $("partsCheckEyebrow").textContent = `Pending expenses · ${partsQueueIndex + 1} of ${partsQueue.length}`;
     $("partsCheckTitle").textContent = "What did this repair use?";
+    const orders = partsOrdersSummary(t);
     const suggested = matchingInventoryItems(t.device || "", t.issues || "").filter((i) => i.quantity > 0);
     const suggestedKeys = new Set(suggested.map((i) => i.key));
     const others = INVENTORY_ITEMS.filter((i) => i.quantity > 0 && !suggestedKeys.has(i.key));
@@ -5852,7 +5976,8 @@
     $("partsCheckBody").innerHTML = `
       <div class="parts-check-repair">
         <p><strong>${esc(t.customerName || "Customer")}</strong> · ${esc(t.device || "Device")} · <span class="mono">#${esc(t.id)}</span></p>
-        <p class="parts-check-meta">${esc(issueSummaryText(t.issues) || "No issues recorded")} · ${esc(t.status)} · charged ${esc(formatMoney(t.repairCost || 0))}</p>
+        <p class="parts-check-meta">${esc(issueSummaryText(t.issues) || "No issues recorded")} · ${esc(t.partsCheckReason === "paid" ? "Paid in full" : t.status)} · charged ${esc(formatMoney(t.repairCost || 0))}</p>
+        ${orders ? `<p class="parts-check-meta">Parts order on file: ${esc(orders.parts || "part")}${orders.vendor ? ` from ${esc(orders.vendor)}` : ""}${orders.total ? ` · ${esc(formatMoney(orders.total))}` : ""} — filled in below.</p>` : ""}
       </div>
       <div class="parts-check-choices" role="radiogroup" aria-label="What did this repair use?">
         <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="stock"><strong>Part from our stock</strong><small>Take one off inventory</small></button>
@@ -5867,32 +5992,34 @@
       <div class="parts-check-detail" data-detail="expense" hidden>
         <div class="form-grid">
           <div class="form-field"><label class="field-label" for="partsCheckAmount">Part cost (TTD)</label>
-            <input id="partsCheckAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 350.00" /></div>
+            <input id="partsCheckAmount" class="text-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 350.00" value="${orders?.total ? orders.total.toFixed(2) : ""}" /></div>
           <div class="form-field"><label class="field-label" for="partsCheckDate">Date bought</label>
             <input id="partsCheckDate" class="text-input" type="date" value="${ymd}" /></div>
         </div>
         <label class="field-label" for="partsCheckVendor">Supplier <span class="field-optional">(optional)</span></label>
-        <input id="partsCheckVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Mobile Sentrix" />
+        <input id="partsCheckVendor" class="text-input" type="text" maxlength="120" placeholder="e.g. Mobile Sentrix" value="${esc(orders?.vendor || "")}" />
         <label class="field-label" for="partsCheckNotes">Notes <span class="field-optional">(optional)</span></label>
-        <input id="partsCheckNotes" class="text-input" type="text" maxlength="300" placeholder="e.g. OLED screen" />
+        <input id="partsCheckNotes" class="text-input" type="text" maxlength="300" placeholder="e.g. OLED screen" value="${esc(orders?.parts || "")}" />
       </div>`;
     $("partsCheckActions").innerHTML = `
       <button type="button" class="ghost-btn" id="partsCheckSkip">Skip for now</button>
       <button type="button" class="primary-btn" id="partsCheckSave" disabled>Confirm</button>`;
     let choice = "";
     const body = $("partsCheckBody");
-    body.querySelectorAll("[data-choice]").forEach((btn) => {
-      btn.onclick = () => {
-        choice = btn.dataset.choice;
-        body.querySelectorAll("[data-choice]").forEach((b) => {
-          b.classList.toggle("active", b === btn);
-          b.setAttribute("aria-checked", b === btn ? "true" : "false");
-        });
-        body.querySelectorAll("[data-detail]").forEach((d) => { d.hidden = d.dataset.detail !== choice; });
-        $("partsCheckSave").disabled = false;
-        partsCheckError("");
-      };
-    });
+    const pick = (value) => {
+      choice = value;
+      body.querySelectorAll("[data-choice]").forEach((b) => {
+        const on = b.dataset.choice === value;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-checked", on ? "true" : "false");
+      });
+      body.querySelectorAll("[data-detail]").forEach((d) => { d.hidden = d.dataset.detail !== choice; });
+      $("partsCheckSave").disabled = false;
+      partsCheckError("");
+    };
+    body.querySelectorAll("[data-choice]").forEach((btn) => { btn.onclick = () => pick(btn.dataset.choice); });
+    // A part was ordered for this repair: most likely bought for it.
+    if (orders) pick("expense");
     $("partsCheckSkip").onclick = () => { partsQueueIndex++; showPartsQueueItem(); };
     $("partsCheckSave").onclick = async () => {
       const payload = { action: "recordPartsCheck", id: t.id, choice };
@@ -5914,14 +6041,15 @@
         const res = await partsCheckApi(payload);
         mergeTicket(res.ticket);
         if (choice === "stock") refreshInventoryAfterStockChange();
-        if (choice === "expense" && typeof window.RPC_REFRESH_EXPENSES === "function") window.RPC_REFRESH_EXPENSES();
         toast(choice === "expense" ? `Expense of ${formatMoney(payload.amount)} recorded.` : choice === "stock" ? "Stock updated." : "Noted — no part needed.", { tone: "info", duration: 2500 });
         partsQueue.splice(partsQueueIndex, 1);
+        setPendingCount(partsQueue.length);
+        pendingCountAt = Date.now();
         showPartsQueueItem();
       } catch (err) {
         save.disabled = false;
         save.textContent = "Confirm";
-        if (!ownerPinFresh()) { showOwnerPinStep(); }
+        if (!ownerPinFresh()) { closePartsCheck(); pendingViewError("Couldn't save: " + err.message); return; }
         partsCheckError("Couldn't save: " + err.message);
       }
     };
@@ -6891,6 +7019,7 @@
     renderCompletedTickets();
     renderWarrantyList();
     renderPartsCheckBanner();
+    schedulePendingCount();
   }
 
   function issueTagsHtml(issuesStr) {

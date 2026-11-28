@@ -130,6 +130,31 @@ await test("bad answers are refused", async () => {
   }
 });
 
+await test("fully paid (not finished) repairs are asked; ones with an expense naming them aren't", async () => {
+  const { ticket: paid } = await ok({ action: "add", customerName: "Paid Fake (test)", phone: "8680001202", device: "iPhone 12", issues: "Battery", repairCost: "400" });
+  await ok({ action: "update", id: paid.id, amountPaid: "400" });
+  const { ticket: deposit } = await ok({ action: "add", customerName: "Deposit Fake (test)", phone: "8680001203", device: "iPhone 12", issues: "Battery", repairCost: "400" });
+  await ok({ action: "update", id: deposit.id, amountPaid: "100" });
+  const logged = await finished("Logged Fake (test)");
+  await db.query("INSERT INTO expenses (id, date, category, amount, notes) VALUES ('EXP-T1', '2026-11-28', 'Parts', 120, $1)", [`Screen for ${logged.id}`]);
+  const { tickets } = await ok({ action: "partsCheckList", ownerPin: "9876" }, owner);
+  const ids = tickets.map((t) => t.id);
+  assert.ok(ids.includes(paid.id), "paid in full");
+  assert.equal(tickets.find((t) => t.id === paid.id).partsCheckReason, "paid");
+  assert.ok(!ids.includes(deposit.id), "only a deposit");
+  assert.ok(!ids.includes(logged.id), "an expense already names it");
+  const { count } = await ok({ action: "partsCheckCount" }, owner);
+  assert.equal(count, tickets.length, "badge count matches the list");
+  assert.equal((await call({ action: "partsCheckCount" }, staff)).status, 403);
+});
+
+await test("a parts order for the repair comes with the queue item", async () => {
+  const t = await finished("Ordered Fake (test)");
+  await db.query("INSERT INTO parts_orders (id, batch_id, vendor, part, quantity, unit_cost, ticket_id) VALUES ('PO-T1', 'B1', 'Mobile Sentrix', 'OLED screen', 1, 350, $1)", [t.id]);
+  const item = (await ok({ action: "partsCheckList", ownerPin: "9876" }, owner)).tickets.find((x) => x.id === t.id);
+  assert.deepEqual(item.partsOrders, [{ vendor: "Mobile Sentrix", part: "OLED screen", quantity: 1, unitCost: 350 }]);
+});
+
 await test("moving the master keeps the start date; clearing it closes the queue", async () => {
   const before = (await ok({ action: "deviceAccess" }, owner)).partsCheckSince;
   const { deviceId: staffDevice } = await ok({ action: "deviceAccess" }, staff);

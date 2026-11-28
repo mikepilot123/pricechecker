@@ -38,7 +38,7 @@ import { listPartsOrders, addPartsOrder, updatePartsOrder, deletePartsOrder, ren
 import { extractPartsFromPdf } from "../lib/parts-order-extraction.js";
 import { ensureSchema, blockWritesOnReadOnlyDeployment } from "../lib/db.js";
 import { recordSaveFailure, listSaveFailures, isReadAction } from "../lib/save-failures.js";
-import { listPartsChecks, recordPartsCheck } from "../lib/parts-check.js";
+import { listPartsChecks, countPartsChecks, recordPartsCheck } from "../lib/parts-check.js";
 import { syncInvoicePaymentForTicket } from "../lib/invoices.js";
 import { applyCors, checkPin, checkOwnerPin, createBrowserCredential, deviceIdForCredential } from "../lib/security.js";
 import { ownerPinSource, verifyOwnerPin, saveOwnerPin } from "../lib/owner-pin.js";
@@ -415,10 +415,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, summary: await accountSummary() });
     }
     // Parts check — the master device only (lib/parts-check.js).
-    if (action === "partsCheckList" || action === "recordPartsCheck") {
+    if (action === "partsCheckList" || action === "recordPartsCheck" || action === "partsCheckCount") {
       if (!(await isMasterDevice(deviceId))) {
         return res.status(403).json({ ok: false, error: "Only the master device does parts checks. Set it in Settings → Devices (owner PIN)." });
       }
+      // Just the number, for the Pending expenses tab badge: no details, so
+      // no owner PIN needed to show it.
+      if (action === "partsCheckCount") return res.status(200).json({ ok: true, count: await countPartsChecks() });
       // …and only with the owner PIN, so another person on the same browser
       // (e.g. a shared laptop login) can't confirm expenses.
       const ownerDenied = await checkOwnerPin(req, body.ownerPin, verifyOwnerPin);

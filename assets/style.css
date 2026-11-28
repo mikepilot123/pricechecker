@@ -9224,3 +9224,28 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .parts-check-detail[hidden] { display: none; }
 @media (max-width: 480px) { .parts-check-choices { grid-template-columns: 1fr; } }
 .device-badge-master { background: #92400e; color: #fff; }
+
+/* Pending expenses tab (master device) */
+.nav-btn[hidden] { display: none; }
+.nav-badge.nav-badge-warn { background: #d97706; }
+.pending-exp-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pending-exp-lock, .pending-exp-empty { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); }
+.pending-exp-lock p, .pending-exp-empty p { margin: 0 0 8px; }
+.pending-exp-empty p:last-child { margin-bottom: 0; color: var(--text-dim); }
+.pending-exp-lock-row { display: flex; gap: 8px; }
+.pending-exp-lock-row .text-input { max-width: 200px; }
+.pending-exp-actions { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.pending-exp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pending-exp-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); }
+.pending-exp-main { flex: 1; min-width: 0; }
+.pending-exp-main p { margin: 0; }
+.pending-exp-title { overflow-wrap: anywhere; }
+.pending-exp-id { color: var(--text-dim); font-size: 0.85rem; }
+.pending-exp-meta { margin-top: 2px !important; color: var(--text-dim); font-size: 0.88rem; }
+.pending-exp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px !important; }
+.pending-exp-tag { padding: 2px 8px; border-radius: 999px; background: var(--bg-soft); border: 1px solid var(--border); font-size: 0.75rem; font-weight: 600; }
+.pending-exp-tag-order { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+@media (max-width: 560px) {
+  .pending-exp-row { flex-direction: column; align-items: stretch; }
+  .pending-exp-lock-row .text-input { max-width: none; }
+}

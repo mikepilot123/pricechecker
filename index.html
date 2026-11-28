@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap"
         media="print" onload="this.media='all';this.onload=null" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" /></noscript>
-  <link rel="stylesheet" href="assets/style.css?v=parts-check-2" />
+  <link rel="stylesheet" href="assets/style.css?v=pending-expenses-1" />
   <!-- Device permissions (assets/device-access.js): apply this browser's last
        known restrictions before first paint, so a restricted device never
        flashes the figures it isn't allowed to see. A signed-in browser with no
@@ -177,6 +177,8 @@
         <button type="button" class="appt-subnav-btn" data-account-panel="expenses" aria-selected="false">Expenses</button>
         <button type="button" class="appt-subnav-btn active" data-account-panel="overview" aria-selected="true">Bank account</button>
       </div>
+      <!-- Master device only (Settings → Devices): repairs with no expense recorded yet. -->
+      <button class="nav-btn" data-target="pendingExpenses" role="tab" aria-selected="false" hidden><svg class="icon"><use href="#i-receipt"></use></svg>Pending expenses</button>
       <button class="nav-btn settings-nav-btn" id="intakeSettings" type="button" role="button"><svg class="icon"><use href="#i-gear"></use></svg>Settings</button>
       <div class="appt-sidebar-subnav" role="group" aria-label="Settings sections">
         <button type="button" class="appt-subnav-btn active" data-settings-panel="general" aria-selected="true">General</button>
@@ -1106,6 +1108,25 @@
   </div>
 
   <!-- ============ REMINDERS VIEW ============ -->
+  <!-- Pending expenses (master device only) — assets/intake.js, lib/parts-check.js. -->
+  <main class="container view" id="view-pendingExpenses" hidden>
+    <section class="reminders-page pending-exp-page" aria-labelledby="pendingExpTitle">
+      <header class="rem-page-head">
+        <div class="rem-page-title-wrap">
+          <svg class="icon rem-page-icon" aria-hidden="true"><use href="#i-receipt"></use></svg>
+          <h2 id="pendingExpTitle" class="rem-page-title">Pending expenses</h2>
+          <span class="rem-page-count" id="pendingExpCount"></span>
+        </div>
+        <div class="pending-exp-head-actions">
+          <button type="button" id="pendingExpRefresh" class="ghost-btn"><svg class="icon"><use href="#i-refresh"></use></svg>Refresh</button>
+          <button type="button" id="pendingExpLock" class="ghost-btn" hidden>Lock</button>
+        </div>
+      </header>
+      <p class="rem-page-sub">Finished or fully paid repairs with no expense recorded yet. Confirm what each one used and the books update themselves: stock comes off inventory, bought parts go on Expenses.</p>
+      <div id="pendingExpBody"></div>
+    </section>
+  </main>
+
   <main class="container view" id="view-reminders" hidden>
     <section class="reminders-page" aria-labelledby="remindersTitle">
       <header class="rem-page-head">
@@ -2906,17 +2927,17 @@
        scripts execute in document order, all of them before
        DOMContentLoaded fires. -->
   <script defer src="assets/activity.js?v=activity-1"></script>
-  <script defer src="assets/device-access.js?v=parts-check-2"></script>
+  <script defer src="assets/device-access.js?v=pending-expenses-1"></script>
   <script defer src="assets/device-search.js?v=device-search-1"></script>
   <script defer src="assets/app.js?v=less-compute-1"></script>
   <script defer src="assets/inventory.js?v=less-compute-1"></script>
   <script defer src="assets/repair-type-inference.js?v=repair-type-inference-1"></script>
   <script defer src="assets/repair-invoice-sync.js?v=payment-sync-2"></script>
-  <script defer src="assets/intake.js?v=parts-check-2"></script>
+  <script defer src="assets/intake.js?v=pending-expenses-1"></script>
   <script defer src="assets/invoice.js?v=warranty-1"></script>
   <script defer src="assets/email.js?v=email-classic-1"></script>
   <script defer src="assets/zoho.js?v=zoho-2"></script>
-  <script defer src="assets/dashboard.js?v=less-compute-1"></script>
+  <script defer src="assets/dashboard.js?v=pending-expenses-1"></script>
   <script defer src="assets/appointments.js?v=less-compute-1"></script>
   <script defer src="assets/leads.js?v=device-search-1"></script>
   <script defer src="assets/parts-checker.js?v=parts-checker-12"></script>
