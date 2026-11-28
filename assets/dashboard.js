@@ -30,6 +30,8 @@
     "In Progress",
     "To Be Dropped by Ainsley",
     "Being Repaired by Ainsley",
+    "To Be Dropped by Tyrone",
+    "Being Repaired by Tyrone",
   ]);
   const FINAL_STATUSES = new Set(["Picked Up", "No Fix", "No Fix - Client Collected", "Cancelled"]);
   const $ = (id) => document.getElementById(id);
@@ -1310,6 +1312,8 @@
     "In Progress": "st-progress",
     "To Be Dropped by Ainsley": "st-drop-ainsley",
     "Being Repaired by Ainsley": "st-ainsley-repair",
+    "To Be Dropped by Tyrone": "st-drop-tyrone",
+    "Being Repaired by Tyrone": "st-tyrone-repair",
     "Repaired": "st-repaired",
     "Checked Out - Waiting on Client": "st-checked-out",
     "No Fix": "st-no-fix",

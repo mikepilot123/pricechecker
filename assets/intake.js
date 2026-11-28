@@ -55,6 +55,9 @@
     // Out to Ainsley's: waiting to be dropped off, then being repaired there.
     "To Be Dropped by Ainsley",
     "Being Repaired by Ainsley",
+    // Out to Tyrone's: the same two steps.
+    "To Be Dropped by Tyrone",
+    "Being Repaired by Tyrone",
     "Repaired",
     "Checked Out - Waiting on Client",
     NO_FIX_TO_COLLECT,
@@ -71,6 +74,8 @@
     "In Progress": "st-progress",
     "To Be Dropped by Ainsley": "st-drop-ainsley",
     "Being Repaired by Ainsley": "st-ainsley-repair",
+    "To Be Dropped by Tyrone": "st-drop-tyrone",
+    "Being Repaired by Tyrone": "st-tyrone-repair",
     "Repaired": "st-repaired",
     "Checked Out - Waiting on Client": "st-checked-out",
     "No Fix": "st-no-fix",
@@ -91,6 +96,8 @@
     "In Progress",
     "To Be Dropped by Ainsley",
     "Being Repaired by Ainsley",
+    "To Be Dropped by Tyrone",
+    "Being Repaired by Tyrone",
   ]);
   // Every status where the repair is blocked on a part — keep in sync with
   // lib/tickets.js PARTS_STATUSES.
@@ -5813,7 +5820,7 @@
   // Suppliers we've paid before (lib/parts-check.js listSuppliers), offered
   // as suggestions in every Supplier field. A new name typed and saved joins
   // the list straight away, so it's there next time.
-  let SUPPLIERS = ["Ainsley"];
+  let SUPPLIERS = ["Ainsley", "Tyrone"];
   function supplierDatalist() {
     let list = $("supplierList");
     if (!list) {
@@ -5928,9 +5935,17 @@
     return { value: () => selected };
   }
 
-  // Repairs that went out to Ainsley were paid to Ainsley.
+  // Repairs that went out to Ainsley or Tyrone were paid to them (the
+  // current status first, then the repair's history).
   function defaultSupplierFor(t) {
-    return /ainsley/i.test(`${t.status || ""} ${t.history || ""}`) ? "Ainsley" : "";
+    for (const text of [t.status || "", t.history || ""]) {
+      if (/tyrone/i.test(text) && !/ainsley/i.test(text)) return "Tyrone";
+      if (/ainsley/i.test(text) && !/tyrone/i.test(text)) return "Ainsley";
+      const a = text.search(/ainsley/i);
+      const ty = text.search(/tyrone/i);
+      if (a >= 0 && ty >= 0) return a > ty ? "Ainsley" : "Tyrone"; // the later mention wins
+    }
+    return "";
   }
   // What the repair brought in: what the client actually paid, or the
   // repair's price while nothing has been paid yet.
@@ -6496,7 +6511,7 @@
     const stock = stockPicker(t, suggested);
     // The search box gets focus when "Part from our stock" is chosen.
     body.querySelector('[data-choice="stock"]').addEventListener("click", () => setTimeout(() => $("partsCheckItemSearch").focus(), 30));
-    // A part was ordered for this repair, or it went out to Ainsley: most
+    // A part was ordered for this repair, or it went out to Ainsley or Tyrone: most
     // likely we paid a supplier.
     if (orders || defaultSupplierFor(t)) pick("expense");
     const profit = () => { $("partsCheckProfit").innerHTML = supplierProfitHtml(t, $("partsCheckAmount").value, clientPaidValue($("partsCheckClientPaid"))); };
@@ -6973,9 +6988,11 @@
     "Waiting for Parts": ["Part Ordered", "In Progress"],
     "Part to be Ordered": ["Part Ordered"],
     "Part Ordered": ["In Progress", "Repaired"],
-    "In Progress": ["Repaired", "To Be Dropped by Ainsley", NO_FIX_TO_COLLECT],
+    "In Progress": ["Repaired", "To Be Dropped by Ainsley", "To Be Dropped by Tyrone", NO_FIX_TO_COLLECT],
     "To Be Dropped by Ainsley": ["Being Repaired by Ainsley"],
     "Being Repaired by Ainsley": ["Repaired", NO_FIX_TO_COLLECT],
+    "To Be Dropped by Tyrone": ["Being Repaired by Tyrone"],
+    "Being Repaired by Tyrone": ["Repaired", NO_FIX_TO_COLLECT],
     "Repaired": ["Picked Up", "Checked Out - Waiting on Client"],
     "Checked Out - Waiting on Client": ["Picked Up"],
     [NO_FIX_TO_COLLECT]: [NO_FIX_COLLECTED],

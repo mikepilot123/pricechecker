@@ -4735,6 +4735,20 @@ select.rem-assignee-filter { flex: none; width: auto; min-width: 140px; }
   --status-ink: #3730a3;
   --status-dot: #4f46e5;
 }
+/* To Be Dropped by Tyrone — pink, the device has to go out to Tyrone's. */
+.st-drop-tyrone {
+  --status-bg: #fdf2f8;
+  --status-border: #fbcfe8;
+  --status-ink: #be185d;
+  --status-dot: #db2777;
+}
+/* Being Repaired by Tyrone — teal, it's with Tyrone now. */
+.st-tyrone-repair {
+  --status-bg: #f0fdfa;
+  --status-border: #99f6e4;
+  --status-ink: #0f766e;
+  --status-dot: #0d9488;
+}
 .st-repaired {
   --status-bg: #ecfdf5;
   --status-border: #bfe8d8;
