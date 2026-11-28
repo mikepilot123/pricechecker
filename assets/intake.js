@@ -5827,6 +5827,91 @@
     });
   }
 
+  // "Part from our stock": a search box over the inventory sheet. Every word
+  // typed must appear (any order) in the item's name, quality or section;
+  // parts that match the repair come first. The last option is always "Not
+  // in the inventory list", for a part we had that the sheet doesn't track.
+  const STOCK_PICK_LIMIT = 40;
+  function stockItemName(item) {
+    return [item.item || item.device || item.label, item.quality].filter(Boolean).join(" · ");
+  }
+  function stockPicker(ticket, suggested) {
+    const search = $("partsCheckItemSearch");
+    const list = $("partsCheckItemList");
+    const otherForm = $("partsCheckOtherForm");
+    const suggestedKeys = new Set(suggested.map((i) => i.key));
+    const inStock = INVENTORY_ITEMS.filter((i) => i.quantity > 0);
+    const ordered = [...suggested, ...inStock.filter((i) => !suggestedKeys.has(i.key))];
+    let selected = { key: "", other: false };
+    let active = -1; // keyboard highlight
+
+    const haystack = (i) => [i.item, i.device, i.label, i.quality, i.section, i.note].filter(Boolean).join(" ").toLowerCase();
+    const matches = () => {
+      const words = search.value.toLowerCase().split(/[\s·,/]+/).filter(Boolean);
+      if (!words.length) return ordered.slice(0, STOCK_PICK_LIMIT);
+      return ordered.filter((i) => { const h = haystack(i); return words.every((w) => h.includes(w)); }).slice(0, STOCK_PICK_LIMIT);
+    };
+    const render = () => {
+      const found = matches();
+      const typed = search.value.trim();
+      const rows = found.map((i, n) => `
+        <button type="button" class="stock-pick${selected.key === i.key ? " is-selected" : ""}${active === n ? " is-active" : ""}" role="option" aria-selected="${selected.key === i.key}" data-stock-key="${esc(i.key)}">
+          <span class="stock-pick-name">${esc(stockItemName(i))}</span>
+          <span class="stock-pick-meta">${suggestedKeys.has(i.key) ? `<span class="stock-pick-match">Matches this repair</span>` : ""}${i.section ? esc(i.section) + " · " : ""}${i.quantity} in stock</span>
+        </button>`);
+      if (!found.length) rows.push(`<p class="stock-pick-empty">${INVENTORY_ITEMS.length ? `Nothing in stock matches “${esc(typed)}”.` : "The inventory list isn't loaded."}</p>`);
+      rows.push(`
+        <button type="button" class="stock-pick stock-pick-other${selected.other ? " is-selected" : ""}${active === found.length ? " is-active" : ""}" role="option" aria-selected="${selected.other}" data-stock-other>
+          <span class="stock-pick-name">Not in the inventory list${typed && !selected.key ? ` — use “${esc(typed)}”` : ""}</span>
+          <span class="stock-pick-meta">A part we had that the sheet doesn't track</span>
+        </button>`);
+      list.innerHTML = rows.join("");
+      list.querySelector(".is-active")?.scrollIntoView({ block: "nearest" });
+    };
+    const choose = (key, other) => {
+      selected = { key: key || "", other: !!other };
+      otherForm.hidden = !selected.other;
+      if (selected.other) {
+        const note = $("partsCheckStockNote");
+        if (!note.value.trim()) note.value = search.value.trim();
+        setTimeout(() => note.focus(), 0);
+      } else if (selected.key) {
+        const item = INVENTORY_ITEMS.find((i) => i.key === selected.key);
+        if (item) search.value = stockItemName(item);
+      }
+      active = -1;
+      partsCheckError("");
+      render();
+    };
+    list.addEventListener("click", (e) => {
+      const opt = e.target.closest("[data-stock-key], [data-stock-other]");
+      if (!opt) return;
+      choose(opt.dataset.stockKey, opt.hasAttribute("data-stock-other"));
+    });
+    search.addEventListener("input", () => {
+      // Typing again starts a new search (keeps "not in the list" if chosen).
+      if (selected.key) selected = { key: "", other: false };
+      active = -1;
+      render();
+    });
+    search.addEventListener("keydown", (e) => {
+      const count = matches().length + 1; // + "not in the list"
+      if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(count - 1, active + 1); render(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(0, active - 1); render(); }
+      else if (e.key === "Enter") {
+        e.preventDefault();
+        const found = matches();
+        const n = active >= 0 ? active : (found.length === 1 ? 0 : -1);
+        if (n >= 0 && n < found.length) choose(found[n].key, false);
+        else if (n === found.length) choose("", true);
+        else if (selected.key || selected.other) $("partsCheckSave").click();
+      }
+    });
+    enterSaves($("partsCheckStockNote"), () => $("partsCheckSave").click());
+    render();
+    return { value: () => selected };
+  }
+
   // Repairs that went out to Ainsley were paid to Ainsley.
   function defaultSupplierFor(t) {
     return /ainsley/i.test(`${t.status || ""} ${t.history || ""}`) ? "Ainsley" : "";
@@ -6286,11 +6371,6 @@
     $("partsCheckTitle").textContent = "What did this repair use?";
     const orders = partsOrdersSummary(t);
     const suggested = matchingInventoryItems(t.device || "", t.issues || "").filter((i) => i.quantity > 0);
-    const suggestedKeys = new Set(suggested.map((i) => i.key));
-    const others = INVENTORY_ITEMS.filter((i) => i.quantity > 0 && !suggestedKeys.has(i.key));
-    const options = [`<option value="">Choose the part…</option>`];
-    if (suggested.length) options.push(`<optgroup label="Suggested">${suggested.map((i) => inventoryOptionHtml(i, "")).join("")}</optgroup>`);
-    if (others.length) options.push(`<optgroup label="All stock">${others.map((i) => inventoryOptionHtml(i, "")).join("")}</optgroup>`);
     const today = new Date();
     const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     $("partsCheckBody").innerHTML = `
@@ -6305,9 +6385,15 @@
         <button type="button" class="parts-check-choice" role="radio" aria-checked="false" data-choice="none"><strong>Nothing spent</strong><small>No money paid out</small></button>
       </div>
       <div class="parts-check-detail" data-detail="stock" hidden>
-        <label class="field-label" for="partsCheckItem">Stock item used</label>
-        <div class="select-wrap"><select id="partsCheckItem" class="text-input select-input">${options.join("")}</select></div>
-        ${INVENTORY_ITEMS.length ? "" : `<p class="field-hint">Inventory couldn't load — try again in a moment.</p>`}
+        <label class="field-label" for="partsCheckItemSearch">Stock item used</label>
+        <input id="partsCheckItemSearch" class="text-input" type="search" autocomplete="off" placeholder="Search stock — e.g. pixel 7 screen" />
+        <div id="partsCheckItemList" class="stock-pick-list" role="listbox" aria-label="Stock items"></div>
+        <div class="stock-pick-other-form" id="partsCheckOtherForm" hidden>
+          <label class="field-label" for="partsCheckStockNote">Part used (not on the inventory sheet)</label>
+          <input id="partsCheckStockNote" class="text-input" type="text" maxlength="160" placeholder="e.g. Pixel 7 Pro screen" />
+          <p class="field-hint">Noted on the repair as the stock part used. Nothing is taken off the inventory sheet.</p>
+        </div>
+        ${INVENTORY_ITEMS.length ? "" : `<p class="field-hint">The inventory list couldn't load — you can still type the part with “Not in the inventory list”.</p>`}
       </div>
       <div class="parts-check-detail" data-detail="expense" hidden>
         <div class="form-grid">
@@ -6339,6 +6425,9 @@
       partsCheckError("");
     };
     body.querySelectorAll("[data-choice]").forEach((btn) => { btn.onclick = () => pick(btn.dataset.choice); });
+    const stock = stockPicker(t, suggested);
+    // The search box gets focus when "Part from our stock" is chosen.
+    body.querySelector('[data-choice="stock"]').addEventListener("click", () => setTimeout(() => $("partsCheckItemSearch").focus(), 30));
     // A part was ordered for this repair, or it went out to Ainsley: most
     // likely we paid a supplier.
     if (orders || defaultSupplierFor(t)) pick("expense");
@@ -6352,8 +6441,14 @@
     $("partsCheckSave").onclick = async () => {
       const payload = { action: "recordPartsCheck", id: t.id, choice };
       if (choice === "stock") {
-        payload.inventoryItemKey = $("partsCheckItem").value;
-        if (!payload.inventoryItemKey) return partsCheckError("Choose the stock item that was used.");
+        const picked = stock.value();
+        if (picked.key) payload.inventoryItemKey = picked.key;
+        else if (picked.other) {
+          payload.stockNote = $("partsCheckStockNote").value.trim();
+          if (!payload.stockNote) return partsCheckError("Type the name of the part that was used.");
+        } else {
+          return partsCheckError("Search and pick the part, or choose “Not in the inventory list”.");
+        }
       }
       if (choice === "expense") {
         payload.amount = $("partsCheckAmount").value.trim();

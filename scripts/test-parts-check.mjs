@@ -214,6 +214,21 @@ await test("suppliers we've paid are remembered for next time, most used first",
   assert.deepEqual(suppliers, o.suppliers);
 });
 
+await test("from stock, but not on the inventory sheet: the part's name is noted, the sheet is left alone", async () => {
+  const before = sheet.map((r) => r.slice());
+  const t = await finished("Off Sheet Fake (test)");
+  const { ticket } = await ok({ action: "recordPartsCheck", id: t.id, choice: "stock", stockNote: "Pixel 7 Pro screen (old stock)", ownerPin: "9876" }, owner);
+  assert.equal(ticket.partsCheck, "stock");
+  assert.equal(ticket.inventoryItemLabel, "Pixel 7 Pro screen (old stock)");
+  assert.equal(ticket.inventoryItemKey, "");
+  assert.deepEqual(sheet, before, "inventory sheet untouched");
+  assert.match(ticket.history, /used Pixel 7 Pro screen \(old stock\) from stock \(not on the inventory sheet\)/);
+  const rec = (await ok({ action: "partsCheckOverview", ownerPin: "9876" }, owner)).recorded.find((x) => x.id === t.id);
+  assert.equal(rec.stockItem, "Pixel 7 Pro screen (old stock)");
+  const t2 = await finished("No Name Fake (test)");
+  assert.equal((await call({ action: "recordPartsCheck", id: t2.id, choice: "stock", stockNote: "  ", ownerPin: "9876" }, owner)).payload.ok, false);
+});
+
 await test("moving the master keeps the start date; clearing it closes the queue", async () => {
   const before = (await ok({ action: "deviceAccess" }, owner)).partsCheckSince;
   const { deviceId: staffDevice } = await ok({ action: "deviceAccess" }, staff);
