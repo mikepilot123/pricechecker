@@ -9305,3 +9305,13 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 .stock-pick-empty { margin: 4px 6px; color: var(--text-dim); font-size: 0.88rem; }
 .stock-pick-other-form { display: grid; gap: 6px; margin-top: 6px; }
 .stock-pick-other-form[hidden] { display: none; }
+
+/* "Client paid" field (Pending expenses) */
+.client-paid-field { display: grid; grid-template-columns: auto minmax(110px, 160px) 1fr; align-items: center; gap: 4px 10px; margin-top: 10px; }
+.client-paid-field .field-label { margin: 0; }
+.client-paid-field .text-input { min-height: 38px; padding: 6px 10px; background: var(--card); }
+.client-paid-hint { color: var(--text-dim); font-size: 0.8rem; }
+.pending-exp-editor .client-paid-field { margin-top: 0; }
+@media (max-width: 560px) {
+  .client-paid-field { grid-template-columns: 1fr; }
+}

@@ -5710,12 +5710,28 @@
   // tab until the owner confirms what each used: a part from stock (taken off
   // the inventory sheet), a part bought for it (recorded on Expenses), or no
   // part. The tab only shows on the master device (Settings → Devices) and
-  // the list needs the owner PIN, kept in memory for 15 minutes — so a shared
+  // the list needs the owner PIN, remembered on that device for 12 hours (Lock forgets it) — so a shared
   // laptop login can't confirm expenses. Nothing pops up at checkout.
   // Server: lib/parts-check.js.
-  const OWNER_PIN_TTL_MS = 15 * 60 * 1000;
+  // Once entered on the master device, the owner PIN is remembered there for
+  // 12 hours (refreshes and reopening the browser included). Lock forgets it.
+  const OWNER_PIN_TTL_MS = 12 * 60 * 60 * 1000;
+  const LS_PARTS_OWNER_PIN = "rpc_parts_owner_pin";
   const PENDING_COUNT_EVERY_MS = 60 * 1000;
-  let partsOwnerPin = { pin: "", at: 0 };
+  let partsOwnerPin = (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_PARTS_OWNER_PIN) || "null");
+      if (saved && saved.pin && Date.now() - Number(saved.at) < OWNER_PIN_TTL_MS) return { pin: String(saved.pin), at: Number(saved.at) };
+    } catch (_) { /* storage blocked: ask each time */ }
+    return { pin: "", at: 0 };
+  })();
+  function setPartsOwnerPin(pin) {
+    partsOwnerPin = { pin: pin || "", at: pin ? Date.now() : 0 };
+    try {
+      if (pin) localStorage.setItem(LS_PARTS_OWNER_PIN, JSON.stringify(partsOwnerPin));
+      else localStorage.removeItem(LS_PARTS_OWNER_PIN);
+    } catch (_) { /* storage blocked: kept in memory only */ }
+  }
   const ownerPinFresh = () => partsOwnerPin.pin && Date.now() - partsOwnerPin.at < OWNER_PIN_TTL_MS;
   const isMasterDevice = () => !!window.RPC_DEVICE_ACCESS?.isMaster?.();
   let pendingCount = 0;
@@ -5767,7 +5783,7 @@
     const master = isMasterDevice();
     document.querySelectorAll('.nav-btn[data-target="pendingExpenses"]').forEach((btn) => { btn.hidden = !master; });
     if (!master) {
-      partsOwnerPin = { pin: "", at: 0 };
+      setPartsOwnerPin("");
       partsQueue = [];
       partsQueueLoaded = false;
       setPendingCount(0);
@@ -5916,13 +5932,54 @@
   function defaultSupplierFor(t) {
     return /ainsley/i.test(`${t.status || ""} ${t.history || ""}`) ? "Ainsley" : "";
   }
-  // "Charged TT$450 · paid TT$300 · TT$150 profit" under the amount field.
-  function supplierProfitHtml(t, paidValue) {
-    const charged = Number(t.repairCost) || 0;
+  // What the repair brought in: what the client actually paid, or the
+  // repair's price while nothing has been paid yet.
+  function clientRevenue(t) {
+    const paid = Number(t.amountPaid) || 0;
+    return paid > 0 ? paid : (Number(t.repairCost) || 0);
+  }
+  // "Client paid TT$450 · we paid TT$300 · TT$150 profit" under the amount
+  // field. `revenue` overrides what the client paid (the field being edited).
+  function supplierProfitHtml(t, paidValue, revenue) {
+    const fromClient = revenue != null && revenue !== "" ? Number(revenue) || 0 : clientRevenue(t);
+    const label = (revenue != null && revenue !== "") || Number(t.amountPaid) > 0 ? "Client paid" : "Charged";
     const paid = Number(paidValue) || 0;
-    if (!charged || !paid) return charged ? `Charged the client ${esc(formatMoney(charged))}.` : "";
-    const profit = Math.round((charged - paid) * 100) / 100;
-    return `Charged ${esc(formatMoney(charged))} · paid ${esc(formatMoney(paid))} · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong>`;
+    if (!fromClient || !paid) return fromClient ? `${label} ${esc(formatMoney(fromClient))}.` : "";
+    const profit = Math.round((fromClient - paid) * 100) / 100;
+    return `${label} ${esc(formatMoney(fromClient))} · we paid ${esc(formatMoney(paid))} · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong>`;
+  }
+  // "Client paid" field: the input's value if it's a valid amount, else null.
+  function clientPaidValue(input) {
+    const raw = String(input?.value || "").trim();
+    return /^\d+(?:\.\d{1,2})?$/.test(raw) ? Number(raw) : null;
+  }
+  // Saves what the client actually paid on the repair (like editing Amount
+  // paid in the repair window), raising the repair's price to match if they
+  // paid more than it. Returns the updated repair, or the same one if nothing
+  // changed.
+  async function saveClientPaid(t, value) {
+    if (value == null) return t;
+    const current = Number(t.amountPaid) || 0;
+    if (Math.abs(current - value) < 0.005) return t;
+    const previous = TICKETS.find((x) => x.id === t.id) || t;
+    const changes = { amountPaid: value };
+    if (value > (Number(previous.repairCost) || 0)) changes.repairCost = value;
+    const res = await api(Object.assign({ action: "update", id: t.id }, changes));
+    if (!res.ok) throw new Error(res.error || "Couldn't save what the client paid");
+    mergeTicket(res.ticket);
+    const updated = TICKETS.find((x) => x.id === t.id) || res.ticket;
+    try { await syncLinkedInvoiceFromRepair(updated, { ...previous }); } catch (_) { /* invoice sync is best-effort here */ }
+    if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
+    return updated;
+  }
+  function clientPaidFieldHtml(t, id) {
+    const start = clientRevenue(t);
+    const charged = Number(t.repairCost) || 0;
+    return `<div class="client-paid-field">
+      <label class="field-label" for="${id}">Client paid (TTD)</label>
+      <input id="${id}" class="text-input client-paid-input" type="number" min="0" step="0.01" inputmode="decimal" value="${start ? start.toFixed(2) : ""}" />
+      <small class="client-paid-hint">${Number(t.amountPaid) > 0 ? `Recorded on the repair` : "Nothing recorded as paid yet"}${charged ? ` · repair price ${esc(formatMoney(charged))}` : ""}</small>
+    </div>`;
   }
 
   // ---- Repair window: "Supplier cost" ----
@@ -5960,9 +6017,9 @@
       line = `Part from our stock${s.stockItem ? `: ${esc(s.stockItem)}` : ""}`;
       action = "";
     } else if (s.partsCheck === "expense" && s.expense) {
-      const charged = Number(t.repairCost) || 0;
+      const charged = clientRevenue(t);
       const profit = Math.round((charged - Number(s.expense.amount)) * 100) / 100;
-      line = `Paid <strong>${esc(s.expense.vendor || "supplier")}</strong> ${esc(formatMoney(s.expense.amount))}${charged ? `<span class="supplier-profit-inline"> · charged ${esc(formatMoney(charged))} · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong></span>` : ""}`;
+      line = `Paid <strong>${esc(s.expense.vendor || "supplier")}</strong> ${esc(formatMoney(s.expense.amount))}${charged ? `<span class="supplier-profit-inline"> · ${Number(t.amountPaid) > 0 ? "client paid" : "charged"} ${esc(formatMoney(charged))} · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong></span>` : ""}`;
     } else if (s.partsCheck === "none" || s.partsCheck === "expense") {
       line = "Nothing spent on this repair";
     } else {
@@ -6089,7 +6146,7 @@
         e.preventDefault();
         const pin = $("pendingExpPin").value.trim();
         if (!pin) return pendingViewError("Enter the owner PIN.");
-        partsOwnerPin = { pin, at: Date.now() };
+        setPartsOwnerPin(pin);
         loadPartsQueue();
       };
       setTimeout(() => $("pendingExpPin")?.focus(), 30);
@@ -6123,15 +6180,15 @@
     const costed = recorded.filter(({ r }) => r.expense || r.namedExpense || (r.partsCheck === "none" && !r.stockItem));
     const fromStock = recorded.length - costed.length;
     if (costed.length) {
-      const charged = costed.reduce((sum, { t }) => sum + (Number(t.repairCost) || 0), 0);
+      const charged = costed.reduce((sum, { t }) => sum + clientRevenue(t), 0);
       const paid = costed.reduce((sum, { r }) => sum + (r.expense?.amount || r.namedExpense?.amount || 0), 0);
       const profit = Math.round((charged - paid) * 100) / 100;
       const margin = charged > 0 ? Math.round((profit / charged) * 100) : 0;
       sections.push(`
         <div class="pending-exp-summary" aria-label="Profit, last 30 days">
-          <div class="pending-exp-stat"><span>Charged clients</span><strong>${esc(formatMoney(charged))}</strong></div>
+          <div class="pending-exp-stat"><span>Clients paid</span><strong>${esc(formatMoney(charged))}</strong></div>
           <div class="pending-exp-stat"><span>Paid suppliers</span><strong>${esc(formatMoney(paid))}</strong></div>
-          <div class="pending-exp-stat pending-exp-stat-profit"><span>Profit</span><strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))}</strong>${charged > 0 ? `<small>${margin}% of what we charged</small>` : ""}</div>
+          <div class="pending-exp-stat pending-exp-stat-profit"><span>Profit</span><strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))}</strong>${charged > 0 ? `<small>${margin}% of what clients paid</small>` : ""}</div>
         </div>
         <p class="pending-exp-help">Last 30 days · ${costed.length} recorded repair${costed.length === 1 ? "" : "s"}${fromStock ? ` · ${fromStock} using stock parts not counted` : ""}${partsQueue.length ? ` · ${partsQueue.length} still to confirm` : ""}</p>`);
     }
@@ -6168,7 +6225,7 @@
           let line;
           let button = `<button type="button" class="ghost-btn pending-exp-btn" data-update-id="${esc(t.id)}"><svg class="icon"><use href="#i-pencil"></use></svg>Update</button>`;
           if (r.expense) {
-            const charged = Number(t.repairCost) || 0;
+            const charged = clientRevenue(t);
             const profit = Math.round((charged - r.expense.amount) * 100) / 100;
             line = `Paid <strong>${esc(r.expense.vendor || "supplier")}</strong> ${esc(formatMoney(r.expense.amount))}${charged ? ` · <strong class="${profit < 0 ? "money-due" : "money-positive"}">${esc(formatMoney(profit))} ${profit < 0 ? "loss" : "profit"}</strong>` : ""}`;
           } else if (r.partsCheck === "stock" || (r.stockItem && !r.partsCheck)) {
@@ -6200,6 +6257,7 @@
     const editor = row.querySelector(".pending-exp-editor");
     editor.hidden = false;
     editor.innerHTML = `
+      ${clientPaidFieldHtml(t, "peClientPaid-" + id)}
       <div class="form-grid">
         <div class="form-field"><label class="field-label">Amount we paid (TTD)</label>
           <input class="text-input pe-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 300.00" value="${r.expense ? r.expense.amount.toFixed(2) : ""}" /></div>
@@ -6215,8 +6273,11 @@
         <button type="button" class="primary-btn" data-pe-save>Save</button>
       </div>`;
     const amount = editor.querySelector(".pe-amount");
-    const profit = () => { editor.querySelector(".pe-profit").innerHTML = supplierProfitHtml(t, amount.value); };
+    const clientInput = editor.querySelector(".client-paid-input");
+    const profit = () => { editor.querySelector(".pe-profit").innerHTML = supplierProfitHtml(t, amount.value, clientPaidValue(clientInput)); };
     amount.addEventListener("input", profit);
+    clientInput.addEventListener("input", profit);
+    enterSaves(clientInput, () => saveRowEditor(id, true));
     profit();
     supplierDatalist();
     enterSaves(amount, () => saveRowEditor(id, true));
@@ -6230,6 +6291,9 @@
     const editor = row.querySelector(".pending-exp-editor");
     const err = (m) => { const el = editor.querySelector(".pe-error"); el.textContent = m || ""; el.hidden = !m; };
     const payload = { action: "setSupplierCost", id, spent };
+    const clientInput = editor.querySelector(".client-paid-input");
+    const clientPaid = clientPaidValue(clientInput);
+    if (clientInput.value.trim() && clientPaid == null) return err("Enter what the client paid as an amount, e.g. 450 or 450.00.");
     if (spent) {
       payload.amount = editor.querySelector(".pe-amount").value.trim();
       payload.vendor = editor.querySelector(".pe-vendor").value.trim();
@@ -6240,6 +6304,9 @@
     }
     editor.querySelectorAll("button").forEach((btn) => { btn.disabled = true; });
     try {
+      const updatedRepair = await saveClientPaid(TICKETS.find((x) => x.id === id) || r, clientPaid);
+      r.amountPaid = updatedRepair.amountPaid;
+      r.repairCost = updatedRepair.repairCost;
       const res = await api(payload);
       if (!res.ok) throw new Error(res.error || "Couldn't save");
       mergeTicket(res.ticket);
@@ -6288,7 +6355,7 @@
     else refreshPendingCount({ force: true }).then(renderPendingView);
   });
   $("pendingExpLock")?.addEventListener("click", () => {
-    partsOwnerPin = { pin: "", at: 0 };
+    setPartsOwnerPin("");
     partsQueue = [];
     partsOverview = { notRecorded: [], recorded: [] };
     partsQueueLoaded = false;
@@ -6298,10 +6365,9 @@
   async function partsCheckApi(body) {
     const res = await api({ ...body, ownerPin: partsOwnerPin.pin });
     if (!res.ok) {
-      if (/owner pin/i.test(String(res.error))) partsOwnerPin = { pin: "", at: 0 };
+      if (/owner pin/i.test(String(res.error))) setPartsOwnerPin("");
       throw new Error(res.error || "Rejected");
     }
-    partsOwnerPin.at = Date.now();
     return res;
   }
 
@@ -6377,6 +6443,7 @@
       <div class="parts-check-repair">
         <p><strong>${esc(t.customerName || "Customer")}</strong> · ${esc(t.device || "Device")} · <span class="mono">#${esc(t.id)}</span></p>
         <p class="parts-check-meta">${esc(issueSummaryText(t.issues) || "No issues recorded")} · ${esc(t.partsCheckReason === "paid" ? "Paid in full" : t.status)} · charged ${esc(formatMoney(t.repairCost || 0))}</p>
+        ${clientPaidFieldHtml(t, "partsCheckClientPaid")}
         ${orders ? `<p class="parts-check-meta">Parts order on file: ${esc(orders.parts || "part")}${orders.vendor ? ` from ${esc(orders.vendor)}` : ""}${orders.total ? ` · ${esc(formatMoney(orders.total))}` : ""} — filled in below.</p>` : ""}
       </div>
       <div class="parts-check-choices" role="radiogroup" aria-label="What did this repair use?">
@@ -6431,8 +6498,10 @@
     // A part was ordered for this repair, or it went out to Ainsley: most
     // likely we paid a supplier.
     if (orders || defaultSupplierFor(t)) pick("expense");
-    const profit = () => { $("partsCheckProfit").innerHTML = supplierProfitHtml(t, $("partsCheckAmount").value); };
+    const profit = () => { $("partsCheckProfit").innerHTML = supplierProfitHtml(t, $("partsCheckAmount").value, clientPaidValue($("partsCheckClientPaid"))); };
     $("partsCheckAmount").addEventListener("input", profit);
+    $("partsCheckClientPaid").addEventListener("input", profit);
+    enterSaves($("partsCheckClientPaid"), () => $("partsCheckSave").click());
     profit();
     supplierDatalist();
     enterSaves($("partsCheckVendor"), () => $("partsCheckSave").click());
@@ -6458,10 +6527,14 @@
         if (!(Number(payload.amount) > 0)) return partsCheckError("Enter the amount we paid the supplier.");
         if (!payload.vendor) return partsCheckError("Enter the supplier's name.");
       }
+      const clientPaidRaw = $("partsCheckClientPaid").value.trim();
+      const clientPaid = clientPaidValue($("partsCheckClientPaid"));
+      if (clientPaidRaw && clientPaid == null) return partsCheckError("Enter what the client paid as an amount, e.g. 450 or 450.00.");
       const save = $("partsCheckSave");
       save.disabled = true;
       save.textContent = "Saving…";
       try {
+        await saveClientPaid(t, clientPaid);
         const res = await partsCheckApi(payload);
         mergeTicket(res.ticket);
         if (choice === "expense") rememberSupplier(payload.vendor);
