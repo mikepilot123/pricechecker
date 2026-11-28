@@ -9315,3 +9315,11 @@ html.hide-accounting .bottom-nav { grid-template-columns: repeat(4, minmax(0, 1f
 @media (max-width: 560px) {
   .client-paid-field { grid-template-columns: 1fr; }
 }
+
+/* Bank account: expenses come out of Cash on hand */
+.expense-cash-sync { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0; padding: 10px 14px; border: 1px solid #fcd34d; border-radius: var(--radius-md); background: #fffbeb; color: #92400e; }
+.expense-cash-sync[hidden] { display: none; }
+.expense-cash-sync .icon { width: 18px; height: 18px; flex: none; }
+.expense-cash-sync span { flex: 1; min-width: 200px; }
+.acct-pill-expense { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.acct-row-note { color: var(--text-dim); font-size: 0.75rem; }

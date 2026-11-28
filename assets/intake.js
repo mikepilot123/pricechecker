@@ -6313,6 +6313,7 @@
       r.partsCheck = res.ticket.partsCheck;
       r.expense = res.expense ? { id: res.expense.id, amount: Number(res.expense.amount), vendor: res.expense.vendor || "" } : null;
       if (spent) rememberSupplier(payload.vendor);
+      if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
       toast(spent ? `Updated: paid ${payload.vendor} ${formatMoney(payload.amount)}.` : "Updated: nothing spent.", { tone: "info", duration: 2500 });
       renderPendingView();
     } catch (e) {
@@ -6537,7 +6538,10 @@
         await saveClientPaid(t, clientPaid);
         const res = await partsCheckApi(payload);
         mergeTicket(res.ticket);
-        if (choice === "expense") rememberSupplier(payload.vendor);
+        if (choice === "expense") {
+          rememberSupplier(payload.vendor);
+          if (typeof window.RPC_ACCOUNT_REFRESH === "function") window.RPC_ACCOUNT_REFRESH();
+        }
         if (choice === "stock") refreshInventoryAfterStockChange();
         toast(choice === "expense" ? `Paid ${payload.vendor} ${formatMoney(payload.amount)} — recorded on Expenses.` : choice === "stock" ? "Stock updated." : "Noted — nothing spent.", { tone: "info", duration: 2500 });
         modalQueue.splice(partsQueueIndex, 1);

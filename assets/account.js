@@ -117,10 +117,12 @@
     // payment) trigger a refresh here, so don't ask — and don't show an error.
     if (window.RPC_DEVICE_ACCESS?.isHidden?.("accounting")) return Promise.resolve();
     loadInFlight = (async () => {
-      const [bankTransactions, bankSummary] = await Promise.allSettled([
+      const [bankTransactions, bankSummary, cashSync] = await Promise.allSettled([
         api({ action: "listBankTransactions" }),
         api({ action: "bankAccountSummary" }),
+        api({ action: "getExpenseCashSync" }),
       ]);
+      EXPENSE_CASH_SYNC = cashSync.status === "fulfilled" ? cashSync.value : null;
       if (bankTransactions.status === "fulfilled") {
         BANK_TRANSACTIONS = bankTransactions.value.transactions || [];
         writeCache(BANK_CACHE_KEY, BANK_TRANSACTIONS);
@@ -137,6 +139,43 @@
 
   function renderAll() {
     renderBankAccount();
+    renderExpenseCashSync();
+  }
+
+  // ---- Expenses come out of Cash on hand ------------------------------------
+  // New expenses are taken off Cash on hand automatically. Ones recorded
+  // before that wait here until someone presses Sync now.
+  let EXPENSE_CASH_SYNC = null;
+  function renderExpenseCashSync() {
+    const box = $("expenseCashSync");
+    if (!box) return;
+    const s = EXPENSE_CASH_SYNC;
+    const show = s && (s.missing > 0 || s.orphans > 0);
+    box.hidden = !show;
+    if (!show) { box.innerHTML = ""; return; }
+    const parts = [];
+    if (s.missing) parts.push(`<strong>${s.missing} expense${s.missing === 1 ? "" : "s"}</strong> (${money(s.total)}) ${s.missing === 1 ? "isn't" : "aren't"} taken off Cash on hand yet`);
+    if (s.orphans) parts.push(`${s.orphans} cash withdrawal${s.orphans === 1 ? " belongs" : "s belong"} to deleted expenses`);
+    box.innerHTML = `
+      <svg class="icon" aria-hidden="true"><use href="#i-cash"></use></svg>
+      <span>${parts.join("; ")}. Expenses are paid in cash, so syncing records them as Cash withdrawals and keeps them matched from now on.</span>
+      <button type="button" class="primary-btn" data-expense-cash-sync>Sync now</button>`;
+  }
+  async function runExpenseCashSync(button) {
+    const s = EXPENSE_CASH_SYNC || { missing: 0, total: 0 };
+    const ok = confirm(`Take ${s.missing} expense${s.missing === 1 ? "" : "s"} (${money(s.total)}) off Cash on hand?\n\nEach becomes a Cash withdrawal on this page. After this, editing or deleting an expense updates its withdrawal by itself.`);
+    if (!ok) return;
+    button.disabled = true;
+    button.textContent = "Syncing…";
+    try {
+      const res = await api({ action: "syncExpensesToCash" });
+      toast(`Synced ${res.synced} expense${res.synced === 1 ? "" : "s"} to Cash on hand${res.removed ? `, removed ${res.removed} leftover` : ""}.`, { tone: "info", duration: 3000 });
+      await loadAll(true);
+    } catch (err) {
+      button.disabled = false;
+      button.textContent = "Sync now";
+      toast("Couldn't sync: " + err.message);
+    }
   }
 
   // ---- Bank account -------------------------------------------------------
@@ -232,7 +271,9 @@
           <span class="acct-pill bank-pill-${item.kind}">${item.kind === "deposit" ? "Deposit" : "Withdrawal"}</span>
           <span class="acct-pill acct-pill-${item.accountType || "bank"}">${item.accountType === "cash" ? "Cash" : "Bank"}</span>
           ${item.transferId ? `<span class="acct-pill acct-pill-transfer">Transfer</span>` : ""}
-          <div class="ops-row-actions"><button type="button" data-bank-edit="${esc(item.id)}">Edit</button><button type="button" class="danger-text" data-bank-delete="${esc(item.id)}">Delete</button></div>
+          ${String(item.id).startsWith("CASHEXP_")
+            ? `<span class="acct-pill acct-pill-expense">From Expenses</span><small class="acct-row-note">Change it under Expenses</small>`
+            : `<div class="ops-row-actions"><button type="button" data-bank-edit="${esc(item.id)}">Edit</button><button type="button" class="danger-text" data-bank-delete="${esc(item.id)}">Delete</button></div>`}
         </div>
       </article>`).join("");
   }
@@ -449,6 +490,10 @@
       $("bankSearch").value = "";
       $("clearBankSearch").hidden = true;
       renderBankAccount();
+    });
+    $("expenseCashSync")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-expense-cash-sync]");
+      if (button) runExpenseCashSync(button);
     });
     $("bankTransactionList")?.addEventListener("click", (event) => {
       const editId = event.target.closest("[data-bank-edit]")?.dataset.bankEdit;

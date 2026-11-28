@@ -18,7 +18,10 @@ for (const file of files.slice(1)) await db.exec(readFileSync(new URL(file, migr
 const { addExpense, updateExpense, listExpenses, addExpenseCollection, undoExpenseCollection, deleteExpense } = await import("../lib/expenses.js");
 const { updateReminder, listReminders } = await import("../lib/reminders.js");
 const { accountSummary } = await import("../lib/card-payments.js");
-const { listBankTransactions } = await import("../lib/bank-transactions.js");
+const { listBankTransactions: listLedger } = await import("../lib/bank-transactions.js");
+// Each expense also has its own Cash withdrawal (CASHEXP_…, lib/expenses.js);
+// these scenarios are about the collection rows, so leave those out here.
+const listBankTransactions = async () => (await listLedger()).filter((item) => !item.id.startsWith("CASHEXP_"));
 const { default: handler } = await import("../api/intake.js");
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log("  ok  " + name); }
@@ -37,6 +40,8 @@ await test("first partial payment reduces debt, preserving the original expense"
   assert.equal((await accountSummary()).expenseReclaim.total, 749.75);
   const [withdrawal] = await listBankTransactions();
   assert.deepEqual([withdrawal.id, withdrawal.kind, withdrawal.amount], ["BANK_COLLECTION_expense-test_first", "withdrawal", 250.25]);
+  const cash = (await listLedger()).find((item) => item.id === "CASHEXP_expense-test");
+  assert.deepEqual([cash.kind, cash.accountType, cash.amount], ["withdrawal", "cash", 1000], "the expense itself comes out of cash");
 });
 await test("retrying the same receipt is idempotent", async () => {
   const e = await collect("first", 250.25, { notes: "Cash" });

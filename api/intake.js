@@ -25,7 +25,7 @@ import { listMedia, addMedia, deleteMedia } from "../lib/media.js";
 import { getTicketDiagnostic, listTicketDiagnostics, saveTicketDiagnostic, deleteTicketDiagnostic } from "../lib/diagnostics.js";
 import { listCustomers } from "../lib/customers.js";
 import { listAppointments, addAppointment, updateAppointment, deleteAppointment, listNewClientBookings, markAppointmentsSeen } from "../lib/appointments.js";
-import { listExpenses, addExpense, updateExpense, deleteExpense, addExpenseCollection, undoExpenseCollection } from "../lib/expenses.js";
+import { listExpenses, addExpense, updateExpense, deleteExpense, addExpenseCollection, undoExpenseCollection, expenseCashSyncStatus, syncExpensesToCash } from "../lib/expenses.js";
 import { listReminders, addReminder, updateReminder, deleteReminder } from "../lib/reminders.js";
 // Card payments/payouts (lib/card-payments.js, lib/payouts.js) and their
 // settings (lib/settings.js) are retired — no more UI to log a swipe or
@@ -64,6 +64,8 @@ const SECTION_GUARDED_ACTIONS = {
   addCashDepositToBank: ["accounting"],
   listExpenses: ["accounting"],
   deleteExpense: ["accounting"],
+  getExpenseCashSync: ["accounting"],
+  syncExpensesToCash: ["accounting"],
   // A repair's "Supplier cost" (lib/parts-check.js) is an expense too.
   getSupplierCost: ["accounting"],
   setSupplierCost: ["accounting"],
@@ -400,6 +402,14 @@ export default async function handler(req, res) {
     }
     if (action === "deleteReminder") {
       return res.status(200).json({ ok: true, deletedId: await deleteReminder(body) });
+    }
+    // Expenses come out of Cash on hand (lib/expenses.js): what isn't yet, and
+    // the button that brings older expenses in.
+    if (action === "getExpenseCashSync") {
+      return res.status(200).json({ ok: true, ...(await expenseCashSyncStatus()) });
+    }
+    if (action === "syncExpensesToCash") {
+      return res.status(200).json({ ok: true, ...(await syncExpensesToCash()) });
     }
     if (action === "listBankTransactions") {
       return res.status(200).json({ ok: true, transactions: await listBankTransactions() });
